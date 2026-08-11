@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --font:'Poppins',Arial,sans-serif;
+    --c-primary:#24226a; --c-primary-light:#3d51a3; --c-primary-lightest:#f5f9ff; --c-primary-lighter:#d4def2;
+    --c-secondary:#f55b41;
+    --c-ink:#15151b; --c-body:#33333b; --c-muted:#6e6e74; --c-faint:#808080; --c-light:#acacb2;
+    --c-line:#ebebf0; --c-line-strong:#e4e4ea; --c-surface:#ffffff; --c-surface-alt:#f7f7f8; --c-surface-pale:#fdfdfd;
+    --c-success:#13873a; --c-warning:#f26500; --c-info:#0557ca; --c-danger:#cc2d2d; --c-visited:#661eab;
+    --c-info-soft:#ddf2fe;
+    --row-pad:14px 16px;
+    --radius:12px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{font-family:var(--font);color:var(--c-ink);background:var(--c-surface-alt);-webkit-font-smoothing:antialiased;}
+  a{color:var(--c-info);text-decoration:none;}
+  a:hover{text-decoration:underline;}
+  button{font-family:var(--font);}
+  *:focus-visible{outline:2px solid #196de3;outline-offset:2px;border-radius:3px;}
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-thumb{background:var(--c-line-strong);border-radius:999px;border:3px solid var(--c-surface-alt);}
+  @keyframes vDrawerIn{from{transform:translateX(24px);opacity:0;}to{transform:translateX(0);opacity:1;}}
+  @keyframes vFade{from{opacity:0;}to{opacity:1;}}
+</style>
+</helmet>
+
+<div style="display:flex;min-height:100vh;background:var(--c-surface-alt);">
+
+  <aside style="width:248px;flex:none;background:var(--c-primary);color:#fff;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;padding:22px 16px;">
+    <button onClick="{{ goOverview }}" style="display:flex;align-items:center;gap:10px;background:transparent;border:none;cursor:pointer;padding:6px 6px 0;margin-bottom:34px;">
+      <span style="width:10px;height:10px;border-radius:999px;background:var(--c-secondary);"></span>
+      <span style="font-size:21px;font-weight:700;color:#fff;letter-spacing:-.01em;">Vision</span>
+    </button>
+    <nav style="display:flex;flex-direction:column;gap:4px;">
+      <sc-for list="{{ navItems }}" as="item" hint-placeholder-count="4">
+        <button onClick="{{ item.onClick }}" style="{{ item.style }}">
+          <span style="width:6px;height:6px;border-radius:999px;background:{{ item.dot }};flex:none;"></span>
+          {{ item.l }}
+        </button>
+      </sc-for>
+    </nav>
+    <div style="margin-top:auto;display:flex;flex-direction:column;gap:14px;">
+      <button onClick="{{ goAdmin }}" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 14px;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;background:transparent;color:rgba(255,255,255,.5);">
+        <span style="width:6px;height:6px;border-radius:1px;background:rgba(255,255,255,.4);flex:none;"></span>Administration
+      </button>
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 12px;border-radius:10px;background:rgba(255,255,255,.08);">
+        <span style="width:32px;height:32px;border-radius:999px;background:var(--c-secondary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex:none;">CR</span>
+        <div style="min-width:0;">
+          <div style="font-size:13px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Camille Roux</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.55);">Contributrice</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main style="flex:1;min-width:0;display:flex;flex-direction:column;">
+
+    <sc-if value="{{ showDemoBar }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;align-items:center;gap:14px;padding:8px 40px;background:var(--c-primary-lightest);border-bottom:1px solid var(--c-line);font-size:12px;color:var(--c-muted);">
+        <span style="font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--c-light);font-size:10px;">Démo</span>
+        <sc-if value="{{ isProject }}">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span>État du projet :</span>
+            <sc-for list="{{ emptyToggle }}" as="t" hint-placeholder-count="2">
+              <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.l }}</button>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isProduct }}">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span>Produit affiché :</span>
+            <sc-for list="{{ productToggle }}" as="t" hint-placeholder-count="2">
+              <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.l }}</button>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <div style="flex:1;padding:34px 40px 72px;max-width:1240px;width:100%;">
+
+      <!-- ========================= PROJET ========================= -->
+      <sc-if value="{{ isProject }}" hint-placeholder-val="{{ true }}">
+        <div style="animation:vFade .2s ease;">
+          <nav style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--c-muted);margin-bottom:16px;flex-wrap:wrap;">
+            <sc-for list="{{ project.crumbs }}" as="c" hint-placeholder-count="3">
+              <button onClick="{{ c.onClick }}" style="{{ c.style }}">{{ c.label }}</button>
+              <sc-if value="{{ c.sep }}"><span style="color:var(--c-light);">›</span></sc-if>
+            </sc-for>
+          </nav>
+
+          <!-- En-tête identité -->
+          <header style="background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius);padding:26px 28px;margin-bottom:24px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;flex-wrap:wrap;">
+              <div style="min-width:0;flex:1;">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap;">
+                  <span style="display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--c-body);">
+                    <span style="width:9px;height:9px;border-radius:999px;background:{{ project.statusColor }};"></span>{{ project.statusLabel }}
+                  </span>
+                  <span style="color:var(--c-light);">·</span>
+                  <span style="font-size:13px;color:var(--c-muted);">{{ project.period }}</span>
+                </div>
+                <h1 style="font-size:30px;font-weight:700;color:var(--c-ink);margin:0 0 10px;letter-spacing:-.01em;">{{ project.name }}</h1>
+                <p style="font-size:17px;color:var(--c-body);margin:0 0 6px;max-width:60ch;line-height:1.45;">{{ project.objective }}</p>
+                <sc-if value="{{ project.rank }}">
+                  <button onClick="{{ project.onRank }}" style="background:transparent;border:none;padding:0;cursor:pointer;font-size:13px;color:var(--c-info);text-decoration:underline;">{{ project.rankLabel }}</button>
+                </sc-if>
+              </div>
+              <button onClick="{{ openDrawer }}" style="flex:none;display:inline-flex;align-items:center;gap:8px;background:var(--c-primary);color:#fff;border:none;border-radius:8px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer;">
+                <span style="font-size:16px;line-height:1;">+</span> Ajouter une activité
+              </button>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:28px 40px;margin-top:22px;padding-top:20px;border-top:1px solid var(--c-line);">
+              <div>
+                <div style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--c-light);margin-bottom:6px;">Entité</div>
+                <div style="font-size:14px;color:var(--c-body);font-weight:500;">{{ project.entity }}</div>
+              </div>
+              <div>
+                <div style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--c-light);margin-bottom:6px;">Commanditaire</div>
+                <div style="font-size:14px;color:var(--c-body);font-weight:500;">{{ project.sponsorLabel }}</div>
+              </div>
+              <div style="min-width:180px;">
+                <div style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--c-light);margin-bottom:8px;">Approches</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                  <sc-for list="{{ project.approaches }}" as="ap" hint-placeholder-count="2">
+                    <span style="font-size:12px;font-weight:500;color:var(--c-primary-light);background:var(--c-primary-lightest);border:1px solid var(--c-primary-lighter);border-radius:999px;padding:3px 11px;">{{ ap }}</span>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="min-width:160px;">
+                <div style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--c-light);margin-bottom:8px;">Équipe</div>
+                <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                  <div style="display:flex;">
+                    <sc-for list="{{ project.team }}" as="m" hint-placeholder-count="4">
+                      <span title="{{ m.title }}" style="{{ m.avatarStyle }}">{{ m.i }}</span>
+                    </sc-for>
+                  </div>
+                  <span style="font-size:12px;color:var(--c-muted);">{{ project.teamNote }}</span>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <!-- Roadmap -->
+          <section style="margin-bottom:32px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px;">
+              <div>
+                <h2 style="font-size:20px;font-weight:600;color:var(--c-ink);margin:0;">Roadmap des activités</h2>
+                <p style="font-size:13px;color:var(--c-muted);margin:4px 0 0;">Le récit de l'accompagnement, au mois.</p>
+              </div>
+              <button onClick="{{ openDrawer }}" style="flex:none;display:inline-flex;align-items:center;gap:8px;background:var(--c-surface);color:var(--c-primary);border:1px solid var(--c-primary-lighter);border-radius:8px;padding:9px 15px;font-size:13px;font-weight:600;cursor:pointer;">
+                <span style="font-size:15px;line-height:1;">+</span> Ajouter une activité
+              </button>
+            </div>
+
+            <sc-if value="{{ project.hasActivities }}">
+              <div style="display:flex;flex-direction:column;gap:22px;">
+                <sc-for list="{{ project.groups }}" as="g" hint-placeholder-count="3">
+                  <div>
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                      <span style="width:9px;height:9px;border-radius:999px;background:{{ g.color }};"></span>
+                      <h3 style="font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--c-muted);margin:0;">{{ g.label }}</h3>
+                      <span style="font-size:12px;color:var(--c-light);">{{ g.count }}</span>
+                      <span style="flex:1;height:1px;background:var(--c-line);"></span>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:8px;">
+                      <sc-for list="{{ g.items }}" as="a" hint-placeholder-count="2">
+                        <article style="background:var(--c-surface);border:1px solid var(--c-line);border-left:3px solid {{ a.statusColor }};border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;">
+                          <div style="min-width:220px;flex:1;">
+                            <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
+                              <span style="font-size:15px;font-weight:600;color:var(--c-ink);">{{ a.type }}</span>
+                              <sc-if value="{{ a.hasApproach }}"><span style="font-size:12px;color:var(--c-primary-light);">{{ a.approachLabel }}</span></sc-if>
+                            </div>
+                            <p style="font-size:13px;color:var(--c-muted);margin:5px 0 0;line-height:1.4;">{{ a.objective }}</p>
+                          </div>
+                          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+                            <span style="font-size:13px;color:var(--c-faint);white-space:nowrap;">{{ a.periodLabel }}</span>
+                            <sc-if value="{{ a.hasResult }}">
+                              <a href="#" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--c-info);background:var(--c-info-soft);border-radius:999px;padding:4px 12px;">{{ a.resultLabel }} <span style="font-size:12px;">↗</span></a>
+                            </sc-if>
+                          </div>
+                        </article>
+                      </sc-for>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ project.empty }}">
+              <div style="background:var(--c-surface);border:1px dashed var(--c-line-strong);border-radius:var(--radius);padding:44px 32px;text-align:center;">
+                <h3 style="font-size:17px;font-weight:600;color:var(--c-ink);margin:0 0 8px;">Aucune activité pour l'instant</h3>
+                <p style="font-size:14px;color:var(--c-muted);margin:0 auto 20px;max-width:46ch;line-height:1.5;">La roadmap réunira ici les ateliers, tests, audits et restitutions de l'accompagnement, groupés par état. Enregistrez ce que vous venez de faire — cela prend moins d'une minute.</p>
+                <button onClick="{{ openDrawer }}" style="display:inline-flex;align-items:center;gap:8px;background:var(--c-primary);color:#fff;border:none;border-radius:8px;padding:11px 20px;font-size:14px;font-weight:600;cursor:pointer;"><span style="font-size:16px;line-height:1;">+</span> Ajouter une activité</button>
+              </div>
+            </sc-if>
+          </section>
+
+          <!-- Blocs de référence -->
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;">
+            <!-- Ressources -->
+            <section style="background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius);padding:20px 22px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                <h3 style="font-size:15px;font-weight:600;color:var(--c-ink);margin:0;">Ressources</h3>
+                <button onClick="{{ noop }}" style="background:transparent;border:none;cursor:pointer;font-size:13px;font-weight:600;color:var(--c-primary);">+ Relier</button>
+              </div>
+              <sc-if value="{{ project.hasResources }}">
+                <div style="display:flex;flex-direction:column;">
+                  <sc-for list="{{ project.resources }}" as="r" hint-placeholder-count="3">
+                    <a href="#" style="display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--c-line);color:inherit;text-decoration:none;">
+                      <span style="width:34px;height:34px;flex:none;border-radius:7px;background:var(--c-surface-alt);border:1px solid var(--c-line);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;letter-spacing:.02em;color:var(--c-muted);">{{ r.badge }}</span>
+                      <span style="flex:1;min-width:0;font-size:14px;color:var(--c-body);font-weight:500;">{{ r.name }}</span>
+                      <span style="font-size:12px;color:var(--c-info);white-space:nowrap;">{{ r.kind }} ↗</span>
+                    </a>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ project.emptyResources }}">
+                <p style="font-size:13px;color:var(--c-muted);margin:0;line-height:1.5;">Aucune ressource liée. Reliez un livrable hébergé dans SharePoint, Figma ou ailleurs — Vision n'en affiche que le lien.</p>
+              </sc-if>
+            </section>
+
+            <!-- Indicateurs -->
+            <section style="background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius);padding:20px 22px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                <h3 style="font-size:15px;font-weight:600;color:var(--c-ink);margin:0;">Indicateurs adoptés</h3>
+                <button onClick="{{ noop }}" style="background:transparent;border:none;cursor:pointer;font-size:13px;font-weight:600;color:var(--c-primary);">+ Adopter</button>
+              </div>
+              <sc-if value="{{ project.hasIndicators }}">
+                <sc-for list="{{ project.indicators }}" as="ind" hint-placeholder-count="1">
+                  <div style="padding:2px 0;">
+                    <div style="font-size:14px;font-weight:500;color:var(--c-body);line-height:1.4;margin-bottom:12px;">{{ ind.name }}</div>
+                    <div style="display:flex;gap:28px;">
+                      <div><div style="font-size:11px;color:var(--c-light);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">Dernier relevé</div><div style="font-size:19px;font-weight:700;color:var(--c-ink);">{{ ind.latest }}</div><div style="font-size:11px;color:var(--c-faint);">{{ ind.latestDate }}</div></div>
+                      <div><div style="font-size:11px;color:var(--c-light);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">Cible</div><div style="font-size:19px;font-weight:700;color:var(--c-primary-light);">{{ ind.target }}</div><div style="font-size:11px;color:var(--c-faint);">fixée par ce projet</div></div>
+                    </div>
+                    <button onClick="{{ project.onSeeProduct }}" style="margin-top:12px;background:transparent;border:none;padding:0;cursor:pointer;font-size:13px;color:var(--c-info);text-decoration:underline;">Voir la frise du produit</button>
+                  </div>
+                </sc-for>
+              </sc-if>
+              <sc-if value="{{ project.emptyIndicators }}">
+                <p style="font-size:13px;color:var(--c-muted);margin:0;line-height:1.5;">Aucun indicateur adopté. Reprenez un indicateur du produit et fixez-lui une cible pour ce projet.</p>
+              </sc-if>
+            </section>
+
+            <!-- Projets liés -->
+            <section style="background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius);padding:20px 22px;">
+              <h3 style="font-size:15px;font-weight:600;color:var(--c-ink);margin:0 0 14px;">Projets liés</h3>
+              <sc-if value="{{ project.hasRelated }}">
+                <div style="display:flex;flex-direction:column;">
+                  <sc-for list="{{ project.related }}" as="rp" hint-placeholder-count="1">
+                    <button onClick="{{ rp.onClick }}" style="display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--c-line);background:transparent;border-left:none;border-right:none;border-bottom:none;cursor:pointer;text-align:left;width:100%;">
+                      <span style="width:8px;height:8px;border-radius:999px;background:{{ rp.color }};flex:none;"></span>
+                      <span style="flex:1;font-size:14px;font-weight:500;color:var(--c-body);">{{ rp.name }}</span>
+                      <span style="font-size:12px;color:var(--c-faint);white-space:nowrap;">{{ rp.period }}</span>
+                    </button>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ project.emptyRelated }}">
+                <p style="font-size:13px;color:var(--c-muted);margin:0;line-height:1.5;">Premier accompagnement de ce produit. Les accompagnements suivants apparaîtront ici.</p>
+              </sc-if>
+            </section>
+
+            <!-- Budget -->
+            <section style="background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius);padding:20px 22px;">
+              <h3 style="font-size:15px;font-weight:600;color:var(--c-ink);margin:0 0 14px;">Budget</h3>
+              <p style="font-size:13px;color:var(--c-muted);margin:0 0 14px;line-height:1.5;">Le suivi budgétaire est tenu dans l'outil de gestion. Vision renvoie vers la source plutôt que d'en reproduire le détail.</p>
+              <a href="#" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--c-info);">Ouvrir dans l'outil de gestion <span>↗</span></a>
+            </section>
+
+            <!-- Journal -->
+            <section style="grid-column:1 / -1;background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius);padding:6px 22px;">
+              <button onClick="{{ toggleJournal }}" style="display:flex;align-items:center;justify-content:space-between;width:100%;background:transparent;border:none;cursor:pointer;padding:16px 0;text-align:left;">
+                <span style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:var(--c-ink);">Journal</span><span style="font-size:12px;color:var(--c-light);">information de contrôle</span></span>
+                <span style="font-size:13px;color:var(--c-muted);">{{ journalChevron }}</span>
+              </button>
+              <sc-if value="{{ journalOpen }}">
+                <div style="display:flex;flex-direction:column;padding-bottom:12px;">
+                  <sc-for list="{{ project.journal }}" as="j" hint-placeholder-count="3">
+                    <div style="display:flex;gap:14px;padding:9px 0;border-top:1px solid var(--c-line);font-size:13px;">
+                      <span style="color:var(--c-light);white-space:nowrap;width:110px;flex:none;">{{ j.when }}</span>
+                      <span style="color:var(--c-body);"><strong style="font-weight:600;">{{ j.who }}</strong> {{ j.what }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </section>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ========================= PRODUIT ========================= -->
+      <sc-if value="{{ isProduct }}">
+        <div style="animation:vFade .2s ease;">
+          <nav style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--c-muted);margin-bottom:16px;flex-wrap:wrap;">
+            <button onClick="{{ goProducts }}" style="background:transparent;border:none;padding:0;cursor:pointer;font-size:13px;color:var(--c-info);">Produits</button>
+            <span style="color:var(--c-light);">›</span>
+            <span style="color:var(--c-body);font-weight:500;">{{ product.name }}</span>
+          </nav>
+
+          <header style="margin-bottom:26px;">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+              <span style="font-size:12px;font-weight:600;color:var(--c-primary-light);background:var(--c-primary-lightest);border:1px solid var(--c-primary-lighter);border-radius:999px;padding:3px 12px;">{{ product.entity }}</span>
+              <span style="font-size:13px;color:var(--c-muted);">{{ product.countLabel }}</span>
+            </div>
+            <h1 style="font-size:30px;font-weight:700;color:var(--c-ink);margin:0 0 8px;letter-spacing:-.01em;">{{ product.name }}</h1>
+            <p style="font-size:16px;color:var(--c-body);margin:0;max-width:64ch;line-height:1.5;">{{ product.desc }}</p>
+          </header>
+
+          <!-- Frise temps long -->
+          <section style="background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius);padding:22px 24px 12px;margin-bottom:30px;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:20px;">
+              <h2 style="font-size:16px;font-weight:600;color:var(--c-ink);margin:0;">Le temps long du produit</h2>
+              <span style="font-size:12px;color:var(--c-light);">Lecture, sans conclusion</span>
+            </div>
+
+            <div style="position:relative;">
+              <!-- ruler -->
+              <div style="display:flex;border-bottom:1px solid var(--c-line);margin-bottom:16px;">
+                <sc-for list="{{ product.timeline.years }}" as="y" hint-placeholder-count="3">
+                  <div style="flex:1;font-size:12px;font-weight:600;color:var(--c-light);padding-bottom:8px;border-left:1px solid var(--c-line);padding-left:8px;">{{ y }}</div>
+                </sc-for>
+              </div>
+
+              <!-- track: accompagnements -->
+              <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
+                <div style="width:150px;flex:none;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--c-muted);">Accompagnements</div>
+                <div style="position:relative;flex:1;height:46px;">
+                  <sc-for list="{{ product.timeline.bands }}" as="b" hint-placeholder-count="2">
+                    <button onClick="{{ b.onClick }}" title="{{ b.title }}" style="position:absolute;top:0;left:{{ b.left }};width:{{ b.width }};height:44px;background:{{ b.bg }};border:1px solid {{ b.border }};border-radius:8px;cursor:pointer;padding:6px 12px;text-align:left;overflow:hidden;">
+                      <div style="font-size:12px;font-weight:600;color:{{ b.fg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ b.label }}</div>
+                      <div style="font-size:11px;color:{{ b.fgSoft }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ b.sub }}</div>
+                    </button>
+                  </sc-for>
+                </div>
+              </div>
+
+              <!-- track: résultats -->
+              <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
+                <div style="width:150px;flex:none;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--c-muted);">Résultats d'activité</div>
+                <div style="position:relative;flex:1;height:34px;">
+                  <sc-if value="{{ product.timeline.hasMarkers }}">
+                    <sc-for list="{{ product.timeline.markers }}" as="mk" hint-placeholder-count="2">
+                      <div style="position:absolute;left:{{ mk.left }};top:0;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;">
+                        <span style="font-size:12px;font-weight:600;color:var(--c-info);background:var(--c-info-soft);border-radius:999px;padding:2px 10px;white-space:nowrap;">{{ mk.value }}</span>
+                        <span style="font-size:10px;color:var(--c-muted);margin-top:2px;white-space:nowrap;">{{ mk.label }} ↗</span>
+                      </div>
+                    </sc-for>
+                  </sc-if>
+                  <sc-if value="{{ product.timeline.noMarkers }}">
+                    <span style="font-size:12px;color:var(--c-light);font-style:italic;">Aucun résultat encore relié.</span>
+                  </sc-if>
+                </div>
+              </div>
+
+              <!-- track: indicateur -->
+              <div style="display:flex;align-items:flex-start;gap:14px;">
+                <div style="width:150px;flex:none;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--c-muted);padding-top:4px;">Indicateur</div>
+                <div style="flex:1;">
+                  <sc-if value="{{ product.timeline.hasIndicator }}">
+                    <div>
+                      <div style="font-size:12px;color:var(--c-body);margin-bottom:6px;">{{ product.timeline.indicator.name }}</div>
+                      <div style="position:relative;height:110px;">
+                        <svg viewBox="0 0 1000 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;">
+                          <line x1="0" y1="15" x2="1000" y2="15" stroke="var(--c-primary-lighter)" stroke-width="1.5" stroke-dasharray="6 5" vector-effect="non-scaling-stroke"></line>
+                          <polyline points="{{ product.timeline.indicator.poly }}" fill="none" stroke="var(--c-primary-light)" stroke-width="2.5" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"></polyline>
+                        </svg>
+                        <div style="position:absolute;left:0;top:-2px;font-size:11px;font-weight:600;color:var(--c-primary-light);background:var(--c-surface);padding:0 6px 0 0;">{{ product.timeline.indicator.targetLabel }}</div>
+                        <sc-for list="{{ product.timeline.indicator.points }}" as="pt" hint-placeholder-count="3">
+                          <div style="position:absolute;left:{{ pt.left }};top:{{ pt.top }};transform:translate(-50%,-50%);">
+                            <span style="display:block;width:11px;height:11px;border-radius:999px;background:var(--c-primary-light);border:2px solid var(--c-surface);box-shadow:0 0 0 1px var(--c-primary-light);"></span>
+                            <span style="position:absolute;left:50%;bottom:16px;transform:translateX(-50%);font-size:12px;font-weight:700;color:var(--c-ink);white-space:nowrap;">{{ pt.v }}</span>
+                            <span style="position:absolute;left:50%;top:16px;transform:translateX(-50%);font-size:10px;color:var(--c-faint);white-space:nowrap;">{{ pt.date }}</span>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ product.timeline.noIndicator }}">
+                    <p style="font-size:13px;color:var(--c-muted);margin:4px 0 12px;line-height:1.5;max-width:52ch;">Aucun indicateur suivi sur ce produit. Un projet peut en adopter un et fixer une cible ; les relevés datés se liront ici.</p>
+                  </sc-if>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Accompagnements -->
+          <section>
+            <h2 style="font-size:18px;font-weight:600;color:var(--c-ink);margin:0 0 4px;">Accompagnements</h2>
+            <p style="font-size:13px;color:var(--c-muted);margin:0 0 16px;">Du plus récent au plus ancien.</p>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <sc-for list="{{ product.projects }}" as="pj" hint-placeholder-count="2">
+                <button onClick="{{ pj.onClick }}" style="display:block;width:100%;text-align:left;background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius);padding:18px 22px;cursor:pointer;">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;">
+                    <div style="min-width:240px;flex:1;">
+                      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                        <span style="display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--c-body);"><span style="width:8px;height:8px;border-radius:999px;background:{{ pj.statusColor }};"></span>{{ pj.statusLabel }}</span>
+                        <span style="color:var(--c-light);">·</span>
+                        <span style="font-size:12px;color:var(--c-muted);">{{ pj.period }}</span>
+                      </div>
+                      <div style="font-size:16px;font-weight:600;color:var(--c-ink);margin-bottom:4px;">{{ pj.name }}</div>
+                      <div style="font-size:13px;color:var(--c-muted);line-height:1.4;max-width:60ch;">{{ pj.objective }}</div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;">
+                      <div style="display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end;max-width:260px;">
+                        <sc-for list="{{ pj.approaches }}" as="ap" hint-placeholder-count="2">
+                          <span style="font-size:11px;color:var(--c-primary-light);background:var(--c-primary-lightest);border:1px solid var(--c-primary-lighter);border-radius:999px;padding:2px 9px;">{{ ap }}</span>
+                        </sc-for>
+                      </div>
+                      <div style="display:flex;">
+                        <sc-for list="{{ pj.team }}" as="m" hint-placeholder-count="3">
+                          <span style="{{ m.avatarStyle }}">{{ m.i }}</span>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              </sc-for>
+            </div>
+          </section>
+        </div>
+      </sc-if>
+
+      <!-- ========================= VUE D'ENSEMBLE ========================= -->
+      <sc-if value="{{ isOverview }}">
+        <div style="animation:vFade .2s ease;">
+          <header style="margin-bottom:26px;">
+            <h1 style="font-size:30px;font-weight:700;color:var(--c-ink);margin:0 0 6px;letter-spacing:-.01em;">Vue d'ensemble</h1>
+            <p style="font-size:15px;color:var(--c-muted);margin:0;">Groupe Meridian — Centre de compétence Design &amp; Produit</p>
+          </header>
+
+          <section style="margin-bottom:30px;">
+            <h2 style="font-size:16px;font-weight:600;color:var(--c-ink);margin:0 0 14px;">Activité récente</h2>
+            <div style="background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius);overflow:hidden;">
+              <sc-for list="{{ overview.recent }}" as="a" hint-placeholder-count="5">
+                <button onClick="{{ a.onClick }}" style="display:flex;align-items:center;gap:16px;width:100%;text-align:left;background:transparent;border:none;border-top:1px solid var(--c-line);padding:var(--row-pad);cursor:pointer;">
+                  <span style="width:8px;height:8px;border-radius:999px;background:{{ a.statusColor }};flex:none;"></span>
+                  <span style="flex:1;min-width:0;"><span style="font-size:14px;font-weight:600;color:var(--c-ink);">{{ a.type }}</span> <span style="font-size:13px;color:var(--c-muted);">— {{ a.project }}</span></span>
+                  <sc-if value="{{ a.hasResult }}"><span style="font-size:12px;font-weight:600;color:var(--c-info);background:var(--c-info-soft);border-radius:999px;padding:2px 10px;white-space:nowrap;">{{ a.result }}</span></sc-if>
+                  <span style="font-size:13px;color:var(--c-faint);white-space:nowrap;width:88px;text-align:right;">{{ a.period }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </section>
+
+          <section style="margin-bottom:30px;">
+            <h2 style="font-size:16px;font-weight:600;color:var(--c-ink);margin:0 0 6px;">Répartition</h2>
+            <p style="font-size:13px;color:var(--c-muted);margin:0 0 14px;">Cliquez un chiffre pour filtrer la liste des projets.</p>
+            <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;">
+              <sc-for list="{{ overview.breakdowns }}" as="bd" hint-placeholder-count="3">
+                <div style="background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius);padding:18px 20px;">
+                  <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--c-light);margin-bottom:12px;">{{ bd.title }}</div>
+                  <div style="display:flex;flex-direction:column;gap:9px;">
+                    <sc-for list="{{ bd.rows }}" as="r" hint-placeholder-count="2">
+                      <button onClick="{{ r.onClick }}" style="display:flex;align-items:center;gap:10px;width:100%;background:transparent;border:none;cursor:pointer;padding:0;text-align:left;">
+                        <span style="font-size:14px;font-weight:700;color:var(--c-ink);width:22px;flex:none;">{{ r.n }}</span>
+                        <span style="flex:1;height:8px;border-radius:999px;background:var(--c-surface-alt);overflow:hidden;"><span style="display:block;height:100%;width:{{ r.bar }};background:{{ r.color }};border-radius:999px;"></span></span>
+                        <span style="font-size:13px;color:var(--c-body);white-space:nowrap;">{{ r.label }}</span>
+                      </button>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </section>
+
+          <section>
+            <h2 style="font-size:16px;font-weight:600;color:var(--c-ink);margin:0 0 14px;">Projets sans activité récente</h2>
+            <div style="background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius);overflow:hidden;">
+              <sc-for list="{{ overview.stalled }}" as="s" hint-placeholder-count="1">
+                <button onClick="{{ s.onClick }}" style="display:flex;align-items:center;gap:16px;width:100%;text-align:left;background:transparent;border:none;border-top:1px solid var(--c-line);padding:var(--row-pad);cursor:pointer;">
+                  <span style="flex:1;font-size:14px;font-weight:500;color:var(--c-body);">{{ s.name }}</span>
+                  <span style="font-size:13px;color:var(--c-faint);">Dernière activité {{ s.last }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </section>
+        </div>
+      </sc-if>
+
+      <!-- ========================= PRODUITS ========================= -->
+      <sc-if value="{{ isProducts }}">
+        <div style="animation:vFade .2s ease;">
+          <header style="margin-bottom:22px;">
+            <h1 style="font-size:30px;font-weight:700;color:var(--c-ink);margin:0 0 6px;letter-spacing:-.01em;">Produits</h1>
+            <p style="font-size:15px;color:var(--c-muted);margin:0;">Les objets accompagnés par le centre — pas le catalogue de l'entreprise.</p>
+          </header>
+          <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+            <sc-for list="{{ entityChips }}" as="c" hint-placeholder-count="4">
+              <button onClick="{{ noop }}" style="font-size:13px;font-weight:500;color:var(--c-body);background:var(--c-surface);border:1px solid var(--c-line-strong);border-radius:999px;padding:6px 14px;cursor:pointer;">{{ c }}</button>
+            </sc-for>
+          </div>
+          <div style="background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius);overflow:hidden;">
+            <div style="display:flex;gap:16px;padding:12px 20px;background:var(--c-surface-alt);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--c-light);">
+              <span style="flex:1;">Produit</span><span style="width:160px;">Entité</span><span style="width:150px;">Accompagnements</span><span style="width:150px;text-align:right;">Dernière activité</span>
+            </div>
+            <sc-for list="{{ productsList }}" as="p" hint-placeholder-count="2">
+              <button onClick="{{ p.onClick }}" style="display:flex;gap:16px;align-items:center;width:100%;text-align:left;background:transparent;border:none;border-top:1px solid var(--c-line);padding:16px 20px;cursor:pointer;">
+                <span style="flex:1;font-size:15px;font-weight:600;color:var(--c-ink);">{{ p.name }}</span>
+                <span style="width:160px;font-size:13px;color:var(--c-body);">{{ p.entity }}</span>
+                <span style="width:150px;font-size:13px;color:var(--c-body);">{{ p.countLabel }}</span>
+                <span style="width:150px;font-size:13px;color:var(--c-faint);text-align:right;">{{ p.last }}</span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ========================= PROJETS ========================= -->
+      <sc-if value="{{ isProjects }}">
+        <div style="animation:vFade .2s ease;">
+          <header style="margin-bottom:20px;">
+            <h1 style="font-size:30px;font-weight:700;color:var(--c-ink);margin:0 0 6px;letter-spacing:-.01em;">Projets</h1>
+            <p style="font-size:15px;color:var(--c-muted);margin:0;">Tous les accompagnements en cours et passés, tous produits confondus.</p>
+          </header>
+
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+            <div style="position:relative;flex:1;min-width:220px;max-width:340px;">
+              <input placeholder="Rechercher un nom, un objectif, un membre…" style="width:100%;font-family:var(--font);font-size:14px;color:var(--c-ink);background:var(--c-surface);border:1px solid var(--c-line-strong);border-radius:8px;padding:9px 14px;">
+            </div>
+            <sc-for list="{{ projectFilterChips }}" as="c" hint-placeholder-count="4">
+              <button onClick="{{ noop }}" style="font-size:13px;font-weight:500;color:var(--c-body);background:var(--c-surface);border:1px solid var(--c-line-strong);border-radius:999px;padding:7px 14px;cursor:pointer;">{{ c }}</button>
+            </sc-for>
+          </div>
+
+          <sc-if value="{{ hasFilter }}">
+            <div style="display:inline-flex;align-items:center;gap:10px;margin-bottom:14px;background:var(--c-primary-lightest);border:1px solid var(--c-primary-lighter);border-radius:999px;padding:5px 8px 5px 14px;">
+              <span style="font-size:13px;color:var(--c-primary-light);font-weight:500;">Filtre : {{ filterLabel }}</span>
+              <button onClick="{{ clearFilter }}" style="background:var(--c-primary-lighter);border:none;border-radius:999px;width:20px;height:20px;cursor:pointer;color:var(--c-primary);font-size:12px;line-height:1;">×</button>
+            </div>
+          </sc-if>
+
+          <div style="background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius);overflow:hidden;">
+            <div style="display:flex;gap:14px;padding:11px 18px;background:var(--c-surface-alt);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--c-light);font-family:Arial,var(--font);">
+              <span style="flex:1.4;">Projet</span><span style="flex:1;">Produit</span><span style="width:130px;">Entité</span><span style="width:96px;">Statut</span><span style="width:120px;">Équipe</span><span style="width:100px;text-align:right;">Dernière act.</span>
+            </div>
+            <sc-for list="{{ projectsRows }}" as="r" hint-placeholder-count="3">
+              <div style="display:flex;gap:14px;align-items:center;border-top:1px solid var(--c-line);padding:13px 18px;font-family:Arial,var(--font);">
+                <button onClick="{{ r.onOpen }}" style="flex:1.4;text-align:left;background:transparent;border:none;padding:0;cursor:pointer;font-size:14px;font-weight:600;color:var(--c-ink);font-family:var(--font);">{{ r.name }}</button>
+                <button onClick="{{ r.onProduct }}" style="flex:1;text-align:left;background:transparent;border:none;padding:0;cursor:pointer;font-size:13px;color:var(--c-info);font-family:var(--font);">{{ r.product }}</button>
+                <span style="width:130px;font-size:13px;color:var(--c-body);">{{ r.entity }}</span>
+                <span style="width:96px;font-size:12px;color:var(--c-body);display:inline-flex;align-items:center;gap:6px;"><span style="width:7px;height:7px;border-radius:999px;background:{{ r.statusColor }};"></span>{{ r.statusLabel }}</span>
+                <span style="width:120px;font-size:13px;color:var(--c-muted);">{{ r.teamLabel }}</span>
+                <span style="width:100px;font-size:13px;color:var(--c-faint);text-align:right;">{{ r.last }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ========================= À PROPOS ========================= -->
+      <sc-if value="{{ isAbout }}">
+        <div style="animation:vFade .2s ease;max-width:760px;">
+          <header style="margin-bottom:28px;">
+            <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--c-light);margin-bottom:8px;">Note interne</div>
+            <h1 style="font-size:30px;font-weight:700;color:var(--c-ink);margin:0;letter-spacing:-.01em;">À propos de Vision</h1>
+          </header>
+
+          <div style="display:flex;flex-direction:column;gap:26px;">
+            <div>
+              <h2 style="font-size:16px;font-weight:600;color:var(--c-ink);margin:0 0 8px;">Ce qu'est Vision</h2>
+              <p style="font-size:15px;color:var(--c-body);line-height:1.6;margin:0;">Vision documente comment le centre de compétence design accompagne les produits de l'entreprise, dans le temps. Elle relie les livrables, audits et mesures — dispersés dans SharePoint, les plateformes d'audit et l'analytics — à un produit, un projet et un moment. Elle affiche une synthèse et renvoie vers l'outil source.</p>
+            </div>
+            <div>
+              <h2 style="font-size:16px;font-weight:600;color:var(--c-ink);margin:0 0 8px;">Ce qu'elle n'est pas</h2>
+              <ul style="margin:0;padding-left:20px;font-size:15px;color:var(--c-body);line-height:1.7;">
+                <li>Ni gestionnaire de projet, ni espace de stockage, ni outil d'évaluation.</li>
+                <li>Aucun score, note, niveau de maturité ou pourcentage d'avancement.</li>
+                <li>Aucun badge d'alerte, de retard ou de relance : la fraîcheur s'affiche, elle ne se reproche pas.</li>
+                <li>Aucun classement de projets, de personnes ou d'entités.</li>
+              </ul>
+            </div>
+            <div>
+              <h2 style="font-size:16px;font-weight:600;color:var(--c-ink);margin:0 0 12px;">Vocabulaire</h2>
+              <div style="display:flex;flex-direction:column;border:1px solid var(--c-line);border-radius:var(--radius);overflow:hidden;">
+                <sc-for list="{{ glossary }}" as="g" hint-placeholder-count="4">
+                  <div style="display:flex;gap:16px;padding:13px 18px;border-top:1px solid var(--c-line);">
+                    <span style="width:120px;flex:none;font-size:14px;font-weight:600;color:var(--c-primary-light);">{{ g.term }}</span>
+                    <span style="flex:1;font-size:14px;color:var(--c-body);line-height:1.5;">{{ g.def }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div>
+              <h2 style="font-size:16px;font-weight:600;color:var(--c-ink);margin:0 0 8px;">État actuel</h2>
+              <p style="font-size:13px;color:var(--c-light);margin:0 0 10px;">Au 11 août 2026</p>
+              <ul style="margin:0;padding-left:20px;font-size:15px;color:var(--c-body);line-height:1.7;">
+                <li><strong style="font-weight:600;">Existe :</strong> vue d'ensemble, produits, projets, roadmap d'activités, frise produit, saisie d'activité.</li>
+                <li><strong style="font-weight:600;">À venir :</strong> import des relevés d'indicateurs depuis l'analytics, gestion fine des droits par entité.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+  </main>
+
+  <!-- ========================= PANNEAU NOUVELLE ACTIVITÉ ========================= -->
+  <sc-if value="{{ drawerOpen }}">
+    <div style="position:fixed;inset:0;z-index:40;">
+      <div onClick="{{ closeDrawer }}" style="position:absolute;inset:0;background:rgba(21,21,27,.4);animation:vFade .2s ease;"></div>
+      <div role="dialog" aria-label="Nouvelle activité" style="position:absolute;top:0;right:0;height:100%;width:440px;max-width:92vw;background:var(--c-surface);box-shadow:-8px 0 32px rgba(21,21,27,.16);display:flex;flex-direction:column;animation:vDrawerIn .24s cubic-bezier(.2,.7,.3,1);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:22px 24px 16px;border-bottom:1px solid var(--c-line);">
+          <div>
+            <h2 style="font-size:18px;font-weight:600;color:var(--c-ink);margin:0 0 3px;">Nouvelle activité</h2>
+            <p style="font-size:12px;color:var(--c-muted);margin:0;">{{ project.name }}</p>
+          </div>
+          <button onClick="{{ closeDrawer }}" style="background:var(--c-surface-alt);border:none;border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:16px;color:var(--c-muted);">×</button>
+        </div>
+
+        <div style="flex:1;overflow-y:auto;padding:22px 24px;display:flex;flex-direction:column;gap:20px;">
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:var(--c-body);margin-bottom:7px;">Type d'activité <span style="color:var(--c-secondary);">*</span></label>
+            <select style="width:100%;font-family:var(--font);font-size:14px;color:var(--c-ink);background:var(--c-surface);border:1px solid var(--c-line-strong);border-radius:8px;padding:10px 12px;">
+              <option>Atelier</option><option>Campagne de tests</option><option>Audit</option><option>Entretiens utilisateurs</option><option>Restitution</option><option>Formation</option>
+            </select>
+          </div>
+
+          <div>
+            <label style="display:flex;align-items:center;gap:9px;font-size:13px;color:var(--c-body);cursor:pointer;margin-bottom:12px;">
+              <input type="checkbox" checked="{{ drawerPlanned }}" onChange="{{ togglePlanned }}" style="width:16px;height:16px;accent-color:var(--c-primary);">
+              À planifier (sans date)
+            </label>
+            <sc-if value="{{ drawerHasPeriod }}">
+              <div>
+                <label style="display:block;font-size:13px;font-weight:600;color:var(--c-body);margin-bottom:7px;">Période <span style="color:var(--c-secondary);">*</span></label>
+                <input type="month" style="width:100%;font-family:var(--font);font-size:14px;color:var(--c-ink);background:var(--c-surface);border:1px solid var(--c-line-strong);border-radius:8px;padding:10px 12px;">
+                <p style="font-size:11px;color:var(--c-light);margin:6px 0 0;">Granularité au mois.</p>
+              </div>
+            </sc-if>
+          </div>
+
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:var(--c-body);margin-bottom:7px;">Approche</label>
+            <select style="width:100%;font-family:var(--font);font-size:14px;color:var(--c-ink);background:var(--c-surface);border:1px solid var(--c-line-strong);border-radius:8px;padding:10px 12px;">
+              <option value="">—</option><option>Research</option><option>Design Thinking</option><option>Lean</option><option>Audit UX</option><option>Audit d'accessibilité</option><option>Audit d'éco-conception</option><option>Mesure des usages</option>
+            </select>
+          </div>
+
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:var(--c-body);margin-bottom:7px;">Objectif <span style="font-weight:400;color:var(--c-light);">(une phrase)</span></label>
+            <input placeholder="Ce que cette activité cherche à obtenir" style="width:100%;font-family:var(--font);font-size:14px;color:var(--c-ink);background:var(--c-surface);border:1px solid var(--c-line-strong);border-radius:8px;padding:10px 12px;">
+          </div>
+
+          <div>
+            <label style="display:block;font-size:13px;font-weight:600;color:var(--c-body);margin-bottom:7px;">Participants</label>
+            <input placeholder="Ajouter des membres" style="width:100%;font-family:var(--font);font-size:14px;color:var(--c-ink);background:var(--c-surface);border:1px solid var(--c-line-strong);border-radius:8px;padding:10px 12px;">
+          </div>
+
+          <div style="border-top:1px solid var(--c-line);padding-top:18px;">
+            <label style="display:flex;align-items:center;gap:9px;font-size:13px;color:var(--c-body);cursor:pointer;">
+              <input type="checkbox" checked="{{ drawerDone }}" onChange="{{ toggleDone }}" style="width:16px;height:16px;accent-color:var(--c-primary);">
+              Activité terminée — ajouter un résultat
+            </label>
+            <sc-if value="{{ drawerDone }}">
+              <div style="margin-top:14px;background:var(--c-surface-alt);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;">
+                <input placeholder="Libellé du résultat (ex. Conformité RGAA)" style="width:100%;font-family:var(--font);font-size:14px;color:var(--c-ink);background:var(--c-surface);border:1px solid var(--c-line-strong);border-radius:8px;padding:9px 12px;">
+                <div style="display:flex;gap:10px;">
+                  <input placeholder="Valeur" style="flex:1;min-width:0;font-family:var(--font);font-size:14px;color:var(--c-ink);background:var(--c-surface);border:1px solid var(--c-line-strong);border-radius:8px;padding:9px 12px;">
+                  <input placeholder="Unité" style="width:96px;font-family:var(--font);font-size:14px;color:var(--c-ink);background:var(--c-surface);border:1px solid var(--c-line-strong);border-radius:8px;padding:9px 12px;">
+                </div>
+                <input placeholder="Lien vers l'outil (Ergonome, SharePoint…)" style="width:100%;font-family:var(--font);font-size:14px;color:var(--c-info);background:var(--c-surface);border:1px solid var(--c-line-strong);border-radius:8px;padding:9px 12px;">
+              </div>
+            </sc-if>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;padding:16px 24px;border-top:1px solid var(--c-line);background:var(--c-surface);">
+          <button onClick="{{ closeDrawer }}" style="flex:none;background:transparent;border:1px solid var(--c-line-strong);border-radius:8px;padding:11px 18px;font-size:14px;font-weight:600;color:var(--c-body);cursor:pointer;">Annuler</button>
+          <button onClick="{{ closeDrawer }}" style="flex:1;background:var(--c-primary);color:#fff;border:none;border-radius:8px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer;">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: { &quot;width&quot;: 1440, &quot;height&quot;: 940 },
+  &quot;primaryColor&quot;: { &quot;editor&quot;: &quot;color&quot;, &quot;default&quot;: &quot;#24226a&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Thème&quot;, &quot;options&quot;: [&quot;#24226a&quot;, &quot;#1c1a50&quot;, &quot;#323c8e&quot;, &quot;#0557ca&quot;] },
+  &quot;density&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Confortable&quot;, &quot;Compacte&quot;], &quot;default&quot;: &quot;Confortable&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Thème&quot; },
+  &quot;showDemoBar&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Démo&quot; }
+}">
+class Component extends DCLogic {
+  state = {
+    screen: 'project',
+    productId: 'espace-client',
+    projectId: 'autonomie',
+    emptyProject: false,
+    drawerOpen: false,
+    drawerPlanned: false,
+    drawerDone: false,
+    journalOpen: false,
+    filter: null,
+  };
+
+  statusMeta = {
+    encours:    { label: 'En cours',    color: '#3d51a3' },
+    prevu:      { label: 'Prévu',       color: '#0557ca' },
+    aplanifier: { label: 'À planifier', color: '#acacb2' },
+    termine:    { label: 'Terminé',     color: '#13873a' },
+    annule:     { label: 'Annulé',      color: '#acacb2' },
+  };
+
+  products = {
+    'espace-client': { id:'espace-client', name:'Espace client web', entity:'Banque de détail', desc:"Espace web où les clients particuliers gèrent leurs comptes et leurs opérations courantes.", count:2, last:'août 2026', projectIds:['autonomie','virement'] },
+    'declaration':   { id:'declaration', name:'Déclaration de sinistre en ligne', entity:'Assurance', desc:"Parcours en ligne de déclaration de sinistre pour les assurés particuliers.", count:1, last:'juin 2026', projectIds:['demat'] },
+  };
+
+  projects = {
+    autonomie: {
+      id:'autonomie', name:'Autonomie des opérations courantes', productId:'espace-client', product:'Espace client web', entity:'Banque de détail',
+      state:'encours', period:'depuis février 2026', objective:"Permettre les opérations courantes sans contact avec le support.",
+      sponsor:'Marc Tellier', approaches:['Research',"Audit d'accessibilité",'Mesure des usages'],
+      team:[{n:'Camille Roux',i:'CR'},{n:'Inès Kaddour',i:'IK'},{n:'Léa Fontaine',i:'LF'},{n:'Marc Tellier',i:'MT',ext:true}],
+      rank:'2ᵉ accompagnement de ce produit', rankTarget:'virement', last:'août 2026',
+      activities:[
+        { type:'Atelier de priorisation', state:'encours', period:'août 2026', approach:'Design Thinking', objective:"Prioriser les chantiers de la vague 3." },
+        { type:'Audit UX', state:'prevu', period:'octobre 2026', approach:'Audit UX', objective:"Évaluer le parcours après la vague 2." },
+        { type:'Formation des équipes produit', state:'aplanifier', period:null, approach:null, objective:"Transférer les méthodes aux équipes produit." },
+        { type:'Campagne de tests — vague 2', state:'termine', period:'mars 2026', approach:'Research', objective:"Tester le parcours refondu auprès d'utilisateurs.", result:{ label:'Restitution liée', tool:'SharePoint' } },
+        { type:"Audit d'accessibilité", state:'termine', period:'juin 2026', approach:"Audit d'accessibilité", objective:"Mesurer la conformité RGAA du parcours.", result:{ label:'68 % de conformité', tool:"outil d'audit" } },
+      ],
+      resources:[
+        { name:'Restitution des tests — vague 2', kind:'PowerPoint' },
+        { name:"Rapport d'audit d'accessibilité", kind:'PDF' },
+        { name:"Grille d'entretien", kind:'Word' },
+        { name:'Maquettes v3', kind:'Figma' },
+      ],
+      indicators:[{ name:'Part des virements réalisés sans contact support', target:'85 %', latest:'71 %', latestDate:'juin 2026' }],
+      related:[{ id:'virement', name:'Refonte du parcours de virement', period:'mars → sept. 2024', state:'termine' }],
+      journal:[
+        { when:'12 août 2026', who:'Camille Roux', what:"a ajouté l'activité « Atelier de priorisation »." },
+        { when:'28 juin 2026', who:'Inès Kaddour', what:"a lié un résultat à « Audit d'accessibilité »." },
+        { when:'3 mars 2026', who:'Camille Roux', what:"a ajouté l'activité « Campagne de tests — vague 2 »." },
+        { when:'9 février 2026', who:'Camille Roux', what:"a créé le projet." },
+      ],
+    },
+    virement: {
+      id:'virement', name:'Refonte du parcours de virement', productId:'espace-client', product:'Espace client web', entity:'Banque de détail',
+      state:'termine', period:'mars → septembre 2024', objective:"Réduire les abandons en cours de virement.",
+      sponsor:null, approaches:['Research','Audit UX'],
+      team:[{n:'Camille Roux',i:'CR'},{n:'Sofia Marchand',i:'SM'},{n:'Yanis Bertin',i:'YB'}],
+      rank:null, last:'septembre 2024',
+      activities:[
+        { type:'Entretiens utilisateurs', state:'termine', period:'avril 2024', approach:'Research', objective:"Comprendre les points de friction du virement." },
+        { type:'Audit UX', state:'termine', period:'mai 2024', approach:'Audit UX', objective:"Évaluer l'ergonomie du parcours existant.", result:{ label:'62/100', tool:'Ergonome' } },
+        { type:'Atelier de co-conception', state:'termine', period:'juin 2024', approach:'Design Thinking', objective:"Concevoir le nouveau parcours avec l'équipe." },
+        { type:'Restitution', state:'termine', period:'septembre 2024', approach:null, objective:"Présenter les recommandations au commanditaire." },
+      ],
+      resources:[{ name:"Rapport d'audit UX", kind:'PDF' }],
+      indicators:[],
+      related:[{ id:'autonomie', name:'Autonomie des opérations courantes', period:'depuis fév. 2026', state:'encours' }],
+      journal:[
+        { when:'30 sept. 2024', who:'Camille Roux', what:"a clôturé le projet." },
+        { when:'2 sept. 2024', who:'Sofia Marchand', what:"a ajouté l'activité « Restitution »." },
+      ],
+    },
+    demat: {
+      id:'demat', name:'Dématérialisation de la déclaration', productId:'declaration', product:'Déclaration de sinistre en ligne', entity:'Assurance',
+      state:'encours', period:'depuis mai 2026', objective:"Permettre une déclaration complète sans passer par un conseiller.",
+      sponsor:null, approaches:['Design Thinking','Audit UX'],
+      team:[{n:'Thomas Lemaire',i:'TL'},{n:'Awa Diallo',i:'AD'}],
+      rank:null, last:'juin 2026',
+      activities:[
+        { type:'Audit UX', state:'prevu', period:'septembre 2026', approach:'Audit UX', objective:"Auditer le prototype de déclaration." },
+        { type:'Atelier de cadrage', state:'termine', period:'mai 2026', approach:'Design Thinking', objective:"Cadrer le périmètre de la dématérialisation." },
+        { type:'Observation en agence', state:'termine', period:'juin 2026', approach:'Research', objective:"Observer les déclarations réalisées en agence." },
+      ],
+      resources:[],
+      indicators:[],
+      related:[],
+      journal:[{ when:'20 mai 2026', who:'Thomas Lemaire', what:"a créé le projet." }],
+    },
+  };
+
+  timelines = {
+    'espace-client': {
+      years:['2024','2025','2026'],
+      bands:[
+        { id:'autonomie', label:'Autonomie des opérations courantes', sub:'depuis fév. 2026', left:'71.43%', width:'28.57%', active:true },
+        { id:'virement', label:'Refonte du parcours de virement', sub:'mars → sept. 2024', left:'5.71%', width:'17.14%', active:false },
+      ],
+      markers:[
+        { label:'Audit UX', value:'62/100', left:'11.43%' },
+        { label:"Audit d'accessibilité", value:'68 %', left:'82.86%' },
+      ],
+      indicator:{
+        name:'Part des virements réalisés sans contact support',
+        poly:'228.6,46 400,37 828.6,29',
+        targetLabel:'Cible 85 %',
+        points:[
+          { left:'22.86%', top:'46%', v:'54 %', date:'sept. 2024' },
+          { left:'40%', top:'37%', v:'63 %', date:'mars 2025' },
+          { left:'82.86%', top:'29%', v:'71 %', date:'juin 2026' },
+        ],
+      },
+    },
+    'declaration': {
+      years:['2024','2025','2026'],
+      bands:[{ id:'demat', label:'Dématérialisation de la déclaration', sub:'depuis mai 2026', left:'80%', width:'20%', active:true }],
+      markers:[],
+      indicator:null,
+    },
+  };
+
+  glossary = [
+    { term:'Produit', def:"L'objet durable accompagné. Rattaché à une entité. Il survit aux projets." },
+    { term:'Projet', def:"Un accompagnement du centre sur un produit, avec un objectif, une équipe, une période." },
+    { term:'Activité', def:"Un fait d'accompagnement daté : atelier, campagne de tests, audit. C'est le récit du projet." },
+    { term:'Approche', def:"La méthodologie mobilisée : Research, Design Thinking, Lean, Audit UX, Audit d'accessibilité…" },
+    { term:'Résultat', def:"Ce qu'une activité a produit dans un outil externe, toujours accompagné d'un lien." },
+    { term:'Ressource', def:"Un document hébergé ailleurs. Vision n'en affiche qu'un lien." },
+    { term:'Indicateur', def:"Une mesure du produit suivie dans le temps ; un projet l'adopte en fixant une cible." },
+    { term:'Entité', def:"Une division de l'entreprise : Banque de détail, Assurance, Corporate…" },
+  ];
+
+  entityChips = ['Toutes les entités','Banque de détail','Assurance','Corporate','Digital Factory','RH & Interne'];
+  projectFilterChips = ['Entité','Métier','Approche','Statut','Tri : activité récente'];
+
+  componentDidMount(){ this.applyTheme(); }
+  componentDidUpdate(prev){ if(prev.primaryColor!==this.props.primaryColor || prev.density!==this.props.density) this.applyTheme(); }
+  applyTheme(){
+    const root = document.documentElement;
+    root.style.setProperty('--c-primary', this.props.primaryColor || '#24226a');
+    root.style.setProperty('--row-pad', (this.props.density==='Compacte') ? '9px 16px' : '14px 16px');
+  }
+
+  go = (s) => this.setState({ screen:s });
+  openProject = (id) => this.setState({ screen:'project', projectId:id, journalOpen:false });
+  openProduct = (id) => this.setState({ screen:'product', productId:id });
+  applyFilter = (f) => this.setState({ screen:'projects', filter:f });
+
+  avatar(m, i){
+    const base = 'width:28px;height:28px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#fff;border:2px solid var(--c-surface);flex:none;';
+    const bg = m.ext ? 'background:var(--c-light);' : 'background:var(--c-primary-light);';
+    return { i:m.i, title:m.n + (m.ext ? ' — sans compte Vision' : ''), avatarStyle: base + bg + (i>0 ? 'margin-left:-8px;' : '') };
+  }
+
+  decorate(a){
+    const m = this.statusMeta[a.state];
+    return { ...a, statusLabel:m.label, statusColor:m.color,
+      periodLabel: a.state==='aplanifier' ? 'À planifier' : (a.period || '—'),
+      approachLabel: a.approach || '', hasApproach: !!a.approach,
+      hasResult: !!a.result, resultLabel: a.result ? a.result.label : '' };
+  }
+
+  buildGroups(acts){
+    const order = [['encours','En cours'],['prevu','Prévu'],['aplanifier','À planifier'],['termine','Terminé'],['annule','Annulé']];
+    return order.map(([key,label]) => {
+      const items = acts.filter(a => a.state===key).map(a => this.decorate(a));
+      return { key, label, color:this.statusMeta[key].color, count:String(items.length), items };
+    }).filter(g => g.items.length);
+  }
+
+  renderVals(){
+    const S = this.state;
+    const screen = S.screen;
+    const navDef = [['overview',"Vue d'ensemble",'#f55b41'],['products','Produits','#aec3ed'],['projects','Projets','#aec3ed'],['about','À propos','#aec3ed']];
+    const activeNav = (screen==='product'||screen==='project') ? 'products' : screen;
+    const navBase = "display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:10px 14px;border:none;border-radius:8px;font-family:var(--font);font-size:15px;cursor:pointer;";
+    const navItems = navDef.map(([k,l,dot]) => {
+      const active = k===activeNav;
+      return { k, l, dot, onClick:()=>this.go(k),
+        style: navBase + (active ? 'background:rgba(255,255,255,.14);color:#fff;font-weight:600;' : 'background:transparent;color:rgba(255,255,255,.72);font-weight:500;') };
+    });
+
+    // -------- PROJECT --------
+    const rawP = this.projects[S.projectId];
+    const empty = S.emptyProject;
+    const acts = empty ? [] : rawP.activities;
+    const groups = this.buildGroups(acts);
+    const pStatus = this.statusMeta[rawP.state];
+    const resources = (empty ? [] : rawP.resources).map(r => ({ ...r, badge:(r.kind||'').slice(0,3).toUpperCase() }));
+    const indicators = empty ? [] : rawP.indicators;
+    const related = rawP.related.map(rp => ({ ...rp, color:this.statusMeta[rp.state].color, onClick:()=>this.openProject(rp.id) }));
+    const teamNote = rawP.team.some(m=>m.ext) ? '+ 1 côté entité' : (rawP.team.length + ' membres');
+
+    const project = {
+      ...rawP,
+      statusLabel:pStatus.label, statusColor:pStatus.color,
+      sponsorLabel: rawP.sponsor ? (rawP.sponsor + ' (entité)') : 'Non renseigné',
+      team: rawP.team.map((m,i)=>this.avatar(m,i)), teamNote,
+      approaches: rawP.approaches,
+      rankLabel: rawP.rank, onRank: rawP.rankTarget ? (()=>this.openProject(rawP.rankTarget)) : (()=>{}),
+      groups, hasActivities: acts.length>0, empty: acts.length===0,
+      resources, hasResources: resources.length>0, emptyResources: resources.length===0,
+      indicators, hasIndicators: indicators.length>0, emptyIndicators: indicators.length===0,
+      related, hasRelated: related.length>0, emptyRelated: related.length===0,
+      journal: rawP.journal,
+      onSeeProduct: ()=>this.openProduct(rawP.productId),
+      crumbs:[
+        { label:'Produits', sep:true, onClick:()=>this.go('products'), style:'background:transparent;border:none;padding:0;cursor:pointer;font-size:13px;color:var(--c-info);' },
+        { label:rawP.product, sep:true, onClick:()=>this.openProduct(rawP.productId), style:'background:transparent;border:none;padding:0;cursor:pointer;font-size:13px;color:var(--c-info);' },
+        { label:rawP.name, sep:false, onClick:()=>{}, style:'background:transparent;border:none;padding:0;font-size:13px;color:var(--c-body);font-weight:500;cursor:default;' },
+      ],
+    };
+
+    // -------- PRODUCT --------
+    const rawPr = this.products[S.productId];
+    const tl = this.timelines[S.productId];
+    const bandStyle = (b) => b.active
+      ? { bg:'var(--c-primary)', border:'var(--c-primary)', fg:'#fff', fgSoft:'rgba(255,255,255,.7)' }
+      : { bg:'var(--c-primary-lightest)', border:'var(--c-primary-lighter)', fg:'var(--c-primary-light)', fgSoft:'var(--c-muted)' };
+    const product = {
+      ...rawPr,
+      countLabel: rawPr.count>1 ? (rawPr.count + ' accompagnements') : '1 accompagnement',
+      projects: rawPr.projectIds.map(id => {
+        const p = this.projects[id]; const st = this.statusMeta[p.state];
+        return { ...p, statusLabel:st.label, statusColor:st.color, approaches:p.approaches,
+          team:p.team.map((m,i)=>this.avatar(m,i)), onClick:()=>this.openProject(id) };
+      }),
+      timeline:{
+        years: tl.years,
+        bands: tl.bands.map(b => ({ ...b, ...bandStyle(b), title:b.label + ' · ' + b.sub, onClick:()=>this.openProject(b.id) })),
+        markers: tl.markers, hasMarkers: tl.markers.length>0, noMarkers: tl.markers.length===0,
+        indicator: tl.indicator, hasIndicator: !!tl.indicator, noIndicator: !tl.indicator,
+      },
+    };
+
+    // -------- OVERVIEW --------
+    const rc = this.statusMeta;
+    const overview = {
+      recent:[
+        { type:'Atelier de priorisation', project:'Autonomie des opérations courantes', period:'août 2026', statusColor:rc.encours.color, hasResult:false, onClick:()=>this.openProject('autonomie') },
+        { type:"Audit d'accessibilité", project:'Autonomie des opérations courantes', period:'juin 2026', statusColor:rc.termine.color, hasResult:true, result:'68 % de conformité', onClick:()=>this.openProject('autonomie') },
+        { type:'Observation en agence', project:'Dématérialisation de la déclaration', period:'juin 2026', statusColor:rc.termine.color, hasResult:false, onClick:()=>this.openProject('demat') },
+        { type:'Atelier de cadrage', project:'Dématérialisation de la déclaration', period:'mai 2026', statusColor:rc.termine.color, hasResult:false, onClick:()=>this.openProject('demat') },
+        { type:'Campagne de tests — vague 2', project:'Autonomie des opérations courantes', period:'mars 2026', statusColor:rc.termine.color, hasResult:true, result:'Restitution liée', onClick:()=>this.openProject('autonomie') },
+      ],
+      breakdowns:[
+        { title:'Par statut', rows:[
+          { label:'En cours', n:'2', bar:'100%', color:'var(--c-primary-light)', onClick:()=>this.applyFilter({k:'statut',v:'En cours'}) },
+          { label:'Terminé', n:'1', bar:'50%', color:'var(--c-line-strong)', onClick:()=>this.applyFilter({k:'statut',v:'Terminé'}) },
+        ]},
+        { title:'Par entité', rows:[
+          { label:'Banque de détail', n:'2', bar:'100%', color:'var(--c-primary-light)', onClick:()=>this.applyFilter({k:'entité',v:'Banque de détail'}) },
+          { label:'Assurance', n:'1', bar:'50%', color:'var(--c-primary-lighter)', onClick:()=>this.applyFilter({k:'entité',v:'Assurance'}) },
+        ]},
+        { title:'Par approche', rows:[
+          { label:'Audit UX', n:'2', bar:'100%', color:'var(--c-primary-light)', onClick:()=>this.applyFilter({k:'approche',v:'Audit UX'}) },
+          { label:'Research', n:'2', bar:'100%', color:'var(--c-primary-light)', onClick:()=>this.applyFilter({k:'approche',v:'Research'}) },
+          { label:'Design Thinking', n:'1', bar:'50%', color:'var(--c-primary-lighter)', onClick:()=>this.applyFilter({k:'approche',v:'Design Thinking'}) },
+        ]},
+      ],
+      stalled:[{ name:'Refonte du parcours de virement', last:'septembre 2024', onClick:()=>this.openProject('virement') }],
+    };
+
+    // -------- PRODUCTS LIST --------
+    const productsList = Object.values(this.products).map(p => ({
+      ...p, countLabel: p.count>1 ? (p.count + ' accompagnements') : '1 accompagnement', onClick:()=>this.openProduct(p.id),
+    }));
+
+    // -------- PROJECTS TABLE --------
+    let rows = Object.values(this.projects);
+    if(S.filter){
+      const f = S.filter;
+      rows = rows.filter(p => {
+        if(f.k==='statut') return this.statusMeta[p.state].label===f.v;
+        if(f.k==='entité') return p.entity===f.v;
+        if(f.k==='approche') return p.approaches.includes(f.v);
+        return true;
+      });
+    }
+    const projectsRows = rows.map(p => {
+      const st = this.statusMeta[p.state];
+      const more = p.team.length-1;
+      return { name:p.name, product:p.product, entity:p.entity, statusLabel:st.label, statusColor:st.color,
+        teamLabel: p.team[0].n.split(' ')[0] + (more>0 ? (' +'+more) : ''), last:p.last,
+        onOpen:()=>this.openProject(p.id), onProduct:()=>this.openProduct(p.productId) };
+    });
+
+    return {
+      navItems,
+      goOverview:()=>this.go('overview'), goProducts:()=>this.go('products'), goAdmin:()=>{},
+      showDemoBar: this.props.showDemoBar !== false,
+      isOverview:screen==='overview', isProducts:screen==='products', isProduct:screen==='product',
+      isProjects:screen==='projects', isProject:screen==='project', isAbout:screen==='about',
+      project, product, overview, productsList, projectsRows,
+      entityChips:this.entityChips, projectFilterChips:this.projectFilterChips, glossary:this.glossary,
+      hasFilter: !!S.filter, filterLabel: S.filter ? (S.filter.k + ' · ' + S.filter.v) : '',
+      clearFilter:()=>this.setState({ filter:null }),
+      journalOpen:S.journalOpen, journalChevron: S.journalOpen ? 'Replier ▲' : 'Déplier ▼',
+      toggleJournal:()=>this.setState(s=>({ journalOpen:!s.journalOpen })),
+      drawerOpen:S.drawerOpen, openDrawer:()=>this.setState({ drawerOpen:true }), closeDrawer:()=>this.setState({ drawerOpen:false }),
+      drawerPlanned:S.drawerPlanned, drawerHasPeriod:!S.drawerPlanned, drawerDone:S.drawerDone,
+      togglePlanned:()=>this.setState(s=>({ drawerPlanned:!s.drawerPlanned })),
+      toggleDone:()=>this.setState(s=>({ drawerDone:!s.drawerDone })),
+      emptyToggle:[
+        { l:'Rempli', onClick:()=>this.setState({ emptyProject:false }), style:this.pillStyle(!S.emptyProject) },
+        { l:'Vide (sans activité)', onClick:()=>this.setState({ emptyProject:true }), style:this.pillStyle(S.emptyProject) },
+      ],
+      productToggle:[
+        { l:'Espace client web (2)', onClick:()=>this.setState({ productId:'espace-client' }), style:this.pillStyle(S.productId==='espace-client') },
+        { l:'Déclaration de sinistre (1)', onClick:()=>this.setState({ productId:'declaration' }), style:this.pillStyle(S.productId==='declaration') },
+      ],
+      noop:()=>{},
+    };
+  }
+
+  pillStyle(active){
+    return 'font-size:12px;font-weight:600;border-radius:999px;padding:4px 12px;cursor:pointer;border:1px solid '
+      + (active ? 'var(--c-primary);background:var(--c-primary);color:#fff;' : 'var(--c-line-strong);background:var(--c-surface);color:var(--c-muted);');
+  }
+}
+</script>
+</body>
+</html>
