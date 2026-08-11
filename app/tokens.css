@@ -1,0 +1,369 @@
+/* ==========================================================================
+   Vision — variables de thème
+   Traduction de docs/design/design-system.md. Les numéros de paragraphe
+   en commentaire permettent la relecture croisée avec le document.
+
+   Deux couches, et l'ordre compte :
+     1. les primitives — les seules valeurs littérales de tout le projet ;
+     2. la couche sémantique — que des renvois, jamais une valeur.
+
+   Un domaine portera sa charte en redéfinissant la couche 1 sous un
+   sélecteur qui lui est propre. Rien d'autre ne bouge.
+   ========================================================================== */
+
+:root {
+  /* ------------------------------------------------------------------ */
+  /* Couche 1 — primitives (§1)                                          */
+  /* ------------------------------------------------------------------ */
+
+  /* §1.1 Midnight — couleur primaire */
+  --midnight-50: #f6f8fe;
+  --midnight-100: #f5f9ff;
+  --midnight-150: #e4ecf8;
+  --midnight-200: #d4def2;
+  --midnight-250: #aec3ed;
+  --midnight-300: #3d51a3;
+  --midnight-400: #323c8e;
+  --midnight-500: #24226a;
+  --midnight-600: #1f1e5c;
+  --midnight-700: #1c1a50;
+  --midnight-800: #14133b;
+  --midnight-900: #0e0d27;
+
+  /* §1.2 Tangerine — couleur secondaire */
+  --tangerine-50: #fff8f6;
+  --tangerine-100: #fff3eb;
+  --tangerine-150: #fdccc6;
+  --tangerine-200: #fab9b6;
+  --tangerine-250: #f99d9a;
+  --tangerine-300: #f89089;
+  --tangerine-400: #f77062;
+  --tangerine-500: #f55b41;
+  --tangerine-600: #e54f3a;
+  --tangerine-700: #d54233;
+  --tangerine-800: #c22827;
+  --tangerine-900: #b71c1c;
+
+  /* §1.3 Greyscale */
+  --greyscale-0: #ffffff;
+  --greyscale-50: #fdfdfd;
+  --greyscale-100: #f7f7f8;
+  --greyscale-150: #ebebf0;
+  --greyscale-200: #e4e4ea;
+  --greyscale-250: #c7c7cf;
+  --greyscale-300: #acacb2;
+  --greyscale-400: #808080;
+  --greyscale-500: #6e6e74;
+  --greyscale-600: #5e5e64;
+  --greyscale-700: #4e4e54;
+  --greyscale-800: #33333b;
+  --greyscale-900: #15151b;
+
+  /* §1.4 Red — danger */
+  --red-50: #fff9f9;
+  --red-100: #ffebeb;
+  --red-150: #ffdada;
+  --red-200: #ffc0c0;
+  --red-250: #ffaca3;
+  --red-300: #ff4242;
+  --red-400: #de2f2f;
+  --red-500: #cc2d2d;
+  --red-600: #b82828;
+  --red-700: #ae1d1d;
+  --red-800: #8f1818;
+  --red-900: #5f1010;
+
+  /* §1.5 Green — success */
+  --green-50: #ffffea;
+  --green-100: #e5ffed;
+  --green-150: #d5fadf;
+  --green-200: #b5f5ca;
+  --green-250: #80df9e;
+  --green-300: #3ac062;
+  --green-400: #2ba652;
+  --green-500: #13873a;
+  --green-600: #07762d;
+  --green-700: #036524;
+  --green-800: #004316;
+  --green-900: #00250c;
+
+  /* §1.6 Blue — info */
+  --blue-50: #f9fcff;
+  --blue-100: #f3fbff;
+  --blue-150: #ddf2fe;
+  --blue-200: #ccecfd;
+  --blue-250: #97d5fc;
+  --blue-300: #2d83fa;
+  --blue-400: #196de3;
+  --blue-500: #0557ca;
+  --blue-600: #0449aa;
+  --blue-700: #033b88;
+  --blue-800: #032c66;
+  --blue-900: #021d44;
+
+  /* §1.7 Orange — warning */
+  --orange-50: #fdfdfd;
+  --orange-100: #fdf4e5;
+  --orange-150: #fcefd9;
+  --orange-200: #f7ca94;
+  --orange-250: #ffa767;
+  --orange-300: #ff9142;
+  --orange-400: #ff7a1c;
+  --orange-500: #f26500;
+  --orange-600: #d25700;
+  --orange-700: #b64000;
+  --orange-800: #862f00;
+  --orange-900: #531d00;
+
+  /* §1.8 Yuzu — tertiaire */
+  --yuzu-50: #ffffea;
+  --yuzu-100: #fffcc5;
+  --yuzu-150: #fffba5;
+  --yuzu-200: #fffb85;
+  --yuzu-250: #fff867;
+  --yuzu-300: #fff246;
+  --yuzu-400: #ffe41b;
+  --yuzu-500: #fdc400;
+  --yuzu-600: #e29900;
+  --yuzu-700: #bb6d02;
+  --yuzu-800: #985408;
+  --yuzu-900: #7c450b;
+
+  /* §1.9 Purple — lien visité.
+     Les quatre couleurs d'aires thérapeutiques du même paragraphe
+     (burgundy, lime, lavender, teal) ne sont pas traduites : aucun usage
+     dans Vision. Voir JOURNAL-TECHNIQUE.md. */
+  --purple-50: #eee2fa;
+  --purple-500: #661eab;
+  --purple-900: #2d0d4b;
+
+  /* §1.10 Primitives d'opacité — greyscale-900 voilé, sauf opacity-0. */
+  --opacity-primitive-0: transparent;
+  --opacity-primitive-4: color-mix(in srgb, var(--greyscale-900) 4%, transparent);
+  --opacity-primitive-8: color-mix(in srgb, var(--greyscale-900) 8%, transparent);
+  --opacity-primitive-12: color-mix(in srgb, var(--greyscale-900) 12%, transparent);
+  --opacity-primitive-16: color-mix(in srgb, var(--greyscale-900) 16%, transparent);
+  --opacity-primitive-40: color-mix(in srgb, var(--greyscale-900) 40%, transparent);
+  --opacity-primitive-56: color-mix(in srgb, var(--greyscale-900) 56%, transparent);
+  --opacity-primitive-64: color-mix(in srgb, var(--greyscale-900) 64%, transparent);
+  --opacity-primitive-80: color-mix(in srgb, var(--greyscale-900) 80%, transparent);
+
+  /* ------------------------------------------------------------------ */
+  /* Couche 2 — couleurs sémantiques (§2)                                */
+  /* ------------------------------------------------------------------ */
+
+  /* §2.1 Primary (Midnight) */
+  --surface-primary-lightest: var(--midnight-100);
+  --surface-primary-lighter: var(--midnight-200);
+  --surface-primary-soft: var(--midnight-250);
+  --surface-primary-light: var(--midnight-300);
+  --surface-primary-normal: var(--midnight-400);
+  --surface-primary-base: var(--midnight-500);
+  --surface-primary-dark: var(--midnight-700);
+  --content-primary-light: var(--midnight-300);
+  --content-primary-normal: var(--midnight-400);
+  --content-primary-base: var(--midnight-500);
+  --content-primary-dark: var(--midnight-700);
+  --border-primary-lighter: var(--midnight-200);
+  --border-primary-light: var(--midnight-300);
+  --border-primary-normal: var(--midnight-400);
+  --border-primary-base: var(--midnight-500);
+  --border-primary-dark: var(--midnight-700);
+
+  /* §2.2 Secondary (Tangerine) */
+  --surface-secondary-lightest: var(--tangerine-100);
+  --surface-secondary-base: var(--tangerine-500);
+  --surface-secondary-dark: var(--tangerine-700);
+  --content-secondary-base: var(--tangerine-500);
+  --content-secondary-dark: var(--tangerine-700);
+  --border-secondary-base: var(--tangerine-500);
+  --border-secondary-dark: var(--tangerine-700);
+
+  /* §2.3 Tertiary (Yuzu) */
+  --surface-tertiary-lightest: var(--yuzu-100);
+  --surface-tertiary-base: var(--yuzu-500);
+  --surface-tertiary-dark: var(--yuzu-700);
+  --content-tertiary-base: var(--yuzu-500);
+  --content-tertiary-dark: var(--yuzu-700);
+
+  /* §2.4 Neutral (Greyscale) */
+  --surface-neutral-pale: var(--greyscale-50);
+  --surface-neutral-lightest: var(--greyscale-100);
+  --surface-neutral-lighter: var(--greyscale-200);
+  --surface-neutral-light: var(--greyscale-300);
+  --surface-neutral-normal: var(--greyscale-400);
+  --surface-neutral-base: var(--greyscale-500);
+  --surface-neutral-dark: var(--greyscale-700);
+  --surface-neutral-darkest: var(--greyscale-900);
+  --content-neutral-pale: var(--greyscale-50);
+  --content-neutral-light: var(--greyscale-300);
+  --content-neutral-normal: var(--greyscale-400);
+  --content-neutral-base: var(--greyscale-500);
+  --content-neutral-dark: var(--greyscale-700);
+  --content-neutral-darkest: var(--greyscale-900);
+
+  /* §2.5 Surfaces avec opacité */
+  --surface-neutral-opacity-trace: var(--opacity-primitive-4);
+  --surface-neutral-opacity-faded: var(--opacity-primitive-8);
+  --surface-neutral-opacity-faint: var(--opacity-primitive-12);
+  --surface-neutral-opacity-thin: var(--opacity-primitive-16);
+  --surface-neutral-opacity-distinct: var(--opacity-primitive-40);
+
+  /* §2.6 Danger (Red) */
+  --surface-danger-lightest: var(--red-100);
+  --surface-danger-lighter: var(--red-200);
+  --surface-danger-normal: var(--red-400);
+  --surface-danger-base: var(--red-500);
+  --surface-danger-dark: var(--red-700);
+  --content-danger-normal: var(--red-400);
+  --content-danger-base: var(--red-500);
+  --content-danger-dark: var(--red-700);
+
+  /* §2.7 Success (Green) */
+  --surface-success-lightest: var(--green-100);
+  --surface-success-lighter: var(--green-200);
+  --surface-success-subtle: var(--green-150);
+  --surface-success-base: var(--green-500);
+  --surface-success-dark: var(--green-700);
+  --content-success-base: var(--green-500);
+  --content-success-dark: var(--green-700);
+
+  /* §2.8 Warning (Orange) */
+  --surface-warning-lightest: var(--orange-100);
+  --surface-warning-lighter: var(--orange-200);
+  --surface-warning-subtle: var(--orange-150);
+  --surface-warning-base: var(--orange-500);
+  --surface-warning-dark: var(--orange-700);
+  --content-warning-base: var(--orange-500);
+  --content-warning-dark: var(--orange-700);
+  --content-warning-darker: var(--orange-800);
+
+  /* §2.9 Info (Blue) */
+  --surface-info-lightest: var(--blue-100);
+  --surface-info-lighter: var(--blue-200);
+  --surface-info-subtle: var(--blue-150);
+  --surface-info-base: var(--blue-500);
+  --content-info-base: var(--blue-500);
+  --content-info-dark: var(--blue-700);
+
+  /* §2.10 Tokens spéciaux */
+  --border-default: var(--greyscale-100);
+  --border-focus: var(--blue-400);
+  --content-visited-base: var(--purple-500);
+  --icon-logo-primary: var(--midnight-500);
+  --icon-logo-secondary: var(--tangerine-500);
+  --icon-logo-monochrome-light: var(--greyscale-0);
+
+  /* ------------------------------------------------------------------ */
+  /* Typographie (§3)                                                    */
+  /* ------------------------------------------------------------------ */
+
+  /* §3.1 Familles. --font-poppins est fournie par next/font depuis
+     app/layout.tsx : la police est auto-hébergée, jamais chargée depuis
+     un domaine tiers au runtime. */
+  --font-family-primary: var(--font-poppins), Arial, sans-serif;
+  --font-family-secondary: Arial, sans-serif;
+
+  /* §3.2 Tailles */
+  --font-size-2xs: 10px;
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 30px;
+  --font-size-4xl: 36px;
+
+  /* §3.3 Graisses */
+  --font-weight-400: 400;
+  --font-weight-500: 500;
+  --font-weight-600: 600;
+  --font-weight-700: 700;
+
+  /* §3.4 Hauteurs de ligne */
+  --line-height-50: 14px;
+  --line-height-75: 16px;
+  --line-height-125: 20px;
+  --line-height-175: 24px;
+  --line-height-200: 26px;
+  --line-height-225: 28px;
+  --line-height-275: 32px;
+  --line-height-325: 36px;
+  --line-height-375: 40px;
+  --line-height-475: 48px;
+
+  /* ------------------------------------------------------------------ */
+  /* Espacements (§4)                                                    */
+  /* ------------------------------------------------------------------ */
+
+  /* Échelle générique : spacing, gap, padding, dimensions.
+     Le pas est de 4 px, avec 2 et 6 en intercalaires. Les utilitaires
+     Tailwind couvrent la même échelle via --spacing (voir globals.css) :
+     number/2 → 0.5 · number/4 → 1 · number/6 → 1.5 · number/16 → 4. */
+  --number-none: 0;
+  --number-2: 2px;
+  --number-4: 4px;
+  --number-6: 6px;
+  --number-8: 8px;
+  --number-12: 12px;
+  --number-16: 16px;
+  --number-20: 20px;
+  --number-24: 24px;
+  --number-28: 28px;
+  --number-32: 32px;
+  --number-36: 36px;
+  --number-40: 40px;
+  --number-44: 44px;
+  --number-48: 48px;
+  --number-52: 52px;
+  --number-56: 56px;
+  --number-60: 60px;
+  --number-64: 64px;
+  --number-68: 68px;
+  --number-72: 72px;
+  --number-76: 76px;
+  --number-80: 80px;
+  --number-84: 84px;
+  --number-88: 88px;
+  --number-92: 92px;
+  --number-96: 96px;
+  --number-100: 100px;
+
+  /* ------------------------------------------------------------------ */
+  /* Rayons (§5)                                                         */
+  /* ------------------------------------------------------------------ */
+  --border-radius-none: 0;
+  --border-radius-xs: 2px;
+  --border-radius-sm: 4px;
+  --border-radius-md: 6px;
+  --border-radius-lg: 8px;
+  --border-radius-xl: 12px;
+  --border-radius-2xl: 16px;
+  --border-radius-3xl: 24px;
+  --border-radius-4xl: 32px;
+  --border-radius-full: 999px;
+
+  /* ------------------------------------------------------------------ */
+  /* Épaisseurs de bordure (§6)                                          */
+  /* ------------------------------------------------------------------ */
+  /* border-width/2 vaut bien 3px dans le document. Traduit tel quel ;
+     l'écart est signalé dans JOURNAL-TECHNIQUE.md. */
+  --border-width-0: 0;
+  --border-width-1: 1px;
+  --border-width-2: 3px;
+  --border-width-4: 4px;
+
+  /* ------------------------------------------------------------------ */
+  /* Opacités (§7)                                                       */
+  /* ------------------------------------------------------------------ */
+  --opacity-none: 0%;
+  --opacity-trace: 4%;
+  --opacity-faded: 8%;
+  --opacity-faint: 12%;
+  --opacity-thin: 16%;
+  --opacity-distinct: 40%;
+
+  /* Élévations (§8) et gradients (§9) : le document les nomme sans
+     fournir de valeur. Rien n'est inventé ici. Voir JOURNAL-TECHNIQUE.md. */
+}

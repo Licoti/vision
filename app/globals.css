@@ -1,0 +1,220 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+/* ==========================================================================
+   Mappage du thème vers Tailwind
+
+   `@theme inline` et non `@theme` : les utilitaires générés émettent alors
+   `var(--surface-primary-base)` plutôt que la couleur figée à la compilation.
+   C'est ce qui permettra à un domaine de porter sa charte en redéfinissant la
+   couche primitive de tokens.css sous son propre sélecteur, sans recompiler.
+
+   Chaque namespace ouvre par `initial`, qui efface l'échelle livrée par
+   Tailwind. Après quoi `bg-blue-500` ou `text-xl` n'existent plus s'ils ne
+   viennent pas du design system : la règle 2 du CLAUDE.md — aucune valeur
+   visuelle en dur — devient structurelle et non plus déclarative.
+   ========================================================================== */
+
+@theme inline {
+  /* --- Couleurs ---------------------------------------------------- */
+  --color-*: initial;
+
+  /* §2.1 Primary */
+  --color-surface-primary-lightest: var(--surface-primary-lightest);
+  --color-surface-primary-lighter: var(--surface-primary-lighter);
+  --color-surface-primary-soft: var(--surface-primary-soft);
+  --color-surface-primary-light: var(--surface-primary-light);
+  --color-surface-primary-normal: var(--surface-primary-normal);
+  --color-surface-primary-base: var(--surface-primary-base);
+  --color-surface-primary-dark: var(--surface-primary-dark);
+  --color-content-primary-light: var(--content-primary-light);
+  --color-content-primary-normal: var(--content-primary-normal);
+  --color-content-primary-base: var(--content-primary-base);
+  --color-content-primary-dark: var(--content-primary-dark);
+  --color-border-primary-lighter: var(--border-primary-lighter);
+  --color-border-primary-light: var(--border-primary-light);
+  --color-border-primary-normal: var(--border-primary-normal);
+  --color-border-primary-base: var(--border-primary-base);
+  --color-border-primary-dark: var(--border-primary-dark);
+
+  /* §2.2 Secondary */
+  --color-surface-secondary-lightest: var(--surface-secondary-lightest);
+  --color-surface-secondary-base: var(--surface-secondary-base);
+  --color-surface-secondary-dark: var(--surface-secondary-dark);
+  --color-content-secondary-base: var(--content-secondary-base);
+  --color-content-secondary-dark: var(--content-secondary-dark);
+  --color-border-secondary-base: var(--border-secondary-base);
+  --color-border-secondary-dark: var(--border-secondary-dark);
+
+  /* §2.3 Tertiary */
+  --color-surface-tertiary-lightest: var(--surface-tertiary-lightest);
+  --color-surface-tertiary-base: var(--surface-tertiary-base);
+  --color-surface-tertiary-dark: var(--surface-tertiary-dark);
+  --color-content-tertiary-base: var(--content-tertiary-base);
+  --color-content-tertiary-dark: var(--content-tertiary-dark);
+
+  /* §2.4 Neutral */
+  --color-surface-neutral-pale: var(--surface-neutral-pale);
+  --color-surface-neutral-lightest: var(--surface-neutral-lightest);
+  --color-surface-neutral-lighter: var(--surface-neutral-lighter);
+  --color-surface-neutral-light: var(--surface-neutral-light);
+  --color-surface-neutral-normal: var(--surface-neutral-normal);
+  --color-surface-neutral-base: var(--surface-neutral-base);
+  --color-surface-neutral-dark: var(--surface-neutral-dark);
+  --color-surface-neutral-darkest: var(--surface-neutral-darkest);
+  --color-content-neutral-pale: var(--content-neutral-pale);
+  --color-content-neutral-light: var(--content-neutral-light);
+  --color-content-neutral-normal: var(--content-neutral-normal);
+  --color-content-neutral-base: var(--content-neutral-base);
+  --color-content-neutral-dark: var(--content-neutral-dark);
+  --color-content-neutral-darkest: var(--content-neutral-darkest);
+
+  /* §2.5 Surfaces avec opacité */
+  --color-surface-neutral-opacity-trace: var(--surface-neutral-opacity-trace);
+  --color-surface-neutral-opacity-faded: var(--surface-neutral-opacity-faded);
+  --color-surface-neutral-opacity-faint: var(--surface-neutral-opacity-faint);
+  --color-surface-neutral-opacity-thin: var(--surface-neutral-opacity-thin);
+  --color-surface-neutral-opacity-distinct: var(--surface-neutral-opacity-distinct);
+
+  /* §2.6 Danger */
+  --color-surface-danger-lightest: var(--surface-danger-lightest);
+  --color-surface-danger-lighter: var(--surface-danger-lighter);
+  --color-surface-danger-normal: var(--surface-danger-normal);
+  --color-surface-danger-base: var(--surface-danger-base);
+  --color-surface-danger-dark: var(--surface-danger-dark);
+  --color-content-danger-normal: var(--content-danger-normal);
+  --color-content-danger-base: var(--content-danger-base);
+  --color-content-danger-dark: var(--content-danger-dark);
+
+  /* §2.7 Success */
+  --color-surface-success-lightest: var(--surface-success-lightest);
+  --color-surface-success-lighter: var(--surface-success-lighter);
+  --color-surface-success-subtle: var(--surface-success-subtle);
+  --color-surface-success-base: var(--surface-success-base);
+  --color-surface-success-dark: var(--surface-success-dark);
+  --color-content-success-base: var(--content-success-base);
+  --color-content-success-dark: var(--content-success-dark);
+
+  /* §2.8 Warning */
+  --color-surface-warning-lightest: var(--surface-warning-lightest);
+  --color-surface-warning-lighter: var(--surface-warning-lighter);
+  --color-surface-warning-subtle: var(--surface-warning-subtle);
+  --color-surface-warning-base: var(--surface-warning-base);
+  --color-surface-warning-dark: var(--surface-warning-dark);
+  --color-content-warning-base: var(--content-warning-base);
+  --color-content-warning-dark: var(--content-warning-dark);
+  --color-content-warning-darker: var(--content-warning-darker);
+
+  /* §2.9 Info */
+  --color-surface-info-lightest: var(--surface-info-lightest);
+  --color-surface-info-lighter: var(--surface-info-lighter);
+  --color-surface-info-subtle: var(--surface-info-subtle);
+  --color-surface-info-base: var(--surface-info-base);
+  --color-content-info-base: var(--content-info-base);
+  --color-content-info-dark: var(--content-info-dark);
+
+  /* §2.10 Tokens spéciaux */
+  --color-border-default: var(--border-default);
+  --color-border-focus: var(--border-focus);
+  --color-content-visited-base: var(--content-visited-base);
+  --color-icon-logo-primary: var(--icon-logo-primary);
+  --color-icon-logo-secondary: var(--icon-logo-secondary);
+  --color-icon-logo-monochrome-light: var(--icon-logo-monochrome-light);
+
+  /* Valeurs de mot-clé, sans couleur propre : conservées pour bg-transparent
+     et text-current, que l'effacement du namespace emporterait sinon. */
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-inherit: inherit;
+
+  /* --- Typographie (§3) -------------------------------------------- */
+  --font-*: initial;
+  --font-primary: var(--font-family-primary);
+  --font-secondary: var(--font-family-secondary);
+  --default-font-family: var(--font-family-primary);
+
+  --text-*: initial;
+  --text-2xs: var(--font-size-2xs);
+  --text-xs: var(--font-size-xs);
+  --text-sm: var(--font-size-sm);
+  --text-md: var(--font-size-md);
+  --text-lg: var(--font-size-lg);
+  --text-xl: var(--font-size-xl);
+  --text-2xl: var(--font-size-2xl);
+  --text-3xl: var(--font-size-3xl);
+  --text-4xl: var(--font-size-4xl);
+
+  /* Graisses : l'échelle par défaut de Tailwind est réduite aux quatre
+     graisses du §3.3 — thin, extrabold et black disparaissent. Les noms
+     usuels sont conservés, le nombre restant lisible dans le token pointé. */
+  --font-weight-*: initial;
+  --font-weight-normal: var(--font-weight-400);
+  --font-weight-medium: var(--font-weight-500);
+  --font-weight-semibold: var(--font-weight-600);
+  --font-weight-bold: var(--font-weight-700);
+
+  /* Hauteurs de ligne : `leading-175` vaut 24px, comme line-height/175. */
+  --leading-*: initial;
+  --leading-50: var(--line-height-50);
+  --leading-75: var(--line-height-75);
+  --leading-125: var(--line-height-125);
+  --leading-175: var(--line-height-175);
+  --leading-200: var(--line-height-200);
+  --leading-225: var(--line-height-225);
+  --leading-275: var(--line-height-275);
+  --leading-325: var(--line-height-325);
+  --leading-375: var(--line-height-375);
+  --leading-475: var(--line-height-475);
+
+  /* --- Espacements (§4) -------------------------------------------- */
+  /* Pas unique de 4px : l'échelle number/* est reproduite exactement.
+     number/2 → 0.5 · number/4 → 1 · number/6 → 1.5 · number/8 → 2 ·
+     number/12 → 3 · number/16 → 4 · … · number/100 → 25. */
+  --spacing: var(--number-4);
+
+  /* --- Rayons (§5) -------------------------------------------------- */
+  --radius-*: initial;
+  --radius-none: var(--border-radius-none);
+  --radius-xs: var(--border-radius-xs);
+  --radius-sm: var(--border-radius-sm);
+  --radius-md: var(--border-radius-md);
+  --radius-lg: var(--border-radius-lg);
+  --radius-xl: var(--border-radius-xl);
+  --radius-2xl: var(--border-radius-2xl);
+  --radius-3xl: var(--border-radius-3xl);
+  --radius-4xl: var(--border-radius-4xl);
+  --radius-full: var(--border-radius-full);
+
+  /* --- Ombres (§8) --------------------------------------------------- */
+  /* Le design system nomme trois élévations sans en donner la valeur.
+     Le namespace est effacé plutôt que meublé d'ombres inventées. */
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+}
+
+/* ==========================================================================
+   Styles de base
+
+   Épaisseurs de bordure : Tailwind 4 dérive `border-2` d'un nombre brut, pas
+   d'un token. `border` vaut 1px et correspond à border-width/1 ; pour les
+   autres, écrire `border-[length:var(--border-width-2)]` afin que la valeur
+   reste celle du design system.
+   ========================================================================== */
+
+@layer base {
+  html {
+    background-color: var(--surface-neutral-lightest);
+    color: var(--content-neutral-darkest);
+    font-family: var(--font-family-primary);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Posé dès maintenant : la validation de T1.6 exige un focus visible, et
+     le laisser pour plus tard reviendrait à traverser tout C1 sans. */
+  *:focus-visible {
+    outline: var(--number-2) solid var(--border-focus);
+    outline-offset: var(--number-2);
+    border-radius: var(--border-radius-xs);
+  }
+}

@@ -1,0 +1,19 @@
+# dépendances
+/node_modules
+
+# build
+/.next
+/out
+next-env.d.ts
+*.tsbuildinfo
+
+# environnement
+.env
+.env.*
+!.env.example
+
+# déploiement
+.netlify
+
+# système
+.DS_Store
