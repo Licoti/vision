@@ -1009,6 +1009,22 @@ async function seed(): Promise<void> {
     ],
   );
 
+  /* --- La fraîcheur ------------------------------------------------------- */
+
+  /**
+   * `last_activity_at` est un champ dérivé : la couche le pose à chaque
+   * écriture d'activité. Or l'amorçage est idempotent — à la seconde
+   * exécution, il n'écrit plus rien, donc il ne recalculerait plus rien. Une
+   * base amorcée avant T2.1 garderait l'ancienne définition de la fraîcheur.
+   *
+   * Ce rafraîchissement rejoue le calcul sur tous les projets du domaine. Il
+   * ne touche aucune ligne de fixture et n'entre donc pas dans le compte rendu
+   * ci-dessous : le critère d'idempotence de T1.5 porte sur la fixture, pas
+   * sur les champs qu'elle fait dériver.
+   */
+  const refreshed = await scope.refreshLastActivity();
+  console.log(`\nFraîcheur recalculée sur ${refreshed} projet(s).`);
+
   /* --- Le compte rendu ---------------------------------------------------- */
 
   let created = 0;

@@ -367,3 +367,53 @@ Le ticket demande que les composants de base soient posés, et les six routes n'
 donnée : `List`, `ListHeader`, `ListRow`, `Section`, `SectionHeader` et la prop `action` de
 `EmptyState` sont donc écrits sans appelant. C'est une dette assumée et courte — T2.1 et T2.2 les
 consomment. Si leur forme se révèle fausse à l'usage, elle se corrige là, pas ici.
+
+**T2.1 — `last_activity_at` redéfini : les activités prévues sortent du calcul.** T1.3 retenait
+toutes les activités non archivées et non annulées, faute de définition dans `docs/04` §6.
+Conséquence rendue visible par le premier écran qui affiche le champ : deux produits sur deux
+dataient leur « dernière activité » d'octobre et septembre 2026, sur un écran du 12 août 2026.
+`docs/03` §8 veut que ce champ dise « depuis quand un projet n'a pas bougé » — une activité
+prévue n'a pas eu lieu. La condition porte sur l'**état** (`state <> 'planned'`) et jamais sur
+l'horloge : un champ stocké dont la valeur dépendrait de `current_date` serait faux le lendemain
+de son calcul, et aucun recalcul ne le rattraperait. Arbitrage rendu avec l'humain à l'ouverture
+du ticket.
+
+**T2.1 — `refreshLastActivity`, sans quoi la décision précédente ne valait rien.** Le recalcul
+existait depuis T1.3 mais n'était atteignable que par une écriture d'activité : il aurait fallu
+écrire pour corriger. Une base amorcée avant T2.1 aurait gardé l'ancienne définition pour
+toujours. **Leçon générale, pas propre à ce champ** : tout champ dénormalisé a besoin d'un moyen
+de rejouer sa définition, sinon la définition n'est qu'une intention. `updated_at` n'est
+délibérément pas touché — rafraîchir un champ dérivé n'est pas une modification métier, et le
+journal de C6 n'a rien à en dire.
+
+**T2.1 — L'amorçage rafraîchit la fraîcheur, et cela ne rompt pas son idempotence.** L'appel est
+inconditionnel à chaque exécution, mais il ne touche aucune ligne de fixture : le compte rendu
+affiche toujours « Rien à faire : le domaine était déjà à jour ». Le critère de T1.5 porte sur la
+fixture, pas sur les champs qu'elle fait dériver. Vérifié en relançant `npm run db:seed` deux
+fois.
+
+**T2.1 — Un paramètre d'URL non conforme à un UUID rendait 500.** `?entite=n-importe-quoi`
+n'était pas une recherche infructueuse mais une erreur PostgreSQL (`invalid input syntax for type
+uuid`) remontée en page d'erreur. Trouvé en vérifiant le ticket, pas prévu au plan. La forme est
+vérifiée avant la base, dans l'écran. **`/produits/[id]` et `/projets/[id]` ont le même défaut en
+puissance** : ils ne lisent encore rien, mais T2.2 et T2.4 devront poser la même garde, et le 404
+qui va avec un identifiant inconnu.
+
+**T2.1 — `max()` sur `timestamptz` ne revient pas typé.** Drizzle rend la valeur telle que le
+pilote la fournit — une chaîne, là où `select` d'une colonne rend un `Date`. La conversion est
+faite une fois dans `lib/queries/products.ts` plutôt que dans chaque appelant, et le type de
+retour annonce un `Date | null`. À savoir pour toute autre agrégation de dates en C3 et C5.
+
+**T2.1 — Le tri de la liste des produits est alphabétique, faute de consigne.** Le ticket n'en
+impose aucun et `docs/06` §4 ne parle de « tri par activité récente » que pour la liste transverse
+des projets. À reprendre si l'usage montre autre chose.
+
+**T2.1 — Les filtres d'entité ne proposent que les entités qui portent un produit.** Le
+référentiel en compte cinq, deux seulement sont proposées : un filtre qui ne ramène rien est un
+chemin vers le vide. Les trois autres restent atteignables par l'URL, et l'écran sait alors le
+dire — c'est le second état vide du ticket, celui qu'aucun clic ne produit. Arbitrage rendu avec
+l'humain.
+
+**T2.1 — Les filtres sont locaux à l'écran, volontairement.** T2.3 devra combiner quatre filtres
+et une recherche : la forme partagée s'écrira là, avec ses vraies contraintes. La poser ici
+reviendrait à écrire T2.3 par avance, ce qu'interdit la règle 3.

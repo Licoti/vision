@@ -337,6 +337,96 @@ describe("`last_activity_at` est tenu par la couche d'écriture", () => {
     const afterArchive = await a.scope.find(projects, project.id);
     expect(afterArchive?.lastActivityAt).toBeNull();
   });
+
+  /**
+   * T2.1 — la fraîcheur dit « depuis quand ça n'a pas bougé » (docs/03 §8).
+   * Une activité prévue n'a pas eu lieu : elle ne peut pas dater le dernier
+   * mouvement du projet, et surtout pas le poser dans le futur.
+   */
+  test("une activité prévue ne déplace pas la date", async () => {
+    const project = await a.scope.insert(projects, {
+      name: "Projet à l'arrêt",
+      productId: a.productId,
+      statusId: a.statusId,
+    });
+
+    await a.scope.insert(activities, {
+      projectId: project.id,
+      activityTypeId: a.activityTypeId,
+      state: "done",
+      periodStart: "2026-01-05",
+      periodEnd: "2026-01-30",
+    });
+    await a.scope.insert(activities, {
+      projectId: project.id,
+      activityTypeId: a.activityTypeId,
+      state: "planned",
+      periodStart: "2027-06-01",
+      periodEnd: "2027-06-30",
+    });
+
+    const after = await a.scope.find(projects, project.id);
+    expect(after?.lastActivityAt?.toISOString().slice(0, 10)).toBe("2026-01-30");
+  });
+
+  test("une activité en cours déplace la date, elle a commencé", async () => {
+    const project = await a.scope.insert(projects, {
+      name: "Projet en mouvement",
+      productId: a.productId,
+      statusId: a.statusId,
+    });
+
+    await a.scope.insert(activities, {
+      projectId: project.id,
+      activityTypeId: a.activityTypeId,
+      state: "done",
+      periodStart: "2026-01-05",
+      periodEnd: "2026-01-30",
+    });
+    await a.scope.insert(activities, {
+      projectId: project.id,
+      activityTypeId: a.activityTypeId,
+      state: "in_progress",
+      periodStart: "2026-04-01",
+      periodEnd: "2026-04-30",
+    });
+
+    const after = await a.scope.find(projects, project.id);
+    expect(after?.lastActivityAt?.toISOString().slice(0, 10)).toBe("2026-04-30");
+  });
+
+  /**
+   * Le rafraîchissement rejoue la définition sur des lignes déjà écrites.
+   * Sans lui, un changement de définition ne rattraperait jamais l'existant :
+   * la valeur est posée à l'écriture, et une écriture passée ne se refait pas.
+   */
+  test("`refreshLastActivity` rejoue le calcul sur l'existant", async () => {
+    const project = await a.scope.insert(projects, {
+      name: "Projet à rafraîchir",
+      productId: a.productId,
+      statusId: a.statusId,
+    });
+    await a.scope.insert(activities, {
+      projectId: project.id,
+      activityTypeId: a.activityTypeId,
+      state: "done",
+      periodStart: "2026-02-01",
+      periodEnd: "2026-02-28",
+    });
+
+    // Une valeur fausse posée par le client brut, hors de la couche : c'est
+    // l'état qu'aurait laissé une ancienne définition.
+    await db
+      .update(projects)
+      .set({ lastActivityAt: new Date("2030-01-01T00:00:00Z") })
+      .where(eq(projects.id, project.id));
+
+    const count = await a.scope.refreshLastActivity([project.id]);
+    expect(count).toBe(1);
+
+    const after = await a.scope.find(projects, project.id);
+    expect(after?.lastActivityAt?.toISOString().slice(0, 10)).toBe("2026-02-28");
+  });
 });
 
 /* ==========================================================================

@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** T1.6 terminé — C1 clos
+**Dernière mise à jour :** T2.1 terminé
 **Chantier en cours :** C2 — Produits et projets
-**Ticket en cours :** aucun — prochain à lancer : T2.1 (liste des produits)
+**Ticket en cours :** aucun — prochain à lancer : T2.2 (page produit, version socle)
 
 ---
 
@@ -13,7 +13,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | Chantier | Tickets | État |
 |---|---|---|
 | C1 — Socle technique | T1.1 → T1.6 | **terminé** |
-| C2 — Produits et projets | T2.1 → T2.6 | à faire |
+| C2 — Produits et projets | T2.1 → T2.6 | en cours — T2.1 fait |
 | C3 — Activités et roadmap | à découper | à faire |
 | C4 — Ressources et résultats | à découper | à faire |
 | C5 — Indicateurs et temps long | à découper | à faire |
@@ -89,6 +89,21 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   `lib/` est `lib/navigation`. Écarts assumés et consignés : deux blocs de la maquette écartés
   faute de droit de lire la session — carte de la personne courante et entrée Administration ;
   `/a-propos` laissée vide comme les cinq autres alors que son contenu ne coûterait rien.
+- **T2.1 — 12/08/2026 — liste des produits.** Le premier écran vivant de Vision. **Le critère est
+  tenu et lu dans le HTML servi**, pas affirmé : « Déclaration de sinistre en ligne · Assurance ·
+  1 accompagnement · juin 2026 » et « Espace client web · Banque de détail · 2 accompagnements ·
+  août 2026 ». Le ticket a forcé à trancher la fraîcheur, que `ETAT.md` renvoyait à C2 : les
+  activités `planned` sortent du calcul de `last_activity_at`, sur l'**état** et jamais sur
+  l'horloge — un champ stocké qui dépendrait de `current_date` serait faux le lendemain. Sans quoi
+  la colonne affichait octobre 2026 et septembre 2026 sur un écran daté du 12 août. Les deux tests
+  ajoutés ont été mis en défaut séparément : la condition `planned` retirée fait tomber le test de
+  l'activité prévue et lui seul ; `in_progress` exclu en plus fait tomber celui de l'activité en
+  cours et lui seul. La couche gagne `refreshLastActivity`, sans quoi la décision ne s'appliquait
+  qu'aux écritures futures ; l'amorçage l'appelle et reste idempotent sur la fixture — vérifié.
+  Un défaut trouvé en vérifiant, corrigé : `?entite=` non conforme à un UUID rendait 500, la forme
+  est désormais vérifiée avant la base. Écart assumé et consigné : le périmètre déborde sur
+  `lib/db/scoped.ts`, ses tests et `scripts/seed.ts` — c'est le prix d'une décision sur un champ
+  dénormalisé.
 
 ---
 
@@ -105,16 +120,15 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   personne courante et l'entrée Administration sont dans les maquettes ; T1.6 s'interdisait toute
   lecture en base. À rebrancher au premier ticket qui lit la session — l'entrée Administration
   n'apparaissant qu'au responsable de domaine.
-- **Les URL de détail portent un identifiant, pas un slug.** `/produits/[id]`, `/projets/[id]`.
-  Rien n'est tranché : C2, avec l'écran qui construit le lien, dira si l'UUID reste visible ou si
-  un slug le remplace. Le libellé du dernier maillon du fil d'Ariane suit la même échéance — il
-  est générique tant qu'aucun nom n'est lu en base.
-- **`last_activity_at` compte les activités prévues, et se pose donc dans le futur.** T1.3 avait
-  retenu `max(coalesce(period_end, period_start))` sur les activités non archivées et non annulées,
-  faute de définition dans `docs/04` §6. T1.5 rend l'effet visible : deux projets sur trois portent
-  une date à venir, celle d'un audit **prévu**. `docs/03` §8 veut pourtant que ce champ dise
-  « depuis quand un projet n'a pas bougé ». Ce n'est plus une interprétation à confirmer mais un
-  écart constaté. **À trancher en C2**, avec le tri « par activité récente » de T2.3.
+- **Les pages de détail ne vérifient pas encore la forme de leur identifiant.** T2.1 a découvert
+  qu'un paramètre non conforme à un UUID ne produit pas une recherche infructueuse mais une erreur
+  PostgreSQL, donc une page en 500 ; la liste des produits s'en protège. `/produits/[id]` et
+  `/projets/[id]` restent exposés tant qu'ils ne lisent rien — **à traiter en T2.2 et T2.4**, avec
+  le 404 qui va avec un identifiant inconnu.
+- **Une activité `in_progress` porte une fin de période à venir.** La fraîcheur retient
+  `max(coalesce(period_end, period_start))` : pour l'atelier en cours du mois d'août, c'est le
+  31 août. Au mois, l'affichage dit « août 2026 » et reste juste. Le jour où une date au jour
+  s'affiche quelque part, la question se repose.
 - **Rien n'empêche techniquement un import direct de `lib/db/client`.** Le verrou ESLint a été
   écarté du périmètre de T1.3. La règle 1 tient aujourd'hui par la convention, l'en-tête de
   `client.ts` et un `grep`. À reposer si un import sauvage apparaît.

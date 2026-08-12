@@ -1,28 +1,196 @@
 /**
  * Produits — la liste, chemin canonique de la navigation.
  *
- * Route posée par T1.6, sans contenu métier. La liste elle-même est le
- * ticket T2.1.
+ * Elle répond à « sur quels objets le centre intervient-il, et pour quelles
+ * entités ». Quatre colonnes, pas une de plus : nom, entité, nombre
+ * d'accompagnements, dernière activité.
+ *
+ * **Le filtre passe par l'URL** (`?entite=…`) et non par un état client : il
+ * se partage, il survit à un rechargement, et l'écran reste un composant
+ * serveur. Un identifiant qui ne désigne aucune entité du domaine est ignoré,
+ * jamais affiché — inventer un libellé à partir d'un paramètre serait donner
+ * du crédit à ce qu'on n'a pas lu.
+ *
+ * Aucune requête directe : tout passe par `session.db`, déjà scopé sur le
+ * domaine courant. Règle 1.
  */
 
+import Link from "next/link";
+
 import { EmptyState } from "@/components/ui/empty-state";
+import { List, ListHeader, ListRow } from "@/components/ui/list";
 import { Page, PageHeader } from "@/components/ui/page";
+import { requireSession } from "@/lib/auth/provider";
+import { entities } from "@/lib/db/schema";
+import { formatAccompaniments, formatMonth } from "@/lib/format";
+import { ROUTES } from "@/lib/navigation";
+import {
+  listProductEntities,
+  listProductsWithCounts,
+  type ProductEntity,
+} from "@/lib/queries/products";
 
 export const metadata = {
   title: "Produits — Vision",
 };
 
-export default function ProductsPage() {
+/**
+ * Un paramètre d'URL est saisi par n'importe qui. Interroger une colonne
+ * `uuid` avec « n-importe-quoi » n'est pas une recherche infructueuse : c'est
+ * une erreur PostgreSQL, et une page en 500. La forme se vérifie donc avant la
+ * base — constaté en vérifiant le ticket, pas déduit.
+ */
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Les gabarits de colonne, tenus en un seul endroit pour que l'en-tête et
+ *  les lignes ne puissent pas diverger. */
+const COLUMN = {
+  name: "min-w-0 flex-1",
+  entity: "w-40 flex-none",
+  count: "w-40 flex-none",
+  freshness: "w-36 flex-none text-right",
+} as const;
+
+export default async function ProductsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ entite?: string }>;
+}) {
+  const session = await requireSession();
+  const { entite } = await searchParams;
+
+  const filters = await listProductEntities(session.db);
+
+  // Le paramètre est confronté au domaine avant d'être cru. `find` est scopé :
+  // l'entité d'un autre domaine n'existe pas, elle ne « manque » pas.
+  const requested = entite && UUID.test(entite) ? entite : undefined;
+  const activeEntity = requested
+    ? await session.db.find(entities, requested)
+    : undefined;
+
+  const products = await listProductsWithCounts(session.db, {
+    entityId: activeEntity?.id,
+  });
+
   return (
     <Page>
       <PageHeader
         title="Produits"
         lead="Sur quels objets le centre intervient-il, et pour quelles entités ?"
       />
-      <EmptyState
-        title="La liste des produits s'affichera ici"
-        description="Les objets accompagnés par le centre — pas le catalogue de l'entreprise. Chaque ligne portera le nom du produit, son entité, son nombre d'accompagnements et la date de sa dernière activité."
-      />
+
+      {filters.length > 0 ? (
+        <EntityFilters entities={filters} activeId={activeEntity?.id} />
+      ) : null}
+
+      {products.length > 0 ? (
+        <List label="Produits accompagnés">
+          <ListHeader>
+            <span className={COLUMN.name}>Produit</span>
+            <span className={COLUMN.entity}>Entité</span>
+            <span className={COLUMN.count}>Accompagnements</span>
+            <span className={COLUMN.freshness}>Dernière activité</span>
+          </ListHeader>
+
+          {products.map((product) => (
+            <ListRow key={product.id} href={ROUTES.product(product.id)}>
+              <span
+                className={`${COLUMN.name} font-semibold text-content-neutral-darkest`}
+              >
+                {product.name}
+              </span>
+              <span className={COLUMN.entity}>{product.entityLabel}</span>
+              <span className={COLUMN.count}>
+                {formatAccompaniments(product.projectCount)}
+              </span>
+              <span className={`${COLUMN.freshness} text-content-neutral-base`}>
+                {product.lastActivityAt ? (
+                  <>
+                    {/* L'en-tête de colonne est décoratif : la ligne dit
+                        elle-même de quoi cette date est la date. */}
+                    <span className="sr-only">Dernière activité : </span>
+                    {formatMonth(product.lastActivityAt)}
+                  </>
+                ) : (
+                  <>
+                    <span className="sr-only">Dernière activité : </span>
+                    aucune à ce jour
+                  </>
+                )}
+              </span>
+            </ListRow>
+          ))}
+        </List>
+      ) : activeEntity ? (
+        <EmptyState
+          title={`Aucun produit pour ${activeEntity.label}`}
+          description="Le centre n'accompagne aucun produit rattaché à cette entité. Les produits d'une autre entité restent visibles sans le filtre."
+          action={
+            <Link
+              href={ROUTES.products}
+              className="text-sm font-semibold text-content-primary-dark underline"
+            >
+              Voir tous les produits
+            </Link>
+          }
+        />
+      ) : (
+        <EmptyState
+          title="Aucun produit accompagné pour l'instant"
+          description="Cette liste réunira les objets sur lesquels le centre intervient — pas le catalogue de l'entreprise. Chaque produit y portera son entité, le nombre d'accompagnements qu'il a reçus et la date de sa dernière activité."
+        />
+      )}
     </Page>
+  );
+}
+
+/**
+ * Les filtres d'entité, en liens.
+ *
+ * Local à cet écran, et volontairement : T2.3 devra combiner quatre filtres et
+ * une recherche, ce qui appelle une autre forme. La poser ici reviendrait à
+ * écrire ce ticket-là par avance.
+ */
+function EntityFilters({
+  entities: options,
+  activeId,
+}: {
+  entities: ProductEntity[];
+  activeId: string | undefined;
+}) {
+  const chip = (active: boolean) =>
+    [
+      "rounded-full border px-4 py-1.5 text-sm",
+      active
+        ? "border-border-primary-lighter bg-surface-primary-lightest font-semibold text-content-primary-dark"
+        : "border-surface-neutral-lighter bg-surface-neutral-pale font-medium text-content-neutral-dark",
+    ].join(" ");
+
+  return (
+    <nav aria-label="Filtrer par entité">
+      <ul className="flex flex-wrap gap-2">
+        <li>
+          <Link
+            href={ROUTES.products}
+            aria-current={activeId ? undefined : "true"}
+            className={chip(!activeId)}
+          >
+            Toutes les entités
+          </Link>
+        </li>
+        {options.map((option) => (
+          <li key={option.id}>
+            <Link
+              href={`${ROUTES.products}?entite=${option.id}`}
+              aria-current={activeId === option.id ? "true" : undefined}
+              className={chip(activeId === option.id)}
+            >
+              {option.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }

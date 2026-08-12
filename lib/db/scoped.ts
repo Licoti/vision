@@ -181,10 +181,20 @@ function parentChecksOf(table: ScopedTable): readonly ParentCheck[] {
    `last_activity_at`
 
    `docs/04` §6 confie le champ à la couche d'écriture sans en donner la
-   définition. Retenu : la date du dernier fait d'accompagnement — activités
-   non archivées et non annulées. L'autre lecture possible, l'horodatage de la
-   dernière modification, est le rôle d'`events`, pas de ce champ.
-   Nul si le projet n'a que des activités à planifier.
+   définition. Retenu : la date du dernier fait d'accompagnement **qui a eu
+   lieu** — activités non archivées, non annulées, et non `planned`.
+   L'autre lecture possible, l'horodatage de la dernière modification, est le
+   rôle d'`events`, pas de ce champ. Nul si le projet n'a rien commencé.
+
+   **Pourquoi `planned` est exclu** (tranché en T2.1, avec l'humain). T1.3
+   comptait toutes les activités non annulées, ce qui posait la date dans le
+   futur dès qu'un audit était prévu — `docs/03` §8 veut pourtant que ce champ
+   dise « depuis quand un projet n'a pas bougé ». Une activité `in_progress`
+   compte, elle a commencé ; une activité `planned` n'a pas eu lieu.
+
+   La condition porte sur l'**état**, jamais sur l'horloge : un champ stocké
+   dont la valeur dépendrait de `current_date` serait faux le lendemain de son
+   calcul.
    ========================================================================== */
 
 function lastActivityExpression(domainId: string): SQL {
@@ -195,6 +205,7 @@ function lastActivityExpression(domainId: string): SQL {
       and ${activities.domainId} = ${domainId}
       and ${activities.archivedAt} is null
       and ${activities.state} <> 'cancelled'
+      and ${activities.state} <> 'planned'
   )`;
 }
 
@@ -547,6 +558,40 @@ export function forDomain(scope: Scope) {
   }
 
   /**
+   * Rejoue le calcul de `last_activity_at` — sur les projets nommés, ou sur
+   * tous ceux du domaine.
+   *
+   * Le recalcul existe depuis T1.3, mais n'était atteignable que par une
+   * écriture d'activité. Il fallait donc écrire pour corriger, ce qui est
+   * absurde le jour où c'est la **définition** qui change : les lignes déjà en
+   * base gardaient l'ancienne valeur pour toujours. T2.1 a changé cette
+   * définition ; cette fonction est ce qui permet de l'appliquer.
+   *
+   * `updated_at` n'est pas touché, délibérément : rafraîchir un champ dérivé
+   * n'est pas une modification métier, et le journal de C6 n'a rien à en dire.
+   *
+   * Rend le nombre de projets recalculés.
+   */
+  async function refreshLastActivity(
+    projectIds?: readonly string[],
+  ): Promise<number> {
+    if (projectIds) {
+      if (projectIds.length === 0) return 0;
+      await db.batch(
+        projectIds.map((id) => recalcByProject(domainId, id)) as unknown as Batch,
+      );
+      return projectIds.length;
+    }
+
+    const refreshed = await db
+      .update(projects)
+      .set({ lastActivityAt: lastActivityExpression(domainId) })
+      .where(eq(projects.domainId, domainId))
+      .returning({ id: projects.id });
+    return refreshed.length;
+  }
+
+  /**
    * Défait une liaison. Réservé aux tables sans `archived_at` — le typage
    * refuse toute table métier archivable.
    */
@@ -574,6 +619,7 @@ export function forDomain(scope: Scope) {
     insertMany,
     update,
     archive,
+    refreshLastActivity,
     unlink,
   };
 }
