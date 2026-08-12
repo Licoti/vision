@@ -529,3 +529,69 @@ sa table de couleurs de statut au profit de `components/ui/status-dot.tsx` — `
 à T2.4, « avec deux appelants réels », et T2.3 est ce second appelant, arbitrage rendu avec
 l'humain ; et le fichier `lib/queries/projects.test.ts`, que le ticket ne mentionne pas, comme à
 chaque ticket depuis T1.3.
+
+**T2.4 — Le rang d'accompagnement est le miroir de l'ordre de la page produit.** Le critère du
+ticket dit « calculé, non saisi » ; il ne dit pas sur quoi. Deux ordres coexistent déjà dans le
+code : la liste transverse trie sur `last_activity_at`, la page produit sur `started_on`. Le rang
+lit le second — et volontairement le même que celui de la page produit, `started_on` puis le nom :
+un accompagnement affiché troisième là-bas ne peut pas s'annoncer deuxième ici. `findAccompanimentRank`
+prend donc la liste ordonnée des frères et rend `indexOf + 1`, plutôt qu'un `count(*)` de ce qui
+précède : la même expression de tri sert au rang et à l'affichage, et une divergence future serait
+visible d'un coup d'œil.
+
+**T2.4 — Un accompagnement sans date de début n'a pas de rang du tout.** Le classer supposerait de
+décider s'il ouvre ou ferme la chronologie ; les deux réponses sont arbitraires. La requête écarte
+donc `started_on is null` et la mention disparaît de l'écran, plutôt que d'annoncer un « 1er » que
+rien ne fonde. Mutation vérifiée : la garde retirée, ce test tombe et lui seul.
+
+**T2.4 — Désaccord avec la maquette : la mention de rang pointe vers le produit, pas vers le projet
+voisin.** `docs/06` §7 écrit « une mention du type "3ᵉ accompagnement de ce produit", cliquable vers
+la page produit » ; la maquette, elle, ouvre l'accompagnement précédent. Le document l'emporte — le
+CLAUDE.md pose les maquettes en référence visuelle. Arbitrage rendu avec l'humain, comme celui
+d'afficher la mention **dès le rang 1**, que la maquette masquait : la règle de `docs/06` est sans
+condition, et sur un produit à un seul accompagnement la mention reste un chemin vers le parent.
+
+**T2.4 — Le gris de la maquette pour un intervenant côté entité est invisible.** `--c-light`
+(`greyscale-300`) donne **2,22:1** pour la pastille sur la carte **et** 2,22:1 pour ses initiales
+dessus : ni la forme ni les lettres ne tiennent. Même piège qu'en T2.2, autre bout de l'échelle.
+Retenu `surface-neutral-base` (`greyscale-500`), mesuré à **4,98:1** des deux côtés ; la pastille
+`center` reste à 7,11:1. Et la couleur ne porte de toute façon pas seule la distinction : « côté
+entité » est écrit à côté du nom (`docs/06` §11).
+
+**T2.4 — La puce d'approche est décorative, et c'est ce qui l'autorise à être pâle.** Son fond
+(`surface-primary-lightest`) ne se détache de la carte qu'à **1,04:1**, son filet à **1,33:1** —
+les valeurs mêmes qui avaient fait rejeter une pastille d'avatar en T2.2. La différence n'est pas
+de degré : la pastille remplaçait le nom, la puce entoure un mot lisible, mesuré à **6,84:1**. Le
+3:1 du WCAG 1.4.11 vise ce qu'il faut savoir viser ou distinguer, pas un cerne autour d'un texte.
+Les jetons de la maquette sont donc conservés tels quels.
+
+**T2.4 — Le `filter(projects)` de la requête d'identité ne fait tomber aucun test, une troisième
+fois.** T2.2 l'avait relevé sur deux tables jointes, T2.3 sur quatre ; ici la chaîne
+`projects → products → entities → project_statuses` se rattrape de la même façon, et il faut
+retirer les **quatre** filtres pour que le test d'étanchéité cède. Rien de nouveau sur le fond —
+les jointures portent sur des clés étrangères et T1.3 garantit la cohérence du `domain_id` avec
+les parents. À retenir : sur `findAccompanimentRank`, qui ne joint rien, le filtre est au contraire
+seul à sceller le domaine — son retrait fait tomber un test, et un seul.
+
+**T2.4 — Le commanditaire n'a jamais été vu peuplé.** `sponsor` est nul sur les trois projets de
+l'amorçage : le brief ne nomme aucun commanditaire, et la maquette en invente un (« Marc Tellier
+(entité) ») que rien ne justifie de semer. Le champ affiche donc « Non renseigné » partout — un
+état vide est une information, pas un trou à masquer. Reporté en point ouvert d'`ETAT.md`.
+
+**T2.4 — Le journal du projet n'est pas repliable.** `docs/06` §5 le veut « frise repliée par
+défaut ». Il est ici un bloc vide annoncé : replier ce qui ne contient rien n'a pas de sens, et le
+mécanisme — un `<details>`, sans JavaScript — appartient au ticket qui affichera des événements.
+
+**T2.4 — Le titre d'un état vide est un `h2` frère de celui de sa section.** `EmptyState` porte un
+`h2` depuis T1.6, si bien que « Roadmap des activités » et « Aucune activité pour l'instant » sont
+au même niveau alors que le second est contenu dans le premier. Le défaut existe depuis T2.2 sur la
+page produit ; il n'est pas corrigé ici — changer le niveau de titre d'un composant partagé déborde
+du ticket. À reprendre quand un écran imbriquera plus profond ; le centre fait métier de
+l'accessibilité, ce détail se verra.
+
+**T2.4 — Écarts de périmètre.** Quatre, tous assumés : `formatRank` dans `lib/format.ts`, sans quoi
+la forme française du rang se dupliquerait dans l'écran ; la pastille `Avatar` extraite
+d'`AvatarGroup`, pour que la page projet et les deux listes ne divergent pas sur la même forme — le
+rendu des deux listes est inchangé, elles ne passent pas de `tone` ; deux composants neufs,
+`components/ui/field.tsx` et `components/ui/tag.tsx`, que l'en-tête d'identité appelle quatre et
+trois fois ; et `lib/queries/projects.test.ts`, comme à chaque ticket depuis T1.3.

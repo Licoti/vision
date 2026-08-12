@@ -82,6 +82,18 @@ export function formatAccompaniments(count: number): string {
 }
 
 /**
+ * « 1er accompagnement de ce produit » · « 2ᵉ accompagnement de ce produit ».
+ *
+ * Le rang **se calcule** — `findAccompanimentRank` le déduit de la place du
+ * projet dans la chronologie de son produit. Ce qui se décide ici n'est que sa
+ * forme française : ordinal masculin, « er » au premier, « ᵉ » ensuite.
+ */
+export function formatRank(rank: number): string {
+  const ordinal = rank === 1 ? "1er" : `${rank}ᵉ`;
+  return `${ordinal} accompagnement de ce produit`;
+}
+
+/**
  * « 3 projets » · « 1 projet » · « Aucun projet ».
  *
  * Le compteur de la liste transverse, qui dit ce que les filtres ont retenu.

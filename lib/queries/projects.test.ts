@@ -31,7 +31,12 @@ import {
   projects,
 } from "@/lib/db/schema";
 
-import { listProjectFilterOptions, listProjects } from "./projects";
+import {
+  findAccompanimentRank,
+  findProjectDetail,
+  listProjectFilterOptions,
+  listProjects,
+} from "./projects";
 
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
 const teardownOrder = [
@@ -225,13 +230,172 @@ async function seedDomain(label: string): Promise<Fixture> {
   };
 }
 
+/* ==========================================================================
+   La fixture de la page projet
+
+   Un troisième domaine, et non deux projets de plus dans le premier : les
+   tests de la liste transverse comptent leurs lignes, et un accompagnement
+   ajouté chez eux ferait tomber trois tests qui n'ont rien à voir avec T2.4.
+   ========================================================================== */
+
+type DetailFixture = {
+  domainId: string;
+  scope: ScopedDb;
+  /** Le produit qui porte une histoire : trois accompagnements datés. */
+  productId: string;
+  activeStatusId: string;
+  /** Un second produit : ses accompagnements ne comptent pas dans le rang. */
+  otherProductId: string;
+  firstId: string;
+  /** Celui dont on lit le rang. Le plus récent des trois. */
+  secondId: string;
+  /** Daté entre les deux, mais archivé : il ne compte pas. */
+  archivedId: string;
+  /** Sans date de début : il ne se situe dans aucune chronologie. */
+  undatedId: string;
+};
+
+let c: DetailFixture;
+
+async function seedDetailDomain(): Promise<DetailFixture> {
+  const domain = await superAdmin.createDomain({
+    name: `__test__detail__${suffix}`,
+    competenceCenterName: "Centre c",
+  });
+  const scope = forDomain({ domainId: domain.id });
+
+  const entity = await scope.insert(entities, { label: "Banque de détail c" });
+  const active = await scope.insert(projectStatuses, {
+    label: "En cours",
+    nature: "active",
+    position: "2",
+  });
+  const done = await scope.insert(projectStatuses, {
+    label: "Terminé",
+    nature: "done",
+    position: "1",
+  });
+
+  // `position` inversé par rapport à l'alphabet : les approches doivent sortir
+  // dans l'ordre du domaine, pas dans celui du dictionnaire.
+  const research = await scope.insert(approaches, {
+    label: "Research c",
+    position: "1",
+  });
+  const audit = await scope.insert(approaches, {
+    label: "Audit UX c",
+    position: "2",
+  });
+
+  const product = await scope.insert(products, {
+    name: "Espace client c",
+    entityId: entity.id,
+  });
+  const otherProduct = await scope.insert(products, {
+    name: "Autre produit c",
+    entityId: entity.id,
+  });
+
+  const first = await scope.insert(projects, {
+    name: "Premier c",
+    productId: product.id,
+    statusId: done.id,
+    startedOn: "2024-03-01",
+    expectedEndOn: "2024-09-30",
+  });
+  const second = await scope.insert(projects, {
+    name: "Second c",
+    productId: product.id,
+    statusId: active.id,
+    objective: "Permettre les opérations courantes sans contact.",
+    sponsor: "Direction des opérations c",
+    startedOn: "2026-02-01",
+  });
+  const archived = await scope.insert(projects, {
+    name: "Archivé c",
+    productId: product.id,
+    statusId: active.id,
+    startedOn: "2025-01-01",
+  });
+  await scope.archive(projects, archived.id);
+  const undated = await scope.insert(projects, {
+    name: "Sans date c",
+    productId: product.id,
+    statusId: active.id,
+  });
+
+  // Plus ancien que tous les autres, mais chez un autre produit : le rang de
+  // « Second c » ne doit pas s'en apercevoir.
+  await scope.insert(projects, {
+    name: "Voisin c",
+    productId: otherProduct.id,
+    statusId: active.id,
+    startedOn: "2020-01-01",
+  });
+
+  await scope.insert(projectApproaches, {
+    projectId: second.id,
+    approachId: research.id,
+  });
+  await scope.insert(projectApproaches, {
+    projectId: second.id,
+    approachId: audit.id,
+  });
+
+  const roux = await scope.insert(persons, {
+    fullName: "Camille Roux c",
+    source: "manual",
+    kind: "center",
+  });
+  const tellier = await scope.insert(persons, {
+    fullName: "Marc Tellier c",
+    source: "manual",
+    kind: "stakeholder",
+  });
+  const diallo = await scope.insert(persons, {
+    fullName: "Awa Diallo c",
+    source: "manual",
+    kind: "center",
+  });
+
+  // Insérés dans le désordre : c'est la requête qui doit trier, pas la saisie.
+  await scope.insert(projectMembers, {
+    projectId: second.id,
+    personId: tellier.id,
+    isContributor: false,
+  });
+  await scope.insert(projectMembers, {
+    projectId: second.id,
+    personId: roux.id,
+    isContributor: true,
+  });
+  await scope.insert(projectMembers, {
+    projectId: second.id,
+    personId: diallo.id,
+    isContributor: true,
+  });
+
+  return {
+    domainId: domain.id,
+    scope,
+    productId: product.id,
+    activeStatusId: active.id,
+    otherProductId: otherProduct.id,
+    firstId: first.id,
+    secondId: second.id,
+    archivedId: archived.id,
+    undatedId: undated.id,
+  };
+}
+
 beforeAll(async () => {
   a = await seedDomain("a");
   b = await seedDomain("b");
-}, 120_000);
+  c = await seedDetailDomain();
+}, 180_000);
 
 afterAll(async () => {
-  const ids = [a?.domainId, b?.domainId].filter(Boolean) as string[];
+  const ids = [a?.domainId, b?.domainId, c?.domainId].filter(Boolean) as string[];
   if (ids.length === 0) return;
   for (const table of teardownOrder) {
     await db.delete(table).where(inArray(table.domainId, ids));
@@ -454,5 +618,144 @@ describe("listProjectFilterOptions", () => {
 
     expect(all.some((option) => option.label.endsWith(" b"))).toBe(false);
     expect(all.map((option) => option.id)).not.toContain(b.entityId);
+  });
+});
+
+/* ==========================================================================
+   L'en-tête de la page projet
+   ========================================================================== */
+
+describe("findProjectDetail", () => {
+  test("il porte l'identité, le produit, l'entité, le statut et la période", async () => {
+    const project = await findProjectDetail(c.scope, c.secondId);
+
+    expect(project?.name).toBe("Second c");
+    expect(project?.objective).toBe(
+      "Permettre les opérations courantes sans contact.",
+    );
+    expect(project?.sponsor).toBe("Direction des opérations c");
+    expect(project?.productId).toBe(c.productId);
+    expect(project?.productName).toBe("Espace client c");
+    expect(project?.entityLabel).toBe("Banque de détail c");
+    expect(project?.statusLabel).toBe("En cours");
+    expect(project?.statusNature).toBe("active");
+    expect(project?.startedOn).toBe("2026-02-01");
+    expect(project?.expectedEndOn).toBeNull();
+  });
+
+  test("les approches sortent dans l'ordre du référentiel, pas dans celui de l'alphabet", async () => {
+    const project = await findProjectDetail(c.scope, c.secondId);
+    // `position` inversé par rapport à l'alphabet : trié par le libellé,
+    // « Audit UX c » passerait devant.
+    expect(project?.approachLabels).toEqual(["Research c", "Audit UX c"]);
+  });
+
+  test("l'équipe est alphabétique et chaque membre porte son côté", async () => {
+    const project = await findProjectDetail(c.scope, c.secondId);
+
+    expect(project?.team.map((member) => member.fullName)).toEqual([
+      "Awa Diallo c",
+      "Camille Roux c",
+      "Marc Tellier c",
+    ]);
+    expect(project?.team.map((member) => member.kind)).toEqual([
+      "center",
+      "center",
+      "stakeholder",
+    ]);
+  });
+
+  test("un projet sans équipe ni approche reste un projet normal", async () => {
+    const project = await findProjectDetail(c.scope, c.undatedId);
+
+    expect(project?.name).toBe("Sans date c");
+    expect(project?.team).toEqual([]);
+    expect(project?.approachLabels).toEqual([]);
+    expect(project?.sponsor).toBeNull();
+    expect(project?.startedOn).toBeNull();
+  });
+
+  test("un projet archivé reste lisible", async () => {
+    // Règle 4 : archivé n'est pas supprimé. La liste transverse le masque, la
+    // page de détail le rend — sans quoi un lien déjà distribué casserait.
+    const project = await findProjectDetail(c.scope, c.archivedId);
+    expect(project?.name).toBe("Archivé c");
+  });
+
+  test("un identifiant inconnu ne rend rien", async () => {
+    const project = await findProjectDetail(
+      c.scope,
+      "00000000-0000-4000-8000-000000000000",
+    );
+    expect(project).toBeUndefined();
+  });
+
+  test("un projet d'un autre domaine ne rend rien non plus", async () => {
+    // L'écran ne distingue pas les deux cas : il répond 404 dans les deux.
+    expect(await findProjectDetail(a.scope, c.secondId)).toBeUndefined();
+    expect(await findProjectDetail(c.scope, a.entityId)).toBeUndefined();
+  });
+});
+
+/* ==========================================================================
+   Le rang d'accompagnement — le critère de validation de T2.4
+
+   Il est **calculé, jamais saisi** : aucune colonne ne le porte, et le seul
+   enregistrement d'un accompagnement plus ancien le décale.
+   ========================================================================== */
+
+describe("findAccompanimentRank", () => {
+  const rankOf = (id: string) =>
+    findAccompanimentRank(c.scope, { id, productId: c.productId });
+
+  test("le plus ancien est le premier, le plus récent le second", async () => {
+    expect(await rankOf(c.firstId)).toBe(1);
+    expect(await rankOf(c.secondId)).toBe(2);
+  });
+
+  test("un accompagnement archivé ne compte pas", async () => {
+    // « Archivé c » est daté de 2025, entre les deux : s'il comptait,
+    // « Second c » serait troisième.
+    expect(await rankOf(c.secondId)).toBe(2);
+  });
+
+  test("un accompagnement d'un autre produit ne compte pas", async () => {
+    // « Voisin c » est daté de 2020, plus ancien que tous les autres.
+    expect(await rankOf(c.firstId)).toBe(1);
+  });
+
+  test("un projet sans date de début n'a pas de rang", async () => {
+    expect(await rankOf(c.undatedId)).toBeNull();
+  });
+
+  test("aucun rang ne se calcule depuis un autre domaine", async () => {
+    const leaked = await findAccompanimentRank(a.scope, {
+      id: c.secondId,
+      productId: c.productId,
+    });
+    expect(leaked).toBeNull();
+  });
+
+  test("un accompagnement intercalé décale le rang, sans une écriture sur le projet", async () => {
+    // Le cœur du critère. « Second c » n'est pas touché : c'est l'histoire du
+    // produit qui change, et le rang la suit.
+    const before = await rankOf(c.secondId);
+    expect(before).toBe(2);
+
+    const inserted = await c.scope.insert(projects, {
+      name: "Intercalé c",
+      productId: c.productId,
+      statusId: c.activeStatusId,
+      startedOn: "2025-06-01",
+    });
+
+    expect(await rankOf(c.secondId)).toBe(3);
+    expect(await rankOf(inserted.id)).toBe(2);
+
+    // L'état de la fixture est rendu comme il a été trouvé — et l'archivage
+    // du nouveau venu remet « Second c » deuxième, ce qui redit d'un autre
+    // angle qu'un accompagnement rangé ne compte plus.
+    await c.scope.archive(projects, inserted.id);
+    expect(await rankOf(c.secondId)).toBe(2);
   });
 });

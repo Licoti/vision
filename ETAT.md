@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** T2.3 terminé
+**Dernière mise à jour :** T2.4 terminé
 **Chantier en cours :** C2 — Produits et projets
-**Ticket en cours :** aucun — prochain à lancer : T2.4 (page projet, en-tête et équipe)
+**Ticket en cours :** aucun — prochain à lancer : T2.5 (création et édition d'un produit)
 
 ---
 
@@ -13,7 +13,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | Chantier | Tickets | État |
 |---|---|---|
 | C1 — Socle technique | T1.1 → T1.6 | **terminé** |
-| C2 — Produits et projets | T2.1 → T2.6 | en cours — T2.1 à T2.3 faits |
+| C2 — Produits et projets | T2.1 → T2.6 | en cours — T2.1 à T2.4 faits |
 | C3 — Activités et roadmap | à découper | à faire |
 | C4 — Ressources et résultats | à découper | à faire |
 | C5 — Indicateurs et temps long | à découper | à faire |
@@ -142,6 +142,26 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   consignés : `formatProjects` dans `lib/format.ts`, la table de couleurs de statut sortie de la
   page produit vers `components/ui/status-dot.tsx`, et le fichier de tests.
 
+- **T2.4 — 12/08/2026 — page projet, en-tête et équipe.** **Le critère est tenu et lu dans le HTML
+  servi** : « 2ᵉ accompagnement de ce produit » sur « Autonomie des opérations courantes »,
+  « 1er accompagnement de ce produit » sur les deux autres — aucune colonne ne porte ce rang, il se
+  déduit de la place du projet dans la chronologie de son produit. Le rang lit le même ordre que la
+  page produit, `started_on` puis le nom : **son miroir exact**, si bien que le numéro affiché ici
+  et la position affichée là-bas ne peuvent pas se contredire. Trois arbitrages rendus avec
+  l'humain avant écriture : le rang s'affiche dès 1 — `docs/06` §7 pose la règle sans condition, la
+  maquette le masquait —, il pointe vers la page produit et non vers l'accompagnement voisin, et
+  l'équipe s'écrit en toutes lettres à côté des pastilles. Les 13 tests ajoutés ont été **mis en
+  défaut un à un** : le filtre d'archivage retiré du calcul de rang fait tomber trois tests, le
+  filtre de produit quatre, la garde sur `started_on` un seul, le tri des approches un seul, celui
+  de l'équipe un seul. La propriété relevée par T2.2 et T2.3 s'est vérifiée une troisième fois :
+  retirer le seul `filter(projects)` de la requête d'identité ne fait **rien** tomber — les trois
+  tables jointes se rattrapent, et il faut retirer les quatre filtres pour voir l'étanchéité céder.
+  Le contraste a été **mesuré** avant d'être cru : le gris de la maquette pour la pastille d'un
+  intervenant côté entité tombe à 2,22:1 sur la carte comme sous ses initiales — une pastille qu'on
+  devine ; `surface-neutral-base` la rétablit à 4,98:1 des deux côtés. Écarts assumés et consignés :
+  `formatRank` dans `lib/format.ts`, la pastille `Avatar` extraite d'`AvatarGroup`, deux composants
+  neufs — `field.tsx`, `tag.tsx` — et le fichier de tests.
+
 ---
 
 ## Points ouverts
@@ -157,14 +177,17 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   personne courante et l'entrée Administration sont dans les maquettes ; T1.6 s'interdisait toute
   lecture en base. À rebrancher au premier ticket qui lit la session — l'entrée Administration
   n'apparaissant qu'au responsable de domaine.
-- **`/projets/[id]` ne vérifie pas encore la forme de son identifiant.** T2.2 a posé la garde et
-  le 404 sur `/produits/[id]`, et sorti le motif dans `lib/uuid.ts` : **T2.4 n'a plus qu'à
-  l'appeler**. La page projet reste exposée tant qu'elle ne lit rien.
-- **Un intervenant extérieur ne se distingue pas dans l'équipe.** La maquette grise la pastille de
-  qui n'a pas de compte Vision (« Marc Tellier — sans compte Vision ») ; T2.2 puis T2.3 affichent
-  tous les membres à l'identique, `persons.kind` n'étant dans le périmètre d'aucun des deux
-  tickets. Trois écrans portent désormais le même manque. À reprendre avec l'équipe de la page
-  projet (T2.4).
+- **Un intervenant côté entité ne se distingue pas sur deux écrans sur trois.** La page projet le
+  marque depuis T2.4 — pastille grise **et** mention « côté entité », le texte ne dépendant jamais
+  de la couleur. La page produit et la liste transverse continuent d'afficher tous les membres à
+  l'identique : leurs lectures ne remontent pas `persons.kind`, et le faire aurait débordé du
+  ticket — arbitrage rendu avec l'humain. À reprendre au premier ticket qui touche à ces deux
+  listes.
+- **Le commanditaire est vide sur toute la fixture.** `docs/06` §5 l'attend dans l'en-tête, T2.4
+  l'affiche, et il affiche « Non renseigné » sur les trois projets : le brief ne nomme aucun
+  commanditaire et l'amorçage laisse `sponsor` nul. La maquette, elle, montre « Marc Tellier
+  (entité) ». Le champ n'a donc jamais été vu peuplé. À trancher avec T2.6, l'écran qui le saisit,
+  ou par un commanditaire fourni pour l'amorçage.
 - **Le design system n'a pas de jeton de bordure de contrôle.** Le plus sombre des `border-*`,
   `border-default`, ne dépasse pas 1,2:1 sur le fond de page, là où la limite d'un composant
   d'interface se mesure à 3:1. T2.3 a retenu `content-neutral-normal` (3,88:1 mesuré) pour les

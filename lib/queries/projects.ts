@@ -11,13 +11,25 @@
  * courant. Règle 1.
  */
 
-import { and, asc, eq, exists, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  exists,
+  ilike,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  sql,
+} from "drizzle-orm";
 
 import type { ScopedDb } from "@/lib/db/scoped";
 import {
   approaches,
   entities,
   jobs,
+  personKind,
   persons,
   products,
   projectApproaches,
@@ -360,5 +372,171 @@ export function listProjectFilterOptions(
       approaches: strip(approachRows),
       statuses: strip(statusRows),
     };
+  });
+}
+
+/* ==========================================================================
+   La page projet
+   ========================================================================== */
+
+/** Un membre de l'équipe. `kind` distingue le centre de l'entité (docs/04 §2). */
+export type ProjectTeamMember = {
+  id: string;
+  fullName: string;
+  kind: (typeof personKind.enumValues)[number];
+};
+
+/** L'en-tête d'identité de la page projet (docs/06 §5). */
+export type ProjectDetail = {
+  id: string;
+  name: string;
+  objective: string | null;
+  /** D6 — commanditaire, texte libre. Souvent nul. */
+  sponsor: string | null;
+  statusLabel: string;
+  statusNature: ProjectStatusNature;
+  /** Colonnes `date` : chaînes `YYYY-MM-DD`, formatées par `lib/format`. */
+  startedOn: string | null;
+  expectedEndOn: string | null;
+  /** Le parent, affiché **et cliquable** : un projet ne s'affiche jamais seul. */
+  productId: string;
+  productName: string;
+  entityLabel: string;
+  /** Les approches déclarées, dans l'ordre du référentiel du domaine. */
+  approachLabels: string[];
+  team: ProjectTeamMember[];
+};
+
+/**
+ * Un projet du domaine, avec son produit, son entité, son statut, ses
+ * approches et son équipe.
+ *
+ * Rend `undefined` sur un identifiant inconnu **comme sur un projet d'un autre
+ * domaine** : la distinction n'appartient pas à l'appelant, et l'écran répond
+ * 404 dans les deux cas. Un projet archivé est rendu, et un projet dont le
+ * produit est archivé aussi — règle 4, une donnée archivée reste lisible. La
+ * liste transverse les masque tous deux ; les masquer ici casserait un lien
+ * déjà distribué.
+ *
+ * Trois requêtes plutôt qu'un `json_agg` : c'est le choix déjà motivé plus
+ * haut dans ce module — un type qu'aucune vérification ne couvre à la sortie
+ * du pilote ne vaut pas l'aller-retour économisé. `is_contributor` n'est pas
+ * lu : D9 sépare l'appartenance à l'équipe du droit d'écrire, et cet en-tête
+ * affiche une équipe, pas des droits.
+ */
+export function findProjectDetail(
+  scope: ScopedDb,
+  id: string,
+): Promise<ProjectDetail | undefined> {
+  return scope.joinedRead(async (database, { filter }) => {
+    const rows = await database
+      .select({
+        id: projects.id,
+        name: projects.name,
+        objective: projects.objective,
+        sponsor: projects.sponsor,
+        statusLabel: projectStatuses.label,
+        statusNature: projectStatuses.nature,
+        startedOn: projects.startedOn,
+        expectedEndOn: projects.expectedEndOn,
+        productId: products.id,
+        productName: products.name,
+        entityLabel: entities.label,
+      })
+      .from(projects)
+      .innerJoin(
+        products,
+        and(eq(products.id, projects.productId), filter(products)),
+      )
+      .innerJoin(
+        entities,
+        and(eq(entities.id, products.entityId), filter(entities)),
+      )
+      .innerJoin(
+        projectStatuses,
+        and(eq(projectStatuses.id, projects.statusId), filter(projectStatuses)),
+      )
+      .where(and(eq(projects.id, id), filter(projects)))
+      .limit(1);
+
+    const project = rows[0];
+    if (!project) return undefined;
+
+    const declaredApproaches = await database
+      .select({ label: approaches.label })
+      .from(projectApproaches)
+      .innerJoin(
+        approaches,
+        and(eq(approaches.id, projectApproaches.approachId), filter(approaches)),
+      )
+      .where(
+        and(
+          filter(projectApproaches),
+          eq(projectApproaches.projectId, project.id),
+        ),
+      )
+      .orderBy(asc(approaches.position), asc(approaches.label));
+
+    const team = await database
+      .select({
+        id: persons.id,
+        fullName: persons.fullName,
+        kind: persons.kind,
+      })
+      .from(projectMembers)
+      .innerJoin(
+        persons,
+        and(eq(persons.id, projectMembers.personId), filter(persons)),
+      )
+      .where(
+        and(filter(projectMembers), eq(projectMembers.projectId, project.id)),
+      )
+      .orderBy(asc(persons.fullName));
+
+    return {
+      ...project,
+      approachLabels: declaredApproaches.map((row) => row.label),
+      team,
+    };
+  });
+}
+
+/**
+ * Le rang de l'accompagnement dans l'histoire de son produit — le « 2ᵉ » de
+ * « 2ᵉ accompagnement de ce produit » (docs/06 §7).
+ *
+ * **Il se calcule, il ne se saisit pas** : aucune colonne ne le porte, et il
+ * change tout seul le jour où un accompagnement plus ancien est enregistré.
+ *
+ * L'ordre est l'exact miroir de celui de la page produit — `started_on` puis
+ * le nom —, si bien que le rang lu ici et la position lue là-bas ne peuvent
+ * pas se contredire. Les accompagnements archivés ne comptent pas, comme ils
+ * ne s'affichent pas ; le projet consulté fait exception, un projet archivé
+ * restant lisible (règle 4).
+ *
+ * Rend `null` quand le projet n'a pas de date de début : on ne situe pas dans
+ * une chronologie ce qui n'y est pas daté, et la mention disparaît alors de
+ * l'écran plutôt que d'annoncer un rang inventé.
+ */
+export function findAccompanimentRank(
+  scope: ScopedDb,
+  project: { id: string; productId: string },
+): Promise<number | null> {
+  return scope.joinedRead(async (database, { filter }) => {
+    const siblings = await database
+      .select({ id: projects.id })
+      .from(projects)
+      .where(
+        and(
+          filter(projects),
+          eq(projects.productId, project.productId),
+          isNotNull(projects.startedOn),
+          or(isNull(projects.archivedAt), eq(projects.id, project.id)),
+        ),
+      )
+      .orderBy(asc(projects.startedOn), asc(projects.name));
+
+    const index = siblings.findIndex((sibling) => sibling.id === project.id);
+    return index === -1 ? null : index + 1;
   });
 }
