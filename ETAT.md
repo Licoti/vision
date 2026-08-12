@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** T1.5 terminé
-**Chantier en cours :** C1 — Socle technique
-**Ticket en cours :** aucun — prochain à lancer : T1.6 (coquille applicative)
+**Dernière mise à jour :** T1.6 terminé — C1 clos
+**Chantier en cours :** C2 — Produits et projets
+**Ticket en cours :** aucun — prochain à lancer : T2.1 (liste des produits)
 
 ---
 
@@ -12,7 +12,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
 | Chantier | Tickets | État |
 |---|---|---|
-| C1 — Socle technique | T1.1 → T1.6 | en cours — T1.1 à T1.5 faits |
+| C1 — Socle technique | T1.1 → T1.6 | **terminé** |
 | C2 — Produits et projets | T2.1 → T2.6 | à faire |
 | C3 — Activités et roadmap | à découper | à faire |
 | C4 — Ressources et résultats | à découper | à faire |
@@ -74,6 +74,21 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   transitive) ; un 25ᵉ type d'activité, « Atelier de priorisation », que le brief nomme et que
   `docs/03` n'a pas ; trois inventions hors brief — un responsable de domaine, les métiers, les
   participants d'activité —, chacune motivée par un critère de validation à venir.
+- **T1.6 — 12/08/2026 — coquille applicative.** Six routes en français sous le groupe `(app)`,
+  qui porte la coquille et laisse `/dev/session` en dehors : navigation à quatre entrées dans
+  l'ordre Vue d'ensemble · Produits · Projets · À propos, fil d'Ariane sur les deux pages de
+  détail, et les quatre composants de base — page, section, liste, état vide — posés d'après les
+  maquettes. **Le critère est vérifié, pas affirmé** : six routes à 200, une URL inconnue à 404,
+  et l'ordre de tabulation lu dans le rendu — lien d'évitement, logo, les quatre entrées dans
+  l'ordre, puis le contenu, avec `aria-current="page"` sur l'entrée courante et sur le dernier
+  maillon du fil d'Ariane seulement. Le focus visible a été **mesuré** plutôt que constaté : le
+  contour `border/focus` du design system tombe à 2,87:1 sur le fond primaire de la barre
+  latérale, sous les 3:1 exigés ; il passe au token clair sur ce fond, et là seulement. Deux
+  couleurs de texte reprises des maquettes échouaient de même (2,11:1) et ont été relevées d'un
+  cran dans la couche sémantique. Aucune lecture en base, vérifié par `grep` : le seul import de
+  `lib/` est `lib/navigation`. Écarts assumés et consignés : deux blocs de la maquette écartés
+  faute de droit de lire la session — carte de la personne courante et entrée Administration ;
+  `/a-propos` laissée vide comme les cinq autres alors que son contenu ne coûterait rien.
 
 ---
 
@@ -82,8 +97,18 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 - **Pas de tokens d'élévation ni de gradient.** Le design system les nomme sans leur donner de
   valeur. Rien n'a été inventé. La question se posera au premier composant qui porte une ombre —
   panneau latéral (C3) ou modale.
-- **Couleur du corps de texte.** Les maquettes utilisent `#33333b` (greyscale-800) pour le texte
-  courant ; aucun token sémantique du §2.4 ne pointe cette nuance. À trancher en T1.6.
+- **Le contenu rédigé d'`/a-propos` reste à écrire.** La page a son en-tête et son état vide comme
+  les cinq autres. Son contenu — ce qu'est Vision, le vocabulaire, ce qu'elle ne fait pas, l'état
+  daté — ne demande aucune lecture en base : il aurait pu tenir dans T1.6, et n'y a pas tenu parce
+  que le périmètre disait « routes vides ». À porter par un ticket, au plus tard en C7.
+- **Deux blocs de la barre latérale attendent le droit de lire la session.** La carte de la
+  personne courante et l'entrée Administration sont dans les maquettes ; T1.6 s'interdisait toute
+  lecture en base. À rebrancher au premier ticket qui lit la session — l'entrée Administration
+  n'apparaissant qu'au responsable de domaine.
+- **Les URL de détail portent un identifiant, pas un slug.** `/produits/[id]`, `/projets/[id]`.
+  Rien n'est tranché : C2, avec l'écran qui construit le lien, dira si l'UUID reste visible ou si
+  un slug le remplace. Le libellé du dernier maillon du fil d'Ariane suit la même échéance — il
+  est générique tant qu'aucun nom n'est lu en base.
 - **`last_activity_at` compte les activités prévues, et se pose donc dans le futur.** T1.3 avait
   retenu `max(coalesce(period_end, period_start))` sur les activités non archivées et non annulées,
   faute de définition dans `docs/04` §6. T1.5 rend l'effet visible : deux projets sur trois portent

@@ -316,3 +316,54 @@ le brief n'en fournit pas et le ticket ne les demande pas.
 événement, et une seule ressource sur les quatre du brief §7 — « Restitution des tests — vague 2 »,
 la seule que le brief rattache à une activité. Les trois autres n'ont pas d'ancrage donné :
 les inventer aurait été plus coûteux à défaire qu'à écrire. Arbitrage rendu avec l'humain.
+**T1.6 — Le contour de focus du design system échoue sur le fond primaire.** `border/focus`
+(`#196de3`) sur `surface/primary/base` (`#24226a`) donne **2,87:1**, sous les 3:1 qu'exige un
+indicateur de focus (WCAG 2.2, SC 1.4.11). Le critère de validation du ticket demande un focus
+visible : les liens de la barre latérale prennent donc `content/neutral/pale` comme couleur de
+contour — 13,7:1 — **sur ce fond et là seulement**, par une utilitaire de la couche `utilities`,
+sans toucher à la règle globale de `globals.css`. À reprendre le jour où un second composant sera
+posé sur fond primaire : la bonne réponse est peut-être un token de focus clair dans le design
+system, qui n'en a pas.
+
+**T1.6 — Deux couleurs de texte des maquettes échouent au contraste.** `content/neutral/light`
+(`#acacb2`) sur le fond de page (`#f7f7f8`) donne **2,11:1**, très en dessous des 4,5:1 exigés d'un
+texte. Les maquettes l'emploient pour les surtitres, les bandeaux de colonnes et les mentions
+secondaires. Les gabarits utilisent `content/neutral/base` (`#6e6e74`, **4,73:1**) à la place, en
+restant dans la couche sémantique. `content/neutral/light` n'est conservé que sur le séparateur
+`›` du fil d'Ariane, qui est décoratif et `aria-hidden`. **`app/dev/session/page.tsx` porte encore
+l'ancienne nuance sur son surtitre** : route de développement, hors périmètre du ticket, à corriger
+si elle survit au stub.
+
+**T1.6 — Arbitrage rendu sur le corps de texte et les bordures**, question laissée ouverte par
+T1.1. Le corps de texte prend `content/neutral/dark` (`#4e4e54`, 7,7:1 sur le fond de page) et non
+le `#33333b` des maquettes, qu'aucun token sémantique ne désigne : rien n'est inventé dans la
+couche sémantique. Même raisonnement pour les filets : `border/default` vaut `#f7f7f8`,
+c'est-à-dire exactement le fond de page — une carte bordée ainsi n'a pas de bord. Les cartes,
+listes et états vides sont donc bordés de `surface/neutral/lighter` (`#e4e4ea`), un token de
+surface employé comme bordure. C'est un écart au vocabulaire du design system, pas à ses valeurs ;
+la vraie réponse serait un token `border/neutral`, qu'il n'a pas.
+
+**T1.6 — Les cartes ne sont pas blanches.** Les maquettes posent `#ffffff` sur un fond `#f7f7f8`.
+Aucun token sémantique ne pointe `greyscale/0` : la surface la plus claire disponible est
+`surface/neutral/pale` (`#fdfdfd`), retenue pour les cartes. L'écart est d'un point de luminance,
+invisible à l'œil ; il est noté parce qu'il se répétera sur chaque bloc de C2 à C7.
+
+**T1.6 — Le groupe de routes `(app)` existe pour tenir `/dev/session` hors de la coquille.** La
+coquille ne peut pas vivre dans `app/layout.tsx`, qui s'applique à tout, y compris au sélecteur de
+personne courante — un outil de développement n'a pas à hériter de la navigation du produit. Les
+six écrans vivent donc sous `app/(app)/`, et la racine ne garde que `<html>`, `<body>` et la
+police. **Conséquence pour C7** : quand le stub disparaîtra, `app/dev/` disparaîtra avec lui et le
+groupe pourra être aplati — ou pas, il ne coûte rien.
+
+**T1.6 — Les points d'arrêt responsifs ne viennent d'aucun token.** La barre latérale bascule en
+bandeau horizontal sous `md`, le point d'arrêt par défaut de Tailwind. Le design system ne définit
+aucune grille ni aucun point d'arrêt, et le namespace `--breakpoint-*` n'a donc pas été effacé dans
+`globals.css` comme l'ont été les couleurs et les tailles. La règle 2 vise les valeurs visuelles ;
+un point d'arrêt de mise en page n'en est pas une. À reposer si le design system s'enrichit d'une
+grille.
+
+**T1.6 — Les composants `List`, `Section` et l'action des états vides ne servent encore à rien.**
+Le ticket demande que les composants de base soient posés, et les six routes n'affichent aucune
+donnée : `List`, `ListHeader`, `ListRow`, `Section`, `SectionHeader` et la prop `action` de
+`EmptyState` sont donc écrits sans appelant. C'est une dette assumée et courte — T2.1 et T2.2 les
+consomment. Si leur forme se révèle fausse à l'usage, elle se corrige là, pas ici.
