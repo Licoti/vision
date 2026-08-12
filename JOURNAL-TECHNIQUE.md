@@ -466,3 +466,66 @@ se répète en C3, c'est la forme de `Section` qu'il faudra revoir — pas cet a
 ne filtre pas `persons.archived_at` : qui a participé y a participé, et effacer un nom d'un projet
 terminé réécrirait l'histoire du produit. La conséquence est qu'une personne partie reste visible
 dans Vision — conforme à la règle 4, à confirmer au premier écran qui archive une personne.
+
+**T2.3 — Il faut retirer les quatre filtres de domaine pour voir l'étanchéité tomber.** T2.2 avait
+relevé que chaque filtre est rattrapé par celui de la table jointe voisine ; sur `listProjects`,
+la chaîne compte quatre maillons — `projects`, `products`, `entities`, `project_statuses` — et
+**chacun seul suffit à sceller le domaine**. Vérifié en escalade : un retiré, rien ne tombe ; deux,
+rien ; trois, rien ; les quatre, cinq tests tombent d'un coup. La raison n'est pas la chance, c'est
+T1.2 et T1.3 : les jointures portent sur des clés étrangères, et la couche garantit la cohérence
+du `domain_id` avec les parents. **Conséquence à retenir** : sur ces requêtes, aucun test ne peut
+prouver qu'un filtre donné travaille. Les écrire tous reste la consigne de `joinedRead` ; il faut
+seulement savoir que la vérification se fait à la lecture du code, pas à l'exécution des tests.
+
+**T2.3 — Les filtres de domaine des sous-requêtes `exists` sont, eux, entièrement redondants.**
+Même cause, cas plus net : retirer `filter(projectJobs)` de l'`exists` du filtre métier, ou
+`filter(persons)` de celui de la recherche par membre, ne fait tomber aucun test — et ne peut pas
+en faire tomber, puisque la sous-requête est déjà accrochée à `projects.id`, lui-même scopé. Ils
+sont écrits quand même : la consigne de `joinedRead` ne se négocie pas table par table.
+
+**T2.3 — `exists` plutôt qu'une jointure, mais pas pour la raison qu'on croit.** J'avais écrit
+qu'une jointure sur `project_jobs` doublerait les lignes d'un projet déclarant deux métiers. C'est
+faux tant que le filtre porte **une seule** valeur : la jointure est alors contrainte à une ligne.
+Le commentaire du code et le nom du test ont été corrigés. `exists` reste le bon choix, pour une
+autre raison — il ne touche pas à la forme du jeu de résultats, donc il restera juste le jour où
+le filtre acceptera plusieurs valeurs, là où la jointure se mettrait à mentir.
+
+**T2.3 — Le motif d'un `like` doit être échappé, et ça se voit.** Sans échappement de `\`, `%` et
+`_`, une recherche sur « % » ramène la liste entière et « _ » devient un joker : la recherche
+cesse de dire ce qu'elle affiche. `likePattern` échappe `\` en premier, faute de quoi il masquerait
+les échappements suivants. La fixture porte un projet nommé « Taux 100 % » exprès : le test exige
+que « % » rende **cette ligne et elle seule**, ce qui distingue l'échappement d'une simple absence
+de résultat. Mutation vérifiée : échappement retiré, ce test tombe et lui seul.
+
+**T2.3 — Aucun jeton `border-*` n'atteint 3:1 sur le fond de page.** Le plus sombre,
+`border-default`, vaut `greyscale-100`. Or la bordure d'un champ de formulaire est la limite d'un
+composant d'interface : le WCAG 1.4.11 y exige 3:1, pas le 4,5:1 du texte ni rien du tout. Les
+filets des blocs (`surface-neutral-lighter`) sont décoratifs et ne sont pas concernés ; ceux des
+champs le sont. Retenu `content-neutral-normal` (`greyscale-400`, **3,88:1** mesuré sur
+`surface-neutral-pale`), un jeton de contenu employé comme bordure — la règle 2 est tenue, la
+sémantique du design system l'est moins. À signaler à qui maintient le design system : il manque
+un jeton de bordure de contrôle.
+
+**T2.3 — Le formulaire GET laisse des paramètres vides dans l'URL.** Soumettre sans rien choisir
+produit `?recherche=&entite=&metier=&approche=&statut=`. C'est inélégant et sans conséquence : la
+forme de chaque paramètre est vérifiée avant la base, une chaîne vide n'est pas un UUID, et le
+compteur comme le lien de retrait se comportent comme sur `/projets` nu — vérifié. Les nettoyer
+demanderait du JavaScript client, ce que cet écran n'a pas.
+
+**T2.3 — La ligne de la liste transverse n'est pas cliquable en entier.** Les autres listes font
+de la ligne un `Link` ; celle-ci porte **deux** liens, le projet et son produit de rattachement
+que `docs/06` §4 exige cliquable, et un `<a>` ne peut pas en contenir un autre. `ListRow` est donc
+appelé sans `href` — le composant le prévoyait déjà. C'est aussi ce que fait la maquette.
+
+**T2.3 — La conservation des filtres au retour depuis un projet n'est pas traitée.** `docs/06` §9
+la demande. Les filtres vivant dans l'URL, le retour navigateur les restitue, ce qui couvre le
+geste courant ; un clic sur « Projets » dans la navigation principale, lui, repart à zéro. Aller
+plus loin demanderait de mémoriser l'URL de retour, donc un état de session — hors périmètre du
+ticket. À reposer si l'usage le réclame.
+
+**T2.3 — Écarts de périmètre.** Trois, tous assumés : `lib/format.ts` gagne `formatProjects`, sans
+quoi le compteur exigé par la validation n'a pas de forme ; `app/(app)/produits/[id]/page.tsx` perd
+sa table de couleurs de statut au profit de `components/ui/status-dot.tsx` — `ETAT.md` la destinait
+à T2.4, « avec deux appelants réels », et T2.3 est ce second appelant, arbitrage rendu avec
+l'humain ; et le fichier `lib/queries/projects.test.ts`, que le ticket ne mentionne pas, comme à
+chaque ticket depuis T1.3.

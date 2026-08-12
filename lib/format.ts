@@ -80,3 +80,14 @@ export function formatAccompaniments(count: number): string {
   if (count === 0) return "Aucun accompagnement";
   return `${count} accompagnement${count > 1 ? "s" : ""}`;
 }
+
+/**
+ * « 3 projets » · « 1 projet » · « Aucun projet ».
+ *
+ * Le compteur de la liste transverse, qui dit ce que les filtres ont retenu.
+ * Zéro s'écrit en toutes lettres, pour la même raison que ci-dessus.
+ */
+export function formatProjects(count: number): string {
+  if (count === 0) return "Aucun projet";
+  return `${count} projet${count > 1 ? "s" : ""}`;
+}

@@ -24,34 +24,15 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { List, ListRow } from "@/components/ui/list";
 import { Page, PageHeader } from "@/components/ui/page";
 import { SectionHeader } from "@/components/ui/section";
+import { StatusDot } from "@/components/ui/status-dot";
 import { requireSession } from "@/lib/auth/provider";
 import { formatAccompaniments, formatPeriod } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
-import {
-  findProductDetail,
-  listProductProjects,
-  type ProductProject,
-} from "@/lib/queries/products";
+import { findProductDetail, listProductProjects } from "@/lib/queries/products";
 import { isUuid } from "@/lib/uuid";
 
 export const metadata = {
   title: "Produit — Vision",
-};
-
-/**
- * La pastille de statut est colorée par la **nature**, jamais par le libellé :
- * un domaine renomme « En cours », il ne renomme pas `active`. Elle est
- * décorative — le libellé est écrit juste à côté, et la couleur ne porte
- * jamais seule une information.
- *
- * La table reste locale à cet écran. T2.4 en aura le même besoin : c'est là,
- * avec deux appelants réels, que la forme partagée s'écrira.
- */
-const STATUS_DOT: Record<ProductProject["statusNature"], string> = {
-  framing: "bg-surface-info-base",
-  active: "bg-surface-primary-base",
-  paused: "bg-surface-neutral-base",
-  done: "bg-surface-success-base",
 };
 
 export default async function ProductPage({
@@ -97,10 +78,7 @@ export default async function ProductPage({
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <span className="flex flex-wrap items-center gap-2 text-xs">
                       <span className="flex items-center gap-2 font-semibold text-content-neutral-dark">
-                        <span
-                          aria-hidden="true"
-                          className={`h-2 w-2 flex-none rounded-full ${STATUS_DOT[project.statusNature]}`}
-                        />
+                        <StatusDot nature={project.statusNature} />
                         {project.statusLabel}
                       </span>
                       <span aria-hidden="true" className="text-content-neutral-light">

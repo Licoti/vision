@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** T2.2 terminé
+**Dernière mise à jour :** T2.3 terminé
 **Chantier en cours :** C2 — Produits et projets
-**Ticket en cours :** aucun — prochain à lancer : T2.3 (liste transverse des projets)
+**Ticket en cours :** aucun — prochain à lancer : T2.4 (page projet, en-tête et équipe)
 
 ---
 
@@ -13,7 +13,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | Chantier | Tickets | État |
 |---|---|---|
 | C1 — Socle technique | T1.1 → T1.6 | **terminé** |
-| C2 — Produits et projets | T2.1 → T2.6 | en cours — T2.1, T2.2 faits |
+| C2 — Produits et projets | T2.1 → T2.6 | en cours — T2.1 à T2.3 faits |
 | C3 — Activités et roadmap | à découper | à faire |
 | C4 — Ressources et résultats | à découper | à faire |
 | C5 — Indicateurs et temps long | à découper | à faire |
@@ -121,6 +121,26 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   invisible ; la palette de la maquette rétablit 7,11:1 des deux côtés. Écarts assumés et
   consignés : le fichier de tests lui-même, l'alias `@/` ajouté à `vitest.config.mts` sans lequel
   il ne s'exécute pas, et le motif d'UUID déplacé hors de `app/(app)/produits/page.tsx`.
+- **T2.3 — 12/08/2026 — liste transverse des projets.** **Les trois critères sont tenus et lus
+  dans le HTML servi** : les filtres se combinent — entité seule 2 projets, plus le statut 1, plus
+  un métier que ce projet ne déclare pas 0 —, le compteur suit à chaque étape, et « Retirer tous
+  les filtres » pointe sur `/projets` nu. La recherche trouve par le nom, par l'objectif et par un
+  membre. Quatre dimensions plus une recherche ont écarté la forme en pastilles de T2.1, qui en
+  aurait produit une vingtaine : un `form method="get"`, sans JavaScript, l'écran restant serveur —
+  arbitrage rendu avec l'humain. L'ordre de tabulation est lu dans le rendu : recherche, les quatre
+  listes, « Filtrer », puis les lignes. La ligne n'est **pas** cliquable en entier — elle porte deux
+  liens, le projet et son produit, et un `<a>` n'en contient pas un autre. Les 22 tests ajoutés ont
+  été mis en défaut : `nulls last` ôté fait tomber le tri et lui seul, l'échappement du motif de
+  recherche fait tomber le test du joker et lui seul, le produit archivé réintégré en fait tomber
+  trois. Ce faisant, la propriété relevée par T2.2 s'est confirmée et amplifiée : ici **quatre**
+  filtres de domaine se rattrapent l'un l'autre, et il faut les retirer tous les quatre pour voir
+  l'étanchéité tomber. Une affirmation de ma part n'a pas résisté et a été corrigée dans le code
+  comme dans le journal : sur un filtre à valeur unique, une jointure ne dupliquerait rien —
+  `exists` reste retenu, pour une autre raison. Le contraste des bordures de champ a été **mesuré**
+  avant d'être cru : aucun jeton `border-*` du design system n'atteint les 3:1 qu'exige la limite
+  d'un composant d'interface ; `content-neutral-normal` est retenu à 3,88:1. Écarts assumés et
+  consignés : `formatProjects` dans `lib/format.ts`, la table de couleurs de statut sortie de la
+  page produit vers `components/ui/status-dot.tsx`, et le fichier de tests.
 
 ---
 
@@ -140,13 +160,24 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 - **`/projets/[id]` ne vérifie pas encore la forme de son identifiant.** T2.2 a posé la garde et
   le 404 sur `/produits/[id]`, et sorti le motif dans `lib/uuid.ts` : **T2.4 n'a plus qu'à
   l'appeler**. La page projet reste exposée tant qu'elle ne lit rien.
-- **La table des couleurs de statut est locale à la page produit.** Quatre natures, quatre tokens,
-  dans `app/(app)/produits/[id]/page.tsx`. T2.4 en aura le même besoin : c'est là, avec deux
-  appelants réels, que la forme partagée s'écrira — pas avant.
 - **Un intervenant extérieur ne se distingue pas dans l'équipe.** La maquette grise la pastille de
-  qui n'a pas de compte Vision (« Marc Tellier — sans compte Vision ») ; T2.2 affiche les quatre
-  membres à l'identique, `persons.kind` n'étant pas dans les quatre champs du ticket. À reprendre
-  avec l'équipe de la page projet (T2.4).
+  qui n'a pas de compte Vision (« Marc Tellier — sans compte Vision ») ; T2.2 puis T2.3 affichent
+  tous les membres à l'identique, `persons.kind` n'étant dans le périmètre d'aucun des deux
+  tickets. Trois écrans portent désormais le même manque. À reprendre avec l'équipe de la page
+  projet (T2.4).
+- **Le design system n'a pas de jeton de bordure de contrôle.** Le plus sombre des `border-*`,
+  `border-default`, ne dépasse pas 1,2:1 sur le fond de page, là où la limite d'un composant
+  d'interface se mesure à 3:1. T2.3 a retenu `content-neutral-normal` (3,88:1 mesuré) pour les
+  champs de sa barre de filtres — un jeton de contenu employé comme bordure. À faire remonter à
+  qui maintient le design system ; d'ici là, tout nouveau formulaire reprendra ce choix.
+- **Les filtres ne survivent pas à un aller-retour par la navigation principale.** `docs/06` §9
+  demande qu'ils soient conservés quand on entre dans un projet et qu'on revient. Ils vivent dans
+  l'URL, donc le retour navigateur les restitue ; un clic sur « Projets » dans la barre latérale
+  repart à zéro. Mémoriser l'URL de retour demanderait un état de session — hors périmètre de
+  T2.3. À trancher si l'usage le réclame.
+- **La liste transverse n'est ni paginée ni plafonnée.** `docs/06` §4 la projette « à quinze puis
+  cinquante projets », ce qu'une page rend sans effort. La question se posera au-delà, et elle
+  appellera un plafond avant une pagination : la comparaison ligne à ligne est le but de l'écran.
 - **Un produit archivé s'affiche comme un produit vivant.** Aucun écran ne l'archive encore et la
   fixture n'en contient aucun ; inventer une mention aurait été un ajout hors ticket. À trancher
   avec T2.5, l'écran qui archive.
