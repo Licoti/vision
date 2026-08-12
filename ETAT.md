@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** T2.4 terminé
+**Dernière mise à jour :** T2.5 terminé
 **Chantier en cours :** C2 — Produits et projets
-**Ticket en cours :** aucun — prochain à lancer : T2.5 (création et édition d'un produit)
+**Ticket en cours :** aucun — prochain à lancer : T2.6 (création et édition d'un projet)
 
 ---
 
@@ -13,7 +13,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | Chantier | Tickets | État |
 |---|---|---|
 | C1 — Socle technique | T1.1 → T1.6 | **terminé** |
-| C2 — Produits et projets | T2.1 → T2.6 | en cours — T2.1 à T2.4 faits |
+| C2 — Produits et projets | T2.1 → T2.6 | en cours — T2.1 à T2.5 faits |
 | C3 — Activités et roadmap | à découper | à faire |
 | C4 — Ressources et résultats | à découper | à faire |
 | C5 — Indicateurs et temps long | à découper | à faire |
@@ -162,6 +162,33 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   `formatRank` dans `lib/format.ts`, la pastille `Avatar` extraite d'`AvatarGroup`, deux composants
   neufs — `field.tsx`, `tag.tsx` — et le fichier de tests.
 
+- **T2.5 — 12/08/2026 — création et édition d'un produit.** Le premier écran d'écriture de Vision.
+  **Le critère est tenu et lu dans le HTML servi** : « Nouveau produit » et « Modifier ce produit »
+  apparaissent une fois chez Camille Roux, zéro fois chez Léa Fontaine, et aucune adresse de
+  formulaire ne fuit dans son rendu ; les deux routes lui répondent 404. Mais le verrou qui compte
+  est ailleurs : les champs d'action ont été récoltés sur la page servie au responsable puis
+  **repostés sous le cookie du contributeur** — l'action rend son refus, et la base ne bouge pas.
+  Une action serveur est un point d'entrée HTTP, atteignable sans jamais charger la page qui
+  l'affichait. Le parcours entier a été joué **sans une ligne de JavaScript**, par soumission
+  `multipart` reconstituée : création → 303 vers la page du produit, qui l'affiche avec son entité,
+  sa description et « Aucun accompagnement » ; modification du nom, de l'entité et du type →
+  reflétée sur les deux écrans et relue en base, `domain_id` et `created_by` posés par la couche
+  sans que l'appelant y pense. Les trois refus ont été éprouvés séparément : nom vide, entité
+  absente du domaine — refusée par `assertPreconditions`, pas par l'écran —, type hors de
+  l'énuméré ; dans les trois cas la saisie revient dans le formulaire. Les 20 tests ajoutés sont
+  les premiers du projet à **ne toucher aucune base**, la validation ayant été isolée pour cela, et
+  ils ont été mis en défaut un à un : la règle du nom retirée fait tomber 5 tests, celle de la
+  forme de l'entité **1 seul**, celle du type 2, le rognage des espaces 2, la description ramenée à
+  `null` 2, et `parseProductForm` rendant une ligne malgré les erreurs 2. Un `as` sur le type de
+  produit a été retiré avant livraison : vrai ce jour-là, faux le jour où l'énuméré s'allonge. Le
+  contraste a été **mesuré** avant d'être cru sur les douze couples du formulaire, et deux
+  corrections en sont sorties — le design system n'ayant pas plus de jeton de bordure d'erreur que
+  de bordure de contrôle, `content-danger-base` est retenu à 5,19:1, et le filet de la carte de
+  type est passé de `surface-neutral-lighter` (1,18:1, une carte qu'on devine) à
+  `content-neutral-normal`. Deux mesures fausses de ma part ont été corrigées en vérifiant, toutes
+  deux des défauts de lecture du HTML et non du code. Écarts assumés et consignés : `action` sur
+  `PageHeader`, deux routes dans `ROUTES`, et le fichier de tests.
+
 ---
 
 ## Points ouverts
@@ -173,10 +200,12 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   les cinq autres. Son contenu — ce qu'est Vision, le vocabulaire, ce qu'elle ne fait pas, l'état
   daté — ne demande aucune lecture en base : il aurait pu tenir dans T1.6, et n'y a pas tenu parce
   que le périmètre disait « routes vides ». À porter par un ticket, au plus tard en C7.
-- **Deux blocs de la barre latérale attendent le droit de lire la session.** La carte de la
-  personne courante et l'entrée Administration sont dans les maquettes ; T1.6 s'interdisait toute
-  lecture en base. À rebrancher au premier ticket qui lit la session — l'entrée Administration
-  n'apparaissant qu'au responsable de domaine.
+- **Deux blocs de la barre latérale attendent toujours d'être rebranchés.** La carte de la personne
+  courante et l'entrée Administration sont dans les maquettes ; T1.6 s'interdisait toute lecture en
+  base. L'obstacle a disparu — les écrans lisent la session depuis T2.1, et T2.5 lit
+  `can.manageDomain` pour masquer ses actions, exactement ce dont l'entrée Administration a besoin.
+  Ce qui manque n'est plus un droit mais un ticket : la coquille est hors du périmètre de tous ceux
+  de C2. À porter par le ticket de l'écran Administration (D25, C7), ou plus tôt.
 - **Un intervenant côté entité ne se distingue pas sur deux écrans sur trois.** La page projet le
   marque depuis T2.4 — pastille grise **et** mention « côté entité », le texte ne dépendant jamais
   de la couleur. La page produit et la liste transverse continuent d'afficher tous les membres à
@@ -188,11 +217,14 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   commanditaire et l'amorçage laisse `sponsor` nul. La maquette, elle, montre « Marc Tellier
   (entité) ». Le champ n'a donc jamais été vu peuplé. À trancher avec T2.6, l'écran qui le saisit,
   ou par un commanditaire fourni pour l'amorçage.
-- **Le design system n'a pas de jeton de bordure de contrôle.** Le plus sombre des `border-*`,
-  `border-default`, ne dépasse pas 1,2:1 sur le fond de page, là où la limite d'un composant
-  d'interface se mesure à 3:1. T2.3 a retenu `content-neutral-normal` (3,88:1 mesuré) pour les
-  champs de sa barre de filtres — un jeton de contenu employé comme bordure. À faire remonter à
-  qui maintient le design system ; d'ici là, tout nouveau formulaire reprendra ce choix.
+- **Le design system n'a ni jeton de bordure de contrôle, ni jeton de bordure d'erreur.** Le plus
+  sombre des `border-*`, `border-default`, ne dépasse pas 1,2:1 sur le fond de page, là où la
+  limite d'un composant d'interface se mesure à 3:1 ; et aucun `border-danger-*` n'existe. T2.3 a
+  retenu `content-neutral-normal` (3,88:1 mesuré) pour les champs de sa barre de filtres, T2.5 a
+  repris ce choix pour les quatre contrôles du formulaire de produit et y a ajouté
+  `content-danger-base` (5,19:1 mesuré) pour un champ en erreur — deux jetons de contenu employés
+  comme bordures. À faire remonter à qui maintient le design system ; d'ici là, tout nouveau
+  formulaire reprend ces deux choix.
 - **Les filtres ne survivent pas à un aller-retour par la navigation principale.** `docs/06` §9
   demande qu'ils soient conservés quand on entre dans un projet et qu'on revient. Ils vivent dans
   l'URL, donc le retour navigateur les restitue ; un clic sur « Projets » dans la barre latérale
@@ -201,9 +233,27 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 - **La liste transverse n'est ni paginée ni plafonnée.** `docs/06` §4 la projette « à quinze puis
   cinquante projets », ce qu'une page rend sans effort. La question se posera au-delà, et elle
   appellera un plafond avant une pagination : la comparaison ligne à ligne est le but de l'écran.
-- **Un produit archivé s'affiche comme un produit vivant.** Aucun écran ne l'archive encore et la
-  fixture n'en contient aucun ; inventer une mention aurait été un ajout hors ticket. À trancher
-  avec T2.5, l'écran qui archive.
+- **Un produit archivé s'affiche comme un produit vivant, et aucun écran ne l'archive.** T2.5 ne
+  l'a pas fait : sa fiche ne nomme que quatre champs, et la règle 3 interdit l'ajout — arbitrage
+  rendu avec l'humain. Il n'existe donc toujours aucun chemin d'archivage dans l'interface, et la
+  fixture ne contient aucune ligne archivée. **Ce point n'a plus de ticket désigné** : il appelle
+  désormais un ticket à lui, en C7 au plus tard, qui traitera l'archivage d'un produit et d'un
+  projet ensemble — le geste, sa confirmation, et l'affichage d'une ligne archivée là où elle
+  reste lisible. Noter que `find` rend les lignes archivées : `/produits/{id}/modifier` ouvrirait
+  aujourd'hui le formulaire d'un produit archivé.
+
+- **Le type d'un produit ne se voit sur aucun écran de lecture.** T2.5 saisit `kind` — « Produit
+  accompagné » ou « Mission transverse » (D10) — mais la liste des produits, la page produit et la
+  liste transverse affichent les deux à l'identique. Aucun des trois écrans n'a de colonne pour
+  lui, et en ajouter une aurait débordé de T2.5 comme des tickets qui les ont posés. À reprendre
+  au premier ticket qui touche à ces listes, ou à laisser tel quel si le type n'a d'usage qu'au
+  rattachement.
+
+- **Une entité archivée disparaîtrait du formulaire d'édition d'un produit.** La liste des entités
+  proposées écarte les lignes archivées. Si le produit modifié pointait une entité archivée, sa
+  valeur ne figurerait dans aucune option et le formulaire exigerait un nouveau choix plutôt que
+  de conserver en douce un rattachement archivé. Le comportement est défendable mais **n'a pas été
+  éprouvé** : aucun écran n'archive une entité (D25, C7) et l'amorçage n'en archive aucune.
 - **Une activité `in_progress` porte une fin de période à venir.** La fraîcheur retient
   `max(coalesce(period_end, period_start))` : pour l'atelier en cours du mois d'août, c'est le
   31 août. Au mois, l'affichage dit « août 2026 » et reste juste. Le jour où une date au jour
@@ -216,8 +266,9 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   conséquence de T1.2, pas un choix de T1.3. À confirmer au premier écran qui retire un membre
   d'un projet.
 - **Un projet archivé est-il en lecture seule ?** Rien ne le dit dans `docs/`. T1.4 n'a pas
-  tranché : un contributeur désigné d'un projet archivé garde son droit d'écriture. À régler en C2,
-  avec l'écran qui archive.
+  tranché : un contributeur désigné d'un projet archivé garde son droit d'écriture. À régler avec
+  le ticket d'archivage ci-dessus, et non plus « en C2 » : T2.5 n'a pas archivé, et T2.6 ne
+  l'archivera pas non plus — sa fiche ne le mentionne pas davantage.
 - **Le domaine courant est le premier domaine actif trouvé en base.** Pas de variable
   d'environnement : `docs/05` §3 pose un domaine unique. Le jour où un second domaine existe, le
   choix devient un vrai choix et revient au fournisseur d'identité.
@@ -230,9 +281,13 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 - **Trois des quatre ressources du brief ne sont pas semées.** Seule « Restitution des tests —
   vague 2 » a un rattachement donné. « Grille d'entretien », « Maquettes v3 » et « Rapport d'audit
   d'accessibilité » attendent une ancre — projet, activité, URL — que le brief ne fournit pas.
-- **Renommer un référentiel dans l'interface fera recréer la ligne au prochain amorçage.**
-  L'amorçage rapproche par clé naturelle, et le libellé est cette clé. Sans conséquence tant que
-  l'écran de gestion des référentiels n'existe pas ; à revoir quand il arrivera.
+- **Renommer un produit ou un référentiel dans l'interface le fera recréer au prochain amorçage.**
+  L'amorçage rapproche par clé naturelle, et le libellé est cette clé — pour les référentiels comme
+  pour `products`, que `scripts/seed.ts` reconnaît par `row.name`. **T2.5 rend ce piège
+  atteignable** : renommer « Espace client web » puis relancer `npm run db:seed` recrée un second
+  produit sous l'ancien nom, et modifier sa description ou son entité sans le renommer les remet à
+  la valeur du fichier. Sans conséquence en production, où l'amorçage ne tourne pas ; à garder en
+  tête sur la base de développement, et à revoir avec l'écran de gestion des référentiels (D25, C7).
 - **Deux secrets Neon ont transité en clair dans la conversation**, les 12/08/2026 — la base de
   développement, puis la branche de test. Ils ne sont que dans `.env.local`, hors dépôt, mais à
   faire tourner si ces transcripts quittent le poste.

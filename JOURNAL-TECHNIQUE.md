@@ -595,3 +595,103 @@ d'`AvatarGroup`, pour que la page projet et les deux listes ne divergent pas sur
 rendu des deux listes est inchangé, elles ne passent pas de `tone` ; deux composants neufs,
 `components/ui/field.tsx` et `components/ui/tag.tsx`, que l'en-tête d'identité appelle quatre et
 trois fois ; et `lib/queries/projects.test.ts`, comme à chaque ticket depuis T1.3.
+
+---
+
+**T2.5 — Le droit se vérifie deux fois, et la seconde est la seule qui compte.** Les deux
+formulaires rendent 404 pour qui n'est pas responsable de domaine ; l'action serveur revérifie
+`can.manageDomain` avant d'écrire. La seconde n'est pas une ceinture de plus : **une action
+serveur est un point d'entrée HTTP à part entière**, atteignable sans jamais charger la page qui
+l'affichait. Vérifié en récoltant les champs d'action sur la page servie au responsable, puis en
+postant la même charge sous le cookie d'un contributeur — l'action rend son message de refus et
+aucune ligne n'est écrite, contrôlé en base. Un bouton masqué n'est pas un droit ; le refus l'est.
+
+**T2.5 — 404 plutôt que 403 sur les deux formulaires.** Annoncer l'existence d'un écran qu'on
+refuse d'ouvrir n'apprend rien d'utile à qui le demande. C'est aussi ce que font déjà
+`/produits/{id}` et `/projets/{id}` sur un identifiant d'un autre domaine depuis T2.2 : la page
+inexistante et la page interdite se répondent pareil. Aucune décision de `docs/07` ne le posait ;
+si l'usage réclame un jour un écran « vous n'avez pas ce droit », il se posera ici.
+
+**T2.5 — Un `as` sur le type de produit a été retiré avant d'être livré.** L'action écrivait
+`kind: values.kind as "product" | "internal"`, la validation venant de prouver l'appartenance à
+l'énuméré. L'affirmation était vraie ce jour-là et aurait menti le jour où une troisième valeur
+entre dans `product_kind` : le `as` ne suit pas le schéma, il l'affirme. `parseProductForm` rend
+désormais soit des erreurs, soit une ligne **typée** — `input` est non nul si et seulement si
+`errors` est vide —, et l'action n'a plus rien à affirmer. Deux tests tiennent cette équivalence.
+
+**T2.5 — Le type de produit n'apparaît sur aucun écran de lecture.** Le formulaire écrit `kind`,
+mais la liste des produits, la page produit et la liste transverse affichent une mission
+transverse (`internal`) exactement comme un produit. Aucun des trois écrans n'a de colonne pour
+elle, et en ajouter une déborderait de T2.5 comme des tickets qui les ont posés. D10 pose le type
+pour que les missions transverses aient un rattachement, pas nécessairement pour qu'il se voie.
+Reporté en point ouvert d'`ETAT.md`.
+
+**T2.5 — Désaccord avec `docs/06` §9 : l'édition n'est pas en place.** Le document dit « édition
+en place pour les champs simples, formulaire complet uniquement pour la création ». Une page
+dédiée `/produits/{id}/modifier` est retenue, sur trois motifs : l'arborescence de `docs/06` §2
+pose « création / édition » en **un seul nœud** sous Produit ; deux des quatre champs sont des
+listes de choix, ce que « champ simple » décrit mal ; et sans JavaScript, l'édition en place
+deviendrait un second état de la page produit, donc deux rendus à tenir pour un écran qui en a
+déjà un. Arbitrage rendu avec l'humain avant écriture. La règle 6 ne s'applique pas — §9 est un
+pattern d'interaction, pas une décision de `docs/07` — mais le désaccord se consigne quand même.
+
+**T2.5 — Le formulaire est le second composant client du projet, et il fonctionne sans
+JavaScript.** `useActionState` impose la frontière client ; React 19 améliore progressivement une
+action serveur passée à `<form action>`. **Vérifié, pas supposé** : la page servie porte les
+champs `$ACTION_REF_1`, `$ACTION_1:0`, `$ACTION_1:1` et `$ACTION_KEY`, et une soumission
+`multipart` reconstituée à la main — sans exécuter une ligne de JavaScript — rend un 303 vers la
+page du produit créé. Ce que le hook apporte quand JavaScript est là : les valeurs refusées
+reviennent dans le formulaire. Sans lui, une description de dix lignes disparaîtrait au premier
+nom oublié — constaté sur le rendu, la description survit au refus.
+
+**T2.5 — L'identifiant du produit modifié ne transite pas par le formulaire.** `updateProduct` est
+liée par `.bind(null, product.id)` côté serveur. Un champ caché aurait marché et se serait
+remplacé par celui d'un autre produit dans la requête soumise ; la liaison, non. Le droit aurait
+rattrapé un contributeur, pas un responsable de domaine visant la mauvaise ligne.
+
+**T2.5 — Le design system n'a pas plus de jeton de bordure d'erreur que de bordure de contrôle.**
+Aucun `border-danger-*` n'existe. Le champ en erreur reprend donc un jeton de contenu comme
+bordure, exactement comme T2.3 l'a fait pour le champ ordinaire : `content-danger-base`, **mesuré**
+à 5,19:1 sur le fond du champ. Les autres mesures du formulaire : bordure de champ
+`content-neutral-normal` 3,88:1, message de champ `content-danger-dark` 6,55:1 sur le fond de page,
+texte du bandeau 6,13:1 sur `surface-danger-lightest`, bordure du bandeau 4,93:1, note de champ
+`content-neutral-base` 4,73:1. **Le message d'erreur ne dépend jamais de la couleur** : il est
+écrit sous le champ, repris dans un bandeau `role="alert"`, et le champ porte `aria-invalid` et
+`aria-describedby`.
+
+**T2.5 — Le filet de la carte de type est passé à `content-neutral-normal`, mesuré.** Le premier
+choix reprenait `surface-neutral-lighter`, le jeton des blocs — 1,18:1 sur le fond de page, c'est-
+à-dire une carte qu'on devine. Or cette carte est la cible de clic d'un bouton radio, pas un bloc
+de lecture. Les quatre contrôles du formulaire partagent donc un seul jeton de bordure.
+
+**T2.5 — Deux mesures fausses de ma part, corrigées en vérifiant.** J'ai d'abord lu « la
+description n'est pas conservée » et « aucun type n'est coché » dans le HTML servi : les deux
+étaient des défauts de mes expressions de lecture, pas du code. La première capturait la balise
+`<meta name="description">` de l'en-tête avant d'atteindre le `<textarea>` ; la seconde exigeait
+`value` avant `checked`, quand React émet l'inverse. Les deux comportements sont corrects, et
+revérifiés sur des motifs ancrés à `<textarea>` et `<input type="radio">`. Conséquence à retenir :
+un motif qui n'est pas ancré à la balise visée mesure autre chose que ce qu'on croit.
+
+**T2.5 — Le produit créé pendant la vérification a été retiré de la base de développement.** Il
+polluait la fixture de T1.5, sur laquelle se lisent les critères de T2.1 à T2.4. La couche scopée
+n'expose aucune suppression de produit — règle 4 — : le retrait s'est fait par un script jetable
+important `db` directement, hors de tout code livré. Résidu de vérification, pas donnée métier.
+
+**T2.5 — Une entité archivée disparaîtrait silencieusement du formulaire d'édition.** La liste des
+entités écarte les lignes archivées, comme le veut la couche. Si le produit modifié pointait une
+entité archivée, sa valeur ne serait dans aucune option : le formulaire retomberait sur « Choisir
+une entité » et exigerait un nouveau choix. Le comportement est défendable — on ne conserve pas en
+douce un rattachement archivé — mais il n'a pas été éprouvé : aucun écran n'archive une entité, et
+l'amorçage n'en archive aucune. Reporté en point ouvert d'`ETAT.md`.
+
+**T2.5 — L'archivage d'un produit reste hors périmètre.** `ETAT.md` désignait T2.5 comme « l'écran
+qui archive » sur deux points ouverts. La fiche du ticket ne mentionne que quatre champs, et la
+règle 3 interdit l'ajout. Arbitrage rendu avec l'humain : le périmètre est tenu, et les deux points
+ouverts sont reformulés pour ne plus désigner un ticket qui ne les traitera pas.
+
+**T2.5 — Écarts de périmètre.** Trois, tous assumés : `PageHeader` gagne un `action`, calqué sur
+celui que `SectionHeader` porte depuis T1.6 — sans lui, l'action d'écran se placerait où la
+maquette ne la prévoit pas, et les deux en-têtes divergeraient sur la même forme ; `ROUTES` gagne
+`productNew` et `productEdit`, le module tenant toutes les adresses depuis T1.6 ; et
+`lib/forms/product.test.ts`, comme à chaque ticket depuis T1.3 — à ceci près qu'il est le premier
+fichier de tests du projet à ne toucher aucune base, la validation ayant été isolée pour cela.

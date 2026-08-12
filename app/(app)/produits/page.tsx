@@ -11,6 +11,11 @@
  * jamais affiché — inventer un libellé à partir d'un paramètre serait donner
  * du crédit à ce qu'on n'a pas lu.
  *
+ * **« Nouveau produit » n'apparaît qu'au responsable de domaine** (F1-D1, D9).
+ * C'est le critère de validation de T2.5, et il se lit ici : l'action est
+ * absente du rendu, pas seulement grisée. Elle figure aussi dans l'état vide,
+ * `docs/06` §9 voulant qu'un état vide propose le geste qui le remplit.
+ *
  * Aucune requête directe : tout passe par `session.db`, déjà scopé sur le
  * domaine courant. Règle 1.
  */
@@ -71,6 +76,7 @@ export default async function ProductsPage({
       <PageHeader
         title="Produits"
         lead="Sur quels objets le centre intervient-il, et pour quelles entités ?"
+        action={session.can.manageDomain ? <NewProductLink /> : null}
       />
 
       {filters.length > 0 ? (
@@ -132,9 +138,25 @@ export default async function ProductsPage({
         <EmptyState
           title="Aucun produit accompagné pour l'instant"
           description="Cette liste réunira les objets sur lesquels le centre intervient — pas le catalogue de l'entreprise. Chaque produit y portera son entité, le nombre d'accompagnements qu'il a reçus et la date de sa dernière activité."
+          {...(session.can.manageDomain
+            ? { action: <NewProductLink /> }
+            : {})}
         />
       )}
     </Page>
+  );
+}
+
+/** L'action de création. Rendue par l'appelant, et lui seul, sous condition
+ *  de droit — ce composant n'en connaît aucun. */
+function NewProductLink() {
+  return (
+    <Link
+      href={ROUTES.productNew}
+      className="rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale"
+    >
+      Nouveau produit
+    </Link>
   );
 }
 

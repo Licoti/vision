@@ -22,14 +22,22 @@ export type NavEntry = {
 };
 
 /**
- * Les adresses des six écrans. Les pages de détail prennent un identifiant :
- * le schéma en pose des UUID, et rien ne promet encore de slug — ce choix
- * revient à C2, avec l'écran qui construit le lien.
+ * Les adresses des six écrans, et des formulaires qui les alimentent. Les
+ * pages de détail prennent un identifiant : le schéma en pose des UUID, et
+ * rien ne promet encore de slug — ce choix revient à C2, avec l'écran qui
+ * construit le lien.
+ *
+ * `productNew` est un segment statique sous `/produits`, là où `product` est
+ * dynamique : Next donne la priorité au statique, et `isUuid` rattraperait de
+ * toute façon en 404. Les formulaires ne figurent pas dans `MAIN_NAV` — un
+ * formulaire n'est pas une destination de navigation.
  */
 export const ROUTES = {
   overview: "/",
   products: "/produits",
   product: (id: string) => `/produits/${id}`,
+  productNew: "/produits/nouveau",
+  productEdit: (id: string) => `/produits/${id}/modifier`,
   projects: "/projets",
   project: (id: string) => `/projets/${id}`,
   about: "/a-propos",

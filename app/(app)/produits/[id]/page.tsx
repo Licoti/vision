@@ -12,10 +12,14 @@
  * 404 : la seconde réponse ne se distingue pas de la première, et c'est
  * volontaire.
  *
+ * **« Modifier ce produit » n'apparaît qu'au responsable de domaine**
+ * (F1-D1, D9) : l'action est absente du rendu pour tout autre, pas grisée.
+ *
  * Aucune requête directe : tout passe par `session.db`, déjà scopé sur le
  * domaine courant. Règle 1.
  */
 
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Breadcrumb } from "@/components/shell/breadcrumb";
@@ -63,6 +67,16 @@ export default async function ProductPage({
           overline={`${product.entityLabel} · ${formatAccompaniments(projects.length)}`}
           title={product.name}
           {...(product.description ? { lead: product.description } : {})}
+          action={
+            session.can.manageDomain ? (
+              <Link
+                href={ROUTES.productEdit(product.id)}
+                className="rounded-lg border border-content-neutral-normal px-4 py-2 text-sm font-semibold text-content-neutral-dark"
+              >
+                Modifier ce produit
+              </Link>
+            ) : null
+          }
         />
 
         <section className="flex flex-col gap-4">
