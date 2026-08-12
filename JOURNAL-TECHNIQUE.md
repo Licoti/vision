@@ -222,3 +222,97 @@ sur tous les projets, le contributeur sur le seul projet où `is_contributor` es
 celui où il n'est que membre d'équipe —, le simple membre sur aucun. La soumission du formulaire
 sans JavaScript pose bien le cookie. La sonde a été supprimée, la base de développement n'a jamais
 été touchée. **Aucune donnée factice n'entre dans le dépôt : c'est T1.5.**
+
+**T1.5 — Écart de périmètre : `tsx`, sans quoi le script n'est pas exécutable.** Le ticket ne
+prévoit que `scripts/seed.ts`, mais rien dans le dépôt ne sait lancer un `.ts` hors de Next et de
+Vitest. Node 24 retire les types tout seul, et échoue quand même : `lib/db/scoped.ts` importe
+`./client` sans extension, la résolution ESM lève `ERR_MODULE_NOT_FOUND` (essayé). `tsx` était déjà
+présent dans `node_modules` en dépendance transitive de `drizzle-kit` : le déclarer n'a rien
+téléchargé. Deux lignes dans `package.json` — la dépendance et le script `db:seed`. Même nature
+d'écart qu'en T1.3 avec Vitest.
+
+**T1.5 — Pas d'`await` de premier niveau dans un script.** `package.json` ne porte pas
+`"type": "module"` : `tsx` compile `scripts/seed.ts` en CommonJS et esbuild refuse alors le
+`await` de premier niveau. D'où la forme `seed().then(…, …)` en pied de fichier plutôt qu'un
+`await seed()`. **À savoir pour tout futur script** ; le jour où l'un d'eux a besoin d'un `await`
+de premier niveau, c'est l'extension `.mts` qu'il faudra, comme pour `vitest.config.mts`.
+
+**T1.5 — La rejouabilité tient à une clé naturelle, pas à un identifiant.** Les UUID sont tirés au
+hasard : un script qui insère sans rapprocher doublerait tout à la seconde exécution. Chaque table
+est donc lue une fois et indexée par une clé stable — `label` pour les référentiels, `name` pour
+les produits et les projets, `full_name` pour les personnes, le couple d'identifiants pour les
+liaisons, `(project_id, activity_type_id)` pour les activités. **Conséquence à connaître : renommer
+un référentiel dans l'interface fera recréer la ligne au prochain amorçage.** Acceptable pour un
+script de développement, à revoir si l'amorçage devient un chantier de production (`docs/04` §6).
+La fixture est contrôlée au démarrage : deux clés identiques lèvent au lieu de s'écraser en silence.
+
+**T1.5 — `numeric` revient cadré, et cassait la rejouabilité.** PostgreSQL rend `"62.0000"` pour
+un `"62"` écrit. Comparé tel quel, chaque champ chiffré paraissait avoir dérivé et le script
+réécrivait les mêmes lignes indéfiniment. La comparaison normalise donc les valeurs numériques
+avant de conclure — c'est tout l'objet de `sameValue`. Sans elle, « rejouable sans doublon » aurait
+été vrai et « sans écriture inutile » faux.
+
+**T1.5 — La rejouabilité a été mise en défaut avant d'être crue**, comme les tests de T1.3 et T1.4.
+Deux exécutions au vert ne prouvent que la moitié : elles montrent qu'on ne duplique pas, pas qu'on
+rattrape. L'objectif d'un projet et la valeur d'un résultat ont donc été faussés en base, puis
+l'amorçage relancé : exactement deux lignes remises à jour, les valeurs du brief relues telles
+quelles, et l'exécution suivante de nouveau silencieuse. Sans cette manipulation, la branche de
+mise à jour n'aurait jamais tourné.
+
+**T1.5 — Les champs que le brief ne donne pas restent nuls.** Courriels des personnes, `base_url`
+des outils, `external_url` des résultats, description des produits, commanditaire, valeur de
+référence de l'indicateur : le brief ne les fournit pas, rien n'est inventé. **Une seule exception,
+imposée par le schéma** : `resources.url` est non nul, la ressource porte donc un lien en
+`exemple.invalid` — domaine réservé par la RFC 2606, visiblement factice, et qui ne pointera jamais
+ailleurs par accident. Arbitrage rendu avec l'humain en ouverture du ticket. **Conséquence pour
+C4 :** les deux résultats sont sans lien profond, alors que le brief §7 les annonce « lien
+Ergonome » et « lien vers l'outil ». L'écran devra traiter le résultat sans lien comme un cas
+normal — ce qu'il doit savoir faire de toute façon —, ou l'humain fournira les adresses.
+
+**T1.5 — « Atelier de priorisation » est ajouté au référentiel.** Le brief §7 nomme cette activité ;
+les 24 types de `docs/03` §2 ne la portent pas. Plutôt que de la loger sous « Atelier de
+co-conception » avec son vrai nom relégué dans l'objectif — la roadmap aurait alors affiché autre
+chose que le brief —, un 25ᵉ type a été créé en famille Conception. `docs/03` présente sa liste
+comme « le référentiel de départ **proposé** », et `docs/04` §1 pose que les référentiels sont des
+données du domaine. Arbitrage rendu avec l'humain.
+
+**T1.5 — Trois inventions assumées, toutes visibles à l'écran.** Le brief est muet, le produit ne
+l'est pas :
+— **Camille Roux est responsable de domaine**, les six autres membres du centre sont `member`.
+  Le brief ne désigne personne ; elle est la seule présente sur les deux accompagnements du produit
+  vitrine. Sans un responsable **et** un contributeur qui ne l'est pas, la bascule de T1.4 n'a rien
+  à montrer et la validation de T2.5 — « un contributeur ne voit pas l'action » — rien à vérifier.
+— **Les métiers sont attribués** — un par membre du centre —, et `project_jobs` en est **dérivé**
+  par union sur l'équipe, jamais écrit à la main. Sans eux, le filtre « métier » de T2.3, qui est
+  au périmètre du POC (`docs/05` §3), n'aurait rien à filtrer. Arbitrage rendu avec l'humain.
+— **Les participants d'une activité sont les membres du centre de son équipe projet.** Le brief ne
+  détaille pas la présence activité par activité. Inférence la plus plate possible ; à corriger dès
+  qu'une donnée réelle existe.
+
+**T1.5 — `last_activity_at` est dans le futur sur deux projets, et c'est la définition qui parle.**
+La fixture donne 2026-10-31 sur « Autonomie des opérations courantes » et 2026-09-30 sur
+« Dématérialisation de la déclaration » : dans les deux cas un **audit UX prévu**, pas un fait
+accompli. La définition retenue en T1.3 — `max(coalesce(period_end, period_start))` sur les
+activités non archivées et non annulées — ne distingue pas le prévu du fait. `docs/03` §8 veut
+pourtant que ce champ dise « depuis quand un projet n'a pas bougé ». **Rien n'est corrigé ici** :
+la couche d'accès est hors du périmètre de ce ticket. Le point ouvert d'`ETAT.md` sur
+`last_activity_at` est donc requalifié : ce n'est plus une interprétation à confirmer, c'est un
+écart observé, à trancher en C2 avec le tri « par activité récente ».
+
+**T1.5 — Personne, dans la fixture, n'a de compte annuaire.** Les huit personnes sont en
+`source: manual`, `external_id` nul. Il n'y a pas d'annuaire au POC et fabriquer des identifiants
+aurait été inventer. La contrainte `persons_external_id_requires_directory` l'autorise —
+elle n'interdit qu'un `external_id` sans annuaire, jamais l'inverse. **À reprendre en C7** : l'import
+Entra ID devra rattacher ces lignes à des comptes annuaire sans leur faire perdre leurs
+rattachements de projet (`docs/04` §2, D19).
+
+**T1.5 — L'amorçage n'écrit aucun `created_by`.** `forDomain({ actorId: null })` : il n'y a pas de
+personne courante quand la première personne n'existe pas encore. Toutes les lignes semées portent
+donc `created_by` nul, ce que `schema.ts` prévoyait explicitement. **Conséquence pour C6 :** le
+journal `events` ne pourra rien attribuer sur ces lignes ; il n'y a d'ailleurs aucun événement semé,
+le brief n'en fournit pas et le ticket ne les demande pas.
+
+**T1.5 — Rien n'a été semé hors de l'énumération du ticket.** Ni budget, ni lien déclaré, ni
+événement, et une seule ressource sur les quatre du brief §7 — « Restitution des tests — vague 2 »,
+la seule que le brief rattache à une activité. Les trois autres n'ont pas d'ancrage donné :
+les inventer aurait été plus coûteux à défaire qu'à écrire. Arbitrage rendu avec l'humain.

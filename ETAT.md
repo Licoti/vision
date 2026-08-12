@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** T1.4 terminé
+**Dernière mise à jour :** T1.5 terminé
 **Chantier en cours :** C1 — Socle technique
-**Ticket en cours :** aucun — prochain à lancer : T1.5 (référentiels et données factices)
+**Ticket en cours :** aucun — prochain à lancer : T1.6 (coquille applicative)
 
 ---
 
@@ -12,7 +12,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
 | Chantier | Tickets | État |
 |---|---|---|
-| C1 — Socle technique | T1.1 → T1.6 | en cours — T1.1 à T1.4 faits |
+| C1 — Socle technique | T1.1 → T1.6 | en cours — T1.1 à T1.5 faits |
 | C2 — Produits et projets | T2.1 → T2.6 | à faire |
 | C3 — Activités et roadmap | à découper | à faire |
 | C4 — Ressources et résultats | à découper | à faire |
@@ -60,6 +60,20 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   peuplée sur la branche de test, formulaire soumis sans JavaScript. Deux écarts assumés et
   consignés au journal : le responsable de domaine écrit sur tous les projets — arbitrage sur un
   silence de D9 —, et les tests eux-mêmes, que le périmètre du ticket ne mentionnait pas.
+- **T1.5 — 12/08/2026 — référentiels et données factices.** `scripts/seed.ts` amorce
+  « Groupe Meridian » : 142 lignes sur 20 tables, dont les six référentiels — 5 entités, 6 métiers,
+  7 approches, 4 statuts avec leur `nature`, 4 outils, 25 types d'activité en 6 familles — puis les
+  données du brief : 2 produits, 3 projets, 12 activités, 2 résultats, 1 ressource, 1 indicateur,
+  3 relevés, 1 adoption. **Le critère est tenu et vérifié en base** : la seconde exécution ne crée
+  ni ne met à jour aucune ligne, et les comptes relus par la couche scopée correspondent un à un à
+  la fixture. Le rapprochement se fait par clé naturelle, pas par identifiant, et les valeurs
+  `numeric` sont normalisées avant comparaison — sans quoi le script réécrivait les mêmes lignes à
+  chaque passage. `/dev/session` sert désormais sept comptes ; Marc Tellier, sans compte Vision,
+  n'y figure pas, et la portée d'écriture d'un contributeur se limite bien à son projet. Écarts
+  assumés et consignés : `tsx` déclaré pour pouvoir lancer un `.ts` (il était déjà là en dépendance
+  transitive) ; un 25ᵉ type d'activité, « Atelier de priorisation », que le brief nomme et que
+  `docs/03` n'a pas ; trois inventions hors brief — un responsable de domaine, les métiers, les
+  participants d'activité —, chacune motivée par un critère de validation à venir.
 
 ---
 
@@ -70,11 +84,12 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   panneau latéral (C3) ou modale.
 - **Couleur du corps de texte.** Les maquettes utilisent `#33333b` (greyscale-800) pour le texte
   courant ; aucun token sémantique du §2.4 ne pointe cette nuance. À trancher en T1.6.
-- **Définition de `last_activity_at` : une interprétation, pas une décision documentée.** `docs/04`
-  §6 confie le champ à la couche d'écriture sans dire ce qu'il vaut. T1.3 a retenu la date du
-  dernier fait d'accompagnement — `max(coalesce(period_end, period_start))` sur les activités non
-  archivées et non annulées — plutôt que l'horodatage de la dernière modification, qui est le rôle
-  d'`events`. À confirmer quand C2 triera les listes de projets.
+- **`last_activity_at` compte les activités prévues, et se pose donc dans le futur.** T1.3 avait
+  retenu `max(coalesce(period_end, period_start))` sur les activités non archivées et non annulées,
+  faute de définition dans `docs/04` §6. T1.5 rend l'effet visible : deux projets sur trois portent
+  une date à venir, celle d'un audit **prévu**. `docs/03` §8 veut pourtant que ce champ dise
+  « depuis quand un projet n'a pas bougé ». Ce n'est plus une interprétation à confirmer mais un
+  écart constaté. **À trancher en C2**, avec le tri « par activité récente » de T2.3.
 - **Rien n'empêche techniquement un import direct de `lib/db/client`.** Le verrou ESLint a été
   écarté du périmètre de T1.3. La règle 1 tient aujourd'hui par la convention, l'en-tête de
   `client.ts` et un `grep`. À reposer si un import sauvage apparaît.
@@ -90,6 +105,16 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   choix devient un vrai choix et revient au fournisseur d'identité.
 - **`/dev/session` est une route de développement**, rendue 404 en production. Elle disparaîtra
   avec le stub en C7. Elle n'est reliée à aucune navigation : T1.6 n'a pas à la référencer.
+- **Les deux résultats factices n'ont pas de lien profond.** Le brief §7 les annonce « lien
+  Ergonome » et « lien vers l'outil » sans donner d'adresse, et rien n'a été inventé. C4 devra
+  traiter le résultat sans lien comme un cas normal, ou l'humain fournira les adresses. Même
+  silence sur `tools.base_url` et sur les courriels des personnes.
+- **Trois des quatre ressources du brief ne sont pas semées.** Seule « Restitution des tests —
+  vague 2 » a un rattachement donné. « Grille d'entretien », « Maquettes v3 » et « Rapport d'audit
+  d'accessibilité » attendent une ancre — projet, activité, URL — que le brief ne fournit pas.
+- **Renommer un référentiel dans l'interface fera recréer la ligne au prochain amorçage.**
+  L'amorçage rapproche par clé naturelle, et le libellé est cette clé. Sans conséquence tant que
+  l'écran de gestion des référentiels n'existe pas ; à revoir quand il arrivera.
 - **Deux secrets Neon ont transité en clair dans la conversation**, les 12/08/2026 — la base de
   développement, puis la branche de test. Ils ne sont que dans `.env.local`, hors dépôt, mais à
   faire tourner si ces transcripts quittent le poste.
