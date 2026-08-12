@@ -47,6 +47,47 @@ une variable circulaire et silencieuse. Les familles sont nommées `--font-famil
 graisses exposées sous les noms usuels (`font-semibold`) plutôt que sous leur nombre. **Règle à
 retenir : un token ne doit jamais porter le nom exact d'un namespace de thème Tailwind.**
 
+**T1.2 — `domain_id` ajouté là où le document ne le liste pas.** `docs/04` ne mentionne pas de
+`domain_id` sur `project_members`, `project_jobs`, `project_approaches`, `activity_participants`,
+`indicator_readings`, `project_indicators`, `budgets` ni `project_links`. La colonne y a été
+ajoutée, non nulle et avec clé étrangère. Sans elle, la couche d'accès de T1.3 devrait remonter au
+domaine par jointure sur la table parente pour ces huit tables, et le filtrage deviendrait une
+règle à géométrie variable. Le critère de validation du ticket demandait d'ailleurs des `domain_id`
+« présents partout ». **Corollaire pour T1.3 : le `domain_id` d'une liaison doit être vérifié
+cohérent avec celui de son parent à l'écriture** — la base ne l'impose pas.
+
+**T1.2 — `domains` ne porte pas de `created_by`.** La convention du §1 veut ce champ sur chaque
+table, mais il référencerait `persons`, elle-même scopée par domaine : un domaine serait créé par
+une personne qui ne peut exister qu'après lui. Seul le super administrateur écrit dans cette
+table, et il n'a pas de ligne `persons`. Le champ est omis, `created_at` et `updated_at` restent.
+
+**T1.2 — Deux règles d'intégrité ne tiennent pas dans une contrainte de table.** « Un résultat ne
+se rattache qu'à une activité `done` » traverse deux tables ; le recalcul de
+`projects.last_activity_at` est un effet d'écriture. Aucun déclencheur n'a été posé — un
+déclencheur est du code métier caché dans la base, invisible à la relecture du dépôt. Les deux
+règles reviennent donc à la couche d'écriture de T1.3, où elles seront testables. **Tant qu'elles
+n'y sont pas, rien ne les garantit.**
+
+**T1.2 — Les contraintes ont été éprouvées, pas seulement déclarées.** Sept écritures illégales
+ont été tentées sur la vraie base — domaine inexistant, activité terminée sans date de fin,
+activité annulée sans motif, état hors liste, nature `archived` proscrite par D42, personne sans
+accès mais avec un rôle, projet lié à lui-même. Les sept ont été refusées. Un `CHECK` mal écrit
+passe la génération de migration sans broncher : le vérifier en base est le seul contrôle qui vaut.
+
+**T1.2 — `numeric` revient en `string` côté TypeScript.** Drizzle mappe `numeric` sur `string`
+pour ne pas perdre de précision. Les valeurs de `results`, `indicator_readings`,
+`project_indicators` et `budgets` sont donc des chaînes à la lecture. À convertir explicitement au
+moment de l'affichage, en C4 et C5 — pas de `Number()` disséminé dans les composants.
+
+**T1.2 — `position` est un `numeric`, non un entier.** Les référentiels s'ordonnent par `position`
+et seront réordonnables depuis l'écran de gestion de C7. Un décimal permet d'insérer entre deux
+lignes sans réécrire toute la colonne.
+
+**T1.2 — Le secret Neon a transité en clair dans la conversation.** La chaîne de connexion a été
+collée dans le fil de discussion du 12/08/2026, puis déposée dans `.env.local`, que `.gitignore`
+couvre — vérifié par `git check-ignore`. Elle n'est pas dans le dépôt, mais elle est dans un
+transcript. **À faire tourner sur Neon si ce transcript sort du poste.**
+
 **T1.1 — Épaisseurs de bordure sans utilitaire.** Tailwind 4 dérive `border-2` d'un nombre brut et
 non d'un token ; `border-2` vaudrait donc 2px là où le design system dit 3px. Seul `border` (1px)
 coïncide avec un token. Les autres épaisseurs s'écrivent
