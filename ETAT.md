@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** T2.1 terminé
+**Dernière mise à jour :** T2.2 terminé
 **Chantier en cours :** C2 — Produits et projets
-**Ticket en cours :** aucun — prochain à lancer : T2.2 (page produit, version socle)
+**Ticket en cours :** aucun — prochain à lancer : T2.3 (liste transverse des projets)
 
 ---
 
@@ -13,7 +13,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | Chantier | Tickets | État |
 |---|---|---|
 | C1 — Socle technique | T1.1 → T1.6 | **terminé** |
-| C2 — Produits et projets | T2.1 → T2.6 | en cours — T2.1 fait |
+| C2 — Produits et projets | T2.1 → T2.6 | en cours — T2.1, T2.2 faits |
 | C3 — Activités et roadmap | à découper | à faire |
 | C4 — Ressources et résultats | à découper | à faire |
 | C5 — Indicateurs et temps long | à découper | à faire |
@@ -104,6 +104,23 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   est désormais vérifiée avant la base. Écart assumé et consigné : le périmètre déborde sur
   `lib/db/scoped.ts`, ses tests et `scripts/seed.ts` — c'est le prix d'une décision sur un champ
   dénormalisé.
+- **T2.2 — 12/08/2026 — page produit, version socle.** **Le critère est tenu et lu dans le HTML
+  servi** : sur « Espace client web », « Autonomie des opérations courantes · depuis février 2026 »
+  précède « Refonte du parcours de virement · mars 2024 → septembre 2024 ». « Le plus récent » se
+  lit sur `started_on`, la date de l'accompagnement, et non sur `last_activity_at` : une activité
+  saisie aujourd'hui sur un projet clos en 2024 ne doit pas le faire remonter en tête d'une
+  chronologie. Les deux points ouverts que T2.1 renvoyait ici sont refermés : `/produits/{id}` rend
+  404 sur un identifiant mal formé comme sur un identifiant inconnu — vérifié, 404 et non 500 — et
+  le motif d'UUID vit désormais dans `lib/uuid.ts`, d'où T2.4 le reprendra. Les huit tests ajoutés
+  ont été **mis en défaut un à un** : le tri par nom seul fait tomber le test de l'ordre et lui
+  seul, les projets archivés réintégrés celui de l'archivage, les filtres de domaine retirés ceux
+  de l'étanchéité. Ce faisant, une propriété non écrite est apparue : chaque filtre de domaine
+  **seul** est rattrapé par celui de la table jointe voisine — l'étanchéité ne tombe qu'en en
+  retirant deux. Le contraste des pastilles d'équipe a été **mesuré** avant d'être cru : le premier
+  choix donnait des initiales à 15:1 sur une pastille à 1,04:1 du fond, c'est-à-dire une forme
+  invisible ; la palette de la maquette rétablit 7,11:1 des deux côtés. Écarts assumés et
+  consignés : le fichier de tests lui-même, l'alias `@/` ajouté à `vitest.config.mts` sans lequel
+  il ne s'exécute pas, et le motif d'UUID déplacé hors de `app/(app)/produits/page.tsx`.
 
 ---
 
@@ -120,11 +137,19 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   personne courante et l'entrée Administration sont dans les maquettes ; T1.6 s'interdisait toute
   lecture en base. À rebrancher au premier ticket qui lit la session — l'entrée Administration
   n'apparaissant qu'au responsable de domaine.
-- **Les pages de détail ne vérifient pas encore la forme de leur identifiant.** T2.1 a découvert
-  qu'un paramètre non conforme à un UUID ne produit pas une recherche infructueuse mais une erreur
-  PostgreSQL, donc une page en 500 ; la liste des produits s'en protège. `/produits/[id]` et
-  `/projets/[id]` restent exposés tant qu'ils ne lisent rien — **à traiter en T2.2 et T2.4**, avec
-  le 404 qui va avec un identifiant inconnu.
+- **`/projets/[id]` ne vérifie pas encore la forme de son identifiant.** T2.2 a posé la garde et
+  le 404 sur `/produits/[id]`, et sorti le motif dans `lib/uuid.ts` : **T2.4 n'a plus qu'à
+  l'appeler**. La page projet reste exposée tant qu'elle ne lit rien.
+- **La table des couleurs de statut est locale à la page produit.** Quatre natures, quatre tokens,
+  dans `app/(app)/produits/[id]/page.tsx`. T2.4 en aura le même besoin : c'est là, avec deux
+  appelants réels, que la forme partagée s'écrira — pas avant.
+- **Un intervenant extérieur ne se distingue pas dans l'équipe.** La maquette grise la pastille de
+  qui n'a pas de compte Vision (« Marc Tellier — sans compte Vision ») ; T2.2 affiche les quatre
+  membres à l'identique, `persons.kind` n'étant pas dans les quatre champs du ticket. À reprendre
+  avec l'équipe de la page projet (T2.4).
+- **Un produit archivé s'affiche comme un produit vivant.** Aucun écran ne l'archive encore et la
+  fixture n'en contient aucun ; inventer une mention aurait été un ajout hors ticket. À trancher
+  avec T2.5, l'écran qui archive.
 - **Une activité `in_progress` porte une fin de période à venir.** La fraîcheur retient
   `max(coalesce(period_end, period_start))` : pour l'atelier en cours du mois d'août, c'est le
   31 août. Au mois, l'affichage dit « août 2026 » et reste juste. Le jour où une date au jour

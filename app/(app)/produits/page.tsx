@@ -29,19 +29,11 @@ import {
   listProductsWithCounts,
   type ProductEntity,
 } from "@/lib/queries/products";
+import { isUuid } from "@/lib/uuid";
 
 export const metadata = {
   title: "Produits — Vision",
 };
-
-/**
- * Un paramètre d'URL est saisi par n'importe qui. Interroger une colonne
- * `uuid` avec « n-importe-quoi » n'est pas une recherche infructueuse : c'est
- * une erreur PostgreSQL, et une page en 500. La forme se vérifie donc avant la
- * base — constaté en vérifiant le ticket, pas déduit.
- */
-const UUID =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Les gabarits de colonne, tenus en un seul endroit pour que l'en-tête et
  *  les lignes ne puissent pas diverger. */
@@ -62,9 +54,10 @@ export default async function ProductsPage({
 
   const filters = await listProductEntities(session.db);
 
-  // Le paramètre est confronté au domaine avant d'être cru. `find` est scopé :
-  // l'entité d'un autre domaine n'existe pas, elle ne « manque » pas.
-  const requested = entite && UUID.test(entite) ? entite : undefined;
+  // La forme est vérifiée avant la base (`lib/uuid`), puis le paramètre est
+  // confronté au domaine avant d'être cru. `find` est scopé : l'entité d'un
+  // autre domaine n'existe pas, elle ne « manque » pas.
+  const requested = entite && isUuid(entite) ? entite : undefined;
   const activeEntity = requested
     ? await session.db.find(entities, requested)
     : undefined;

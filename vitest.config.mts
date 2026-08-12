@@ -9,6 +9,8 @@
  * développement.
  */
 
+import { fileURLToPath } from "node:url";
+
 import { config } from "dotenv";
 import { defineConfig } from "vitest/config";
 
@@ -26,6 +28,12 @@ if (!testUrl) {
 }
 
 export default defineConfig({
+  // Le chemin `@/…` de `tsconfig.json`. Les modules de `lib/queries` l'emploient
+  // pour importer la couche d'accès ; sans cette ligne, ils sont typables mais
+  // pas exécutables sous Vitest. Aucune dépendance ajoutée pour si peu.
+  resolve: {
+    alias: { "@": fileURLToPath(new URL(".", import.meta.url)) },
+  },
   test: {
     include: ["lib/**/*.test.ts"],
     environment: "node",

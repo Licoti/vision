@@ -417,3 +417,52 @@ l'humain.
 **T2.1 — Les filtres sont locaux à l'écran, volontairement.** T2.3 devra combiner quatre filtres
 et une recherche : la forme partagée s'écrira là, avec ses vraies contraintes. La poser ici
 reviendrait à écrire T2.3 par avance, ce qu'interdit la règle 3.
+
+**T2.2 — Les colonnes `date` ne reviennent pas en `Date`.** `started_on` et `expected_end_on`
+arrivent en chaîne `YYYY-MM-DD` : le pilote rend le type PostgreSQL tel quel, là où `timestamptz`
+donne un `Date`. `formatMonth` attendait un `Date` ; la conversion est faite une fois dans
+`lib/format.ts` (`parseDay`, lecture en UTC comme le formateur), et le type de `ProductProject`
+annonce des chaînes, sans mentir. À rapprocher du piège inverse relevé en T2.1 sur `max()` : dans
+les deux cas, c'est le pilote qui décide, pas le schéma.
+
+**T2.2 — L'ordre des accompagnements se lit sur `started_on`, pas sur `last_activity_at`.** Les
+deux critères donnent le même résultat sur la fixture, et ce n'est pas une raison de les
+confondre : une activité saisie aujourd'hui sur un accompagnement clos en 2024 le ferait remonter
+en tête d'une liste qui raconte une chronologie. `nulls last` est explicite — PostgreSQL place les
+nuls **en tête** d'un tri descendant, ce que `desc()` de Drizzle ne corrige pas —, et le nom
+départage à date égale : un ordre qui varierait d'un affichage à l'autre serait un défaut, pas un
+détail.
+
+**T2.2 — Chaque filtre de domaine seul est rattrapé par celui de la table jointe voisine.**
+Découvert en mettant les nouveaux tests en défaut : retirer `filter(products)` de
+`findProductDetail` ne fait fuir aucune ligne, parce que la jointure sur `entities` porte encore
+le sien — un produit d'un autre domaine ne trouve pas d'entité à joindre. Il faut retirer **les
+deux** pour voir tomber le test. Ce n'est pas une invitation à en écrire un seul : c'est la
+démonstration que la consigne de `joinedRead` — toute table jointe porte son filtre — produit une
+défense en profondeur, et qu'un test d'étanchéité qui passe ne prouve donc pas que le filtre qu'on
+regarde est celui qui travaille.
+
+**T2.2 — Vitest ne résolvait pas l'alias `@/`.** `lib/queries/products.ts` importe la couche
+d'accès par `@/lib/db/scoped` : typable, mais pas exécutable sous Vitest, qui ignore les `paths` du
+`tsconfig.json`. Les tests des chantiers précédents ne l'avaient jamais rencontré, tous voisins de
+leurs imports. Corrigé par un `resolve.alias` de six lignes dans `vitest.config.mts`, plutôt que
+par la dépendance `vite-tsconfig-paths` : une dépendance de plus pour une ligne de configuration
+serait un mauvais change.
+
+**T2.2 — Une pastille d'avatar peut être parfaitement lisible et pourtant invisible.** Le premier
+choix — initiales `content-primary-dark` sur `surface-primary-lightest` — donnait un texte à
+15,14:1, chiffre rassurant et hors sujet : la pastille elle-même ne se détachait du fond de la
+ligne qu'à **1,04:1**. Deux pastilles superposées se lisaient alors comme un seul mot, « CRIK ».
+La palette de la maquette (fond `surface-primary-light`, initiales `content-neutral-pale`) rétablit
+7,11:1 sur les deux rapports. **Leçon générale** : sur une forme superposée, le contraste du texte
+et celui de la forme sont deux mesures distinctes, et la seconde s'oublie plus facilement.
+
+**T2.2 — `SectionHeader` est employé sans `Section`.** Le bloc « Accompagnements » est une `List`,
+qui porte déjà sa surface et son filet ; l'imbriquer dans une `Section` aurait posé deux fois le
+même fond. Le titre et sa note passent donc par `SectionHeader` dans un `<section>` nu. Si le cas
+se répète en C3, c'est la forme de `Section` qu'il faudra revoir — pas cet appel.
+
+**T2.2 — Une personne archivée reste dans l'équipe des accompagnements passés.** `listProductProjects`
+ne filtre pas `persons.archived_at` : qui a participé y a participé, et effacer un nom d'un projet
+terminé réécrirait l'histoire du produit. La conséquence est qu'une personne partie reste visible
+dans Vision — conforme à la règle 4, à confirmer au premier écran qui archive une personne.
