@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** T1.2 terminé
+**Dernière mise à jour :** T1.3 terminé
 **Chantier en cours :** C1 — Socle technique
-**Ticket en cours :** aucun — prochain à lancer : T1.3 (couche d'accès scopée)
+**Ticket en cours :** aucun — prochain à lancer : T1.4 (contexte de session, stub)
 
 ---
 
@@ -12,7 +12,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
 | Chantier | Tickets | État |
 |---|---|---|
-| C1 — Socle technique | T1.1 → T1.6 | en cours — T1.1, T1.2 faits |
+| C1 — Socle technique | T1.1 → T1.6 | en cours — T1.1, T1.2, T1.3 faits |
 | C2 — Produits et projets | T2.1 → T2.6 | à faire |
 | C3 — Activités et roadmap | à découper | à faire |
 | C4 — Ressources et résultats | à découper | à faire |
@@ -40,6 +40,15 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   15 types énumérés, 7 contraintes `CHECK`, 76 index. Les rejets ont été éprouvés en base, pas
   seulement déclarés : 7 écritures illégales sur 7 refusées. Écart assumé et consigné : le
   `domain_id` a été ajouté sur les tables de liaison, que le document ne détaille pas.
+- **T1.3 — 12/08/2026 — couche d'accès scopée.** `lib/db/scoped.ts` est le seul module qui importe
+  `db`, vérifié par `grep`. 15 tests passent sur une branche Neon dédiée. Les tests ne se contentent
+  pas de passer : le filtre de domaine a été neutralisé pour voir tomber 9 tests sur 15, et les deux
+  règles d'intégrité pour en voir tomber exactement 3. Les trois dettes ouvertes par T1.2 sont
+  refermées : résultat sur activité `done`, recalcul de `last_activity_at`, cohérence du `domain_id`
+  avec les parents — cette dernière **dérivée des clés étrangères du schéma**, pas d'une liste
+  écrite à la main. Écarts de périmètre, tous consignés au journal : la mise en place de Vitest
+  (dépendance, `vitest.config.mts`, script `test`, `.env.example`), sans laquelle « tests associés »
+  n'a pas de sens.
 
 ---
 
@@ -50,12 +59,21 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   panneau latéral (C3) ou modale.
 - **Couleur du corps de texte.** Les maquettes utilisent `#33333b` (greyscale-800) pour le texte
   courant ; aucun token sémantique du §2.4 ne pointe cette nuance. À trancher en T1.6.
-- **Deux règles d'intégrité restent à la charge du code.** Un résultat ne doit se rattacher qu'à
-  une activité `done`, et toute écriture d'activité doit recalculer `projects.last_activity_at`.
-  Ni l'une ni l'autre ne tient dans une contrainte de table. **À traiter en T1.3**, dans la couche
-  d'écriture — c'est le seul endroit qui peut encore les garantir.
-- **Le secret Neon a transité en clair dans la conversation** du 12/08/2026. Il n'est que dans
-  `.env.local`, hors dépôt, mais à faire tourner si ce transcript quitte le poste.
+- **Définition de `last_activity_at` : une interprétation, pas une décision documentée.** `docs/04`
+  §6 confie le champ à la couche d'écriture sans dire ce qu'il vaut. T1.3 a retenu la date du
+  dernier fait d'accompagnement — `max(coalesce(period_end, period_start))` sur les activités non
+  archivées et non annulées — plutôt que l'horodatage de la dernière modification, qui est le rôle
+  d'`events`. À confirmer quand C2 triera les listes de projets.
+- **Rien n'empêche techniquement un import direct de `lib/db/client`.** Le verrou ESLint a été
+  écarté du périmètre de T1.3. La règle 1 tient aujourd'hui par la convention, l'en-tête de
+  `client.ts` et un `grep`. À reposer si un import sauvage apparaît.
+- **Les tables de liaison se suppriment pour de bon.** Elles ne portent pas d'`archived_at` : la
+  couche expose `unlink`, une vraie suppression, réservée à elles par le typage. C'est une
+  conséquence de T1.2, pas un choix de T1.3. À confirmer au premier écran qui retire un membre
+  d'un projet.
+- **Deux secrets Neon ont transité en clair dans la conversation**, les 12/08/2026 — la base de
+  développement, puis la branche de test. Ils ne sont que dans `.env.local`, hors dépôt, mais à
+  faire tourner si ces transcripts quittent le poste.
 
 ---
 
