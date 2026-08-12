@@ -163,3 +163,62 @@ configuration lève si la variable manque — aucun test n'est sauté en silence
 **T1.3 — Le secret de la branche de test a transité en clair dans la conversation**, comme celui
 de T1.2. Il n'est que dans `.env.local`, couvert par `.gitignore`. **À faire tourner sur Neon si ce
 transcript sort du poste.**
+
+**T1.4 — Désaccord avec la lettre de D9 : le responsable de domaine écrit partout.** D9 dit
+« seuls les contributeurs désignés écrivent dans un projet ». Lu au pied de la lettre, un
+responsable de domaine qui crée un projet ne peut pas y saisir une activité tant qu'il ne s'est pas
+désigné contributeur de son propre projet. `canWriteProject` fait donc du rôle un sur-ensemble :
+`role === "domain_manager" || contributorProjectIds.has(projectId)`. **Arbitrage rendu par
+l'humain en ouverture du ticket**, D9 n'étant pas explicite sur ce cas. Ce n'est pas une
+réouverture de décision : c'est le comblement d'un silence, et il tient en une ligne de
+`rightsFor` si l'on veut revenir dessus.
+
+**T1.4 — « Contributeur » est un profil, pas un rôle.** Le ticket demande de basculer entre
+« un responsable de domaine, un contributeur et un simple membre ». `persons.domain_role` n'a que
+deux valeurs, `domain_manager` et `member` : le contributeur est un `member` qui porte
+`project_members.is_contributor` sur au moins un projet. Le sélecteur affiche donc deux rôles et
+trois comportements. **Piège de vocabulaire à ne pas reproduire dans les écrans de C2** : ne jamais
+écrire « rôle : contributeur ».
+
+**T1.4 — Le fournisseur appelle le contexte, jamais l'inverse.** `session.ts` n'importe rien de
+Next ; `provider.ts` importe `next/headers` et `session.ts`. La dépendance est dans ce sens pour
+deux raisons : les tests chargent le contexte sans traîner `next/headers`, dont l'import hors
+requête est fragile sous Vitest ; et C7 remplace un seul fichier. **Ne pas inverser** — un import
+de `provider.ts` depuis `session.ts` rendrait le contexte intestable et le SSO invasif.
+
+**T1.4 — Une identité fournie et inéligible est refusée, jamais remplacée.** `loadSession` rend
+`null` si le `personId` désigne quelqu'un d'archivé, d'inactif, sans `has_access`, ou d'un autre
+domaine. Le repli sur une personne par défaut n'a lieu qu'en l'absence totale d'identité. La
+tolérance au cookie périmé — fréquente en développement, après un ré-amorçage — vit dans
+`provider.ts`, c'est-à-dire dans le fichier que C7 jette. **Si elle remontait dans `session.ts`,
+un jeton Entra ID nommant une personne sans accès ouvrirait une session sur quelqu'un d'autre.**
+
+**T1.4 — Le domaine courant est trouvé, pas configuré.** `resolveDomainId` prend le premier
+domaine actif et non archivé, par nom (`docs/05` §3 — « domaine unique »). Une variable
+d'environnement aurait été un réglage de plus à tenir à jour pour une valeur que la base connaît.
+**À reposer le jour où un second domaine existe** : le choix deviendra alors un vrai choix, et il
+appartiendra au fournisseur.
+
+**T1.4 — Un contributeur d'un projet archivé garde son droit d'écriture.** `contributorProjectIds`
+ne filtre pas les projets archivés : `project_members` ne porte pas d'`archived_at` et la question
+« un projet archivé est-il en lecture seule ? » n'est tranchée nulle part dans `docs/`. Le contexte
+ne l'invente pas. **À trancher en C2**, avec l'écran qui archive un projet.
+
+**T1.4 — Les tests ont été mis en défaut avant d'être crus**, comme en T1.3. `manageDomain` forcé
+à `false` : 4 tests tombent, exactement les quatre qui parlent du responsable. Le filtre
+`is_contributor` inversé : 2 tests tombent, ceux qui distinguent le projet désigné de l'autre.
+Sans cette contre-épreuve, 19 tests au vert n'auraient rien prouvé.
+
+**T1.4 — Écart de périmètre : les tests.** Le ticket ne les mentionne pas, contrairement à T1.3.
+Ils ont été écrits — décision prise avec l'humain — parce que la base de développement est vide
+jusqu'à T1.5 : sans eux, le critère « le basculement change les droits observables » n'aurait pu
+être ni démontré ni infirmé pendant le ticket. Aucun fichier de configuration n'a été touché,
+`vitest.config.mts` capte déjà `lib/**/*.test.ts`.
+
+**T1.4 — La bascule a été observée peuplée, sur la branche de test.** La base de développement
+étant vide, un domaine sonde a été amorcé sur la branche Neon **de test**, `/dev/session` servi
+avec `DATABASE_URL` remappée, et les trois profils lus dans le HTML rendu : le responsable écrit
+sur tous les projets, le contributeur sur le seul projet où `is_contributor` est vrai — pas sur
+celui où il n'est que membre d'équipe —, le simple membre sur aucun. La soumission du formulaire
+sans JavaScript pose bien le cookie. La sonde a été supprimée, la base de développement n'a jamais
+été touchée. **Aucune donnée factice n'entre dans le dépôt : c'est T1.5.**
