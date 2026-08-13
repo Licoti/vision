@@ -19,9 +19,12 @@ import type { ScopedDb } from "@/lib/db/scoped";
 import {
   activities,
   activityFamily,
+  activityParticipants,
   activityTypes,
   approaches,
+  persons,
 } from "@/lib/db/schema";
+import type { PersonKind } from "@/lib/forms/project";
 
 /** `framing` · `research` · … Dérivé du schéma, jamais réécrit à la main. */
 export type ActivityFamily = (typeof activityFamily.enumValues)[number];
@@ -36,9 +39,22 @@ export type ActivityTypeOption = {
 /** Une approche proposée au choix. D12 — une seule par activité. */
 export type ApproachOption = { id: string; label: string };
 
+/**
+ * Une personne du domaine, telle qu'elle se désigne comme participante — même
+ * forme que `ProjectFormPerson` (T2.6), réutilisée pour les participants
+ * proposés au choix comme pour ceux déjà liés à une entrée de roadmap (T3.6).
+ */
+export type ActivityFormPerson = {
+  id: string;
+  fullName: string;
+  kind: PersonKind;
+};
+
 export type ActivityFormOptions = {
   activityTypes: ActivityTypeOption[];
   approaches: ApproachOption[];
+  /** Facultatif (`docs/03` §4). Aucune création à la volée — c'est T2.6. */
+  persons: ActivityFormPerson[];
 };
 
 /**
@@ -64,6 +80,11 @@ export type ActivityFormOptions = {
  * `position` est l'ordre du domaine et prime sur l'alphabet ; la famille le
  * précède pour le type, son énuméré portant l'ordre de `docs/03` §2. C'est ce
  * tri qui permet au panneau de grouper en un seul passage, sans retrier.
+ *
+ * `persons` (T3.6) suit le modèle exact de `listProjectFormOptions` : les
+ * personnes actives du domaine, triées par nom. Aucune exception d'archivage
+ * nominative comme pour le type — un participant archivé depuis disparaîtrait
+ * simplement des options, hors du périmètre de ce ticket.
  */
 export async function listActivityFormOptions(
   scope: ScopedDb,
@@ -71,7 +92,7 @@ export async function listActivityFormOptions(
 ): Promise<ActivityFormOptions> {
   const keep = options.keepActivityTypeId;
 
-  const [typeRows, approachRows] = await Promise.all([
+  const [typeRows, approachRows, personRows] = await Promise.all([
     scope.list(activityTypes, {
       /* Sans exception, c'est la couche qui écarte les archivés. Avec, le
          filtre passe dans le `where` — `includeArchived` ne lève rien de plus
@@ -94,6 +115,10 @@ export async function listActivityFormOptions(
     scope.list(approaches, {
       orderBy: [asc(approaches.position), asc(approaches.label)],
     }),
+    scope.list(persons, {
+      where: eq(persons.isActive, true),
+      orderBy: [asc(persons.fullName)],
+    }),
   ]);
 
   return {
@@ -103,7 +128,27 @@ export async function listActivityFormOptions(
       family: row.family,
     })),
     approaches: approachRows.map((row) => ({ id: row.id, label: row.label })),
+    persons: personRows.map((row) => ({
+      id: row.id,
+      fullName: row.fullName,
+      kind: row.kind,
+    })),
   };
+}
+
+/**
+ * Les identifiants des personnes déjà liées à une activité — le
+ * pré-remplissage du panneau en édition (T3.6), sur le modèle de
+ * `findProjectDetail` pour l'équipe.
+ */
+export async function listActivityParticipantIds(
+  scope: ScopedDb,
+  activityId: string,
+): Promise<string[]> {
+  const rows = await scope.list(activityParticipants, {
+    where: eq(activityParticipants.activityId, activityId),
+  });
+  return rows.map((row) => row.personId);
 }
 
 /**
@@ -134,6 +179,8 @@ export type RoadmapActivity = {
   approachLabel: string | null;
   /** Non nul seulement dans le groupe `cancelled` (`activities_cancelled_requires_reason`). */
   cancellationReason: string | null;
+  /** Facultatif (`docs/03` §4), triés par nom. Vide la plupart du temps — T3.6. */
+  participants: ActivityFormPerson[];
 };
 
 export type RoadmapGroup = {
@@ -243,6 +290,42 @@ export function listProjectRoadmap(
         asc(activities.id),
       );
 
+    /* Les participants (T3.6) : une deuxième lecture plutôt qu'un troisième
+       `leftJoin` sur la requête ci-dessus — une activité peut porter
+       plusieurs participants, et les multiplier par une jointure dupliquerait
+       la ligne d'activité autant de fois. `activities` est jointe pour
+       porter `filter(activities)` sur la table réellement lue, et pour ne
+       lire que les participants d'activités non archivées de ce projet —
+       chaque table jointe filtrée sur le domaine, la règle du fichier. */
+    const participantRows = await database
+      .select({
+        activityId: activityParticipants.activityId,
+        id: persons.id,
+        fullName: persons.fullName,
+        kind: persons.kind,
+      })
+      .from(activityParticipants)
+      .innerJoin(
+        activities,
+        and(eq(activities.id, activityParticipants.activityId), filter(activities)),
+      )
+      .innerJoin(persons, and(eq(persons.id, activityParticipants.personId), filter(persons)))
+      .where(
+        and(
+          filter(activityParticipants),
+          eq(activities.projectId, projectId),
+          isNull(activities.archivedAt),
+        ),
+      )
+      .orderBy(asc(persons.fullName));
+
+    const participantsByActivity = new Map<string, ActivityFormPerson[]>();
+    for (const row of participantRows) {
+      const list = participantsByActivity.get(row.activityId) ?? [];
+      list.push({ id: row.id, fullName: row.fullName, kind: row.kind });
+      participantsByActivity.set(row.activityId, list);
+    }
+
     const byKey = new Map<RoadmapGroupKey, RoadmapActivity[]>();
     for (const row of rows) {
       const key: RoadmapGroupKey =
@@ -266,6 +349,7 @@ export function listProjectRoadmap(
         isUnscheduled: row.isUnscheduled,
         approachLabel: row.approachLabel,
         cancellationReason: row.cancellationReason,
+        participants: participantsByActivity.get(row.id) ?? [],
       });
       byKey.set(key, group);
     }

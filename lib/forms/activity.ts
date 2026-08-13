@@ -68,6 +68,8 @@ export type ActivityFormValues = {
   periodEnd: string;
   approachId: string;
   objective: string;
+  /** Facultatif (`docs/03` §4). Personnes déjà référencées dans le domaine — T3.6. */
+  participantIds: string[];
 };
 
 export type ActivityFormErrors = Partial<
@@ -93,6 +95,7 @@ export const EMPTY_ACTIVITY_VALUES: ActivityFormValues = {
   periodEnd: "",
   approachId: "",
   objective: "",
+  participantIds: [],
 };
 
 /**
@@ -112,6 +115,9 @@ export function toActivityFormValues(row: {
   periodEnd: string | null;
   approachId: string | null;
   objective: string | null;
+  /** Le seul champ de ce formulaire qui ne vient pas d'une colonne
+   *  d'`activities` : l'appelant le lit à côté, dans `activity_participants`. */
+  participantIds: string[];
 }): ActivityFormValues {
   return {
     activityTypeId: row.activityTypeId,
@@ -120,6 +126,7 @@ export function toActivityFormValues(row: {
     periodEnd: row.periodEnd ?? "",
     approachId: row.approachId ?? "",
     objective: row.objective ?? "",
+    participantIds: row.participantIds,
   };
 }
 
@@ -127,6 +134,24 @@ export function toActivityFormValues(row: {
 function field(formData: FormData, name: string): string {
   const value = formData.get(name);
   return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * Les valeurs cochées d'un champ multiple, rognées et dédoublonnées.
+ *
+ * Jumeau du `fields()` privé de `lib/forms/project.ts` — dupliqué plutôt
+ * qu'importé, même raisonnement que `field()` ci-dessus : deux fonctions de
+ * cinq lignes valent mieux qu'un couplage entre deux modules pour si peu.
+ * Le dédoublonnage compte ici aussi : `activity_participants` porte une
+ * contrainte d'unicité sur le couple activité/personne.
+ */
+function fields(formData: FormData, name: string): string[] {
+  const values = formData
+    .getAll(name)
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return [...new Set(values)];
 }
 
 /**
@@ -148,6 +173,7 @@ export function readActivityForm(formData: FormData): ActivityFormValues {
     periodEnd: field(formData, "periodEnd"),
     approachId: field(formData, "approachId"),
     objective: field(formData, "objective"),
+    participantIds: fields(formData, "participantIds"),
   };
 }
 
@@ -221,6 +247,14 @@ export function validateActivityForm(
     values.periodEnd < values.periodStart
   ) {
     errors.periodEnd = "La fin de période ne peut pas précéder son début.";
+  }
+
+  // Forme seulement, comme le reste de ce bloc : l'existence d'un participant
+  // dans le domaine n'est pas vérifiée ici. C'est un choix de la fiche —
+  // `lib/db/scoped.ts` la refuse déjà à l'écriture, et une seconde autorité
+  // divergerait un jour de la première.
+  if (values.participantIds.some((id) => !isUuid(id))) {
+    errors.participantIds = "Un participant sélectionné n'est pas reconnu.";
   }
 
   return errors;
@@ -403,11 +437,19 @@ export function parseActivityForm(
   values: ActivityFormValues;
   errors: ActivityFormErrors;
   input: ActivityRowInput | null;
+  /**
+   * Les personnes cochées, formellement valides — l'existence dans le
+   * domaine appartient à `lib/db/scoped.ts`, pas à ce module (T3.6). Toujours
+   * rendu ; l'appelant ne l'utilise que si `input` est non nul.
+   */
+  participantIds: string[];
 } {
   const values = readActivityForm(formData);
   const errors = validateActivityForm(values);
 
-  if (Object.keys(errors).length > 0) return { values, errors, input: null };
+  if (Object.keys(errors).length > 0) {
+    return { values, errors, input: null, participantIds: values.participantIds };
+  }
 
   const period = resolveActivityPeriod(values, today, current);
 
@@ -423,6 +465,7 @@ export function parseActivityForm(
       periodEnd: period.periodEnd,
       isUnscheduled: period.isUnscheduled,
     },
+    participantIds: values.participantIds,
   };
 }
 

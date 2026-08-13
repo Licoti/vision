@@ -37,6 +37,8 @@ import {
 
 const TYPE = "3f2504e0-4f89-11d3-9a0c-0305e82c3311";
 const APPROACH = "3f2504e0-4f89-11d3-9a0c-0305e82c3312";
+const PERSON_A = "3f2504e0-4f89-11d3-9a0c-0305e82c3321";
+const PERSON_B = "3f2504e0-4f89-11d3-9a0c-0305e82c3322";
 
 /** Le jour de référence de tous les tests de dérivation. */
 const TODAY = "2026-08-13";
@@ -50,13 +52,18 @@ function valid(overrides: Partial<ActivityFormValues> = {}): ActivityFormValues 
     periodEnd: "2026-08-31",
     approachId: APPROACH,
     objective: "Prioriser les chantiers du second semestre.",
+    participantIds: [],
     ...overrides,
   };
 }
 
-function form(entries: Record<string, string>): FormData {
+function form(entries: Record<string, string | string[]>): FormData {
   const data = new FormData();
-  for (const [key, value] of Object.entries(entries)) data.append(key, value);
+  for (const [key, value] of Object.entries(entries)) {
+    for (const one of Array.isArray(value) ? value : [value]) {
+      data.append(key, one);
+    }
+  }
   return data;
 }
 
@@ -83,6 +90,7 @@ describe("readActivityForm", () => {
         periodEnd: "2026-08-31",
         approachId: APPROACH,
         objective: "Prioriser les chantiers.",
+        participantIds: [PERSON_A, PERSON_B],
       }),
     );
 
@@ -93,7 +101,23 @@ describe("readActivityForm", () => {
       periodEnd: "2026-08-31",
       approachId: APPROACH,
       objective: "Prioriser les chantiers.",
+      participantIds: [PERSON_A, PERSON_B],
     });
+  });
+
+  test("les participants cochés se dédoublonnent (T3.6)", () => {
+    const values = readActivityForm(
+      form({
+        activityTypeId: TYPE,
+        periodStart: "2026-08-03",
+        participantIds: [PERSON_A, PERSON_B, PERSON_A],
+      }),
+    );
+    expect(values.participantIds).toEqual([PERSON_A, PERSON_B]);
+  });
+
+  test("aucun participant coché vaut un tableau vide", () => {
+    expect(readActivityForm(minimal()).participantIds).toEqual([]);
   });
 
   test("une case absente vaut « non cochée » : son absence est sa valeur", () => {
@@ -208,6 +232,27 @@ describe("validateActivityForm", () => {
       valid({ approachId: "", objective: "" }),
     );
     expect(errors).toEqual({});
+  });
+
+  test("les participants sont facultatifs (T3.6)", () => {
+    const errors = validateActivityForm(valid({ participantIds: [] }));
+    expect(errors).toEqual({});
+  });
+
+  test("un participant qui n'a pas la forme d'un identifiant est refusé", () => {
+    const errors = validateActivityForm(
+      valid({ participantIds: [PERSON_A, "camille-roux"] }),
+    );
+    expect(errors.participantIds).toBeDefined();
+  });
+
+  test("l'existence d'un participant dans le domaine n'est pas vérifiée ici", () => {
+    // C'est le choix explicite de la fiche : `lib/db/scoped.ts` la refuse à
+    // l'écriture, pas ce module. Deux identifiants bien formés suffisent.
+    const errors = validateActivityForm(
+      valid({ participantIds: [PERSON_A, PERSON_B] }),
+    );
+    expect(errors.participantIds).toBeUndefined();
   });
 });
 
@@ -389,6 +434,32 @@ describe("parseActivityForm", () => {
     expect(values.objective).toBe("Un objectif qu'on ne jette pas.");
   });
 
+  test("rend les participants cochés à côté de la ligne (T3.6)", () => {
+    const { input, participantIds } = parseActivityForm(
+      form({
+        activityTypeId: TYPE,
+        periodStart: "2026-08-03",
+        periodEnd: "2026-08-31",
+        participantIds: [PERSON_A, PERSON_B],
+      }),
+      TODAY,
+    );
+    expect(input).not.toBeNull();
+    expect(participantIds).toEqual([PERSON_A, PERSON_B]);
+    // Les participants ne sont pas une colonne d'`activities` : `input` reste
+    // exactement les sept colonnes de la ligne, pas une de plus.
+    expect(input).not.toHaveProperty("participantIds");
+  });
+
+  test("rend aussi les participants quand la saisie est refusée", () => {
+    const { input, participantIds } = parseActivityForm(
+      form({ activityTypeId: "", participantIds: [PERSON_A] }),
+      TODAY,
+    );
+    expect(input).toBeNull();
+    expect(participantIds).toEqual([PERSON_A]);
+  });
+
   test("« à planifier » écrit une activité prévue sans date", () => {
     const { input } = parseActivityForm(
       form({ activityTypeId: TYPE, isUnscheduled: "on" }),
@@ -478,6 +549,7 @@ describe("toActivityFormValues", () => {
         periodEnd: null,
         approachId: null,
         objective: null,
+        participantIds: [],
       }),
     ).toEqual({
       activityTypeId: TYPE,
@@ -486,7 +558,22 @@ describe("toActivityFormValues", () => {
       periodEnd: "",
       approachId: "",
       objective: "",
+      participantIds: [],
     });
+  });
+
+  test("les participants sont restitués tels quels (T3.6)", () => {
+    expect(
+      toActivityFormValues({
+        activityTypeId: TYPE,
+        isUnscheduled: false,
+        periodStart: "2026-08-03",
+        periodEnd: "2026-08-31",
+        approachId: null,
+        objective: null,
+        participantIds: [PERSON_A, PERSON_B],
+      }).participantIds,
+    ).toEqual([PERSON_A, PERSON_B]);
   });
 
   test("l'aller-retour avec `readActivityForm` conserve la saisie", () => {
@@ -497,6 +584,7 @@ describe("toActivityFormValues", () => {
       periodEnd: "2026-08-31",
       approachId: APPROACH,
       objective: "Prioriser les chantiers du second semestre.",
+      participantIds: [PERSON_A, PERSON_B],
     });
 
     // Ce que le panneau rendrait de ces valeurs, relu comme une soumission :
@@ -508,6 +596,7 @@ describe("toActivityFormValues", () => {
         periodEnd: values.periodEnd,
         approachId: values.approachId,
         objective: values.objective,
+        participantIds: values.participantIds,
       }),
     );
 

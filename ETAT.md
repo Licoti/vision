@@ -2,9 +2,10 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** T3.5 terminé — une activité change d'état ou s'annule, d'un geste depuis la roadmap
-**Chantier en cours :** C3 — activités et roadmap
-**Ticket en cours :** aucun — prochain ticket : **T3.6 — Participants d'une activité**
+**Dernière mise à jour :** T3.6 terminé — participants d'une activité. **C3 est terminé, et avec lui
+le POC minimal démontrable (C1 à C3).**
+**Chantier en cours :** aucun — C4 (ressources et résultats) reste à découper en tickets
+**Ticket en cours :** aucun
 
 ---
 
@@ -14,13 +15,14 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 |---|---|---|
 | C1 — Socle technique | T1.1 → T1.6 | **terminé** |
 | C2 — Produits et projets | T2.1 → T2.6 | **terminé** |
-| C3 — Activités et roadmap | T3.1 → T3.6 | **en cours** — T3.1, T3.2, T3.3, T3.4, T3.5 faits |
+| C3 — Activités et roadmap | T3.1 → T3.6 | **terminé** |
 | C4 — Ressources et résultats | à découper | à faire |
 | C5 — Indicateurs et temps long | à découper | à faire |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
-**Point de bascule :** C1 à C3 constituent le POC minimal démontrable.
+**Point de bascule atteint :** C1 à C3 constituent le POC minimal démontrable, et les trois sont
+terminés.
 
 ---
 
@@ -421,6 +423,44 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   toutes quatre consignées ci-dessous, règle 4 obligeant à ne rien défaire par une suppression
   déguisée.
 
+- **T3.6 — 13/08/2026 — participants d'une activité.** Le dernier ticket de C3, et **le ticket qui
+  clôt C3** — avec lui, C1 à C3 forment le POC minimal démontrable annoncé par `docs/05`. Une
+  activité peut désormais porter des participants, sur le modèle exact des membres de projet de
+  T2.6 — une liaison qui se crée et se retire, un retrait qui est une vraie suppression de ligne —
+  mais réduit à sa forme la plus simple : pas de rôle, pas de quotité, aucune création de personne
+  à la volée. **Le critère est tenu et vérifié en base, sur le chemin réel** : deux participants
+  ajoutés à la création, l'un retiré et un troisième ajouté en édition — `updated_at` de la ligne
+  `activities` relu **inchangé à la milliseconde**, la preuve que les participants se synchronisent
+  indépendamment de la période, du type ou de l'objectif — puis une re-soumission strictement
+  identique qui ne crée aucun doublon. Le parcours entier a été joué **sans une ligne de
+  JavaScript**, par soumissions `multipart` reconstituées à partir des champs `$ACTION_…` du
+  balisage servi, sur un serveur de développement d'une session précédente, réutilisé plutôt que
+  relancé. **Un choix explicite de la fiche, tenu à la lettre** : contrairement au type et à
+  l'approche, l'existence d'un participant dans le domaine n'est vérifiée **nulle part côté
+  écran** — c'est `assertPreconditions` de `lib/db/scoped.ts`, déjà là pour toute clé étrangère du
+  schéma, qui refuse seule une personne hors domaine, attrapée par `scopeRefusal` comme le reste.
+  **Un défaut réel a été trouvé en vérifiant sur ce chemin précis, et corrigé avant livraison** :
+  la première version de `syncParticipants` déliait d'abord, ajoutait ensuite ; un ajout forgé hors
+  domaine faisait donc échouer la requête **après** qu'un retrait légitime avait déjà eu lieu — le
+  seul refus du produit qui n'aurait pas laissé « la ligne relue intacte », contrairement à tout ce
+  que T2.5 à T3.5 ont éprouvé. Reproduit puis corrigé en inversant l'ordre : l'ajout passe en
+  premier, et `insertMany` vérifie chaque ligne avant d'écrire quoi que ce soit, donc avant qu'aucun
+  retrait n'ait pu être exécuté — reproduit une seconde fois après correction, refus rendu, **les
+  deux participants existants intacts**. Le droit a été éprouvé par l'action, comme depuis T3.2 :
+  chez Sofia Marchand, non-contributrice de ce projet, la même édition est refusée, ligne inchangée.
+  Les 8 tests ajoutés à `lib/forms/activity.test.ts` (validation de forme, lecture, restitution) et
+  les 9 ajoutés à `lib/queries/activities.test.ts` (options élargies aux personnes, participants
+  embarqués sur la roadmap, étanchéité de domaine) ne touchent que ce que T3.6 change ; les 55 et 23
+  tests déjà en place n'ont pas bougé. Le rapprochement des participants sur la roadmap **ne
+  duplique aucune ligne d'activité** : une deuxième lecture plutôt qu'un troisième `leftJoin` sur la
+  requête de `listProjectRoadmap`, pour la même raison qui sépare déjà l'équipe d'un projet de sa
+  ligne dans `findProjectDetail`. Écarts de périmètre, tous deux structurels et annoncés avant
+  écriture : `app/(app)/projets/[id]/page.tsx` — doit passer la liste des personnes au panneau et,
+  en édition, les participants déjà liés — et `components/projects/roadmap.tsx` — l'« Attendu » de
+  la fiche exige l'affichage sur l'entrée de roadmap, que seul ce fichier rend. **La base de
+  développement est revenue à son état d'avant le ticket** : l'activité de vérification a été
+  archivée (règle 4) plutôt que laissée visible, contrairement à T3.3 et T3.5.
+
 ---
 
 ## Points ouverts
@@ -657,11 +697,20 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   POC. À reprendre le jour où la couche exposera une transaction — ou plus tôt, si un formulaire
   plus large arrive en C3. **T3.3 ne rouvre pas la question** : la saisie d'une activité écrit **une
   seule table**, et le recalcul de `last_activity_at` part dans le même `batch` que l'insertion,
-  donc dans la même transaction. C'est **T3.6** qui la rouvrira, lui qui écrira
-  `activity_participants` à côté d'`activities`. **T3.4 ne la rouvre pas davantage** : la correction
+  donc dans la même transaction. **T3.4 ne la rouvre pas davantage** : la correction
   écrit la même table unique, et le recalcul part dans le même `batch` que la modification —
   `update` le fait pour les activités comme `insert`, ce que la fraîcheur passée d'août à septembre
-  puis revenue a vérifié par l'écran.
+  puis revenue a vérifié par l'écran. **T3.6 la rouvre, comme annoncé** : `createActivity` écrit
+  désormais `activities` puis `activity_participants`, sans transaction qui les lie. La fenêtre
+  s'est révélée plus étroite qu'à l'écriture de cette note, et pour une raison précise : la fiche de
+  T3.6 refuse explicitement toute pré-vérification de l'existence d'un participant côté écran — «
+  refusée par la couche d'accès, pas par l'écran » —, si bien que la seule vérification possible est
+  celle d'`assertPreconditions`, à l'intérieur même de l'écriture. Ordonner ce second `insertMany`
+  **avant** tout retrait dans `syncParticipants` (édition) tient la même garantie que T2.6 pour un
+  diff, mais rien ne referme le cas d'une **création** dont l'activité s'écrirait avec succès puis
+  dont les participants échoueraient : l'activité existerait sans eux. Non éprouvé séparément — le
+  mécanisme de vérification est rigoureusement le même des deux côtés, et l'édition l'a été. À
+  reprendre avec le reste de cette note, le jour où la couche exposera une transaction.
 
 - **On n'ajoute qu'une personne par enregistrement.** Sans JavaScript, un champ répétable n'existe
   pas : le bloc d'ajout de T2.6 crée une personne, et pour en ajouter deux il faut enregistrer puis

@@ -64,6 +64,7 @@ import { formatPeriod, formatRank } from "@/lib/format";
 import { ACTIVITY_PANEL_NEW, ROUTES } from "@/lib/navigation";
 import {
   listActivityFormOptions,
+  listActivityParticipantIds,
   listProjectRoadmap,
 } from "@/lib/queries/activities";
 import { findAccompanimentRank, findProjectDetail } from "@/lib/queries/projects";
@@ -149,21 +150,29 @@ export default async function ProjectPage({
     listProjectRoadmap(session.db, project.id),
   ]);
 
-  /* Les deux référentiels ne sont lus **que** si le panneau s'ouvre : la page
-     la plus consultée du produit ne paie pas deux requêtes pour un panneau
-     fermé. Le tri et le filtre d'archivage vivent dans `lib/queries` depuis
-     T3.3, avec la raison qui les motive.
+  /* Les référentiels — dont les personnes, depuis T3.6 — ne sont lus **que**
+     si le panneau s'ouvre : la page la plus consultée du produit ne paie pas
+     ces requêtes pour un panneau fermé. Le tri et le filtre d'archivage
+     vivent dans `lib/queries` depuis T3.3, avec la raison qui les motive.
 
      En correction, le type de l'activité éditée est conservé **même s'il a été
      archivé depuis** : il reste sélectionné et n'est proposé nulle part
      ailleurs. Décrire et proposer n'appellent pas le même filtre — la règle de
-     T2.6, ici éprouvable pour la première fois. */
-  const panelOptions = panelOpen
-    ? await listActivityFormOptions(
-        session.db,
-        activity ? { keepActivityTypeId: activity.activityTypeId } : {},
-      )
-    : null;
+     T2.6, ici éprouvable pour la première fois.
+
+     Les participants déjà liés (T3.6) ne se lisent qu'en correction — une
+     création n'en a encore aucun. */
+  const [panelOptions, activityParticipantIds] = panelOpen
+    ? await Promise.all([
+        listActivityFormOptions(
+          session.db,
+          activity ? { keepActivityTypeId: activity.activityTypeId } : {},
+        ),
+        activity
+          ? listActivityParticipantIds(session.db, activity.id)
+          : Promise.resolve<string[]>([]),
+      ])
+    : [null, []];
 
   return (
     <>
@@ -196,11 +205,15 @@ export default async function ProjectPage({
           }
           activityTypes={panelOptions.activityTypes}
           approaches={panelOptions.approaches}
+          persons={panelOptions.persons}
           {...(activity
             ? {
                 title: "Modifier l'activité",
                 submitLabel: "Enregistrer les modifications",
-                initial: toActivityFormValues(activity),
+                initial: toActivityFormValues({
+                  ...activity,
+                  participantIds: activityParticipantIds,
+                }),
               }
             : {})}
         />

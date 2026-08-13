@@ -46,16 +46,33 @@
  * rendre, contrairement au formulaire complet, et rien ne justifie de leur
  * inventer un message d'erreur que l'écran n'atteint jamais en usage normal.
  *
- * Ce que ce fichier ne fait pas : déclarer des participants (T3.6). Aucune
- * suppression, aucun archivage, jamais.
+ * **Les participants (T3.6)** suivent le même principe que le reste : aucune
+ * création de personne à la volée — c'est le formulaire de projet qui la
+ * porte (T2.6, D19) —, et l'existence d'une personne dans le domaine n'est
+ * **pas** pré-vérifiée ici, à la différence du type et de l'approche. C'est un
+ * choix de la fiche : `lib/db/scoped.ts` la refuse déjà d'elle-même, via
+ * `assertPreconditions`, qui dérive les clés étrangères d'`activity_participants`
+ * depuis le schéma et lève `DomainScopeError` — attrapée par `scopeRefusal`,
+ * comme le reste. **Ce ticket rouvre la non-atomicité que T2.6 posait déjà**
+ * (`ETAT.md`) : `createActivity` écrit désormais deux tables, sans transaction
+ * interactive pour les lier — la fenêtre résiduelle est acceptée, pas fermée.
+ *
+ * Aucune suppression, aucun archivage, jamais.
  */
 
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireSession } from "@/lib/auth/provider";
 import type { Session } from "@/lib/auth/session";
-import { activities, activityTypes, approaches, projects } from "@/lib/db/schema";
+import {
+  activities,
+  activityParticipants,
+  activityTypes,
+  approaches,
+  projects,
+} from "@/lib/db/schema";
 import { DomainScopeError, type Row } from "@/lib/db/scoped";
 import {
   activityRowUnchanged,
@@ -190,6 +207,63 @@ function scopeRefusal(error: unknown, formData: FormData): ActivityFormState {
 }
 
 /* ==========================================================================
+   Les participants — T3.6
+
+   Le diff, pas un remplacement : `insertMany` ajoute ce qui manque,
+   `unlink` défait ce qui a disparu — sur le modèle de `syncMembers` dans
+   `projets/actions.ts`, en plus simple, puisqu'une ligne d'`activity_participants`
+   ne porte aucun rôle à mettre à jour. Une re-soumission à l'identique ne
+   touche donc jamais la table : les deux ensembles sont égaux, ni l'un ni
+   l'autre ne trouve quoi que ce soit à faire.
+
+   **L'ajout passe en premier, et ce n'est pas un détail.** `insertMany`
+   vérifie chaque ligne avant d'écrire (`assertPreconditions`, dans
+   `lib/db/scoped.ts`) : une personne hors domaine y fait lever
+   `DomainScopeError` **avant** toute écriture, puisque la boucle de
+   vérification précède l'unique `insert` groupé. Si le retrait passait
+   avant, une soumission qui retire une personne légitime et en ajoute une
+   forgée verrait le retrait déjà écrit au moment où l'ajout est refusé — la
+   ligne ne resterait pas intacte, contrairement à tout refus du reste du
+   produit. Éprouvé sur le vrai chemin : une personne retirée et une
+   personne forgée dans la même soumission laissaient l'ancien participant
+   disparu malgré le refus, avant que cet ordre ne soit corrigé.
+   ========================================================================== */
+
+/**
+ * Rend vrai si la liaison a changé — pour que l'appelant sache s'il doit
+ * revalider les pages, indépendamment de la ligne `activities` elle-même.
+ */
+async function syncParticipants(
+  session: Session,
+  activityId: string,
+  wanted: readonly string[],
+): Promise<boolean> {
+  const current = await session.db.list(activityParticipants, {
+    where: eq(activityParticipants.activityId, activityId),
+  });
+
+  const held = new Set(current.map((row) => row.personId));
+  const added = wanted.filter((personId) => !held.has(personId));
+  if (added.length > 0) {
+    await session.db.insertMany(
+      activityParticipants,
+      added.map((personId) => ({ activityId, personId })),
+    );
+  }
+
+  const target = new Set(wanted);
+  let removed = false;
+  for (const row of current) {
+    if (!target.has(row.personId)) {
+      await session.db.unlink(activityParticipants, row.id);
+      removed = true;
+    }
+  }
+
+  return added.length > 0 || removed;
+}
+
+/* ==========================================================================
    Créer
    ========================================================================== */
 
@@ -210,14 +284,18 @@ export async function createActivity(
   const gate = await openProject(session, projectId);
   if ("message" in gate) return refusal(formData, gate.message);
 
-  const { values, errors, input } = parseActivityForm(formData, today());
+  const { values, errors, input, participantIds } = parseActivityForm(
+    formData,
+    today(),
+  );
   if (!input) return { values, errors };
 
   const unknown = await checkReferences(session, input);
   if (Object.keys(unknown).length > 0) return { values, errors: unknown };
 
   try {
-    await session.db.insert(activities, { projectId, ...input });
+    const created = await session.db.insert(activities, { projectId, ...input });
+    await syncParticipants(session, created.id, participantIds);
   } catch (error) {
     return scopeRefusal(error, formData);
   }
@@ -294,7 +372,7 @@ export async function updateActivity(
     objective: existing.objective,
   };
 
-  const { values, errors, input } = parseActivityForm(
+  const { values, errors, input, participantIds } = parseActivityForm(
     formData,
     today(),
     current,
@@ -304,12 +382,20 @@ export async function updateActivity(
   const unknown = await checkReferences(session, input);
   if (Object.keys(unknown).length > 0) return { values, errors: unknown };
 
-  // Une re-soumission à l'identique n'écrit rien : ni `updated_at` repoussé, ni
-  // fraîcheur recalculée, ni ligne dans le journal de C6 pour une modification
-  // qui n'en est pas une. Le panneau se referme quand même — refuser de fermer
-  // parce que rien n'a changé serait une confirmation intermédiaire de plus.
-  if (!activityRowUnchanged(input, current)) {
-    try {
+  // Une re-soumission à l'identique n'écrit rien sur la ligne : ni
+  // `updated_at` repoussé, ni fraîcheur recalculée, ni ligne dans le journal
+  // de C6 pour une modification qui n'en est pas une. Les participants (T3.6)
+  // suivent leur propre diff, **indépendant** de ce constat : ils peuvent
+  // changer sans que la période ne bouge, et `syncParticipants` tourne donc
+  // toujours — sa propre idempotence (aucune ligne à ajouter ni retirer)
+  // suffit à ne rien écrire sur une re-soumission identique. Le panneau se
+  // referme dans tous les cas — refuser de fermer parce que rien n'a changé
+  // serait une confirmation intermédiaire de plus.
+  const rowChanged = !activityRowUnchanged(input, current);
+  let participantsChanged: boolean;
+
+  try {
+    if (rowChanged) {
       const updated = await session.db.update(activities, activityId, input);
       if (!updated) {
         return refusal(
@@ -317,10 +403,17 @@ export async function updateActivity(
           "Cette activité n'existe plus dans cet accompagnement.",
         );
       }
-    } catch (error) {
-      return scopeRefusal(error, formData);
     }
+    participantsChanged = await syncParticipants(
+      session,
+      activityId,
+      participantIds,
+    );
+  } catch (error) {
+    return scopeRefusal(error, formData);
+  }
 
+  if (rowChanged || participantsChanged) {
     refresh(projectId, gate.project.productId);
   }
 

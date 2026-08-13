@@ -1359,3 +1359,57 @@ membre non contributeur refusée, ligne relue intacte. La fraîcheur du projet a
 d'août à octobre 2026 dans la liste transverse au passage prévue → en cours d'une activité
 d'octobre — le critère explicite de la fiche, pas une extrapolation depuis T2.1. Les quatre
 écritures de vérification n'ont pas été reprises en base ; consignées dans `ETAT.md`.
+
+**T3.6 — Un défaut réel trouvé en vérifiant, corrigé avant livraison : l'ordre du diff
+`syncParticipants` laissait un refus retirer quand même une personne légitime.** La première
+version délivait d'abord (`unlink` de ce qui a disparu) puis ajoutait (`insertMany` de ce qui
+manque). Éprouvé sur le chemin réel — une soumission qui retire une personne existante et en ajoute
+une forgée hors domaine — le refus était bien rendu (`DomainScopeError` → `scopeRefusal`), **mais
+la personne retirée avait déjà disparu de la table** au moment où l'ajout forgé faisait échouer la
+requête : le retrait, lui, n'échoue jamais. C'est le seul refus du produit qui n'aurait pas laissé
+« la ligne relue intacte », contrairement à tout ce que T2.5, T2.6, T3.2, T3.3, T3.4 et T3.5 ont
+éprouvé et consigné. Corrigé en inversant l'ordre : l'ajout passe en premier, et
+`insertMany` vérifie **chaque** ligne (`assertPreconditions`) avant d'écrire quoi que ce soit — une
+personne hors domaine parmi les ajouts fait donc échouer l'ensemble avant qu'aucun retrait n'ait eu
+lieu. Reproduit puis corrigé sur la base de développement, participant restauré à la main.
+**Leçon pour tout futur diff de liaison qui n'aurait pas de pré-vérification en amont (`checkReferences`)** :
+l'ordre à l'intérieur du diff porte la garantie transactionnelle à lui seul, et l'ajout doit
+toujours précéder le retrait.
+
+**T3.6 — Aucune vérification de l'existence d'un participant dans le domaine côté action, par choix
+explicite de la fiche — à la différence de `activityTypeId`/`approachId` (T3.3) et de l'équipe de
+projet (T2.6).** « Une personne d'un autre domaine est refusée par la couche d'accès, pas par
+l'écran » : `checkReferences` dans `projets/[id]/actions.ts` ne porte donc aucune règle sur
+`participantIds`, et c'est `assertPreconditions` de `lib/db/scoped.ts` — déjà là pour toute clé
+étrangère du schéma — qui est le seul filet, attrapé par `scopeRefusal`. Assumé : c'est ce choix qui
+a rendu atteignable le défaut ci-dessus, une pré-vérification à l'écran l'aurait rendu impossible en
+détournant le problème plutôt qu'en le résolvant.
+
+**T3.6 — La non-atomicité de l'écriture d'activité, rouverte comme `ETAT.md` l'annonçait
+d'avance.** `createActivity` écrit désormais deux tables — `activities` puis
+`activity_participants` — sans transaction interactive (`neon-http` n'expose que `batch`). Un
+participant forgé peut donc faire échouer `syncParticipants` **après** que la ligne `activities` a
+déjà été insérée : l'activité existe, sans ses participants, et l'écran affiche un refus. Fenêtre
+resserrée par l'ordre (la vérification de forme précède l'écriture, comme partout) mais pas fermée
+— la même limite acceptée en T2.6 pour la création d'un projet. Non reproduit : forger un
+participant hors domaine à la **création** n'a pas été rejoué séparément de l'édition, le mécanisme
+`assertPreconditions` étant strictement le même des deux côtés et déjà éprouvé en édition.
+
+**T3.6 — Imprécision de la fiche : « une personne de type `external` ».** L'énuméré du schéma
+(`persons.kind`) ne connaît que `center` et `stakeholder` (D19, repris depuis T2.4/T2.6, « côté
+entité »). Aucun type `external` n'existe. Traité comme un raccourci de rédaction pour
+`stakeholder`, et implémenté comme tel — c'est la seule lecture qui rattache la fiche au reste du
+produit, où « côté entité » désigne déjà exactement ce cas sur trois écrans.
+
+**T3.6 — Vérifié sur le chemin réel, par soumissions `multipart` reconstituées à partir des champs
+`$ACTION_…` du balisage servi, comme T3.3 à T3.5.** Un serveur de développement d'une session
+précédente était encore actif (`localhost:3001`) ; réutilisé tel quel plutôt que d'en relancer un
+second, Turbopack rechargeant les fichiers modifiés sans redémarrage. Cinq gestes joués et relus en
+base à chaque étape : création avec deux participants ; retrait de l'un, ajout d'un troisième — la
+ligne `activities` relue avec un `updated_at` **inchangé à la milliseconde**, la preuve que
+`syncParticipants` tourne indépendamment de `activityRowUnchanged` ; re-soumission strictement
+identique sans doublon ; participant forgé refusé par la couche d'accès (voir l'entrée ci-dessus,
+défaut trouvé puis corrigé à cette étape) ; édition tentée sous le cookie de Sofia Marchand,
+non-contributrice de ce projet, refusée avec la ligne intacte. L'activité de vérification a été
+archivée en fin de parcours (règle 4), et non reprise en base autrement — contrairement à T3.3 et
+T3.5, aucune trace de vérification n'est restée visible dans la roadmap.

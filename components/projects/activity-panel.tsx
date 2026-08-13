@@ -72,6 +72,7 @@ import {
 } from "@/lib/forms/activity";
 import type {
   ActivityFamily,
+  ActivityFormPerson,
   ActivityTypeOption,
   ApproachOption,
 } from "@/lib/queries/activities";
@@ -120,6 +121,7 @@ export function ActivityPanel({
   action,
   activityTypes,
   approaches,
+  persons,
   title = "Nouvelle activité",
   submitLabel = "Enregistrer",
   initial = EMPTY_ACTIVITY_VALUES,
@@ -138,6 +140,8 @@ export function ActivityPanel({
   ) => Promise<ActivityFormState>;
   activityTypes: readonly ActivityTypeOption[];
   approaches: readonly ApproachOption[];
+  /** Facultatif (`docs/03` §4). Aucune création à la volée — T2.6, D19. */
+  persons: readonly ActivityFormPerson[];
   /** « Nouvelle activité », ou le type de celle qu'on corrige. */
   title?: string;
   submitLabel?: string;
@@ -441,6 +445,67 @@ export function ActivityPanel({
                 className={`${CONTROL} ${borderOf(errors.objective)}`}
               />
             </PanelField>
+
+            {/* Facultatif (`docs/03` §4). Sur le modèle de l'équipe de projet
+                (T2.6) : les personnes viennent de la liste existante, aucune
+                création à la volée (D19). Aucun rôle, aucune quotité : la case
+                seule porte l'information. */}
+            <fieldset className="flex flex-col gap-2.5">
+              <legend className="text-2xs font-semibold text-content-neutral-dark uppercase">
+                Participants
+              </legend>
+              <p className="text-xs text-content-neutral-base">
+                {"Facultatif. Les personnes qui ont pris part à cette activité, parmi celles déjà référencées dans le domaine."}
+              </p>
+
+              {persons.length > 0 ? (
+                <div className="flex flex-col gap-2 rounded-lg border border-content-neutral-normal bg-surface-neutral-pale px-4 py-3">
+                  {persons.map((person) => (
+                    <label
+                      key={person.id}
+                      htmlFor={`activite-participant-${person.id}`}
+                      className="flex items-center gap-2 text-sm text-content-neutral-darkest"
+                    >
+                      <input
+                        id={`activite-participant-${person.id}`}
+                        name="participantIds"
+                        type="checkbox"
+                        value={person.id}
+                        defaultChecked={values.participantIds.includes(person.id)}
+                        aria-describedby={
+                          errors.participantIds
+                            ? "activite-participants-erreur"
+                            : undefined
+                        }
+                        className="accent-surface-primary-base"
+                      />
+                      {person.fullName}
+                      {/* Texte, jamais couleur seule (`docs/06` §11) — la
+                          règle de T2.4 et T2.6, reprise ici pour un troisième
+                          écran. */}
+                      {person.kind === "stakeholder" ? (
+                        <span className="text-xs text-content-neutral-base">
+                          {" · côté entité"}
+                        </span>
+                      ) : null}
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-content-neutral-dark">
+                  Aucune personne référencée dans ce domaine.
+                </p>
+              )}
+
+              {errors.participantIds ? (
+                <p
+                  id="activite-participants-erreur"
+                  className="text-xs font-semibold text-content-danger-dark"
+                >
+                  {errors.participantIds}
+                </p>
+              ) : null}
+            </fieldset>
           </div>
 
           {/* Enregistrement sans confirmation intermédiaire (`docs/06` §9) :

@@ -19,10 +19,12 @@ import { db } from "@/lib/db/client";
 import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
 import {
   activities,
+  activityParticipants,
   activityTypes,
   approaches,
   domains,
   entities,
+  persons,
   products,
   projectStatuses,
   projects,
@@ -30,11 +32,16 @@ import {
 
 import {
   listActivityFormOptions,
+  listActivityParticipantIds,
   listProjectRoadmap,
   type RoadmapGroup,
 } from "./activities";
 
-/** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
+/**
+ * Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon.
+ * `activity_participants` n'y figure pas : `activity_id` porte `onDelete:
+ * cascade` (T3.6), donc la suppression d'`activities` l'emporte déjà.
+ */
 const teardownOrder = [
   activities,
   projects,
@@ -43,6 +50,7 @@ const teardownOrder = [
   approaches,
   projectStatuses,
   entities,
+  persons,
 ];
 
 type Fixture = {
@@ -61,6 +69,14 @@ type Fixture = {
   retiredTypeId: string;
   /** Un type vivant, pour éprouver que l'exception ne duplique rien. */
   liveTypeId: string;
+  /** L'activité « Audit d'accessibilité », terminée — porte deux participants. */
+  accessibilityActivityId: string;
+  /** L'activité « Atelier de priorisation », en cours — porte un participant. */
+  workshopActivityId: string;
+  /** Côté centre de compétence — kind `center`. */
+  centerPersonId: string;
+  /** Côté entité accompagnée — kind `stakeholder` (T3.6, « côté entité »). */
+  stakeholderPersonId: string;
 };
 
 const suffix = Math.random().toString(36).slice(2, 10);
@@ -135,7 +151,7 @@ async function seedDomain(label: string): Promise<Fixture> {
     periodStart: "2026-03-01",
     periodEnd: "2026-03-31",
   });
-  await scope.insert(activities, {
+  const accessibilityActivity = await scope.insert(activities, {
     projectId: full.id,
     activityTypeId: accessibility.id,
     state: "done",
@@ -182,7 +198,7 @@ async function seedDomain(label: string): Promise<Fixture> {
     activityTypeId: observation.id,
     state: "in_progress",
   });
-  await scope.insert(activities, {
+  const workshopActivity = await scope.insert(activities, {
     projectId: full.id,
     activityTypeId: workshop.id,
     state: "in_progress",
@@ -221,6 +237,28 @@ async function seedDomain(label: string): Promise<Fixture> {
     periodEnd: "2025-02-28",
   });
 
+  /* --- Les participants (T3.6) ------------------------------------------- */
+  const person = async (fullName: string, kind: "center" | "stakeholder") =>
+    scope.insert(persons, {
+      source: "manual",
+      fullName,
+      kind,
+      hasAccess: false,
+      domainRole: null,
+      isActive: true,
+    });
+
+  // « Zoé » avant « Amir » dans l'ordre alphabétique inverse d'insertion :
+  // c'est la lecture qui doit trier par nom, pas l'ordre d'écriture.
+  const center = await person(`Zoé Centre ${label}`, "center");
+  const stakeholder = await person(`Amir Entité ${label}`, "stakeholder");
+
+  await scope.insertMany(activityParticipants, [
+    { activityId: accessibilityActivity.id, personId: center.id },
+    { activityId: accessibilityActivity.id, personId: stakeholder.id },
+    { activityId: workshopActivity.id, personId: stakeholder.id },
+  ]);
+
   return {
     domainId: domain.id,
     scope,
@@ -231,6 +269,10 @@ async function seedDomain(label: string): Promise<Fixture> {
     archivedActivityId: archived.id,
     retiredTypeId: retired.id,
     liveTypeId: audit.id,
+    accessibilityActivityId: accessibilityActivity.id,
+    workshopActivityId: workshopActivity.id,
+    centerPersonId: center.id,
+    stakeholderPersonId: stakeholder.id,
   };
 }
 
@@ -544,5 +586,99 @@ describe("listActivityFormOptions — le type archivé", () => {
     });
     expect(ids).not.toContain(a.retiredTypeId);
     expect(ids.length).toBeGreaterThan(0);
+  });
+});
+
+/* ==========================================================================
+   Les participants — T3.6
+   ========================================================================== */
+
+describe("listActivityFormOptions — les personnes proposées", () => {
+  test("les deux personnes du domaine sont proposées, triées par nom", async () => {
+    const { persons: proposed } = await listActivityFormOptions(a.scope);
+
+    expect(proposed.map((p) => p.id)).toEqual(
+      expect.arrayContaining([a.centerPersonId, a.stakeholderPersonId]),
+    );
+    // « Amir » avant « Zoé » : l'ordre alphabétique, pas celui de l'écriture.
+    const names = proposed.map((p) => p.fullName);
+    expect(names.indexOf(`Amir Entité a`)).toBeLessThan(
+      names.indexOf(`Zoé Centre a`),
+    );
+  });
+
+  test("chaque personne porte son côté (`kind`)", async () => {
+    const { persons: proposed } = await listActivityFormOptions(a.scope);
+    const stakeholder = proposed.find((p) => p.id === a.stakeholderPersonId);
+    const center = proposed.find((p) => p.id === a.centerPersonId);
+
+    expect(stakeholder?.kind).toBe("stakeholder");
+    expect(center?.kind).toBe("center");
+  });
+
+  test("une personne d'un autre domaine n'est jamais proposée", async () => {
+    const { persons: proposed } = await listActivityFormOptions(a.scope);
+    expect(proposed.map((p) => p.id)).not.toContain(b.stakeholderPersonId);
+  });
+});
+
+describe("listProjectRoadmap — les participants", () => {
+  test("une entrée porte ses participants, triés par nom", async () => {
+    const groups = await listProjectRoadmap(a.scope, a.fullId);
+    const done = groups.find((group) => group.key === "done")?.activities ?? [];
+    const accessibility = done.find((row) => row.id === a.accessibilityActivityId);
+
+    expect(accessibility?.participants).toEqual([
+      { id: a.stakeholderPersonId, fullName: `Amir Entité a`, kind: "stakeholder" },
+      { id: a.centerPersonId, fullName: `Zoé Centre a`, kind: "center" },
+    ]);
+  });
+
+  test("une entrée sans participant rend un tableau vide", async () => {
+    const groups = await listProjectRoadmap(a.scope, a.fullId);
+    const cancelled =
+      groups.find((group) => group.key === "cancelled")?.activities ?? [];
+
+    expect(cancelled[0]?.participants).toEqual([]);
+  });
+
+  test("les participants d'un autre domaine ne s'y mêlent jamais", async () => {
+    const groups = await listProjectRoadmap(a.scope, a.fullId);
+    const flatIds = groups.flatMap((group) =>
+      group.activities.flatMap((activity) =>
+        activity.participants.map((person) => person.id),
+      ),
+    );
+
+    expect(flatIds).not.toContain(b.centerPersonId);
+    expect(flatIds).not.toContain(b.stakeholderPersonId);
+  });
+});
+
+describe("listActivityParticipantIds", () => {
+  test("rend les identifiants liés à l'activité", async () => {
+    const ids = await listActivityParticipantIds(
+      a.scope,
+      a.accessibilityActivityId,
+    );
+    expect(ids.sort()).toEqual(
+      [a.centerPersonId, a.stakeholderPersonId].sort(),
+    );
+  });
+
+  test("une activité sans participant rend un tableau vide", async () => {
+    expect(await listActivityParticipantIds(a.scope, a.cancelledId)).toEqual(
+      [],
+    );
+  });
+
+  test("ne traverse pas la frontière de domaine", async () => {
+    // La liaison existe dans le domaine `a` ; interrogée depuis `b`, le
+    // filtre de domaine de `scope.list` ne trouve rien — la couche est
+    // scopée sur `activity_participants` elle-même, pas seulement sur ce
+    // qu'elle joint.
+    expect(
+      await listActivityParticipantIds(b.scope, a.accessibilityActivityId),
+    ).toEqual([]);
   });
 });

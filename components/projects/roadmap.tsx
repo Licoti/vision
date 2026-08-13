@@ -343,6 +343,21 @@ function RoadmapEntry({
             {activity.objective}
           </p>
         ) : null}
+        {/* Facultatif (`docs/03` §4, T3.6). « · côté entité » en texte, jamais
+            couleur seule (`docs/06` §11) — la règle de T2.4 et T2.6, reprise
+            ici pour un troisième écran. */}
+        {activity.participants.length > 0 ? (
+          <p className="mt-1.5 text-xs leading-175 text-content-neutral-base">
+            {"Participants : "}
+            {activity.participants
+              .map(
+                (person) =>
+                  person.fullName +
+                  (person.kind === "stakeholder" ? " · côté entité" : ""),
+              )
+              .join(", ")}
+          </p>
+        ) : null}
         {/* `cancellationReason` n'est renseigné que dans ce groupe
             (`activities_cancelled_requires_reason`) : le motif remplace les
             gestes, il ne s'ajoute pas à côté d'eux. Texte, pas couleur seule
