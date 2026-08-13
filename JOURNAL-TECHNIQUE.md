@@ -1115,3 +1115,97 @@ pouvait pas tenir dans `activity-panel.tsx` : `"use client"` s'applique au modul
 panneau importe l'énuméré `activityFamily` du schéma. Aucun fichier de tests n'est ajouté, pour la
 première fois depuis T1.3 : le ticket ne pose aucune fonction pure à éprouver — ses arbitrages sont
 de rendu, et se vérifient dans le HTML servi et dans un navigateur, comme ceux de T1.6.
+
+---
+
+**T3.3 — Un argument lié à une action serveur n'est pas un secret. Affirmation corrigée dans le
+code.** J'avais écrit, dans `app/(app)/projets/[id]/page.tsx` comme dans l'en-tête de son
+`actions.ts`, que l'identifiant du projet lié par `createActivity.bind(null, project.id)` « ne
+transite par aucun champ, et ne peut donc pas être remplacé par celui d'un projet voisin ». C'est
+faux, et la vérification l'a montré : le balisage servi porte
+`<input type="hidden" name="$ACTION_1:1" value="[&quot;a9357cc0-…&quot;,{…}]">` — l'argument lié en
+clair, au moins en développement. Réécrire ce champ et soumettre a été fait pour le voir. **La règle
+qui en sort dépasse ce ticket** : une action serveur ne doit jamais tirer une autorisation de la
+valeur qu'on lui a liée. `createActivity` interroge `session.can.writeProject(projectId)` sur
+l'identifiant **reçu**, si bien que le repointage est refusé comme le reste — mais c'est ce contrôle
+qui protège, pas la liaison. La liaison ne fait qu'une chose, utile mais modeste : sortir
+l'identifiant de la saisie, pour que le panneau ne connaisse pas le projet dans lequel il écrit.
+`updateProduct` et `updateProject` de C2 lient déjà un identifiant et n'ont rien à reprendre : tous
+deux exigent `manageDomain`, un droit qui ne dépend d'aucun identifiant. À revoir au premier ticket
+qui liera une valeur **dont dépend** un droit.
+
+**T3.3 — « Enregistrer » vivait hors du `<form>` depuis T3.2.** Le pied du panneau était un `div`
+frère du formulaire, si bien que le bouton n'aurait rien soumis même sans son `disabled`. Le défaut
+était invisible tant qu'aucune action n'était branchée, et c'est précisément ce que « le formulaire
+vide — qui n'enregistre rien à ce stade » avait rendu inobservable. Le formulaire enveloppe
+désormais le corps défilant **et** le pied, ce qui n'a coûté qu'un niveau de `flex`. À retenir : un
+composant dont une moitié est désactivée « en attendant le ticket suivant » ne s'éprouve pas, et le
+ticket suivant hérite du défaut.
+
+**T3.3 — Le panneau devient un composant client, et la propriété revendiquée par T3.2 tombe.**
+L'en-tête de `activity-panel.tsx` faisait de son absence de `"use client"` « tout le propos ». La
+fiche de T3.3 exige qu'« une saisie refusée revienne dans le panneau avec ses valeurs », ce qui
+demande `useActionState` — il n'existe pas de troisième voie : une action qui redirigerait en
+réencodant la saisie dans l'URL serait pire à tous égards, et un formulaire qui repart vide jette ce
+qui a été tapé. L'arbitrage a été rendu avec l'humain avant écriture, contre l'alternative
+d'extraire un `activity-form.tsx` client et de garder le panneau serveur : elle préservait la
+propriété et une frontière plus étroite, au prix d'un fichier hors périmètre et d'un panneau coupé
+en deux que T3.4, T3.5 et T3.6 toucheront tous les trois. **Ce qui n'a pas bougé mérite d'être dit**
+: l'ouverture reste une URL, les trois sorties restent des liens, `inert` et `autofocus` restent des
+attributs HTML, et `FocusTrap` reste le seul endroit où du JavaScript est indispensable. C'est la
+frontière du bundle qui a bougé, pas la nature du socle — vérifié dans Chrome scripts coupés, où
+`aria-modal` absent prouve que rien ne s'exécute et où le parcours entier aboutit quand même.
+
+**T3.3 — `today` est un paramètre de la dérivation, jamais lu à l'horloge.** `deriveActivityState`
+reçoit le jour courant en `YYYY-MM-DD` ; seule l'action le calcule, en un seul endroit. Sans cela,
+les tests de bascule — la veille, le jour même, le lendemain — auraient été justes le jour de leur
+écriture et faux le mois suivant, et un test de date qui ne se trompe que dans six mois est pire
+qu'aucun test. Le calcul passe par `toLocaleDateString("sv-SE")` et non par `toISOString()` : ce
+dernier convertit en UTC et reculerait d'un jour pour toute saisie faite avant 2 h du matin en heure
+d'été française.
+
+**T3.3 — Cinquième refus non prévu par la fiche : une fin de période sans début.** Arbitré avec
+l'humain en ouverture de ticket. Le cas n'était couvert ni par la fiche, ni par les trois arbitrages
+d'avance, et il n'était pas neutre : `activities_planned_requires_period_or_unscheduled` exige un
+`period_start`, donc une fin seule **à venir** n'a aucun état légal et aurait produit une exception
+PostgreSQL — un 500 là où l'on attend un message de champ. Dériver `done` pour une fin passée et
+refuser pour une fin à venir aurait fait deux comportements pour une même forme de saisie,
+impossibles à énoncer dans la note du champ. Le refus est donc uniforme. La propriété que cela
+préserve est celle qui porte le ticket : **les deux contraintes `CHECK` du schéma tiennent par
+construction**, jamais par un rattrapage.
+
+**T3.3 — `isIsoDay` et `valueOrNull` sont importés de `lib/forms/project.ts`. Dette assumée.** Les
+deux fonctions sont des règles générales — une date qui existe, un champ vide qui part à `null` —
+et ne doivent rien au formulaire de projet. Les redire dans `lib/forms/activity.ts` aurait posé une
+seconde autorité sur l'aller-retour de date, qui divergerait un jour ; les importer donne une
+dépendance qui se lit mal, `activity` n'ayant rien à faire de `project`. Un `lib/forms/dates.ts`
+aurait tranché, mais c'est un fichier hors du périmètre annoncé. **À poser au premier ticket dont la
+fiche nomme déjà `lib/forms/`** — T3.4 est le candidat, qui rouvre `lib/forms/activity.ts`.
+
+**T3.3 — `FormField` est redit une troisième fois, et la dette de T3.2 n'est pas refermée.** T3.2
+annonçait T3.4 comme le moment d'extraire `components/ui/form-field.tsx`. T3.3 n'en a pas profité,
+et cette fois la raison n'est plus la frontière client — le panneau est passé client — mais le
+périmètre : le fichier n'est pas dans la fiche. Le `PanelField` local a gagné son message d'erreur
+et son `errorId`, ce qui le rapproche encore du `FormField` de `project-form.tsx`. **Deux
+différences restent réelles** et devront être des props si l'extraction se fait : le panneau est
+dense — intitulés `text-2xs`, gouttières de 1,5 — là où la page ne l'est pas, et le panneau porte la
+mention « (obligatoire) » que la page n'a jamais eue.
+
+**T3.3 — Écarts de périmètre : deux, tous deux annoncés avant écriture.**
+`app/(app)/projets/[id]/page.tsx` — le panneau ne peut pas se lier lui-même à un projet, et la page
+est le seul endroit où l'action se lie côté serveur ; elle y reprend au passage
+`listActivityFormOptions`, le déplacement que T3.2 avait annoncé pour ce ticket. Et deux lignes de
+commentaire dans `components/ui/focus-trap.tsx`, dont l'en-tête justifiait son `:not([disabled])`
+par un « Enregistrer » inactif « tant que T3.3 n'a pas branché son action » : le sélecteur ne bouge
+pas — il sert désormais l'état `pending` — mais la phrase serait devenue fausse.
+
+**T3.3 — Les cinq saisies de vérification ont été archivées, pas supprimées.** Une fois les critères
+lus dans le HTML servi, laisser cinq activités d'essai sur « Autonomie des opérations courantes »
+aurait rendu illisible le critère de T3.1, qui se lit sur cinq activités dans un ordre exact.
+`scope.archive` est le geste sanctionné par la règle 4, et la roadmap écarte déjà les lignes
+archivées : le projet est revenu à ses cinq activités et sa fraîcheur à août 2026, vérifié. **Effet
+de bord instructif** : l'archivage a fait redescendre `last_activity_at` de septembre à août, ce qui
+éprouve une moitié de la règle que T3.3 n'avait pas à vérifier — la couche recalcule le champ à
+l'archivage comme à l'insertion. Noter enfin qu'**aucun écran n'archive une activité** : il a fallu
+passer par la couche. L'annulation de T3.5 ne remplace pas ce geste, elle exige un motif et laisse
+l'activité visible.

@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** T3.2 terminé — le panneau de saisie s'ouvre et se ferme sans JavaScript
+**Dernière mise à jour :** T3.3 terminé — une activité se saisit, et son état se déduit de sa période
 **Chantier en cours :** C3 — activités et roadmap
-**Ticket en cours :** aucun — prochain ticket : **T3.3 — Création d'une activité**
+**Ticket en cours :** aucun — prochain ticket : **T3.4 — Édition d'une activité**
 
 ---
 
@@ -14,7 +14,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 |---|---|---|
 | C1 — Socle technique | T1.1 → T1.6 | **terminé** |
 | C2 — Produits et projets | T2.1 → T2.6 | **terminé** |
-| C3 — Activités et roadmap | T3.1 → T3.6 | **en cours** — T3.1, T3.2 faits |
+| C3 — Activités et roadmap | T3.1 → T3.6 | **en cours** — T3.1, T3.2, T3.3 faits |
 | C4 — Ressources et résultats | à découper | à faire |
 | C5 — Indicateurs et temps long | à découper | à faire |
 | C6 — Liens et journal | à découper | à faire |
@@ -295,6 +295,54 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   `components/ui/focus-trap.tsx`, le cinquième fichier ci-dessus. Aucun fichier de tests — le premier
   ticket depuis T1.3 à n'en ajouter aucun, le ticket ne posant aucune fonction pure à éprouver.
 
+- **T3.3 — 13/08/2026 — création d'une activité.** Le pivot de C3, et le seul ticket du chantier
+  qui portait une logique neuve : **l'état ne se saisit pas, il se déduit de la période.**
+  **Le critère est tenu et lu dans le HTML servi**, un cas par groupe sur « Autonomie des opérations
+  courantes » : janvier 2026 → « Terminé », 10 août → 15 septembre → « En cours », décembre 2026 →
+  « Prévu », case cochée → « À planifier ». La fraîcheur suit dans la liste transverse **et sait ne
+  pas suivre** — elle passe d'août à **septembre** 2026 sur l'activité en cours, et les deux
+  activités prévues qui suivent, dont une en décembre, ne la déplacent pas : la règle de T2.1,
+  vérifiée ici pour la première fois par un écran d'écriture. C'est la liste des **produits** qui a
+  imposé un `revalidatePath` de plus, elle aussi porteuse de cette fraîcheur. Le parcours entier a
+  été joué **sans une ligne de JavaScript**, de deux façons : par soumissions `multipart`
+  reconstituées sans en-tête `Next-Action` — ce sont les champs cachés `$ACTION_…` du balisage servi
+  qui portent l'action —, puis **dans Chrome, scripts coupés**, où `aria-modal` absent prouve que
+  `FocusTrap` n'a pas tourné : un refus rend le panneau ouvert avec son bandeau, son type
+  resélectionné et son objectif réaffiché, et la même saisie corrigée par la case aboutit,
+  referme le panneau et paraît dans la roadmap. **Une affirmation de ma part n'a pas résisté à la
+  vérification et a été corrigée dans le code** : j'avais écrit que l'identifiant du projet, lié
+  côté serveur, « ne transite par aucun champ ». Il transite — Next sérialise l'argument lié dans
+  `$ACTION_1:1`, **en clair en développement**. La liaison range l'identifiant hors de la saisie,
+  elle ne le protège pas. Le verrou est ailleurs et il tient : `writeProject` est interrogé sur le
+  `projectId` **reçu**, et repointer la liaison de son propre panneau vers un projet où l'on n'écrit
+  pas est refusé — éprouvé. Le droit l'a été sur le témoin que T3.2 avait appris à choisir : Sofia
+  Marchand, contributrice sur « Refonte du parcours de virement » et sur lui seul — l'action lui est
+  offerte là-bas et absente ici, et les champs récoltés chez Camille Roux puis **repostés sous son
+  cookie** rendent un refus, **zéro ligne créée, contrôlé en base**. **Sept refus éprouvés
+  séparément**, et dans les sept cas la saisie revient dans le panneau : type absent, période absente
+  sans « à planifier », fin antérieure au début, « à planifier » cochée avec une période, **fin sans
+  début**, date impossible (`2026-02-31`), type hors du domaine. Le cinquième est un arbitrage rendu
+  en ouverture de ce ticket : une fin seule à venir n'a **aucun état légal**
+  (`activities_planned_requires_period_or_unscheduled` exige un début), et dériver `done` pour une
+  fin passée aurait fait deux comportements pour une même forme de saisie. Les 36 tests ajoutés ne
+  touchent aucune base et ont été **mis en défaut un à un, douze fois** : chaque neutralisation en
+  fait tomber entre 1 et 3, jamais zéro — la dérivation `done` neutralisée fait tomber exactement
+  « période entièrement passée », « fin à la veille du jour même » et la ligne rendue par
+  `parseActivityForm`, et rien d'autre. `today` est un **paramètre** de la dérivation, jamais lu à
+  l'horloge : sans quoi ces tests seraient justes ce jour-là et faux le mois suivant. Le contraste a
+  été **mesuré avant d'être cru** sur les neuf couples de l'écran et **aucune correction n'en est
+  sortie** : le bandeau d'erreur donne 6,13:1, son filet 5,19:1 contre le panneau, le message sous le
+  champ 6,90:1. Son fond ne tient que 1,13:1 contre celui du panneau — et n'a pas à tenir davantage :
+  c'est son filet qui porte la limite, le même raisonnement qu'en T3.2 pour le voile. Deux arbitrages
+  rendus avec l'humain avant écriture : le refus de la fin sans début, et **le panneau qui devient un
+  composant client** — la propriété que T3.2 revendiquait tombe, `useActionState` étant le seul moyen
+  de faire revenir une saisie refusée avec ses valeurs. Un défaut trouvé en vérifiant, corrigé :
+  « Enregistrer » vivait **hors** du `<form>` depuis T3.2, donc hors de toute soumission. Écarts de
+  périmètre assumés et consignés, tous deux annoncés avant écriture :
+  `app/(app)/projets/[id]/page.tsx` — l'action se lie au projet côté serveur, et la page reprend au
+  passage `listActivityFormOptions` — et deux lignes de commentaire devenues fausses dans
+  `components/ui/focus-trap.tsx`.
+
 ---
 
 ## Points ouverts
@@ -346,6 +394,10 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   plus — mesuré, celui-ci laisse le panneau à 2,66:1 de lui. Le panneau s'en sort par son filet, à
   `content-neutral-dark` : c'est le seul endroit du produit où un filet est plus sombre que celui
   des contrôles, et il ne le doit qu'à ce manque.
+  **T3.3 n'ajoute rien à cette liste, et c'était le but** : le premier formulaire du panneau reprend
+  `content-neutral-normal` pour ses contrôles et `content-danger-base` pour un champ en erreur, sans
+  en inventer un troisième — les neuf couples de l'écran ont été mesurés et aucune correction n'en
+  est sortie.
 
 - **La coquille de navigation reste focalisable derrière le voile, sans JavaScript.** Le contenu de
   la page projet porte `inert` quand le panneau est ouvert, mais la barre latérale vit dans
@@ -357,19 +409,91 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   coquille. Le tenir vraiment demanderait que le layout connaisse l'état du panneau — à reprendre si
   une seconde modale arrive, ou avec le ticket qui rebranche les deux blocs manquants de la barre
   latérale.
-- **Le panneau de saisie affiche un « Enregistrer » inactif entre T3.2 et T3.3.** La fiche de T3.2
-  interdit toute écriture et annonce « le formulaire vide — qui n'enregistre rien à ce stade » : un
-  bouton actif aurait soit ne rien fait, soit rechargé la page en jetant la saisie, et les deux
-  mentent davantage. Il n'est donc pas un arrêt de tabulation, qui se termine sur « Annuler ».
-  **T3.3 lui donne son action et referme ce point** — c'est la première chose que son critère
-  vérifie.
-- **Le formulaire du panneau est posé, sa validation ne l'est pas.** T3.2 rend les cinq champs de
-  `docs/06` §9 — type groupé par famille, case « à planifier », période, approche, objectif — sans
-  aucune règle : rien n'empêche aujourd'hui de cocher « à planifier » **et** de saisir une période,
-  ni de donner une fin antérieure au début. Sans conséquence, le formulaire n'écrivant nulle part.
-  **T3.3 tranche le conflit** et éprouve les trois refus que son critère nomme. Noter au passage que
-  la case ne masque pas la période, comme le fait la maquette : sans JavaScript un champ ne
-  disparaît pas, et c'est la note sous la case qui énonce la règle.
+- ~~**Le panneau de saisie affiche un « Enregistrer » inactif entre T3.2 et T3.3.**~~ **Refermé par
+  T3.3**, et le ticket a trouvé au passage que le bouton vivait **hors** du `<form>` depuis T3.2 —
+  donc hors de toute soumission, quand bien même il aurait été actif. Le formulaire enveloppe
+  désormais le pied. Le cycle de tabulation compte un arrêt de plus, **éprouvé dans Chrome, touches
+  réellement dépêchées** : la 13ᵉ tabulation atteint « Enregistrer », la 14ᵉ « Annuler », la 15ᵉ
+  revient sur la croix. Les champs `date` prennent trois tabulations chacun — segments jour, mois,
+  année du contrôle natif, comme en T2.6.
+- ~~**Le formulaire du panneau est posé, sa validation ne l'est pas.**~~ **Refermé par T3.3**, avec
+  **sept** refus là où la fiche en nommait trois : les trois du critère, le quatrième de
+  l'arbitrage (b), un cinquième tranché en ouverture de ticket (fin sans début), plus la date
+  impossible et le type hors du domaine. Noter que la case ne masque toujours pas la période, comme
+  le fait la maquette : sans JavaScript un champ ne disparaît pas, et c'est la note sous la case qui
+  énonce la règle — et le refus qui la fait respecter.
+
+- **Le panneau de saisie n'est plus un composant serveur.** T3.2 en faisait une propriété — « rien
+  ici n'a d'état, et c'est tout le propos ». T3.3 l'a retournée : faire revenir une saisie refusée
+  avec ses valeurs demande `useActionState`, donc `"use client"`, et il n'y avait pas de troisième
+  voie — une action qui redirigerait en réencodant la saisie dans l'URL aurait été pire à tous
+  égards. Le panneau prend donc la forme de `project-form.tsx` depuis T2.5 : amélioration
+  progressive, socle qui tient sans script. **Ce qui n'a pas bougé** : l'ouverture reste une URL, les
+  trois sorties restent des liens, `inert` et `autofocus` restent des attributs HTML, et `FocusTrap`
+  reste le seul endroit où du JavaScript est indispensable. Ce qui a bougé est la **frontière** du
+  bundle client, pas la nature du socle. L'alternative écartée avec l'humain — extraire un
+  `activity-form.tsx` et garder le panneau serveur — coupait en deux un composant que T3.4, T3.5 et
+  T3.6 toucheront tous les trois.
+
+- **Un argument lié à une action serveur n'est pas un secret.** Découvert en vérifiant T3.3, et à
+  garder en tête pour tout ticket d'écriture à venir : `createActivity.bind(null, project.id)` fait
+  sortir l'identifiant de la saisie, mais Next le sérialise dans un champ `$ACTION_1:1` du balisage,
+  **en clair en développement** — et une requête soumise peut le réécrire, ce qui a été fait pour le
+  voir. La conséquence est une règle, pas une inquiétude : **une action ne doit jamais tirer une
+  autorisation de la valeur qu'on lui a liée.** `createActivity` interroge `writeProject` sur le
+  `projectId` **reçu**, si bien que repointer la liaison vers un projet où l'on n'écrit pas est
+  refusé comme le reste. La même vigilance vaut pour `updateProduct` et `updateProject` de C2, qui
+  lient déjà un identifiant — tous deux exigent `manageDomain`, un droit qui ne dépend d'aucun
+  identifiant, donc rien à reprendre. À revoir le jour où une action liera une valeur **dont dépend**
+  un droit.
+- **La base de développement porte cinq activités archivées de plus depuis T3.3.** Les cinq saisies
+  de vérification ont été **archivées et non supprimées** (règle 4) une fois les critères lus : la
+  roadmap les écarte, si bien que le critère de T3.1 se relit mot pour mot sur « Autonomie des
+  opérations courantes » — cinq activités, dans l'ordre exact — et que la fraîcheur du projet est
+  revenue à août 2026. L'archivage a confirmé au passage une propriété que T3.3 n'avait pas à
+  éprouver : `archive` recalcule `last_activity_at` comme l'insertion, et la valeur est bien
+  redescendue de septembre à août. `npm run db:seed` ne les retirera pas — l'amorçage ignore ce
+  qu'il n'a pas semé. Noter aussi qu'un « Test projet » et un produit « test », d'une session
+  antérieure et étrangers à ce ticket, traînent dans cette base.
+- **Rien n'archive une activité dans l'interface.** T3.3 a dû passer par la couche d'accès pour
+  ranger ses saisies de vérification. Ce n'est pas un manque du ticket — `docs/03` §4 ferme la
+  suppression, et **l'annulation de T3.5 en tient lieu** pour une activité qui ne se fera pas. Mais
+  l'annulation n'est pas l'archivage : elle demande un motif et laisse l'activité visible. Une
+  activité saisie **par erreur** n'a donc aucun chemin. À joindre au ticket d'archivage déjà
+  attendu en C7 pour le produit et le projet.
+
+- **Trois arbitrages rendus d'avance pour T3.3, T3.4 et T3.5 — 13/08/2026.** Ils ne sont dans aucun
+  document, ils ont été tranchés avec l'humain hors ticket, et ils sont à consommer tels quels.
+  **(a) et (b) ont été consommés par T3.3**, sans écart : la table de dérivation est écrite telle
+  quelle dans `deriveActivityState`, et le refus (b) est le quatrième des sept. **(c) attend T3.4**,
+  et reste à lire avant d'écrire une ligne de ce ticket. T3.3 lui laisse le terrain net : la
+  dérivation est une fonction pure qui reçoit la période et le jour, donc T3.4 n'aura qu'à décider
+  **s'il l'appelle**, jamais à la réécrire.
+
+  **a. Dérivation période → état. Vision ne fabrique aucune date.** « À planifier » cochée sans
+  date → `planned` + `is_unscheduled`. Deux bornes saisies → `planned`, `in_progress` ou `done`
+  selon que la période est à venir, couvre aujourd'hui, ou est passée. **Début seul, sans fin →
+  `in_progress`, quelle que soit son ancienneté**, et `period_end` reste nul. Conséquence assumée :
+  une activité commencée en mars 2024 sans fin reste « en cours » indéfiniment, et T3.5 est le seul
+  chemin pour la clore. Propriété qui en découle et qui vaut d'être connue : `done` n'est dérivé que
+  d'une période dont la fin est **saisie**, si bien que
+  `activities_done_requires_period_end` ne peut pas être violée par la dérivation ;
+  `activities_planned_requires_period_or_unscheduled` tient de même. Les deux contraintes tiennent
+  **par construction**. Attention à la phrase de la fiche de T3.3 — « une fin de période à venir, au
+  31 du mois en cours » : elle décrit le cas où **les deux bornes sont saisies** dans le mois
+  courant, ce n'est pas une règle de complétion.
+
+  **b. « À planifier » cochée avec une période saisie : refus.** Quatrième refus, en plus des trois
+  que nomme la validation, et la saisie revient dans le panneau avec ses deux valeurs. Vision ne
+  jette jamais en silence ce qui a été tapé — la raison même qui a fait rendre « Enregistrer »
+  inactif en T3.2.
+
+  **c. Précédence T3.4 / T3.5 : l'état n'est redérivé que si la période a bougé.** T3.4 compare la
+  période et `is_unscheduled` soumis à la ligne existante. Inchangés, l'état est laissé tel quel — la
+  correction manuelle de T3.5 survit à l'édition d'un objectif, d'un type ou d'une approche.
+  Modifiés, l'état est redérivé : déplacer une période est une intention sur l'état. Aucune colonne
+  à ajouter, aucune migration. **Sans cet arbitrage, T3.4 déferait silencieusement T3.5**, et le
+  défaut ne se serait vu qu'en T3.5 — donc en reprise de T3.4.
 - **Une activité annulée est invisible entre T3.1 et T3.5.** La roadmap de T3.1 écarte l'état
   `cancelled` de sa lecture, sa fiche lui interdisant le cinquième groupe : c'est T3.5 qui l'ouvre,
   parce que c'est lui qui peut le peupler. La donnée est en base et n'est pas perdue — elle n'est
@@ -418,7 +542,10 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   La parade de T2.6 est de tout confronter au domaine **avant** d'écrire, si bien que la fenêtre
   résiduelle se limite à une ligne supprimée entre la vérification et l'écriture. Acceptable au
   POC. À reprendre le jour où la couche exposera une transaction — ou plus tôt, si un formulaire
-  plus large arrive en C3.
+  plus large arrive en C3. **T3.3 ne rouvre pas la question** : la saisie d'une activité écrit **une
+  seule table**, et le recalcul de `last_activity_at` part dans le même `batch` que l'insertion,
+  donc dans la même transaction. C'est **T3.6** qui la rouvrira, lui qui écrira
+  `activity_participants` à côté d'`activities`.
 
 - **On n'ajoute qu'une personne par enregistrement.** Sans JavaScript, un champ répétable n'existe
   pas : le bloc d'ajout de T2.6 crée une personne, et pour en ajouter deux il faut enregistrer puis
@@ -485,6 +612,14 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
 ## Rappels de contexte
 
-- Modèle : **Opus pour C1**, Sonnet à partir de C2.
+- Modèle : **Opus pour C1**, Sonnet à partir de C2 — ce que disent aussi les en-têtes de
+  `tickets-C1-C2.md` et de `tickets-C3.md`. **En pratique, C2 puis T3.1 et T3.2 ont été menés avec
+  Opus** : un sur-provisionnement par rapport au plan écrit, pas un rattrapage. Arbitrage du
+  13/08/2026 pour la suite de C3 : **T3.3 sur Opus** — c'est le seul ticket restant qui porte une
+  logique neuve, la dérivation de l'état, et le pivot que l'en-tête de C3 désigne lui-même ;
+  **T3.4, T3.5 et T3.6 sur Sonnet**, ils rejouent des motifs posés en C2 et leurs dettes arrivent
+  toutes avec leur remède écrit. T3.6 est T2.6 transposé. Le levier n'est pas le modèle mais les
+  cinq disciplines de vérification de l'étape 4 : tant qu'elles ne sont pas écrites dans
+  `CLAUDE.md`, un ticket peut être correct **et** non vérifié.
 - L'authentification est un stub jusqu'en C7, mais le contexte de session a sa forme finale.
 - Les maquettes `docs/design/maquettes/` sont une référence visuelle, jamais branchées.

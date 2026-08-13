@@ -35,8 +35,8 @@ import { useEffect, useRef, type ReactNode } from "react";
 
 /**
  * Ce qui prend le focus au clavier. La forme négative des `:not([disabled])`
- * est volontaire : « Enregistrer » est inactif tant que T3.3 n'a pas branché
- * son action, et un cycle qui s'arrêterait dessus serait un cul-de-sac.
+ * est volontaire : « Enregistrer » est inactif le temps d'une soumission en
+ * cours depuis T3.3, et un cycle qui s'arrêterait dessus serait un cul-de-sac.
  */
 const FOCUSABLE = [
   "a[href]",

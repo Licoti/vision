@@ -1,8 +1,9 @@
 /**
- * La lecture de la roadmap d'un accompagnement — le récit du projet, et la
- * raison d'être de Vision (`docs/06` §5).
+ * Les lectures liées aux activités : la roadmap d'un accompagnement — le récit
+ * du projet, et la raison d'être de Vision (`docs/06` §5) — et les deux
+ * référentiels que le panneau de saisie propose.
  *
- * Elle joint, donc elle passe par `joinedRead`. **Toute table jointe porte
+ * La première joint, donc elle passe par `joinedRead`. **Toute table jointe porte
  * `filter(table)`**, le `leftJoin` sur les approches compris : c'est la
  * condition posée par l'en-tête de `joinedRead`, et la propriété relevée par
  * T2.2 à T2.4 — les filtres de domaine se rattrapent l'un l'autre — ne
@@ -15,7 +16,71 @@
 import { and, asc, eq, isNull, ne, sql } from "drizzle-orm";
 
 import type { ScopedDb } from "@/lib/db/scoped";
-import { activities, activityTypes, approaches } from "@/lib/db/schema";
+import {
+  activities,
+  activityFamily,
+  activityTypes,
+  approaches,
+} from "@/lib/db/schema";
+
+/** `framing` · `research` · … Dérivé du schéma, jamais réécrit à la main. */
+export type ActivityFamily = (typeof activityFamily.enumValues)[number];
+
+/** Un type d'activité proposé au choix : le référentiel du domaine (D16). */
+export type ActivityTypeOption = {
+  id: string;
+  label: string;
+  family: ActivityFamily;
+};
+
+/** Une approche proposée au choix. D12 — une seule par activité. */
+export type ApproachOption = { id: string; label: string };
+
+export type ActivityFormOptions = {
+  activityTypes: ActivityTypeOption[];
+  approaches: ApproachOption[];
+};
+
+/**
+ * Les deux référentiels que le panneau de saisie propose.
+ *
+ * T3.2 les lisait dans la page, faute de pouvoir toucher `lib/queries` : le
+ * déplacement était annoncé pour ce ticket, et le voici.
+ *
+ * `list` écarte déjà les lignes archivées, et c'est la nuance qui compte :
+ * **on propose des lignes vivantes** là où `listProjectRoadmap` décrit avec
+ * les libellés archivés compris. Décrire et proposer n'appellent pas le même
+ * filtre — la même règle qu'en T2.6 pour les entités et les produits.
+ *
+ * `position` est l'ordre du domaine et prime sur l'alphabet ; la famille le
+ * précède pour le type, son énuméré portant l'ordre de `docs/03` §2. C'est ce
+ * tri qui permet au panneau de grouper en un seul passage, sans retrier.
+ */
+export async function listActivityFormOptions(
+  scope: ScopedDb,
+): Promise<ActivityFormOptions> {
+  const [typeRows, approachRows] = await Promise.all([
+    scope.list(activityTypes, {
+      orderBy: [
+        asc(activityTypes.family),
+        asc(activityTypes.position),
+        asc(activityTypes.label),
+      ],
+    }),
+    scope.list(approaches, {
+      orderBy: [asc(approaches.position), asc(approaches.label)],
+    }),
+  ]);
+
+  return {
+    activityTypes: typeRows.map((row) => ({
+      id: row.id,
+      label: row.label,
+      family: row.family,
+    })),
+    approaches: approachRows.map((row) => ({ id: row.id, label: row.label })),
+  };
+}
 
 /**
  * Les quatre groupes de lecture de `docs/03` §6, dans leur ordre.

@@ -36,10 +36,10 @@
  * domaine courant. Règle 1.
  */
 
-import { asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
+import { createActivity } from "./actions";
 import { ActivityPanel } from "@/components/projects/activity-panel";
 import { Roadmap } from "@/components/projects/roadmap";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
@@ -50,10 +50,12 @@ import { Section, SectionHeader } from "@/components/ui/section";
 import { StatusDot } from "@/components/ui/status-dot";
 import { Tag } from "@/components/ui/tag";
 import { requireSession } from "@/lib/auth/provider";
-import { activityTypes, approaches } from "@/lib/db/schema";
 import { formatPeriod, formatRank } from "@/lib/format";
 import { ACTIVITY_PANEL_NEW, ROUTES } from "@/lib/navigation";
-import { listProjectRoadmap } from "@/lib/queries/activities";
+import {
+  listActivityFormOptions,
+  listProjectRoadmap,
+} from "@/lib/queries/activities";
 import { findAccompanimentRank, findProjectDetail } from "@/lib/queries/projects";
 import { isUuid } from "@/lib/uuid";
 
@@ -119,40 +121,29 @@ export default async function ProjectPage({
 
   /* Les deux référentiels ne sont lus **que** si le panneau s'ouvre : la page
      la plus consultée du produit ne paie pas deux requêtes pour un panneau
-     fermé. `list` écarte déjà les lignes archivées — on propose des lignes
-     vivantes, là où la roadmap **décrit** avec les libellés archivés compris.
-     `position` est l'ordre du domaine et prime sur l'alphabet ; la famille le
-     précède pour le type, son énuméré portant l'ordre de `docs/03` §2. */
+     fermé. Le tri et le filtre d'archivage vivent dans `lib/queries` depuis
+     T3.3, avec la raison qui les motive. */
   const panelOptions = panelOpen
-    ? await Promise.all([
-        session.db.list(activityTypes, {
-          orderBy: [
-            asc(activityTypes.family),
-            asc(activityTypes.position),
-            asc(activityTypes.label),
-          ],
-        }),
-        session.db.list(approaches, {
-          orderBy: [asc(approaches.position), asc(approaches.label)],
-        }),
-      ])
+    ? await listActivityFormOptions(session.db)
     : null;
 
   return (
     <>
       {panelOptions ? (
+        /* L'action est liée **côté serveur** au projet courant, comme
+           `updateProject` l'est dans `/projets/[id]/modifier` : l'identifiant
+           sort ainsi de la saisie, et le panneau ne connaît pas le projet dans
+           lequel il écrit. Ce n'est pas pour autant un verrou — Next sérialise
+           l'argument lié dans un champ `$ACTION_…`, réécrivable. Le verrou est
+           dans l'action, qui interroge `writeProject` sur l'identifiant reçu ;
+           un panneau absent du rendu n'a jamais protégé le point d'entrée HTTP
+           qui l'accompagne. */
         <ActivityPanel
           projectName={project.name}
           closeHref={ROUTES.project(project.id)}
-          activityTypes={panelOptions[0].map((row) => ({
-            id: row.id,
-            label: row.label,
-            family: row.family,
-          }))}
-          approaches={panelOptions[1].map((row) => ({
-            id: row.id,
-            label: row.label,
-          }))}
+          action={createActivity.bind(null, project.id)}
+          activityTypes={panelOptions.activityTypes}
+          approaches={panelOptions.approaches}
         />
       ) : null}
 
