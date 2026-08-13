@@ -27,10 +27,11 @@ export type NavEntry = {
  * rien ne promet encore de slug — ce choix revient à C2, avec l'écran qui
  * construit le lien.
  *
- * `productNew` est un segment statique sous `/produits`, là où `product` est
- * dynamique : Next donne la priorité au statique, et `isUuid` rattraperait de
- * toute façon en 404. Les formulaires ne figurent pas dans `MAIN_NAV` — un
- * formulaire n'est pas une destination de navigation.
+ * `productNew` et `projectNew` sont des segments statiques sous `/produits` et
+ * `/projets`, là où `product` et `project` sont dynamiques : Next donne la
+ * priorité au statique, et `isUuid` rattraperait de toute façon en 404. Les
+ * formulaires ne figurent pas dans `MAIN_NAV` — un formulaire n'est pas une
+ * destination de navigation.
  */
 export const ROUTES = {
   overview: "/",
@@ -40,6 +41,16 @@ export const ROUTES = {
   productEdit: (id: string) => `/produits/${id}/modifier`,
   projects: "/projets",
   project: (id: string) => `/projets/${id}`,
+  projectNew: "/projets/nouveau",
+  /**
+   * La même route, le produit pré-sélectionné. Un accompagnement se crée
+   * depuis le produit qu'il accompagne : le rattachement est alors connu, et
+   * le formulaire n'a pas à le redemander. Le paramètre reste une **suggestion**
+   * — l'écran le confronte au domaine avant de le croire.
+   */
+  projectNewForProduct: (productId: string) =>
+    `/projets/nouveau?produit=${productId}`,
+  projectEdit: (id: string) => `/projets/${id}/modifier`,
   about: "/a-propos",
 } as const;
 

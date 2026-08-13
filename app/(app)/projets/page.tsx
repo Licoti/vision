@@ -17,6 +17,9 @@
  * affiché : inventer un libellé à partir d'un paramètre serait donner du
  * crédit à ce qu'on n'a pas lu.
  *
+ * **« Nouvel accompagnement » n'apparaît qu'au responsable de domaine**
+ * (F1-D1, D9) : l'action est absente du rendu pour tout autre, pas grisée.
+ *
  * Aucune requête directe : tout passe par `session.db`, déjà scopé sur le
  * domaine courant. Règle 1.
  */
@@ -136,6 +139,7 @@ export default async function ProjectsPage({
       <PageHeader
         title="Projets"
         lead="Quels accompagnements existent en ce moment, tous produits confondus ?"
+        action={session.can.manageDomain ? <NewProjectLink /> : null}
       />
 
       {hasOptions ? (
@@ -268,9 +272,25 @@ export default async function ProjectsPage({
         <EmptyState
           title="Aucun accompagnement pour l'instant"
           description="Cette liste réunira tous les accompagnements, tous produits confondus — une lecture transverse de ce que fait le centre. Chaque ligne portera son produit de rattachement, cliquable, pour que la hiérarchie reste à portée."
+          {...(session.can.manageDomain
+            ? { action: <NewProjectLink /> }
+            : {})}
         />
       )}
     </Page>
+  );
+}
+
+/** L'action de création. Rendue par l'appelant, et lui seul, sous condition
+ *  de droit — ce composant n'en connaît aucun. */
+function NewProjectLink() {
+  return (
+    <Link
+      href={ROUTES.projectNew}
+      className="rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale"
+    >
+      Nouvel accompagnement
+    </Link>
   );
 }
 

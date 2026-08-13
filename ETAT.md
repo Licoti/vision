@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** T2.5 terminé
-**Chantier en cours :** C2 — Produits et projets
-**Ticket en cours :** aucun — prochain à lancer : T2.6 (création et édition d'un projet)
+**Dernière mise à jour :** T2.6 terminé — **C2 est terminé**
+**Chantier en cours :** aucun — C2 est clos
+**Ticket en cours :** aucun — prochain chantier : C3 (activités et roadmap), **à découper**
 
 ---
 
@@ -13,7 +13,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | Chantier | Tickets | État |
 |---|---|---|
 | C1 — Socle technique | T1.1 → T1.6 | **terminé** |
-| C2 — Produits et projets | T2.1 → T2.6 | en cours — T2.1 à T2.5 faits |
+| C2 — Produits et projets | T2.1 → T2.6 | **terminé** |
 | C3 — Activités et roadmap | à découper | à faire |
 | C4 — Ressources et résultats | à découper | à faire |
 | C5 — Indicateurs et temps long | à découper | à faire |
@@ -189,6 +189,41 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   deux des défauts de lecture du HTML et non du code. Écarts assumés et consignés : `action` sur
   `PageHeader`, deux routes dans `ROUTES`, et le fichier de tests.
 
+- **T2.6 — 13/08/2026 — création et édition d'un projet.** Le ticket qui clôt C2, et le premier
+  qui écrit **cinq tables** là où T2.5 en écrivait une. **Le critère est tenu et lu dans le HTML
+  servi** : un accompagnement créé sur « Espace client web » apparaît aussitôt sur sa page produit,
+  en tête de la chronologie, et dans la liste transverse, dont le compteur passe de 3 à 4 projets ;
+  la liste des produits passe de 2 à 3 accompagnements pour ce produit — c'est elle qui a imposé un
+  `revalidatePath` de plus, une liste de produits affichant un compte de projets. Le parcours
+  entier a été joué **sans une ligne de JavaScript**, par soumissions `multipart` reconstituées :
+  création, quatre éditions, et une re-soumission **à l'identique** qui ne crée aucun doublon de
+  liaison ni de personne — le diff est idempotent, relu en base. Quatre arbitrages rendus avec
+  l'humain avant écriture : l'ajout manuel d'une personne est implémenté — D9 écarte la création à
+  la volée d'un **projet**, pas d'une personne, et D19 décrit exactement ce cas ; l'équipe se
+  saisit en une valeur par personne plutôt qu'en deux cases, ce qui rend l'état « contributeur sans
+  être membre » **inatteignable** au lieu de le rattraper ; la période se saisit au jour et se lit
+  au mois, `input type="month"` n'existant pas sous Firefox ; et l'entrée depuis la page produit
+  pré-sélectionne le rattachement. Le droit a été éprouvé par l'action et pas par l'écran : champs
+  récoltés chez Camille Roux, **repostés sous le cookie de Léa Fontaine** — refus rendu, zéro
+  projet et zéro personne créés, contrôlé en base ; les deux routes lui répondent 404 et aucune
+  adresse de formulaire ne fuit dans ses trois écrans. Sept refus éprouvés séparément — nom vide,
+  produit absent, statut absent, fin antérieure au début, date impossible (`2026-02-31`), métier
+  puis personne d'un autre domaine —, et dans les sept cas la saisie revient dans le formulaire.
+  Les 45 tests ajoutés ne touchent aucune base et ont été **mis en défaut un à un** : la règle du
+  nom retirée fait tomber 5 tests, l'aller-retour de `isIsoDay` 3, `valueOrNull` 2,
+  `parseProjectForm` rendant une ligne malgré les erreurs 2, et **un seul** pour chacune des cinq
+  autres — l'ordre des dates, le dédoublonnage des cases, la forme du produit, le filtre `none` de
+  l'équipe, le rôle du bloc d'ajout. Le contraste a été mesuré sur les neuf couples du formulaire
+  et **aucune correction n'en est sortie** — c'était le but : le formulaire ne reprend que des
+  couples déjà mesurés en T2.3 et T2.5. Une généricité a été écrite puis retirée avant livraison :
+  une fonction commune à `project_jobs` et `project_approaches` ne compilait qu'au prix d'un
+  `as never`, et deux fonctions jumelles de quinze lignes valent mieux qu'une affirmation de type.
+  Deux points ouverts se referment : le commanditaire est **vu peuplé** pour la première fois, et
+  la suppression réelle d'une ligne de liaison est confirmée au premier écran qui retire un membre.
+  Écart de périmètre assumé et consigné, contre le plan annoncé : `lib/queries/projects.ts` a été
+  touché — les deux écrans font les mêmes six lectures, et les dupliquer aurait installé la
+  divergence. Les autres écarts : trois entrées dans `ROUTES`, et le fichier de tests.
+
 ---
 
 ## Points ouverts
@@ -211,20 +246,21 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   de la couleur. La page produit et la liste transverse continuent d'afficher tous les membres à
   l'identique : leurs lectures ne remontent pas `persons.kind`, et le faire aurait débordé du
   ticket — arbitrage rendu avec l'humain. À reprendre au premier ticket qui touche à ces deux
-  listes.
-- **Le commanditaire est vide sur toute la fixture.** `docs/06` §5 l'attend dans l'en-tête, T2.4
-  l'affiche, et il affiche « Non renseigné » sur les trois projets : le brief ne nomme aucun
-  commanditaire et l'amorçage laisse `sponsor` nul. La maquette, elle, montre « Marc Tellier
-  (entité) ». Le champ n'a donc jamais été vu peuplé. À trancher avec T2.6, l'écran qui le saisit,
-  ou par un commanditaire fourni pour l'amorçage.
+  listes. **T2.6 rejoint la page projet** : son formulaire écrit « · côté entité » à côté du nom,
+  le texte ne dépendant jamais de la couleur. Deux écrans sur quatre le disent désormais.
+- ~~**Le commanditaire est vide sur toute la fixture.**~~ **Refermé par T2.6**, par l'écran et non
+  par l'amorçage : le formulaire saisit `sponsor` (D6, texte libre), et le projet créé en
+  vérification affiche « Hélène Vasseur » dans son en-tête. `scripts/seed.ts` n'est pas touché —
+  les trois projets du brief n'ont toujours pas de commanditaire, et le brief n'en nomme aucun.
 - **Le design system n'a ni jeton de bordure de contrôle, ni jeton de bordure d'erreur.** Le plus
   sombre des `border-*`, `border-default`, ne dépasse pas 1,2:1 sur le fond de page, là où la
   limite d'un composant d'interface se mesure à 3:1 ; et aucun `border-danger-*` n'existe. T2.3 a
   retenu `content-neutral-normal` (3,88:1 mesuré) pour les champs de sa barre de filtres, T2.5 a
   repris ce choix pour les quatre contrôles du formulaire de produit et y a ajouté
   `content-danger-base` (5,19:1 mesuré) pour un champ en erreur — deux jetons de contenu employés
-  comme bordures. À faire remonter à qui maintient le design system ; d'ici là, tout nouveau
-  formulaire reprend ces deux choix.
+  comme bordures. T2.6 a repris ces deux mêmes choix sans en inventer un troisième, et c'était le
+  but : ses neuf couples de couleurs sont tous des couples déjà mesurés. À faire remonter à qui
+  maintient le design system ; d'ici là, tout nouveau formulaire reprend ces deux choix.
 - **Les filtres ne survivent pas à un aller-retour par la navigation principale.** `docs/06` §9
   demande qu'ils soient conservés quand on entre dans un projet et qu'on revient. Ils vivent dans
   l'URL, donc le retour navigateur les restitue ; un clic sur « Projets » dans la barre latérale
@@ -240,7 +276,9 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   désormais un ticket à lui, en C7 au plus tard, qui traitera l'archivage d'un produit et d'un
   projet ensemble — le geste, sa confirmation, et l'affichage d'une ligne archivée là où elle
   reste lisible. Noter que `find` rend les lignes archivées : `/produits/{id}/modifier` ouvrirait
-  aujourd'hui le formulaire d'un produit archivé.
+  aujourd'hui le formulaire d'un produit archivé. **T2.6 met le projet dans le même cas** :
+  `/projets/{id}/modifier` ouvrirait celui d'un projet archivé, et sa fiche ne mentionnait pas
+  davantage l'archivage — arbitrage rendu avec l'humain, périmètre tenu.
 
 - **Le type d'un produit ne se voit sur aucun écran de lecture.** T2.5 saisit `kind` — « Produit
   accompagné » ou « Mission transverse » (D10) — mais la liste des produits, la page produit et la
@@ -254,6 +292,23 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   valeur ne figurerait dans aucune option et le formulaire exigerait un nouveau choix plutôt que
   de conserver en douce un rattachement archivé. Le comportement est défendable mais **n'a pas été
   éprouvé** : aucun écran n'archive une entité (D25, C7) et l'amorçage n'en archive aucune.
+  **T2.6 étend le cas au produit** : un projet rattaché à un produit archivé verrait son
+  rattachement absent des options. Noter la nuance retenue au passage — dans le même formulaire,
+  les entités servant à **décrire** un produit sont lues archivées comprises, parce qu'on ne
+  choisit pas une entité, on la lit. Décrire et proposer n'appellent pas le même filtre.
+
+- **La création d'un projet n'est pas atomique, et ne peut pas l'être.** `neon-http` n'a pas de
+  transaction interactive — la couche n'a que `batch`. Le formulaire écrit `persons`, `projects`
+  puis trois tables de liaison : une écriture refusée en cours de route laisserait les précédentes.
+  La parade de T2.6 est de tout confronter au domaine **avant** d'écrire, si bien que la fenêtre
+  résiduelle se limite à une ligne supprimée entre la vérification et l'écriture. Acceptable au
+  POC. À reprendre le jour où la couche exposera une transaction — ou plus tôt, si un formulaire
+  plus large arrive en C3.
+
+- **On n'ajoute qu'une personne par enregistrement.** Sans JavaScript, un champ répétable n'existe
+  pas : le bloc d'ajout de T2.6 crée une personne, et pour en ajouter deux il faut enregistrer puis
+  rouvrir le formulaire. La limite est écrite dans l'écran. Elle tombera avec l'écran
+  d'administration des personnes (D25, C7).
 - **Une activité `in_progress` porte une fin de période à venir.** La fraîcheur retient
   `max(coalesce(period_end, period_start))` : pour l'atelier en cours du mois d'août, c'est le
   31 août. Au mois, l'affichage dit « août 2026 » et reste juste. Le jour où une date au jour
@@ -261,14 +316,16 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 - **Rien n'empêche techniquement un import direct de `lib/db/client`.** Le verrou ESLint a été
   écarté du périmètre de T1.3. La règle 1 tient aujourd'hui par la convention, l'en-tête de
   `client.ts` et un `grep`. À reposer si un import sauvage apparaît.
-- **Les tables de liaison se suppriment pour de bon.** Elles ne portent pas d'`archived_at` : la
-  couche expose `unlink`, une vraie suppression, réservée à elles par le typage. C'est une
-  conséquence de T1.2, pas un choix de T1.3. À confirmer au premier écran qui retire un membre
-  d'un projet.
+- ~~**Les tables de liaison se suppriment pour de bon.**~~ **Confirmé par T2.6**, l'écran annoncé :
+  retirer un membre, un métier ou une approche d'un projet appelle `unlink`, une vraie suppression
+  de ligne, et c'est le comportement voulu — une désignation défaite n'est pas une donnée métier
+  qu'on range, c'est un lien qui n'existe plus. La règle 4 tient parce que le typage réserve
+  `unlink` aux tables sans `archived_at`.
 - **Un projet archivé est-il en lecture seule ?** Rien ne le dit dans `docs/`. T1.4 n'a pas
   tranché : un contributeur désigné d'un projet archivé garde son droit d'écriture. À régler avec
   le ticket d'archivage ci-dessus, et non plus « en C2 » : T2.5 n'a pas archivé, et T2.6 ne
-  l'archivera pas non plus — sa fiche ne le mentionne pas davantage.
+  l'a pas archivé non plus — sa fiche ne le mentionnait pas davantage. À régler avec le ticket
+  d'archivage, en C7 au plus tard.
 - **Le domaine courant est le premier domaine actif trouvé en base.** Pas de variable
   d'environnement : `docs/05` §3 pose un domaine unique. Le jour où un second domaine existe, le
   choix devient un vrai choix et revient au fournisseur d'identité.
@@ -288,6 +345,15 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   produit sous l'ancien nom, et modifier sa description ou son entité sans le renommer les remet à
   la valeur du fichier. Sans conséquence en production, où l'amorçage ne tourne pas ; à garder en
   tête sur la base de développement, et à revoir avec l'écran de gestion des référentiels (D25, C7).
+
+- **La base de développement porte un accompagnement de plus depuis T2.6.** « Refonte de l'espace
+  documents », sur « Espace client web », créé en vérification et **conservé** : il porte trois
+  choses que la fixture n'avait pas — un commanditaire renseigné, une personne `source = manual`
+  créée depuis l'interface (Nadia Berthier), et un troisième accompagnement sur ce produit. Il a
+  été ramené par le formulaire à son produit et à son équipe d'origine après les essais de
+  changement de produit. **Conséquence à connaître** : les critères de T2.1 à T2.4 se lisaient sur
+  « 2 accompagnements » pour ce produit ; ils s'y liraient désormais sur 3. `npm run db:seed` ne le
+  retirera pas — l'amorçage ignore ce qu'il n'a pas semé.
 - **Deux secrets Neon ont transité en clair dans la conversation**, les 12/08/2026 — la base de
   développement, puis la branche de test. Ils ne sont que dans `.env.local`, hors dépôt, mais à
   faire tourner si ces transcripts quittent le poste.

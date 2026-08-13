@@ -695,3 +695,157 @@ maquette ne la prévoit pas, et les deux en-têtes divergeraient sur la même fo
 `productNew` et `productEdit`, le module tenant toutes les adresses depuis T1.6 ; et
 `lib/forms/product.test.ts`, comme à chaque ticket depuis T1.3 — à ceci près qu'il est le premier
 fichier de tests du projet à ne toucher aucune base, la validation ayant été isolée pour cela.
+
+---
+
+**T2.6 — D9 dit « pas de création à la volée », la fiche dit « ajout manuel possible ».** La
+contradiction est apparente : D9 énonce que **le responsable de domaine crée produits et projets,
+puis désigne les contributeurs** — la création à la volée qu'il écarte est celle d'un produit ou
+d'un projet par qui n'a pas ce droit, pas celle d'une personne. D19 tranche l'autre moitié : « une
+personne peut être référencée sans compte : `source = manual`, `has_access = false` ». Le
+formulaire crée donc des lignes `persons`, et c'est exactement le cas que D19 décrit — le chef de
+projet côté entité qui figure dans l'équipe et n'aura jamais de compte. Arbitrage rendu avec
+l'humain avant écriture. Sans lui, l'équipe d'un accompagnement neuf se serait limitée aux huit
+personnes de l'amorçage : **aucun autre écran n'en ajoute** avant l'administration (D25, C7).
+
+**T2.6 — L'équipe se saisit en une valeur par personne, pas en deux cases.** `project_members`
+porte `is_contributor`, ce qui appelait naturellement une case « membre » et une case
+« contributeur ». Retenu à la place : un `select` à trois valeurs — « Pas dans l'équipe » /
+« Membre » / « Contributeur ». La raison n'est pas esthétique : deux cases autorisent l'état
+« contributeur sans être membre », qui n'existe pas en base et qu'il aurait fallu rattraper à la
+validation. Une seule valeur rend l'état incohérent **inatteignable** plutôt que corrigé.
+Arbitrage rendu avec l'humain. D9 s'y lit en toutes lettres : appartenir à l'équipe et pouvoir y
+écrire sont deux choses distinctes, et le formulaire le dit sous le bloc.
+
+**T2.6 — Cinq tables écrites, aucune transaction : la parade est de vérifier avant d'écrire.**
+`neon-http` n'a pas de transaction interactive — `lib/db/scoped.ts` le note depuis T1.3, il n'a que
+`batch`. Un formulaire qui écrit `persons`, `projects`, `project_jobs`, `project_approaches` et
+`project_members` ne peut donc pas être atomique : une référence refusée à la troisième écriture
+laisserait les deux premières en base. `checkReferences` confronte donc **tout** au domaine avant
+la moindre écriture — produit, statut, métiers, approches, personnes —, si bien
+qu'`assertPreconditions` devient un second filet et non le premier. La fenêtre résiduelle n'est pas
+nulle : une ligne supprimée entre la vérification et l'écriture la rouvrirait. Elle est jugée
+acceptable au POC, et elle se refermera le jour où la couche exposera une transaction. **Le second
+filet est branché** : un `DomainScopeError` remonte en message de formulaire, pas en page d'erreur.
+
+**T2.6 — L'édition d'un projet est un diff, pas un `update`.** Trois tables de liaison rendent
+l'écriture asymétrique : ce qui a disparu se délie (`unlink`), ce qui apparaît se lie
+(`insertMany`), et un membre qui change de rôle voit sa ligne **modifiée**, pas refaite — refaire
+la ligne perdrait son `created_at` et son `created_by` pour un changement de booléen. `unlink` est
+une vraie suppression, ce que la règle 4 tolère précisément parce que le typage la réserve aux
+tables sans `archived_at` : le point ouvert de T1.3 — « à confirmer au premier écran qui retire un
+membre d'un projet » — est refermé ici, et dans le sens prévu.
+
+**T2.6 — `syncJobs` et `syncApproaches` sont deux fonctions jumelles, délibérément.** Une fonction
+générique sur `project_jobs` et `project_approaches` a été écrite puis retirée : les deux tables
+ont la même forme mais pas la même colonne, et Drizzle ne réduit pas un `T` non résolu — la version
+générique ne compilait qu'au prix d'un `as never` sur les lignes insérées. Deux fonctions de
+quinze lignes valent mieux qu'une affirmation de type, pour la raison exposée en T2.5 à propos
+du `as` sur `kind`.
+
+**T2.6 — La période se saisit au jour et se lit au mois.** D13 pose la lecture au mois, et
+`formatPeriod` la tient partout. `input type="month"` aurait fait coïncider saisie et affichage,
+mais Firefox ne l'implémente pas et retombe sur un champ texte libre, qu'il aurait fallu valider à
+la main. Deux `input type="date"` sont retenus : contrôle natif partout, et la colonne est en
+`date` — la valeur y va telle quelle. On saisit donc plus fin qu'on n'affiche, et c'est assumé.
+Arbitrage rendu avec l'humain.
+
+**T2.6 — L'ordre des deux dates est une règle de formulaire, que la base ne porte pas.** Aucun
+`CHECK` de `projects` n'interdit une fin antérieure au début — vérifié dans `schema.ts`. La règle
+vit donc dans `lib/forms/project.ts` et nulle part ailleurs, ce qui veut dire qu'une écriture par
+un autre chemin y échapperait. Elle compare deux chaînes `YYYY-MM-DD`, qui s'ordonnent
+lexicographiquement comme elles s'ordonnent dans le temps. Elle ne s'applique pas quand l'une des
+deux dates est déjà refusée, sans quoi son message masquerait celui de la date impossible — un test
+tient cette précédence.
+
+**T2.6 — Une date bien formée n'est pas une date qui existe.** `2026-02-31` satisfait le motif
+`\d{4}-\d{2}-\d{2}` et PostgreSQL le refuse : ce serait une exception là où l'on attend un message
+de champ, le même piège que celui de `lib/uuid.ts` pour les identifiants. `isIsoDay` fait donc
+l'aller-retour par `Date` et compare la chaîne rendue à celle reçue — seul moyen de voir que le
+31 février s'est déplacé au 3 mars. Vérifié en HTTP : la date impossible revient en message de
+champ, pas en 500.
+
+**T2.6 — Les cases à cocher sont dédoublonnées à la lecture du formulaire.** `project_jobs` et
+`project_approaches` portent une contrainte d'unicité sur le couple projet/valeur. Deux cases de
+même valeur — qu'un formulaire reconstitué à la main produit sans peine — feraient échouer
+l'insertion **entière**, donc un projet créé sans ses métiers. Le `Set` est dans `fields()`, au
+plus près de la lecture.
+
+**T2.6 — L'entité est écrite dans le libellé de chaque produit, faute de pouvoir la suivre sans
+JavaScript.** `docs/06` et la fiche demandent une entité « déduite du produit ». La montrer dans un
+champ à part supposerait de réagir au changement du `select`, donc un état client, donc un écran
+qui ne fonctionne plus sans JavaScript. Chaque option porte donc « Produit — Entité », et une note
+dit d'où l'entité vient. Le compromis est visible : l'entité se lit dans une liste déroulante
+plutôt que sous elle.
+
+**T2.6 — Les entités du libellé sont lues **archivées comprises**, et elles seules.** Partout
+ailleurs la couche écarte les lignes archivées, et c'est ce qu'il faut pour une valeur proposée au
+choix. Ici l'entité n'est pas choisie : elle décrit un produit qui, lui, est proposé. Un produit
+rattaché à une entité archivée doit continuer de dire de quelle entité il relève plutôt que de
+s'afficher amputé. C'est l'inverse du cas relevé par T2.5 sur le formulaire de produit, et pour la
+raison qui les distingue : proposer ou décrire.
+
+**T2.6 — Une seule personne ajoutée par enregistrement.** Sans JavaScript, un champ répétable
+n'existe pas : le bloc d'ajout porte un nom, un rattachement et un rôle, et il en crée une. Pour en
+ajouter deux, on enregistre puis on rouvre le formulaire. La limite est dite dans l'écran, pas
+seulement ici. Elle tombera avec l'écran d'administration des personnes (D25, C7).
+
+**T2.6 — Le formulaire est le troisième composant client du projet, et il fonctionne sans une
+ligne de JavaScript.** **Vérifié, pas supposé** : le parcours complet — création, puis quatre
+éditions dont un changement de produit — a été joué par soumissions `multipart` reconstituées à
+partir des champs `$ACTION_REF_1`, `$ACTION_1:0`, `$ACTION_1:1` et `$ACTION_KEY` que la page sert.
+Une re-soumission **à l'identique** du formulaire d'édition, sérialisé comme un navigateur le
+ferait, ne crée aucun doublon de liaison ni de personne — le diff est idempotent, relu en base.
+
+**T2.6 — Un contributeur ne franchit ni la route ni l'action.** Les deux routes rendent 404 pour
+Léa Fontaine, et aucune adresse de formulaire ne figure dans le rendu de ses trois écrans —
+`/projets`, la page projet, la page produit. Le verrou qui compte reste le second : les champs
+d'action récoltés sur la page servie à Camille Roux, **repostés sous le cookie de Léa**, rendent le
+refus, et la base ne bouge pas — zéro projet, zéro personne créés, contrôlé en base. La réponse
+HTTP est un 404, la page qui rend l'action étant elle-même interdite ; le message de refus, lui,
+vient bien de l'action.
+
+**T2.6 — Le rang d'accompagnement et les compteurs suivent un changement de produit.** Déplacer le
+projet d'essai de « Espace client web » vers « Déclaration de sinistre en ligne » (D20) fait passer
+le premier de 3 à 2 accompagnements et le second de 1 à 2, sur la page produit **comme** dans la
+liste des produits, et le fil d'Ariane de la page projet suit. C'est ce que coûte le
+`revalidatePath` sur l'**ancien** produit, lu avant l'écriture : sans lui, l'ancienne page produit
+continuerait d'afficher un accompagnement parti ailleurs.
+
+**T2.6 — Contraste mesuré avant d'être cru, sur les neuf couples du formulaire.** Aucune correction
+n'en est sortie, pour une raison qui mérite d'être dite : le formulaire ne reprend que des couples
+déjà mesurés en T2.3 et T2.5, et c'était le but. Les mesures, relevées à nouveau : bordure de
+contrôle `content-neutral-normal` 3,88:1 sur `surface-neutral-pale` et 3,95:1 sur le fond de page,
+bordure d'erreur `content-danger-base` 5,19:1, nom d'une personne `content-neutral-darkest`
+17,87:1, mention « côté entité » `content-neutral-dark` 8,12:1, notes `content-neutral-base`
+5,07:1, pastille de case `surface-primary-base` 13,65:1. À noter : le `select` d'équipe a le même
+fond que le bloc qui le porte — c'est sa **bordure** qui le délimite, et c'est elle qu'il fallait
+mesurer à 3:1. L'ordre de tabulation est lu dans le rendu et suit l'ordre visuel, sans un seul
+`tabindex` : produit, nom, objectif, statut, les deux dates, commanditaire, les six métiers, les
+sept approches, les neuf personnes, le bloc d'ajout, puis « Créer » et « Annuler ».
+
+**T2.6 — Le commanditaire est vu peuplé pour la première fois.** Le point ouvert d'`ETAT.md` le
+notait vide sur toute la fixture depuis T2.4, et renvoyait l'arbitrage à ce ticket. Il est tranché
+par l'écran plutôt que par l'amorçage : le formulaire le saisit (D6, texte libre), et un projet
+créé en vérification affiche « Hélène Vasseur » dans son en-tête. `scripts/seed.ts` n'est pas
+touché — les trois projets du brief n'ont toujours pas de commanditaire, et le brief n'en nomme
+aucun.
+
+**T2.6 — Le projet d'essai est resté dans la base de développement, remis en état cohérent.**
+T2.5 avait retiré le sien par un script jetable ; celui-ci est conservé, parce qu'il porte trois
+choses que la fixture n'avait pas — un commanditaire renseigné, une personne `source = manual`
+créée depuis l'interface, et un troisième accompagnement sur « Espace client web ». Il a été
+ramené par le formulaire lui-même à son produit et à son équipe d'origine après les essais de
+changement de produit. **Conséquence à connaître** : les critères de T2.1 à T2.4 se lisaient sur
+« 2 accompagnements » pour ce produit ; ils s'y liraient désormais sur 3. Un `npm run db:seed` ne
+le retirera pas — l'amorçage rapproche par clé naturelle et ignore ce qu'il n'a pas semé.
+
+**T2.6 — Écart de périmètre : `lib/queries/projects.ts` a été touché, contre le plan annoncé.**
+Le plan le déclarait explicitement non touché, au motif qu'aucune jointure n'était nécessaire. Le
+motif tient — `listProjectFormOptions` et `findProjectLinks` n'appellent pas `joinedRead` et s'en
+tiennent à `list` —, mais la conclusion ne tenait pas : les deux écrans de saisie font les **mêmes**
+six lectures, et les laisser se dupliquer dans deux fichiers de route revenait à installer la
+divergence. Elles vivent donc dans le module des lectures de projet, dont l'en-tête dit désormais
+que toutes ne joignent pas. Les autres écarts : `ROUTES` gagne `projectNew`, `projectNewForProduct`
+et `projectEdit` ; et `lib/forms/project.test.ts`, comme à chaque ticket depuis T1.3 — quarante-
+cinq tests qui ne touchent aucune base, le second fichier du projet dans ce cas après celui de T2.5.

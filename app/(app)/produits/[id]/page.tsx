@@ -12,8 +12,9 @@
  * 404 : la seconde réponse ne se distingue pas de la première, et c'est
  * volontaire.
  *
- * **« Modifier ce produit » n'apparaît qu'au responsable de domaine**
- * (F1-D1, D9) : l'action est absente du rendu pour tout autre, pas grisée.
+ * **« Modifier ce produit » et « Nouvel accompagnement » n'apparaissent qu'au
+ * responsable de domaine** (F1-D1, D9) : les actions sont absentes du rendu
+ * pour tout autre, pas grisées.
  *
  * Aucune requête directe : tout passe par `session.db`, déjà scopé sur le
  * domaine courant. Règle 1.
@@ -69,12 +70,15 @@ export default async function ProductPage({
           {...(product.description ? { lead: product.description } : {})}
           action={
             session.can.manageDomain ? (
-              <Link
-                href={ROUTES.productEdit(product.id)}
-                className="rounded-lg border border-content-neutral-normal px-4 py-2 text-sm font-semibold text-content-neutral-dark"
-              >
-                Modifier ce produit
-              </Link>
+              <span className="flex flex-wrap items-center gap-3">
+                <Link
+                  href={ROUTES.productEdit(product.id)}
+                  className="rounded-lg border border-content-neutral-normal px-4 py-2 text-sm font-semibold text-content-neutral-dark"
+                >
+                  Modifier ce produit
+                </Link>
+                <NewProjectLink productId={product.id} />
+              </span>
             ) : null
           }
         />
@@ -124,10 +128,32 @@ export default async function ProductPage({
             <EmptyState
               title="Aucun accompagnement pour l'instant"
               description="Les accompagnements de ce produit s'afficheront ici, du plus récent au plus ancien, chacun avec sa période, son statut, son objectif et son équipe."
+              {...(session.can.manageDomain
+                ? { action: <NewProjectLink productId={product.id} /> }
+                : {})}
             />
           )}
         </section>
       </Page>
     </>
+  );
+}
+
+/**
+ * L'action de création d'un accompagnement, le produit déjà désigné.
+ *
+ * C'est le chemin canonique : un accompagnement se crée depuis le produit
+ * qu'il accompagne, et le rattachement — obligatoire (D4) — n'a alors pas à
+ * être redemandé. Rendue par l'appelant, et lui seul, sous condition de droit :
+ * ce composant n'en connaît aucun.
+ */
+function NewProjectLink({ productId }: { productId: string }) {
+  return (
+    <Link
+      href={ROUTES.projectNewForProduct(productId)}
+      className="rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale"
+    >
+      Nouvel accompagnement
+    </Link>
   );
 }

@@ -1,11 +1,16 @@
 /**
- * Les lectures de la liste transverse des projets.
+ * Les lectures des écrans de projet — la liste transverse, la page, et depuis
+ * T2.6 les deux formulaires.
  *
- * Elles joignent, donc elles passent par `joinedRead` — le seul chemin que la
- * couche d'accès ouvre à une jointure. **Toute table jointe porte
- * `filter(table)`**, y compris à l'intérieur des sous-requêtes `exists` :
- * c'est la condition posée par l'en-tête de `joinedRead`, et un oubli serait
- * une fuite de domaine que rien d'autre ne rattraperait.
+ * Celles qui joignent passent par `joinedRead` — le seul chemin que la couche
+ * d'accès ouvre à une jointure. **Toute table jointe porte `filter(table)`**,
+ * y compris à l'intérieur des sous-requêtes `exists` : c'est la condition
+ * posée par l'en-tête de `joinedRead`, et un oubli serait une fuite de domaine
+ * que rien d'autre ne rattraperait.
+ *
+ * Celles du formulaire ne joignent pas, et ne passent donc pas par là : elles
+ * s'en tiennent à `list`, que la couche filtre d'elle-même. C'est le chemin le
+ * plus sûr ; il n'y a aucune raison de le quitter quand il suffit.
  *
  * Ce module n'importe pas `db` : il reçoit un `ScopedDb` déjà lié au domaine
  * courant. Règle 1.
@@ -539,4 +544,128 @@ export function findAccompanimentRank(
     const index = siblings.findIndex((sibling) => sibling.id === project.id);
     return index === -1 ? null : index + 1;
   });
+}
+
+/* ==========================================================================
+   Le formulaire d'un accompagnement
+   ========================================================================== */
+
+/** Un produit de rattachement, avec l'entité qui en découle (D24). */
+export type ProjectFormProduct = {
+  id: string;
+  name: string;
+  entityLabel: string;
+};
+
+/** Une personne du domaine, telle qu'elle se désigne dans une équipe. */
+export type ProjectFormPerson = {
+  id: string;
+  fullName: string;
+  kind: (typeof personKind.enumValues)[number];
+};
+
+/** Tout ce que les deux écrans de saisie proposent au choix. */
+export type ProjectFormOptions = {
+  products: ProjectFormProduct[];
+  statuses: FilterOption[];
+  jobs: FilterOption[];
+  approaches: FilterOption[];
+  people: ProjectFormPerson[];
+};
+
+/**
+ * Les référentiels et les personnes du domaine, pour la création comme pour
+ * l'édition.
+ *
+ * **Aucune jointure** : six lectures scopées, et l'entité de chaque produit
+ * rapprochée en mémoire. C'est ce qui permet à cette fonction de ne pas passer
+ * par `joinedRead` — elle n'en a pas besoin, et le chemin le plus sûr reste
+ * celui que la couche filtre d'elle-même.
+ *
+ * Les entités sont lues **archivées comprises**, et elles seules : le libellé
+ * d'entité est ici descriptif, pas proposé au choix. Un produit rattaché à une
+ * entité archivée doit continuer de dire de quelle entité il relève, plutôt
+ * que de s'afficher amputé — c'est le contraire du cas d'une valeur qu'on
+ * offrirait à la sélection.
+ *
+ * Les référentiels portent un `position` : c'est l'ordre du domaine, et il
+ * prime sur l'alphabet. Le libellé départage.
+ */
+export async function listProjectFormOptions(
+  scope: ScopedDb,
+): Promise<ProjectFormOptions> {
+  const [
+    productRows,
+    entityRows,
+    statusRows,
+    jobRows,
+    approachRows,
+    personRows,
+  ] = await Promise.all([
+    scope.list(products, { orderBy: [asc(products.name)] }),
+    scope.list(entities, { includeArchived: true }),
+    scope.list(projectStatuses, {
+      orderBy: [asc(projectStatuses.position), asc(projectStatuses.label)],
+    }),
+    scope.list(jobs, { orderBy: [asc(jobs.position), asc(jobs.label)] }),
+    scope.list(approaches, {
+      orderBy: [asc(approaches.position), asc(approaches.label)],
+    }),
+    scope.list(persons, {
+      where: eq(persons.isActive, true),
+      orderBy: [asc(persons.fullName)],
+    }),
+  ]);
+
+  const entityLabels = new Map(entityRows.map((row) => [row.id, row.label]));
+
+  return {
+    products: productRows.map((product) => ({
+      id: product.id,
+      name: product.name,
+      entityLabel: entityLabels.get(product.entityId) ?? "entité inconnue",
+    })),
+    statuses: statusRows.map((row) => ({ id: row.id, label: row.label })),
+    jobs: jobRows.map((row) => ({ id: row.id, label: row.label })),
+    approaches: approachRows.map((row) => ({ id: row.id, label: row.label })),
+    people: personRows.map((row) => ({
+      id: row.id,
+      fullName: row.fullName,
+      kind: row.kind,
+    })),
+  };
+}
+
+/**
+ * L'état des liaisons d'un projet, tel que le formulaire le réaffiche.
+ *
+ * Trois lectures scopées, sans jointure : seuls les identifiants comptent —
+ * les libellés sont déjà dans les référentiels chargés à côté.
+ */
+export async function findProjectLinks(
+  scope: ScopedDb,
+  projectId: string,
+): Promise<{
+  jobIds: string[];
+  approachIds: string[];
+  members: { personId: string; isContributor: boolean }[];
+}> {
+  const [jobRows, approachRows, memberRows] = await Promise.all([
+    scope.list(projectJobs, { where: eq(projectJobs.projectId, projectId) }),
+    scope.list(projectApproaches, {
+      where: eq(projectApproaches.projectId, projectId),
+    }),
+    scope.list(projectMembers, {
+      where: eq(projectMembers.projectId, projectId),
+    }),
+  ]);
+
+  return {
+    jobIds: jobRows.map((row) => row.jobId),
+    approachIds: approachRows.map((row) => row.approachId),
+    members: memberRows.map((row) => ({
+      personId: row.personId,
+      isContributor: row.isContributor,
+    })),
+  };
 }

@@ -16,6 +16,11 @@
  * 404 : la seconde réponse ne se distingue pas de la première, et c'est
  * volontaire.
  *
+ * **« Modifier cet accompagnement » n'apparaît qu'au responsable de domaine**
+ * (F1-D1, D9) : l'action est absente du rendu pour tout autre, pas grisée. Un
+ * contributeur désigné écrit dans le projet — activités, ressources — mais ne
+ * modifie pas son identité, qui reste au responsable.
+ *
  * Aucune requête directe : tout passe par `session.db`, déjà scopé sur le
  * domaine courant. Règle 1.
  */
@@ -112,6 +117,16 @@ export default async function ProjectPage({
           <PageHeader
             title={project.name}
             {...(project.objective ? { lead: project.objective } : {})}
+            action={
+              session.can.manageDomain ? (
+                <Link
+                  href={ROUTES.projectEdit(project.id)}
+                  className="rounded-lg border border-content-neutral-normal px-4 py-2 text-sm font-semibold text-content-neutral-dark"
+                >
+                  Modifier cet accompagnement
+                </Link>
+              ) : null
+            }
           />
 
           {/* Le rang **se calcule** (`findAccompanimentRank`), et il mène à la
