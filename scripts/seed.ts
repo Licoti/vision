@@ -858,16 +858,40 @@ async function seed(): Promise<void> {
 
   /* --- Les activités ------------------------------------------------------ */
 
+  /**
+   * La clé d'une activité, telle que la fixture la désigne. `projet · type`
+   * ne suffit pas : C3 rend normal un second Audit UX sur un projet qui
+   * dure, et deux lignes réelles sous la même clé se réconcilieraient en
+   * une seule à l'amorçage suivant — le même piège que celui déjà documenté
+   * pour le renommage d'un produit (`ETAT.md`, points ouverts). La période
+   * distingue la fixture aujourd'hui ; une collision resterait possible à
+   * type et mois identiques, résiduelle et assumée plutôt qu'éliminée.
+   */
+  const activityKey = (
+    project: string,
+    type: string,
+    periodStart?: string | null,
+  ): string =>
+    `${idOf(projectIndex, project, "Projet")}·${idOf(typeIndex, type, "Type d'activité")}·${periodStart ?? "unscheduled"}`;
+
+  /** Retrouve la période d'une activité de `ACTIVITIES` par sa désignation. */
+  const periodOfActivity = (project: string, type: string): string | null => {
+    const activity = ACTIVITIES.find(
+      (row) => row.project === project && row.type === type,
+    );
+    return activity?.periodStart ?? null;
+  };
+
   const activityIndex = await ensureAll(
     scope,
     activities,
     "activities",
-    (row) => `${row.projectId}·${row.activityTypeId}`,
+    (row) => `${row.projectId}·${row.activityTypeId}·${row.periodStart ?? "unscheduled"}`,
     ACTIVITIES.map((activity) => {
       const projectId = idOf(projectIndex, activity.project, "Projet");
       const activityTypeId = idOf(typeIndex, activity.type, "Type d'activité");
       return {
-        key: `${projectId}·${activityTypeId}`,
+        key: activityKey(activity.project, activity.type, activity.periodStart),
         values: {
           projectId,
           activityTypeId,
@@ -880,10 +904,6 @@ async function seed(): Promise<void> {
       };
     }),
   );
-
-  /** La clé d'une activité, telle que la fixture la désigne. */
-  const activityKey = (project: string, type: string): string =>
-    `${idOf(projectIndex, project, "Projet")}·${idOf(typeIndex, type, "Type d'activité")}`;
 
   // Participants : les membres du centre de l'équipe du projet. Le brief ne
   // détaille pas la présence activité par activité — inférence assumée,
@@ -898,7 +918,7 @@ async function seed(): Promise<void> {
       if (!project) return [];
       const activityId = idOf(
         activityIndex,
-        activityKey(activity.project, activity.type),
+        activityKey(activity.project, activity.type, activity.periodStart),
         "Activité",
       );
       return project.team
@@ -923,7 +943,11 @@ async function seed(): Promise<void> {
     RESULTS.map((result) => {
       const activityId = idOf(
         activityIndex,
-        activityKey(result.project, result.activityType),
+        activityKey(
+          result.project,
+          result.activityType,
+          periodOfActivity(result.project, result.activityType),
+        ),
         "Activité",
       );
       return {
@@ -951,7 +975,11 @@ async function seed(): Promise<void> {
         projectId: idOf(projectIndex, resource.project, "Projet"),
         activityId: idOf(
           activityIndex,
-          activityKey(resource.project, resource.activityType),
+          activityKey(
+            resource.project,
+            resource.activityType,
+            periodOfActivity(resource.project, resource.activityType),
+          ),
           "Activité",
         ),
         title: resource.title,

@@ -886,3 +886,26 @@ un libellé, une valeur, une unité et un lien vers l'outil. C'est le résultat 
 §5, que `docs/05` §5 range en C4. Il est nommé en interdit dans T3.2, T3.3 et T3.4 précisément
 parce que la maquette le met sous les yeux du ticket qui écrit le panneau. Conséquence à connaître
 pour C4 : le panneau devra rouvrir, et non être recopié.
+
+**Avant C3 — verrou ESLint posé sur `lib/db/client`.** Écarté du périmètre de T1.3, qui ne tenait
+la règle 1 que par convention, l'en-tête de `client.ts` et un `grep`. `eslint.config.mjs` porte
+désormais `no-restricted-imports`, avec deux exceptions : `lib/db/scoped.ts`, seul module
+applicatif autorisé, et tout fichier `*.test.ts` — quatre en profitent aujourd'hui
+(`scoped.test.ts`, `session.test.ts`, `products.test.ts`, `projects.test.ts`), qui vérifient la
+couche scopée par le client brut, exactement la justification déjà écrite en tête de
+`scoped.test.ts`. Éprouvé, pas seulement déclaré : un import temporaire de `db` depuis
+`lib/queries/products.ts` fait échouer `npm run lint`, retiré ensuite.
+
+**Avant C3 — la clé d'amorçage des activités s'étend à la période.** `projet · type` suffisait tant
+que la fixture ne répétait jamais un type sur un même projet, ce qui est vrai aujourd'hui mais que
+C3 rend faux dans l'usage — un second Audit UX sur un projet qui dure est un cas normal, pas une
+erreur de saisie. Sans la période dans la clé, une telle activité réelle se serait réconciliée avec
+la ligne de fixture voisine au prochain `npm run db:seed`, l'une écrasant l'autre silencieusement —
+le même mécanisme que le piège déjà documenté pour le renommage d'un produit, plus facile à
+déclencher ici. La clé devient `projet · type · période` (`unscheduled` en son absence) ;
+`results` et `resources` ne portant que `projet · type` dans leurs fixtures, la période de
+l'activité correspondante est retrouvée par recherche dans `ACTIVITIES` plutôt que dupliquée dans
+chaque fixture. **Le risque est atténué, pas éliminé** : deux activités réelles du même type sur le
+même projet dans le même mois collisionneraient encore — assumé, comme pour le renommage d'un
+produit, faute d'écran d'administration des référentiels (D25, C7). Rejoué : `npm run db:seed` reste
+sans écriture sur les 12 activités, 33 participants, 2 résultats et 1 ressource existants.

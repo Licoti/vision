@@ -88,7 +88,10 @@ depuis son projet.
 Facultatifs : l'objectif — une phrase, fortement encouragé — et l'approche, une seule (D12).
 **L'état n'est pas saisi : il se déduit de la période** (`docs/06` §9) — période passée, activité
 terminée ; période en cours, activité en cours ; période à venir ou sans date, activité prévue. La
-correction à la main est le geste de T3.5. Enregistrement sans confirmation intermédiaire. Le droit
+correction à la main est le geste de T3.5. **Une activité `in_progress` porte alors une fin de
+période à venir** — au 31 du mois en cours pour une activité créée en août 2026 : l'affichage au
+mois (`docs/06` §9) reste juste, c'est un effet de la dérivation et non une anomalie à corriger.
+Enregistrement sans confirmation intermédiaire. Le droit
 se vérifie dans l'action et pas seulement à l'écran. L'écriture recalcule `last_activity_at`
 (`docs/04` §3, §6). Une saisie refusée revient dans le panneau avec ses valeurs.
 
@@ -112,7 +115,11 @@ projet (`docs/03` §9). Aucun champ de charge ni de durée.
 **Attendu** — Chaque entrée de la roadmap ouvre le panneau pré-rempli. Mêmes champs, mêmes règles,
 même validation qu'à la création : un seul formulaire, deux points d'entrée. Une activité « à
 planifier » qui reçoit une période quitte ce groupe, et une activité datée dont on coche « à
-planifier » y entre — les deux sens, `is_unscheduled` et la période restant cohérents. Le droit et
+planifier » y entre — les deux sens, `is_unscheduled` et la période restant cohérents. **Un type
+d'activité archivé, si l'activité éditée le pointe, reste sélectionné et disparaît des autres
+options** — le même comportement que celui retenu pour une entité ou un produit archivés dans les
+formulaires de T2.5 et T2.6, ici éprouvable pour la première fois puisque `activity_types` porte un
+`archived_at`. Le droit et
 le recalcul de fraîcheur sont ceux de T3.3.
 
 **Validation** — La Formation « à planifier » d'« Autonomie des opérations courantes », datée de
@@ -160,7 +167,9 @@ s'il n'est pas dans le schéma d'états.
 **Attendu** — Champ facultatif du panneau (`docs/03` §4), sur le modèle des membres de projet de
 T2.6 : les personnes viennent de la liste existante, la liaison `activity_participants` se crée et
 se retire, et le retrait est une vraie suppression de ligne — une présence défaite n'est pas une
-donnée métier qu'on range. Les participants s'affichent sur l'entrée de roadmap.
+donnée métier qu'on range. Les participants s'affichent sur l'entrée de roadmap, **avec la mention
+« côté entité » pour une personne de type `external`**, texte et non couleur seule — la règle posée
+par T2.4 et T2.6, reprise ici pour un troisième écran.
 
 **Validation** — Deux participants ajoutés puis un retiré, relu en base. Une re-soumission à
 l'identique ne crée aucun doublon. Une personne d'un autre domaine est refusée par la couche

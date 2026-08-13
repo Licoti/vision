@@ -313,9 +313,10 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   `max(coalesce(period_end, period_start))` : pour l'atelier en cours du mois d'août, c'est le
   31 août. Au mois, l'affichage dit « août 2026 » et reste juste. Le jour où une date au jour
   s'affiche quelque part, la question se repose.
-- **Rien n'empêche techniquement un import direct de `lib/db/client`.** Le verrou ESLint a été
-  écarté du périmètre de T1.3. La règle 1 tient aujourd'hui par la convention, l'en-tête de
-  `client.ts` et un `grep`. À reposer si un import sauvage apparaît.
+- ~~**Rien n'empêche techniquement un import direct de `lib/db/client`.**~~ **Fermé avant C3** :
+  `eslint.config.mjs` porte désormais `no-restricted-imports` sur `lib/db/client`, exception faite
+  de `lib/db/scoped.ts` et des fichiers `*.test.ts` — vérifié en réintroduisant temporairement
+  l'import dans `lib/queries/products.ts`, qui fait échouer `npm run lint`.
 - ~~**Les tables de liaison se suppriment pour de bon.**~~ **Confirmé par T2.6**, l'écran annoncé :
   retirer un membre, un métier ou une approche d'un projet appelle `unlink`, une vraie suppression
   de ligne, et c'est le comportement voulu — une désignation défaite n'est pas une donnée métier
@@ -338,13 +339,20 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 - **Trois des quatre ressources du brief ne sont pas semées.** Seule « Restitution des tests —
   vague 2 » a un rattachement donné. « Grille d'entretien », « Maquettes v3 » et « Rapport d'audit
   d'accessibilité » attendent une ancre — projet, activité, URL — que le brief ne fournit pas.
-- **Renommer un produit ou un référentiel dans l'interface le fera recréer au prochain amorçage.**
-  L'amorçage rapproche par clé naturelle, et le libellé est cette clé — pour les référentiels comme
-  pour `products`, que `scripts/seed.ts` reconnaît par `row.name`. **T2.5 rend ce piège
-  atteignable** : renommer « Espace client web » puis relancer `npm run db:seed` recrée un second
-  produit sous l'ancien nom, et modifier sa description ou son entité sans le renommer les remet à
-  la valeur du fichier. Sans conséquence en production, où l'amorçage ne tourne pas ; à garder en
-  tête sur la base de développement, et à revoir avec l'écran de gestion des référentiels (D25, C7).
+- **Renommer un produit ou un référentiel dans l'interface le fera recréer au prochain amorçage —
+  et la même famille de piège touche désormais les activités.** L'amorçage rapproche par clé
+  naturelle : le libellé pour les référentiels et pour `products`, que `scripts/seed.ts` reconnaît
+  par `row.name`. **T2.5 rend ce piège atteignable** : renommer « Espace client web » puis relancer
+  `npm run db:seed` recrée un second produit sous l'ancien nom, et modifier sa description ou son
+  entité sans le renommer les remet à la valeur du fichier. **Avant C3**, la clé des activités —
+  `projet · type · période` depuis lors, `projet · type` seul avant — a été étendue en prévision :
+  C3 rend normal un second Audit UX sur un projet qui dure, ce que la fixture ne fait jamais mais
+  qu'un contributeur fera. Sans la période, une activité réelle et une ligne de fixture sous la même
+  clé se seraient réconciliées en une seule à l'amorçage suivant, l'une écrasant l'autre. La période
+  atténue le risque, elle ne l'élimine pas : deux activités réelles du même type sur le même projet
+  **dans le même mois** collisionneraient encore. Sans conséquence en production, où l'amorçage ne
+  tourne pas ; à garder en tête sur la base de développement, et à revoir avec l'écran de gestion
+  des référentiels (D25, C7).
 
 - **La base de développement porte un accompagnement de plus depuis T2.6.** « Refonte de l'espace
   documents », sur « Espace client web », créé en vérification et **conservé** : il porte trois
