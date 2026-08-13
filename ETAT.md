@@ -2,10 +2,11 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** C4 découpé en quatre tickets — `tickets-C4.md`. **C3 est terminé, et avec
-lui le POC minimal démontrable (C1 à C3).**
-**Chantier en cours :** C4 — ressources et résultats, découpé, aucun ticket ouvert
-**Ticket suivant :** T4.1 — bloc « Ressources » de la page projet, lecture
+**Dernière mise à jour :** T4.1 terminé — le bloc « Ressources » de la page projet affiche les
+documents rattachés à l'accompagnement, et `components/ui/external-link.tsx` porte la marque de lien
+sortant que T4.3 reprendra.
+**Chantier en cours :** C4 — ressources et résultats, 1 ticket sur 4 terminé
+**Ticket suivant :** T4.2 — relier une ressource
 
 ---
 
@@ -16,7 +17,7 @@ lui le POC minimal démontrable (C1 à C3).**
 | C1 — Socle technique | T1.1 → T1.6 | **terminé** |
 | C2 — Produits et projets | T2.1 → T2.6 | **terminé** |
 | C3 — Activités et roadmap | T3.1 → T3.6 | **terminé** |
-| C4 — Ressources et résultats | T4.1 → T4.4 | découpé, à faire |
+| C4 — Ressources et résultats | T4.1 → T4.4 | **T4.1 terminé**, T4.2 → T4.4 à faire |
 | C5 — Indicateurs et temps long | à découper | à faire |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
@@ -461,6 +462,39 @@ terminés.
   développement est revenue à son état d'avant le ticket** : l'activité de vérification a été
   archivée (règle 4) plutôt que laissée visible, contrairement à T3.3 et T3.5.
 
+- **T4.1 — 13/08/2026 — bloc « Ressources » de la page projet, lecture.** Le premier écran de C4, et
+  le premier bloc de référence de la page projet à porter autre chose qu'une phrase d'attente : la
+  seconde moitié de la boucle minimale de `docs/05` §2 commence par l'écran qui l'affiche. **Le
+  critère est tenu et lu dans le HTML servi**, pas affirmé : sur « Autonomie des opérations
+  courantes », « Restitution des tests — vague 2 » sort avec « PowerPoint · Test utilisateur », le
+  titre en lien sortant `target="_blank" rel="noreferrer"` marqué d'un chevron `aria-hidden` et d'un
+  « (lien externe, nouvel onglet) » en `sr-only` ; sur « Refonte du parcours de virement » et
+  « Dématérialisation de la déclaration », l'état vide s'affiche. Le bloc est **le premier des cinq**
+  — l'ordre lu dans le rendu est Ressources · Indicateurs adoptés · Projets liés · Budget · Journal —
+  et le titre de la ressource **n'apparaît sur aucun autre écran** : zéro occurrence sur les deux
+  autres pages projet, sur la liste transverse et sur la liste des produits. Trois arbitrages rendus
+  avec l'humain avant écriture : l'ordre d'affichage, que la fiche laisse au ticket — **la plus
+  récemment reliée en tête**, `created_at` étant la seule date qu'une ressource porte à l'écran —,
+  le nouvel onglet, et le libellé d'une activité archivée qui **reste affiché**, la règle « on
+  décrit, on ne propose pas » de T3.3 appliquée pour la première fois à une jointure. Les 11 tests
+  ajoutés ont été **mis en défaut neuf fois** : filtre de projet **4** tests, filtre d'archivage
+  **2**, le tri **1**, `filter(resources)` **1**, les `leftJoin` passés en `innerJoin` **5**. **Deux
+  d'entre eux n'existaient pas au premier jet, et l'exercice les a imposés** : retirer
+  `filter(activities)` ou `filter(activityTypes)` ne faisait tomber **aucun** test, la jointure
+  portant sur une clé primaire qu'`assertPreconditions` empêche déjà de pointer hors domaine — ces
+  deux filtres sont **infalsifiables sur des données légitimes**. Deux tests écrivent donc
+  directement par `db`, hors de la couche, ce qu'elle interdit : une ressource du domaine B pointant
+  une activité de A, une activité de B pointant un type de A. La propriété relevée depuis T2.2 s'en
+  trouve vérifiée une sixième fois et **mesurée** : `filter(activities)` retiré seul ne fait toujours
+  rien tomber, son voisin le rattrape ; les deux ensemble font tomber les deux. Le contraste a été
+  **mesuré avant d'être cru** sur les quatre couples de l'écran, et **une correction en est sortie** :
+  le séparateur « · », écrit en `content-neutral-light` par les trois écrans qui en portent un, tombe
+  à 2,22:1 — acceptable entre deux éléments visuellement distincts, illisible ici où les deux côtés
+  ont la même graisse ; il prend la couleur du texte qu'il sépare, **4,98:1**, sans introduire de
+  couple neuf. Le titre en lien sortant donne 6,41:1 et reste souligné. **Aucun écart de périmètre** :
+  les six fichiers de la fiche, et rien d'autre. **La base de développement n'a pas bougé** — le
+  ticket ne pose aucune écriture.
+
 ---
 
 ## Points ouverts
@@ -533,6 +567,12 @@ terminés.
   l'entrée de roadmap, est `content-primary-dark` sur `surface-neutral-pale` — celui d'« Annuler »
   dans le panneau depuis T3.2, **mesuré à 15,72:1**. Le lien est souligné : sa nature ne dépend pas
   de sa couleur.
+  **T4.1 n'ajoute rien à cette liste non plus, mais retire un usage** : le séparateur « · » du bloc
+  « Ressources » n'emploie pas `content-neutral-light` comme les trois écrans qui en portent un
+  (2,22:1 mesuré sur la surface de section), parce qu'il sépare ici deux textes de même graisse ; il
+  prend la couleur du texte, `content-neutral-base`, 4,98:1. Le jeton reste en place ailleurs, entre
+  éléments visuellement distincts — la question à poser au design system est celle d'un **jeton de
+  séparateur**, pas d'une correction des trois écrans existants.
 
 - **La coquille de navigation reste focalisable derrière le voile, sans JavaScript.** Le contenu de
   la page projet porte `inert` quand le panneau est ouvert, mais la barre latérale vit dans
@@ -602,7 +642,11 @@ terminés.
   suppression, et **l'annulation de T3.5 en tient lieu** pour une activité qui ne se fera pas. Mais
   l'annulation n'est pas l'archivage : elle demande un motif et laisse l'activité visible. Une
   activité saisie **par erreur** n'a donc aucun chemin. À joindre au ticket d'archivage déjà
-  attendu en C7 pour le produit et le projet.
+  attendu en C7 pour le produit et le projet. **T4.1 ajoute une conséquence à connaître** : une
+  ressource rattachée à une activité archivée continue d'afficher son libellé — « on décrit, on ne
+  propose pas » —, alors que la roadmap ne montre plus cette activité. Le bloc peut donc nommer un
+  fait que l'écran voisin ne porte plus. Non atteignable par l'interface tant que rien n'archive une
+  activité, éprouvé par un test, et à retrancher avec le même ticket.
 - **La base de développement porte quatre transitions de vérification de plus depuis T3.5, non
   revenues en arrière** (règle 4 : rien de tout cela ne se supprime proprement). Sur « Dématérialisation
   de la déclaration », l'« Audit UX » de septembre 2026 est passé prévue → en cours → **terminée**.

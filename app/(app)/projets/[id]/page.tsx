@@ -3,9 +3,10 @@
  *
  * Sa segmentation obéit à la règle de `docs/06` §5 : **un récit dominant, des
  * blocs de référence autour.** T2.4 pose l'en-tête d'identité, T3.1 branche la
- * roadmap ; les cinq blocs de référence restent des états vides annoncés, dans
- * leur ordre définitif — un bloc vide est un écran à part entière, pas une page
- * incomplète (règle 5).
+ * roadmap, T4.1 le premier des blocs de référence — « Ressources », en tête du
+ * tableau de `docs/06` §5 et jamais avant le récit. Les quatre suivants restent
+ * des états vides annoncés, dans leur ordre définitif — un bloc vide est un
+ * écran à part entière, pas une page incomplète (règle 5).
  *
  * Le fil d'Ariane porte les trois maillons de la hiérarchie, le produit
  * cliquable : un projet ne s'affiche jamais sans son parent (`docs/06` §7).
@@ -49,6 +50,7 @@ import {
   updateActivity,
 } from "./actions";
 import { ActivityPanel } from "@/components/projects/activity-panel";
+import { Resources } from "@/components/projects/resources";
 import { Roadmap } from "@/components/projects/roadmap";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
 import { Avatar } from "@/components/ui/avatar";
@@ -68,19 +70,20 @@ import {
   listProjectRoadmap,
 } from "@/lib/queries/activities";
 import { findAccompanimentRank, findProjectDetail } from "@/lib/queries/projects";
+import { listProjectResources } from "@/lib/queries/resources";
 import { isUuid } from "@/lib/uuid";
 
 export const metadata = {
   title: "Projet — Vision",
 };
 
-/** Les blocs de référence, dans l'ordre de `docs/06` §5 — fréquence d'usage. */
+/**
+ * Les blocs de référence **restants**, dans l'ordre de `docs/06` §5 — fréquence
+ * d'usage. « Ressources » les précédait ici jusqu'à T4.1 ; il porte désormais
+ * son contenu réel et vit dans `components/projects/resources.tsx`, en première
+ * case de la grille.
+ */
 const REFERENCE_BLOCKS: { title: string; description: string }[] = [
-  {
-    title: "Ressources",
-    description:
-      "Les liens vers les documents de l'accompagnement s'afficheront ici, avec leur type et l'activité qui les a produits. Vision n'héberge aucun fichier : elle renvoie vers l'outil qui le porte.",
-  },
   {
     title: "Indicateurs adoptés",
     description:
@@ -145,9 +148,12 @@ export default async function ProjectPage({
   const panelOpen =
     canWrite && (activite === ACTIVITY_PANEL_NEW || activity !== null);
 
-  const [rank, roadmap] = await Promise.all([
+  /* Trois lectures indépendantes, un seul aller-retour : les ressources
+     rejoignent le rang et la roadmap plutôt que d'attendre leur tour (T4.1). */
+  const [rank, roadmap, resources] = await Promise.all([
     findAccompanimentRank(session.db, project),
     listProjectRoadmap(session.db, project.id),
+    listProjectResources(session.db, project.id),
   ]);
 
   /* Les référentiels — dont les personnes, depuis T3.6 — ne sont lus **que**
@@ -341,7 +347,10 @@ export default async function ProjectPage({
             cancelActivity={canWrite ? cancelActivity : null}
           />
 
+          {/* Les blocs de référence, « Ressources » en tête (docs/06 §5). */}
           <div className="grid gap-5 md:grid-cols-2">
+            <Resources resources={resources} />
+
             {REFERENCE_BLOCKS.map((block) => (
               <Section key={block.title}>
                 <SectionHeader title={block.title} />

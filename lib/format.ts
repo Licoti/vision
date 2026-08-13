@@ -6,6 +6,8 @@
  * rien à devenir « du 30 juin 2026 ».
  */
 
+import type { ResourceType } from "@/lib/queries/resources";
+
 const MONTH = new Intl.DateTimeFormat("fr-FR", {
   month: "long",
   year: "numeric",
@@ -134,4 +136,30 @@ export function formatRank(rank: number): string {
 export function formatProjects(count: number): string {
   if (count === 0) return "Aucun projet";
   return `${count} projet${count > 1 ? "s" : ""}`;
+}
+
+/**
+ * Le type d'une ressource, en toutes lettres : « PowerPoint », « PDF », « Lien ».
+ *
+ * Les sept valeurs de l'énuméré `resource_type`, saisies et jamais déduites de
+ * l'URL (D21). Les six premières portent le nom de l'outil tel qu'il s'écrit —
+ * la casse est la sienne, pas la nôtre ; la septième est le cas ouvert, un lien
+ * dont le format n'entre dans aucune des six autres cases.
+ *
+ * Le `Record` est **exhaustif à la compilation** : le jour où l'énuméré
+ * s'allonge, ce fichier ne compile plus tant qu'on ne l'a pas complété. Une
+ * chaîne rendue par défaut aurait laissé passer un type sans libellé.
+ */
+const RESOURCE_TYPES: Record<ResourceType, string> = {
+  powerpoint: "PowerPoint",
+  word: "Word",
+  excel: "Excel",
+  pdf: "PDF",
+  figma: "Figma",
+  sharepoint: "SharePoint",
+  link: "Lien",
+};
+
+export function formatResourceType(type: ResourceType): string {
+  return RESOURCE_TYPES[type];
 }

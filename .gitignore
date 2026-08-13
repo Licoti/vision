@@ -17,3 +17,5 @@ next-env.d.ts
 
 # système
 .DS_Store
+
+.ticket-logs/

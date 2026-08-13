@@ -1482,3 +1482,85 @@ révèle rien — la limite déjà rencontrée par « à planifier » en T3.3, o
 par T3.6. Le résultat se saisit donc dans un panneau à lui, ouvert depuis l'entrée de roadmap. **Ce
 que ce choix coûte** : le geste « je termine mon audit et je pose sa valeur » demande deux ouvertures
 de panneau au lieu d'une. À rouvrir si l'usage montre que la seconde ne se fait jamais.
+
+**T4.1 — L'ordre du bloc « Ressources » est tranché ici, faute d'être écrit nulle part.** Retenu :
+**la plus récemment reliée en tête** — `created_at desc`, `id` en départage pour qu'un affichage ne
+varie jamais d'un rechargement à l'autre. Arbitrage rendu avec l'humain avant écriture, parmi trois
+options présentées. La raison est un manque plutôt qu'une préférence : une ressource n'a **aucune
+date propre à l'écran**. `source_updated_at` existe dans le schéma mais aucun ticket de C4 ne la
+saisit (note du découpage ci-dessus), et le rattachement à une activité est facultatif — trier sur
+la période de l'activité aurait donc laissé les ressources non rattachées sans clé, et rejoué en
+plus le tri à cinq groupes de `listProjectRoadmap`, instable dès qu'une activité change d'état.
+`created_at` est la seule date qui existe, et elle répond au geste que C4 installe : on relie une
+restitution, on la retrouve en tête.
+
+**T4.1 — Le lien sortant ouvre un nouvel onglet.** `docs/06` §8 exige qu'il soit « reconnaissable
+avant le clic » et ne dit rien de la cible. `components/ui/external-link.tsx` porte donc
+`target="_blank" rel="noreferrer"` — arbitrage rendu avec l'humain : partir consulter un PowerPoint
+ne doit pas coûter la page projet, la plus consultée du produit. `rel="noreferrer"` couvre
+`noopener` dans tous les navigateurs qui portent `target="_blank"` ; l'inverse n'est pas vrai. La
+marque est **une forme et un texte** (`docs/06` §11) : un chevron `aria-hidden` collé au titre par
+une espace insécable, et « (lien externe, nouvel onglet) » en `sr-only` — retirer la couleur au lien
+ne lui retire ni l'une ni l'autre. T4.3 reprendra le composant tel quel.
+
+**T4.1 — Une ressource rattachée à une activité archivée affiche quand même son libellé.** Troisième
+arbitrage rendu avec l'humain. C'est la règle « on décrit, on ne propose pas » de T3.3/T3.4, ici
+appliquée à une jointure plutôt qu'à un référentiel : `listProjectRoadmap` affiche déjà le libellé
+d'un **type** archivé, et la lecture des ressources ne filtre donc pas l'activité jointe sur son
+`archived_at`. Le libellé est du texte, il ne mène nulle part. **Écart à connaître** : la roadmap
+n'affiche aucune activité archivée, si bien qu'une ressource peut nommer une activité que l'écran ne
+montre plus. Le cas n'est pas atteignable par l'interface — rien n'archive une activité (note
+ouverte depuis T3.3) — mais la base de développement en porte cinq, et le test le couvre nommément.
+
+**T4.1 — Les deux filtres de domaine des jointures sont infalsifiables sur des données légitimes.**
+Découvert en mettant les tests en défaut, et c'est le seul résultat inattendu du ticket. Retirer
+`filter(activities)` ou `filter(activityTypes)` de `listProjectResources` ne faisait tomber **aucun**
+des dix tests écrits par la couche scopée, pour une raison de fond : la jointure porte sur une **clé
+primaire** (`activities.id = resources.activity_id`), et `assertPreconditions` refuse déjà d'écrire
+un rattachement hors domaine — aucune ligne honnête ne peut faire mentir la jointure. Deux tests ont
+donc été ajoutés qui **écrivent directement par `db`**, hors de la couche, exactement ce qu'elle
+interdit : une ressource du domaine B pointant une activité de A, puis une activité de B pointant un
+type de A. C'est le seul endroit du projet qui contourne la couche, et il le fait pour éprouver ce
+qu'elle ne peut pas produire. Ce faisant, la propriété relevée de T2.2 à T3.1 s'est vérifiée une
+sixième fois, **mesurée cette fois-ci** : `filter(activities)` retiré seul ne fait toujours rien
+tomber — `filter(activityTypes)` le rattrape, le type de l'activité étrangère relevant lui aussi de
+l'autre domaine —, `filter(activityTypes)` retiré seul fait tomber le second test, et les deux
+retirés ensemble font tomber les deux. Les neuf neutralisations jouées : filtre de projet **4** tests,
+`isNull(archived_at)` **2**, le tri **1**, `filter(resources)` **1**, les deux filtres de jointure
+**2**, les trois ensemble **3**, et les `leftJoin` passés en `innerJoin` **5**.
+
+**T4.1 — Le séparateur « · » du bloc s'écarte du jeton employé par les trois écrans précédents.**
+La page produit, la liste transverse et l'en-tête de projet écrivent leur `·` en
+`content-neutral-light`, **mesuré ici à 2,22:1** sur la surface de section. Les trois le font entre
+deux éléments visuellement distincts — une pastille de statut et une période, un libellé et une
+valeur de filtre. Dans ce bloc, « PowerPoint » et « Test utilisateur » ont exactement la même taille
+et la même graisse : un séparateur qu'on devine y laisserait lire « PowerPoint Test utilisateur ».
+Il garde donc la couleur du texte qu'il sépare, `content-neutral-base`, **4,98:1** — aucun couple
+neuf n'est introduit, c'est celui du texte lui-même. Le glyphe reste `aria-hidden` : ce sont les
+mentions `sr-only` « Type : » et « Activité : » qui portent l'information pour l'assistance, la
+règle de T2.3.
+
+**T4.1 — L'état vide du bloc est un paragraphe et non un `EmptyState`.** La règle 5 en fait un écran
+à part entière, et `EmptyState` est la forme que le produit lui donne depuis T1.6 — mais il porte un
+`h2` et une hauteur pensés pour un bloc pleine largeur, là où « Ressources » occupe une demi-colonne
+de la grille sous le `h2` de sa propre section. Deux `h2` empilés dans une même carte casseraient la
+hiérarchie des titres vérifiée en audit (`docs/06` §11). Le paragraphe reprend mot pour mot celui que
+`REFERENCE_BLOCKS` portait depuis T2.4 : il dit ce que le bloc contiendra, ce qu'un état vide doit
+dire. **Ce qu'il ne dit pas encore**, c'est le geste qui l'y met — T4.2 l'ajoutera aux deux
+emplacements, en tête du bloc et dans l'état vide, comme `Roadmap` le fait depuis T3.2.
+
+**T4.1 — La vignette de format de la maquette est écartée.** `vision.html` place devant chaque
+ressource un carré de 34 px, filet et rayon compris, portant les initiales du format en 9 px. La
+fiche l'interdit (« aucune vignette, aucune icône de format inventée hors du design system »), et la
+règle 2 le confirmerait seule : ni la taille du carré, ni celle du texte, ni son interlettrage
+`.02em` n'existent dans `app/tokens.css` — le même manque d'interlettrage que T3.1 avait déjà
+consigné. Le type s'écrit donc en toutes lettres, ce que la fiche demande par ailleurs.
+
+**T4.1 — Vérifié sur le HTML servi, serveur de développement d'une session précédente réutilisé.**
+Comme T3.6 : `localhost:3001` était encore actif, Turbopack ayant rechargé les fichiers modifiés
+sans redémarrage. Aucun navigateur n'a été piloté — le ticket ne pose ni action, ni panneau, ni
+JavaScript, et ce qui restait à éprouver était le rendu serveur. L'ordre de tabulation a été
+**extrait du rendu** et non supposé : chez la responsable de domaine, le lien de la ressource est le
+**47ᵉ et dernier** élément focalisable de la page, après les gestes de roadmap ; chez une membre non
+contributrice, le **10ᵉ et dernier**, la roadmap n'offrant alors aucun lien. Le bloc n'ajoute donc
+qu'un arrêt par ressource, et nulle part ailleurs.
