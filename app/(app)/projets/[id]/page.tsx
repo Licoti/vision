@@ -42,7 +42,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
-import { createActivity, updateActivity } from "./actions";
+import {
+  cancelActivity,
+  createActivity,
+  transitionActivity,
+  updateActivity,
+} from "./actions";
 import { ActivityPanel } from "@/components/projects/activity-panel";
 import { Roadmap } from "@/components/projects/roadmap";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
@@ -319,6 +324,8 @@ export default async function ProjectPage({
                     ROUTES.projectActivityEdit(project.id, activityId)
                 : null
             }
+            transitionActivity={canWrite ? transitionActivity : null}
+            cancelActivity={canWrite ? cancelActivity : null}
           />
 
           <div className="grid gap-5 md:grid-cols-2">

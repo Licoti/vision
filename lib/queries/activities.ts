@@ -13,7 +13,7 @@
  * courant. Règle 1.
  */
 
-import { and, asc, eq, isNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, or, sql } from "drizzle-orm";
 
 import type { ScopedDb } from "@/lib/db/scoped";
 import {
@@ -107,13 +107,18 @@ export async function listActivityFormOptions(
 }
 
 /**
- * Les quatre groupes de lecture de `docs/03` §6, dans leur ordre.
+ * Les cinq groupes de lecture de `docs/03` §6, dans leur ordre.
  *
  * `unscheduled` n'est pas un état du schéma : c'est `planned` porteur de
- * `is_unscheduled` (D14). Le cinquième groupe — annulé — n'existe pas ici :
- * il arrive avec T3.5, le ticket qui peut le peupler.
+ * `is_unscheduled` (D14). `cancelled`, lui, en est un — c'est T3.5 qui peuple
+ * ce groupe, resté vide depuis T3.1.
  */
-export type RoadmapGroupKey = "in_progress" | "planned" | "unscheduled" | "done";
+export type RoadmapGroupKey =
+  | "in_progress"
+  | "planned"
+  | "unscheduled"
+  | "done"
+  | "cancelled";
 
 /** Une entrée de roadmap : type, objectif, période, approche. Rien d'autre. */
 export type RoadmapActivity = {
@@ -127,6 +132,8 @@ export type RoadmapActivity = {
   isUnscheduled: boolean;
   /** D12 — une seule approche, facultative. */
   approachLabel: string | null;
+  /** Non nul seulement dans le groupe `cancelled` (`activities_cancelled_requires_reason`). */
+  cancellationReason: string | null;
 };
 
 export type RoadmapGroup = {
@@ -141,6 +148,7 @@ const GROUPS: { key: RoadmapGroupKey; label: string }[] = [
   { key: "planned", label: "Prévu" },
   { key: "unscheduled", label: "À planifier" },
   { key: "done", label: "Terminé" },
+  { key: "cancelled", label: "Annulé" },
 ];
 
 /**
@@ -148,12 +156,15 @@ const GROUPS: { key: RoadmapGroupKey; label: string }[] = [
  *
  * **Le passé se lit à rebours, le présent et l'avenir dans le sens de la
  * marche.** `docs/03` §6 n'impose que « Terminé, du plus récent au plus
- * ancien » ; l'ordre interne des trois autres groupes est tranché ici :
+ * ancien » ; l'ordre interne des quatre autres groupes est tranché ici :
  *
  * - En cours — période croissante : ce qui a commencé en premier en tête ;
  * - Prévu — période croissante : la prochaine échéance en tête ;
  * - À planifier — sans date par définition, donc l'ordre de déclaration ;
- * - Terminé — période décroissante.
+ * - Terminé — période décroissante ;
+ * - Annulé (T3.5) — période décroissante, au même titre que Terminé : aucun
+ *   ordre n'est imposé par les docs pour ce groupe précis, et un fait
+ *   abandonné se lit aussi à rebours.
  *
  * Le tri est **entièrement en SQL**, en deux expressions `case` — une par sens
  * de lecture — plutôt qu'en mémoire : l'ordre est alors la propriété de la
@@ -169,10 +180,9 @@ const GROUPS: { key: RoadmapGroupKey; label: string }[] = [
  * les deux clés de période y suffisent, un état donné n'en activant jamais
  * qu'une. Un rang laissé là aurait fait croire le contraire au lecteur.
  *
- * Les activités annulées sont écartées faute de groupe pour les recevoir, les
- * archivées comme partout ailleurs. Un groupe sans activité n'est pas rendu :
- * c'est à l'appelant que revient l'état vide, et il ne le doit qu'au projet
- * entièrement vide.
+ * Les activités archivées sont écartées, comme partout ailleurs. Un groupe
+ * sans activité n'est pas rendu : c'est à l'appelant que revient l'état vide,
+ * et il ne le doit qu'au projet entièrement vide.
  */
 export function listProjectRoadmap(
   scope: ScopedDb,
@@ -181,15 +191,17 @@ export function listProjectRoadmap(
   return scope.joinedRead(async (database, { filter }) => {
     /* Le sens de la marche — tout sauf le passé. */
     const forward = sql`case
-      when ${activities.state} = 'done' then null
+      when ${activities.state} in ('done', 'cancelled') then null
       else coalesce(${activities.periodStart}, ${activities.periodEnd})
     end`;
 
     /* Le passé, à rebours. Une activité `done` porte toujours une fin de
        période (contrainte `activities_done_requires_period_end`) ; le
-       `coalesce` est une ceinture, pas une hypothèse. */
+       `coalesce` est une ceinture, pas une hypothèse. Une activité `cancelled`
+       n'a aucune garantie de ce genre — elle peut avoir été annulée sans
+       jamais avoir eu de date (T3.5) — d'où le même `coalesce` côté annulé. */
     const backward = sql`case
-      when ${activities.state} = 'done' then coalesce(${activities.periodEnd}, ${activities.periodStart})
+      when ${activities.state} in ('done', 'cancelled') then coalesce(${activities.periodEnd}, ${activities.periodStart})
       else null
     end`;
 
@@ -203,6 +215,7 @@ export function listProjectRoadmap(
         periodEnd: activities.periodEnd,
         isUnscheduled: activities.isUnscheduled,
         approachLabel: approaches.label,
+        cancellationReason: activities.cancellationReason,
       })
       .from(activities)
       .innerJoin(
@@ -221,7 +234,6 @@ export function listProjectRoadmap(
           filter(activities),
           eq(activities.projectId, projectId),
           isNull(activities.archivedAt),
-          ne(activities.state, "cancelled"),
         ),
       )
       .orderBy(
@@ -234,13 +246,15 @@ export function listProjectRoadmap(
     const byKey = new Map<RoadmapGroupKey, RoadmapActivity[]>();
     for (const row of rows) {
       const key: RoadmapGroupKey =
-        row.state === "planned"
-          ? row.isUnscheduled
-            ? "unscheduled"
-            : "planned"
-          : row.state === "in_progress"
-            ? "in_progress"
-            : "done";
+        row.state === "cancelled"
+          ? "cancelled"
+          : row.state === "planned"
+            ? row.isUnscheduled
+              ? "unscheduled"
+              : "planned"
+            : row.state === "in_progress"
+              ? "in_progress"
+              : "done";
 
       const group = byKey.get(key) ?? [];
       group.push({
@@ -251,6 +265,7 @@ export function listProjectRoadmap(
         periodEnd: row.periodEnd,
         isUnscheduled: row.isUnscheduled,
         approachLabel: row.approachLabel,
+        cancellationReason: row.cancellationReason,
       });
       byKey.set(key, group);
     }

@@ -425,3 +425,53 @@ export function parseActivityForm(
     },
   };
 }
+
+/* ==========================================================================
+   Le cycle de vie — T3.5
+
+   Ce que la dérivation ci-dessus ne fait pas : elle ne fait jamais reculer un
+   état ni le faire sortir d'une période inchangée. Le cycle de vie, lui, est
+   la correction volontaire — « Marquer en cours », « Marquer terminée »,
+   annuler — déclenchée depuis la roadmap, sans repasser par ce formulaire.
+   ========================================================================== */
+
+/**
+ * Les quatre flèches du diagramme de `docs/03` §4, et aucune de plus.
+ *
+ * Une table plutôt que des `if` épars : « aucun retour en arrière depuis
+ * annulée » (interdit de la fiche) est vrai **par construction** — `cancelled`
+ * et `done` n'ont simplement pas de sortie — et non par une discipline de
+ * relecture qui s'oublierait un jour.
+ */
+const ACTIVITY_TRANSITIONS: Record<ActivityState, readonly ActivityState[]> = {
+  planned: ["in_progress", "cancelled"],
+  in_progress: ["done", "cancelled"],
+  done: [],
+  cancelled: [],
+};
+
+/** Cette transition existe-t-elle dans le schéma d'états de `docs/03` §4 ? */
+export function canTransitionActivity(
+  from: ActivityState,
+  to: ActivityState,
+): boolean {
+  return ACTIVITY_TRANSITIONS[from].includes(to);
+}
+
+/**
+ * Le motif d'annulation, lu et rogné — même forme que `field()` ci-dessus,
+ * pour un formulaire qui n'a que ce seul champ.
+ */
+export function readCancellationReason(formData: FormData): string {
+  return field(formData, "cancellationReason");
+}
+
+/**
+ * `activities_cancelled_requires_reason` en message de champ, avant que la
+ * base n'ait à le refuser. Le champ est `required` en HTML — ce filet ne
+ * protège que la requête forgée, pas l'usage normal.
+ */
+export function validateCancellationReason(reason: string): string | undefined {
+  if (!reason) return "Le motif est obligatoire pour annuler une activité.";
+  return undefined;
+}

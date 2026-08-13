@@ -20,15 +20,19 @@ import { describe, expect, test } from "vitest";
 import {
   EMPTY_ACTIVITY_VALUES,
   activityRowUnchanged,
+  canTransitionActivity,
   deriveActivityState,
   parseActivityForm,
   readActivityForm,
+  readCancellationReason,
   resolveActivityPeriod,
   toActivityFormValues,
   validateActivityForm,
+  validateCancellationReason,
   type ActivityCurrent,
   type ActivityFormValues,
   type ActivityRowInput,
+  type ActivityState,
 } from "./activity";
 
 const TYPE = "3f2504e0-4f89-11d3-9a0c-0305e82c3311";
@@ -651,5 +655,67 @@ describe("activityRowUnchanged", () => {
     for (const change of changes) {
       expect(activityRowUnchanged(calculated(change), existing)).toBe(false);
     }
+  });
+});
+
+/* ==========================================================================
+   Le cycle de vie — T3.5
+   ========================================================================== */
+
+describe("canTransitionActivity", () => {
+  const STATES: ActivityState[] = ["planned", "in_progress", "done", "cancelled"];
+
+  /** Les quatre flèches du diagramme de `docs/03` §4, et aucune de plus. */
+  const LEGAL: [ActivityState, ActivityState][] = [
+    ["planned", "in_progress"],
+    ["in_progress", "done"],
+    ["planned", "cancelled"],
+    ["in_progress", "cancelled"],
+  ];
+
+  test("les quatre transitions du diagramme sont autorisées", () => {
+    for (const [from, to] of LEGAL) {
+      expect(canTransitionActivity(from, to)).toBe(true);
+    }
+  });
+
+  test("les douze autres couples sont refusés", () => {
+    for (const from of STATES) {
+      for (const to of STATES) {
+        const legal = LEGAL.some(([f, t]) => f === from && t === to);
+        if (!legal) expect(canTransitionActivity(from, to)).toBe(false);
+      }
+    }
+  });
+
+  test("aucun retour en arrière depuis « annulée » ou « terminée »", () => {
+    for (const to of STATES) {
+      expect(canTransitionActivity("cancelled", to)).toBe(false);
+      expect(canTransitionActivity("done", to)).toBe(false);
+    }
+  });
+});
+
+describe("readCancellationReason", () => {
+  test("le motif est rogné", () => {
+    expect(
+      readCancellationReason(form({ cancellationReason: "  Budget retiré.  " })),
+    ).toBe("Budget retiré.");
+  });
+
+  test("absent du formulaire, il vaut une chaîne vide", () => {
+    expect(readCancellationReason(form({}))).toBe("");
+  });
+});
+
+describe("validateCancellationReason", () => {
+  test("un motif vide est refusé", () => {
+    expect(validateCancellationReason("")).toBe(
+      "Le motif est obligatoire pour annuler une activité.",
+    );
+  });
+
+  test("un motif renseigné est accepté", () => {
+    expect(validateCancellationReason("Le commanditaire a annulé.")).toBeUndefined();
   });
 });

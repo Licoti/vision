@@ -1302,3 +1302,60 @@ c'est-à-dire exactement ce qu'envoie un navigateur sans JavaScript. Ce qui n'a 
 re-vérifié cette fois : le cycle de tabulation et la fermeture par Échap, qui dépendent de
 `FocusTrap`. Le panneau n'a pas changé de forme — mêmes contrôles, même ordre, l'ordre du DOM a été
 relu dans le rendu — mais la vérification est de seconde main sur ce point, et il faut le savoir.
+
+**T3.5 — `page.tsx` n'était pas dans la fiche, et le geste devait pourtant naître dans
+`roadmap.tsx`.** La fiche listait `actions.ts`, `roadmap.tsx`, `activity-panel.tsx` et
+`lib/forms/activity.ts` — pas `page.tsx`, ni `lib/queries/activities.ts`. La question posée était :
+qui lie les deux actions neuves à l'activité concernée ? Deux réponses possibles — `roadmap.tsx`
+importe `actions.ts` directement, en rupture avec la convention du produit (« `page.tsx` lie, les
+composants rendent ») ; ou `page.tsx` les importe et les passe en props à `Roadmap`, gatées à
+`null` comme `editHref`, au prix d'un écart de périmètre de plus. La seconde a été retenue, parce
+que T3.4 avait déjà tranché la même tension dans le même sens sans que sa fiche ne l'annonce non
+plus. `lib/queries/activities.ts` était de toute façon inévitable : `ETAT.md` l'annonçait mot pour
+mot depuis T3.1 pour le cinquième groupe.
+
+**T3.5 — `activity-panel.tsx` figurait au périmètre et n'a pas été touché.** Rien dans la
+conception ne l'exigeait : les quatre transitions sont des formulaires nus, directement dans
+l'entrée de roadmap, jamais dans le panneau complet — c'est littéralement ce que dit la fiche
+(« sans passer par le formulaire complet »). Le fichier était probablement listé par précaution,
+comme d'autres tickets de C3 l'ont fait pour des fichiers finalement inchangés. Consigné plutôt
+qu'inventé une raison de le modifier.
+
+**T3.5 — « Marquer terminée » ne collecte aucune date, et c'est une conséquence directe de
+l'arbitrage du 13/08/2026, pas une limitation du ticket.** Une activité `in_progress` dont la
+période n'a qu'un début (le cas que `deriveActivityState` documente depuis T3.3, « en cours
+indéfiniment ») ne peut donc pas être close par ce geste à un clic : le bouton ne s'affiche pas
+faute de `period_end`, et l'action refuserait une requête forgée pour la même raison. La fermer
+réellement demande d'abord une fin de période, saisie par une personne via le panneau d'édition
+(T3.4) — jamais fabriquée par Vision. Le geste de T3.5 ne fait que valider un fait déjà écrit.
+
+**T3.5 — L'annulation n'a pas de `useActionState`, à la différence de tout le reste du produit qui
+préserve une saisie refusée.** Le motif est `required` en HTML : une soumission vide est bloquée
+par le navigateur, sans aller-retour serveur. Le serveur revalide en second filet et refuse
+silencieusement si ce filet est contourné — vérifié par une requête forgée avec un champ
+`cancellationReason` vide, la ligne relue intacte. Aucune saisie à préserver dans ce cas : le motif
+vide n'atteint jamais l'écran en usage normal, contrairement aux refus de `lib/forms/product.ts` ou
+`lib/forms/project.ts`, qui protègent des formulaires à plusieurs champs où retaper coûte cher.
+
+**T3.5 — Le groupe « Annulé » s'enveloppe dans un `<details>`, pas un composant client repliable.**
+« Replié par défaut » (`docs/03` §6) se lit littéralement : `<details>` sans attribut `open` l'est
+nativement, sans JavaScript, et le triangle de divulgation par défaut du navigateur a été conservé
+plutôt que masqué — c'est le signal standard d'un contenu replié, et la règle 2 interdit
+d'inventer une valeur visuelle pour le remplacer. `<summary>` n'accepte que du contenu de phrasé
+(et, en premier enfant, un titre) : l'en-tête de groupe a dû être extrait en fragment
+(`headerContent`) plutôt que le `<div>` qu'il portait jusque-là, pour rester posable aussi bien
+dans un `<summary>` que dans le `<div>` toujours-ouvert des quatre autres groupes.
+
+**T3.5 — Le choix laissé ouvert par T3.4 sur « Modifier » d'une activité annulée est tranché : le
+lien est retiré.** T3.4 posait la question sans y répondre : garder le lien ferait pointer vers un
+panneau qui refuse déjà d'ouvrir une activité annulée (`updateActivity` depuis T3.4), donc vers un
+lien mort. Le motif s'affiche à sa place, texte et non couleur seule.
+
+**T3.5 — Vérifié sur le chemin réel, sans outil de pilotage de navigateur, comme T3.4.** Quatre
+transitions jouées par soumissions `multipart` reconstituées à partir des champs `$ACTION_…` du
+balisage servi, sans en-tête `Next-Action` : prévue → en cours → terminée sur une activité datée,
+annulation refusée sans motif puis acceptée avec, et une transition forgée sous le cookie d'un
+membre non contributeur refusée, ligne relue intacte. La fraîcheur du projet a été observée bouger
+d'août à octobre 2026 dans la liste transverse au passage prévue → en cours d'une activité
+d'octobre — le critère explicite de la fiche, pas une extrapolation depuis T2.1. Les quatre
+écritures de vérification n'ont pas été reprises en base ; consignées dans `ETAT.md`.

@@ -36,8 +36,18 @@
  * domaine courant et sur la personne courante — `domain_id` et `created_by`
  * sont posés par la couche, l'appelant n'y pense pas. Règle 1.
  *
- * Ce que ce fichier ne fait pas : changer d'état ni annuler (T3.5), déclarer
- * des participants (T3.6). Aucune suppression, aucun archivage, jamais.
+ * **Le changement d'état et l'annulation (T3.5) suivent le même principe, sous
+ * une forme plus légère.** `transitionActivity` et `cancelActivity` ne
+ * passent pas par ce formulaire complet — un geste depuis la roadmap, sans
+ * champ pour la première, un motif court pour la seconde — mais retrouvent
+ * eux-mêmes le projet à partir de l'activité **reçue**, faute d'un
+ * `projectId` lié : `writeProject` s'y vérifie de la même façon, et un refus
+ * n'écrit rien, silencieusement — ces deux gestes n'ont aucune saisie à
+ * rendre, contrairement au formulaire complet, et rien ne justifie de leur
+ * inventer un message d'erreur que l'écran n'atteint jamais en usage normal.
+ *
+ * Ce que ce fichier ne fait pas : déclarer des participants (T3.6). Aucune
+ * suppression, aucun archivage, jamais.
  */
 
 import { revalidatePath } from "next/cache";
@@ -49,12 +59,16 @@ import { activities, activityTypes, approaches, projects } from "@/lib/db/schema
 import { DomainScopeError, type Row } from "@/lib/db/scoped";
 import {
   activityRowUnchanged,
+  canTransitionActivity,
   parseActivityForm,
   readActivityForm,
+  readCancellationReason,
+  validateCancellationReason,
   type ActivityCurrentRow,
   type ActivityFormErrors,
   type ActivityFormState,
   type ActivityRowInput,
+  type ActivityState,
 } from "@/lib/forms/activity";
 import { ROUTES } from "@/lib/navigation";
 
@@ -311,4 +325,106 @@ export async function updateActivity(
   }
 
   redirect(ROUTES.project(projectId));
+}
+
+/* ==========================================================================
+   Le cycle de vie — T3.5
+   ========================================================================== */
+
+/**
+ * L'activité et son projet, retrouvés à partir de l'activité **reçue** — ces
+ * deux gestes n'ont pas de `projectId` lié, contrairement à `createActivity`
+ * et `updateActivity`. `writeProject` se vérifie sur le projet ainsi trouvé,
+ * jamais sur un identifiant qu'on nous soumettrait à côté.
+ *
+ * Un refus ici est **muet** : ni redirection, ni message. Ces deux actions ne
+ * s'atteignent en usage normal que par un bouton que l'écran n'affiche que
+ * lorsque le geste est légal — le contrôle protège la requête forgée, pas un
+ * parcours que l'interface est censée emprunter.
+ */
+async function openActivity(
+  session: Session,
+  activityId: string,
+): Promise<
+  { activity: Row<typeof activities>; project: Row<typeof projects> } | null
+> {
+  const activity = await session.db.find(activities, activityId);
+  if (!activity || activity.archivedAt !== null) return null;
+  if (!session.can.writeProject(activity.projectId)) return null;
+
+  const project = await session.db.find(projects, activity.projectId);
+  if (!project) return null;
+
+  return { activity, project };
+}
+
+/**
+ * Faire avancer une activité d'un cran — « Marquer en cours », « Marquer
+ * terminée » — depuis l'entrée de roadmap, sans passer par le panneau complet
+ * (`docs/03` §4).
+ *
+ * Passer à `in_progress` efface aussi `isUnscheduled` : une activité « à
+ * planifier » qui démarre n'est plus sans date au sens de l'affichage —
+ * `formatActivityPeriod` regarde `isUnscheduled` avant tout le reste, et le
+ * laisser à `true` ferait lire « À planifier » sur une activité en cours.
+ *
+ * Passer à `done` exige une fin de période déjà écrite : ce geste n'a pas de
+ * champ pour en saisir une, et Vision ne fabrique aucune date (arbitrage du
+ * 13/08/2026, repris de la dérivation en T3.3). Une activité `in_progress`
+ * dont la période n'a qu'un début reste donc « en cours » jusqu'à ce qu'une
+ * fin lui soit donnée par le panneau d'édition (T3.4), qui redérive l'état
+ * puisque la période aura bougé.
+ */
+export async function transitionActivity(
+  activityId: string,
+  target: Extract<ActivityState, "in_progress" | "done">,
+): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openActivity(session, activityId);
+  if (!gate) return;
+  const { activity, project } = gate;
+
+  if (!canTransitionActivity(activity.state, target)) return;
+  if (target === "done" && activity.periodEnd === null) return;
+
+  await session.db.update(activities, activityId, {
+    state: target,
+    ...(target === "in_progress" ? { isUnscheduled: false } : {}),
+  });
+
+  refresh(activity.projectId, project.productId);
+}
+
+/**
+ * Annuler une activité — la seule transition qui exige une saisie, un motif
+ * court (`docs/03` §4). Le champ est `required` en HTML ; la vérification
+ * ci-dessous n'est qu'un second filet, pour la requête qui l'aurait
+ * contourné.
+ *
+ * Comme `transitionActivity`, un refus est muet : ni saisie à préserver ni
+ * message à afficher, le formulaire n'ayant qu'un champ dont l'absence est
+ * déjà empêchée côté client.
+ */
+export async function cancelActivity(
+  activityId: string,
+  formData: FormData,
+): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openActivity(session, activityId);
+  if (!gate) return;
+  const { activity, project } = gate;
+
+  if (!canTransitionActivity(activity.state, "cancelled")) return;
+
+  const reason = readCancellationReason(formData);
+  if (validateCancellationReason(reason)) return;
+
+  await session.db.update(activities, activityId, {
+    state: "cancelled",
+    cancellationReason: reason,
+  });
+
+  refresh(activity.projectId, project.productId);
 }

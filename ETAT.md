@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** T3.4 terminé — une activité se corrige, et l'état ne se redérive que si la période a bougé
+**Dernière mise à jour :** T3.5 terminé — une activité change d'état ou s'annule, d'un geste depuis la roadmap
 **Chantier en cours :** C3 — activités et roadmap
-**Ticket en cours :** aucun — prochain ticket : **T3.5 — Cycle de vie : changement d'état et annulation**
+**Ticket en cours :** aucun — prochain ticket : **T3.6 — Participants d'une activité**
 
 ---
 
@@ -14,7 +14,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 |---|---|---|
 | C1 — Socle technique | T1.1 → T1.6 | **terminé** |
 | C2 — Produits et projets | T2.1 → T2.6 | **terminé** |
-| C3 — Activités et roadmap | T3.1 → T3.6 | **en cours** — T3.1, T3.2, T3.3, T3.4 faits |
+| C3 — Activités et roadmap | T3.1 → T3.6 | **en cours** — T3.1, T3.2, T3.3, T3.4, T3.5 faits |
 | C4 — Ressources et résultats | à découper | à faire |
 | C5 — Indicateurs et temps long | à découper | à faire |
 | C6 — Liens et journal | à découper | à faire |
@@ -391,6 +391,36 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   tests. **La base de développement est revenue exactement à son état d'avant le ticket** : le
   critère de T3.1 s'y relit mot pour mot, et la fraîcheur du projet est de nouveau août 2026.
 
+- **T3.5 — 13/08/2026 — cycle de vie d'une activité.** Le ticket qui ouvre le cinquième groupe que
+  T3.1 avait fermé d'avance, et qui referme le cycle de vie de `docs/03` §4. **Les quatre
+  transitions sont une table**, pas des `if` épars — `canTransitionActivity`, testée sur les 16
+  couples d'états —, si bien qu'« aucun retour en arrière depuis annulée » est vrai **par
+  construction** : `done` et `cancelled` n'ont simplement pas de sortie. **Le critère est tenu et
+  vérifié sur le chemin réel**, par soumissions `multipart` reconstituées à partir des champs
+  `$ACTION_…` du balisage servi, sans en-tête `Next-Action` : une activité prévue passe en cours
+  d'un clic — `isUnscheduled` retombe à `false` au passage, sans quoi une activité « à planifier »
+  basculée en cours resterait affichée comme telle — puis en cours passe terminée, et la fraîcheur
+  du projet suit dans la liste transverse, **relevée d'août à octobre 2026** sur « Autonomie des
+  opérations courantes ». Une annulation soumise **sans motif** est refusée, base inchangée — le
+  filet derrière le `required` HTML éprouvé, pas seulement déclaré — et soumise avec un motif,
+  l'activité rejoint le groupe « Annulé », replié par défaut derrière un `<details>` natif, son
+  motif affiché en clair. Une transition forgée sous le cookie d'un membre non contributeur a été
+  refusée de la même façon, la ligne relue intacte. **« Marquer terminée » ne collecte aucune
+  date** : le bouton ne s'affiche que si une fin de période est déjà écrite, et l'action la refuse
+  sinon — Vision ne fabrique toujours aucune date, l'arbitrage du 13/08/2026 tenant jusqu'ici. Les
+  20 tests ajoutés couvrent les 16 couples d'états et les deux bornes du motif ; deux tests neufs
+  de plus **éprouvent en base** les contraintes `CHECK` `activities_done_requires_period_end` et
+  `activities_cancelled_requires_reason`, les premiers du projet à le faire pour ces deux règles.
+  **`activity-panel.tsx` n'a pas été modifié** : rien dans les gestes de ce ticket ne traverse le
+  panneau complet, contrairement à ce que sa fiche laissait attendre en le plaçant dans le
+  périmètre. Écarts de périmètre, tous deux assumés et déjà pressentis par `ETAT.md` avant
+  écriture : `app/(app)/projets/[id]/page.tsx`, pour lier les deux actions neuves à `Roadmap`, et
+  `lib/queries/activities.ts` et son fichier de tests, pour le cinquième groupe. **La base de
+  développement porte quatre écritures de vérification de plus, non revenues en arrière** : une
+  activité menée jusqu'à `done`, une autre annulée avec son motif, deux autres passées en cours —
+  toutes quatre consignées ci-dessous, règle 4 obligeant à ne rien défaire par une suppression
+  déguisée.
+
 ---
 
 ## Points ouverts
@@ -520,6 +550,17 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   l'annulation n'est pas l'archivage : elle demande un motif et laisse l'activité visible. Une
   activité saisie **par erreur** n'a donc aucun chemin. À joindre au ticket d'archivage déjà
   attendu en C7 pour le produit et le projet.
+- **La base de développement porte quatre transitions de vérification de plus depuis T3.5, non
+  revenues en arrière** (règle 4 : rien de tout cela ne se supprime proprement). Sur « Dématérialisation
+  de la déclaration », l'« Audit UX » de septembre 2026 est passé prévue → en cours → **terminée**.
+  Sur « Test projet », l'« Audit UX » sans date objective « Faire l'audit , allez » a été
+  **annulée**, motif « Le budget a été retiré par le commanditaire. », et son « Atelier de
+  cadrage », lui aussi sans date, est passé **en cours** — il y reste sans fin de période possible
+  par ce geste seul, exactement le cas que `lib/forms/activity.ts` documente depuis T3.3. Sur
+  « Autonomie des opérations courantes », l'« Audit UX » d'octobre 2026 est passé **en cours**, ce
+  qui a fait remonter la fraîcheur du projet d'août à octobre dans la liste transverse — la preuve
+  du critère, laissée en base plutôt que rejouée à vide. `npm run db:seed` ne les retirera pas —
+  l'amorçage ignore ce qu'il n'a pas semé.
 
 - ~~**Trois arbitrages rendus d'avance pour T3.3, T3.4 et T3.5 — 13/08/2026.**~~ **Les trois sont
   consommés.** Ils ne sont dans aucun document, ils ont été tranchés avec l'humain hors ticket.
@@ -557,18 +598,12 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   Modifiés, l'état est redérivé : déplacer une période est une intention sur l'état. Aucune colonne
   à ajouter, aucune migration. **Sans cet arbitrage, T3.4 déferait silencieusement T3.5**, et le
   défaut ne se serait vu qu'en T3.5 — donc en reprise de T3.4.
-- **Une activité annulée est invisible entre T3.1 et T3.5.** La roadmap de T3.1 écarte l'état
-  `cancelled` de sa lecture, sa fiche lui interdisant le cinquième groupe : c'est T3.5 qui l'ouvre,
-  parce que c'est lui qui peut le peupler. La donnée est en base et n'est pas perdue — elle n'est
-  pas affichée. Sans conséquence aujourd'hui, la fixture ne contenant aucune activité annulée et
-  aucun écran ne pouvant en produire. **Le jour venu, T3.5 retire le `ne(state, 'cancelled')` de
-  `listProjectRoadmap` et ajoute une cinquième entrée à `GROUPS` — rien d'autre.**
-  **T3.4 ajoute une décision à reprendre là** : une activité annulée **ne s'édite pas** — ni par le
-  panneau, ni par l'action, éprouvé sur une activité rendue annulée à la main. La raison est qu'une
-  période déplacée la ferait sortir de `cancelled` sans qu'on l'ait demandé, et que ce geste
-  appartient à T3.5. Quand le cinquième groupe s'ouvrira, ses entrées porteront donc un lien
-  « Modifier » qui, en l'état, ne mènerait à rien : **soit T3.5 le retire pour ce groupe, soit il
-  autorise l'édition d'une annulée en décidant ce que devient son état.** Le choix lui revient.
+- ~~**Une activité annulée est invisible entre T3.1 et T3.5.**~~ **Fermé par T3.5** : le cinquième
+  groupe — « Annulé », replié par défaut derrière un `<details>` natif — est ouvert, et
+  `listProjectRoadmap` ne retire plus `cancelled` de sa lecture. **Le choix laissé ouvert par T3.4
+  sur le lien « Modifier » d'une entrée annulée est tranché : il est retiré pour ce groupe.** Le
+  motif s'affiche à sa place, sous l'objectif — une activité annulée reste lisible, elle ne se
+  corrige plus.
 - **Les filtres ne survivent pas à un aller-retour par la navigation principale.** `docs/06` §9
   demande qu'ils soient conservés quand on entre dans un projet et qu'on revient. Ils vivent dans
   l'URL, donc le retour navigateur les restitue ; un clic sur « Projets » dans la barre latérale

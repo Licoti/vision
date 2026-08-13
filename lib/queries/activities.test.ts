@@ -259,7 +259,7 @@ function labels(groups: RoadmapGroup[], key: string): string[] {
    ========================================================================== */
 
 describe("listProjectRoadmap — les groupes", () => {
-  test("les quatre groupes sortent dans l'ordre de lecture de docs/03 §6", async () => {
+  test("les cinq groupes sortent dans l'ordre de lecture de docs/03 §6", async () => {
     const groups = await listProjectRoadmap(a.scope, a.fullId);
 
     expect(groups.map((group) => group.key)).toEqual([
@@ -267,12 +267,14 @@ describe("listProjectRoadmap — les groupes", () => {
       "planned",
       "unscheduled",
       "done",
+      "cancelled",
     ]);
     expect(groups.map((group) => group.label)).toEqual([
       "En cours",
       "Prévu",
       "À planifier",
       "Terminé",
+      "Annulé",
     ]);
   });
 
@@ -334,7 +336,15 @@ describe("listProjectRoadmap — l'ordre interne", () => {
     ]);
   });
 
-  test("les cinq entrées du critère se suivent dans l'ordre annoncé", async () => {
+  test("« Annulé » se lit du plus récent au plus ancien, comme « Terminé »", async () => {
+    const groups = await listProjectRoadmap(a.scope, a.fullId);
+
+    // La fixture ne porte qu'une seule activité annulée : l'ordre interne se
+    // limite ici à vérifier qu'elle s'y trouve bien, seule.
+    expect(labels(groups, "cancelled")).toEqual(["Audit UX a"]);
+  });
+
+  test("les dix entrées du critère se suivent dans l'ordre annoncé", async () => {
     // Le critère de la fiche, lu de bout en bout et non groupe par groupe :
     // c'est la séquence entière qui compte à l'écran.
     const groups = await listProjectRoadmap(a.scope, a.fullId);
@@ -352,6 +362,7 @@ describe("listProjectRoadmap — l'ordre interne", () => {
       "Passation a",
       "Audit d'accessibilité a",
       "Test utilisateur a",
+      "Audit UX a", // l'activité annulée, dans le cinquième groupe
     ]);
   });
 });
@@ -361,18 +372,20 @@ describe("listProjectRoadmap — l'ordre interne", () => {
    ========================================================================== */
 
 describe("listProjectRoadmap — le périmètre et les champs", () => {
-  test("une activité annulée n'apparaît nulle part", async () => {
+  test("une activité annulée apparaît dans le groupe « Annulé », avec son motif", async () => {
     const groups = await listProjectRoadmap(a.scope, a.fullId);
-    const ids = groups.flatMap((group) =>
-      group.activities.map((activity) => activity.id),
-    );
+    const cancelled =
+      groups.find((group) => group.key === "cancelled")?.activities ?? [];
 
-    // Elle est bien en base : c'est la lecture qui l'écarte, faute de groupe
-    // pour la recevoir avant T3.5. Le constat porte sur **cette ligne-là**, et
-    // non sur un décompte — un test qui compte tombe pour d'autres raisons.
-    const row = await a.scope.find(activities, a.cancelledId);
-    expect(row?.state).toBe("cancelled");
-    expect(ids).not.toContain(a.cancelledId);
+    // Avant T3.5, cette même ligne n'apparaissait nulle part faute de groupe
+    // pour la recevoir. Le constat porte sur **cette ligne-là**, et non sur un
+    // décompte — un test qui compte tombe pour d'autres raisons.
+    expect(cancelled).toContainEqual(
+      expect.objectContaining({
+        id: a.cancelledId,
+        cancellationReason: "Le commanditaire a retiré le budget.",
+      }),
+    );
   });
 
   test("une activité archivée n'apparaît nulle part", async () => {
@@ -401,6 +414,8 @@ describe("listProjectRoadmap — le périmètre et les champs", () => {
       periodEnd: "2026-06-30",
       isUnscheduled: false,
       approachLabel: "Research a",
+      // Le motif n'a de sens que dans le groupe « Annulé » (T3.5).
+      cancellationReason: null,
     });
 
     const unscheduled =
@@ -433,6 +448,36 @@ describe("listProjectRoadmap — étanchéité du domaine", () => {
 
     expect(flat.length).toBeGreaterThan(0);
     expect(flat.every((label) => label.endsWith(" b"))).toBe(true);
+  });
+});
+
+/* ==========================================================================
+   Les règles d'intégrité de `docs/04` §3 — T3.5
+
+   Éprouvées **en base**, pas seulement dans le code : c'est Postgres qui
+   refuse, via les contraintes `CHECK` posées depuis T1.2.
+   ========================================================================== */
+
+describe("les contraintes CHECK du cycle de vie", () => {
+  test("une activité « terminée » sans fin de période est refusée en base", async () => {
+    await expect(
+      a.scope.insert(activities, {
+        projectId: a.fullId,
+        activityTypeId: a.liveTypeId,
+        state: "done",
+        periodStart: "2026-01-01",
+      }),
+    ).rejects.toThrow();
+  });
+
+  test("une activité « annulée » sans motif est refusée en base", async () => {
+    await expect(
+      a.scope.insert(activities, {
+        projectId: a.fullId,
+        activityTypeId: a.liveTypeId,
+        state: "cancelled",
+      }),
+    ).rejects.toThrow();
   });
 });
 
