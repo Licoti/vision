@@ -849,3 +849,40 @@ divergence. Elles vivent donc dans le module des lectures de projet, dont l'en-t
 que toutes ne joignent pas. Les autres écarts : `ROUTES` gagne `projectNew`, `projectNewForProduct`
 et `projectEdit` ; et `lib/forms/project.test.ts`, comme à chaque ticket depuis T1.3 — quarante-
 cinq tests qui ne touchent aucune base, le second fichier du projet dans ce cas après celui de T2.5.
+
+**C3 (découpage) — `docs/03` §6 décrit deux écrans à deux lignes d'intervalle.** Le paragraphe
+ouvre sur « une frise chronologique par mois, sur laquelle chaque activité occupe sa période », puis
+enchaîne sur « les activités sont regroupées visuellement par état, dans cet ordre de lecture ». Un
+axe temporel où chaque activité occupe sa période et une liste groupée par état ne sont pas la même
+représentation, et la seconde perd la position dans le temps. La maquette tranche pour les groupes,
+et le découpage la suit — un axe à bandes de durée est la porte d'entrée du Gantt, que `docs/06` §10
+interdit nommément. **Désaccord potentiel avec l'intention de `docs/03`, à faire confirmer** : si la
+frise au sens propre est attendue sur la page projet, elle demande un ticket, pas un ajout dans
+T3.1.
+
+**C3 (découpage) — l'ordre interne des groupes de la roadmap n'est écrit que pour un groupe sur
+cinq.** `docs/03` §6 dit « Terminé — l'historique, du plus récent au plus ancien » et ne dit rien
+d'En cours, de Prévu, d'À planifier ni d'Annulé. Aucune liste ne se rend sans un ordre : T3.1 devra
+en choisir un et le consigner ici. Il n'a pas été fixé dans la fiche du ticket, pour ne pas faire
+passer un choix d'implémentation pour une règle du produit.
+
+**C3 (découpage) — aucun chemin d'archivage ni de suppression d'activité n'est ouvert.** `docs/03`
+§4 ferme la suppression — « on ne supprime pas une activité annulée : savoir qu'un audit était prévu
+et a été abandonné est une information sur le projet » — et l'annulation motivée de T3.5 en tient
+lieu. Une activité saisie par erreur n'a donc pas d'issue autre que l'annulation, ce qui est un
+motif d'annulation faux. Le cas rejoint le point ouvert d'`ETAT.md` sur l'archivage du produit et du
+projet, et se traitera avec lui — en C7 au plus tard, pas dans C3.
+
+**C3 (découpage) — le panneau latéral est le premier composant qui demande une ombre.** Annoncé dès
+le journal de T1.1 : le design system nomme trois élévations — `resting`, `raised`, `floating` —
+sans leur donner de valeur, et le namespace `--shadow-*` de Tailwind est effacé plutôt que meublé.
+T3.2 fait remonter la question à qui maintient le design system ; sa fiche lui interdit d'écrire une
+valeur à la main. À défaut de réponse, un panneau se délimite par une bordure, qui a déjà ses jetons
+mesurés depuis T2.3.
+
+**C3 (découpage) — le bloc « Activité terminée — ajouter un résultat » de la maquette du panneau
+n'est pas dans C3.** `docs/design/maquettes/vision.html` place dans le panneau de saisie d'activité
+un libellé, une valeur, une unité et un lien vers l'outil. C'est le résultat déclaratif de `docs/03`
+§5, que `docs/05` §5 range en C4. Il est nommé en interdit dans T3.2, T3.3 et T3.4 précisément
+parce que la maquette le met sous les yeux du ticket qui écrit le panneau. Conséquence à connaître
+pour C4 : le panneau devra rouvrir, et non être recopié.

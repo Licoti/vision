@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** T2.6 terminé — **C2 est terminé**
-**Chantier en cours :** aucun — C2 est clos
-**Ticket en cours :** aucun — prochain chantier : C3 (activités et roadmap), **à découper**
+**Dernière mise à jour :** C3 découpé — six tickets dans `tickets-C3.md`
+**Chantier en cours :** C3 — activités et roadmap
+**Ticket en cours :** aucun — prochain ticket : **T3.1 — Roadmap du projet, lecture**
 
 ---
 
@@ -14,7 +14,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 |---|---|---|
 | C1 — Socle technique | T1.1 → T1.6 | **terminé** |
 | C2 — Produits et projets | T2.1 → T2.6 | **terminé** |
-| C3 — Activités et roadmap | à découper | à faire |
+| C3 — Activités et roadmap | T3.1 → T3.6 | à faire |
 | C4 — Ressources et résultats | à découper | à faire |
 | C5 — Indicateurs et temps long | à découper | à faire |
 | C6 — Liens et journal | à découper | à faire |
