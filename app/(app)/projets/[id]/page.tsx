@@ -2,9 +2,9 @@
  * Projet — la page la plus consultée du produit.
  *
  * Sa segmentation obéit à la règle de `docs/06` §5 : **un récit dominant, des
- * blocs de référence autour.** T2.4 pose l'en-tête d'identité ; la roadmap et
- * les cinq blocs de référence restent des états vides annoncés, dans leur
- * ordre définitif — un bloc vide est un écran à part entière, pas une page
+ * blocs de référence autour.** T2.4 pose l'en-tête d'identité, T3.1 branche la
+ * roadmap ; les cinq blocs de référence restent des états vides annoncés, dans
+ * leur ordre définitif — un bloc vide est un écran à part entière, pas une page
  * incomplète (règle 5).
  *
  * Le fil d'Ariane porte les trois maillons de la hiérarchie, le produit
@@ -28,9 +28,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
+import { Roadmap } from "@/components/projects/roadmap";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
 import { Avatar } from "@/components/ui/avatar";
-import { EmptyState } from "@/components/ui/empty-state";
 import { Field, FieldRow } from "@/components/ui/field";
 import { Page, PageHeader } from "@/components/ui/page";
 import { Section, SectionHeader } from "@/components/ui/section";
@@ -39,6 +39,7 @@ import { Tag } from "@/components/ui/tag";
 import { requireSession } from "@/lib/auth/provider";
 import { formatPeriod, formatRank } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
+import { listProjectRoadmap } from "@/lib/queries/activities";
 import { findAccompanimentRank, findProjectDetail } from "@/lib/queries/projects";
 import { isUuid } from "@/lib/uuid";
 
@@ -88,7 +89,10 @@ export default async function ProjectPage({
   const project = await findProjectDetail(session.db, id);
   if (!project) notFound();
 
-  const rank = await findAccompanimentRank(session.db, project);
+  const [rank, roadmap] = await Promise.all([
+    findAccompanimentRank(session.db, project),
+    listProjectRoadmap(session.db, project.id),
+  ]);
 
   return (
     <>
@@ -195,16 +199,7 @@ export default async function ProjectPage({
 
         {/* Le récit, en position dominante : il vient avant tout bloc de
             référence (docs/06 §5). */}
-        <section className="flex flex-col gap-4">
-          <SectionHeader
-            title="Roadmap des activités"
-            note="Le récit de l'accompagnement, au mois."
-          />
-          <EmptyState
-            title="Aucune activité pour l'instant"
-            description="La roadmap réunira ici les ateliers, tests, audits et restitutions de l'accompagnement, groupés par état : en cours, prévu, à planifier, terminé. Chaque activité portera son type, son objectif, sa période, son approche et, le cas échéant, son résultat avec le lien vers l'outil qui l'a produit."
-          />
-        </section>
+        <Roadmap groups={roadmap} />
 
         <div className="grid gap-5 md:grid-cols-2">
           {REFERENCE_BLOCKS.map((block) => (

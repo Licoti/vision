@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** C3 découpé — six tickets dans `tickets-C3.md`
+**Dernière mise à jour :** T3.1 terminé — la roadmap est branchée en lecture
 **Chantier en cours :** C3 — activités et roadmap
-**Ticket en cours :** aucun — prochain ticket : **T3.1 — Roadmap du projet, lecture**
+**Ticket en cours :** aucun — prochain ticket : **T3.2 — Panneau latéral de saisie**
 
 ---
 
@@ -14,7 +14,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 |---|---|---|
 | C1 — Socle technique | T1.1 → T1.6 | **terminé** |
 | C2 — Produits et projets | T2.1 → T2.6 | **terminé** |
-| C3 — Activités et roadmap | T3.1 → T3.6 | à faire |
+| C3 — Activités et roadmap | T3.1 → T3.6 | **en cours** — T3.1 fait |
 | C4 — Ressources et résultats | à découper | à faire |
 | C5 — Indicateurs et temps long | à découper | à faire |
 | C6 — Liens et journal | à découper | à faire |
@@ -224,6 +224,32 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   touché — les deux écrans font les mêmes six lectures, et les dupliquer aurait installé la
   divergence. Les autres écarts : trois entrées dans `ROUTES`, et le fichier de tests.
 
+- **T3.1 — 13/08/2026 — roadmap du projet, lecture.** Le premier écran de C3, et le bloc dominant
+  de la page projet (`docs/06` §5) : l'état vide annoncé par T2.4 laisse la place au récit de
+  l'accompagnement. **Le critère est tenu et lu dans le HTML servi**, pas affirmé : sur « Autonomie
+  des opérations courantes », les cinq activités sortent dans l'ordre exact de la fiche — Atelier de
+  priorisation (août 2026) · Audit UX (octobre 2026) · Formation (À planifier) · Audit
+  d'accessibilité (juin 2026) · Test utilisateur (mars 2026) —, sous les quatre intitulés En cours ·
+  Prévu · À planifier · Terminé ; et l'état vide s'affiche sur « Refonte de l'espace documents ».
+  Les deux autres projets confirment qu'un groupe sans activité ne s'affiche pas : « Refonte du
+  parcours de virement » ne rend que « Terminé », ses quatre activités de septembre 2024 à avril
+  2024, et « Dématérialisation de la déclaration » n'a pas de groupe « En cours ». Deux arbitrages
+  rendus avec l'humain avant écriture : l'ordre interne des groupes — **le passé se lit à rebours,
+  le présent et l'avenir dans le sens de la marche**, l'ordre de déclaration pour « À planifier »
+  qui n'a aucune date —, et la période d'une activité sans date qui s'écrit « À planifier » plutôt
+  que de rester vide. Les 15 tests ajoutés ont été **mis en défaut un à un** : le filtre
+  d'annulation retiré fait tomber 3 tests, celui d'archivage 3, le sens du passé inversé 3, celui de
+  l'avenir 4, le départage par `created_at` retiré 4. Ce faisant, du code écrit s'est révélé mort et
+  a été supprimé : le rang de groupe du `order by`, neutralisé, ne faisait tomber **aucun** test —
+  le regroupement se fait en mémoire, et le SQL n'a à garantir que l'ordre à l'intérieur d'un
+  groupe. La propriété relevée depuis T2.2 s'est vérifiée une cinquième fois : chaque filtre de
+  domaine **seul** est rattrapé par la jointure voisine, et il faut les retirer tous les deux pour
+  voir l'étanchéité céder. Le contraste a été **mesuré** sur les huit couples de l'écran et aucune
+  correction n'en est sortie — c'était le but, aucun couple n'étant neuf. Une valeur visuelle a été
+  écrite puis retirée avant livraison : `tracking-wide` reprenait l'interlettrage de la maquette au
+  prix d'un `.025em` venu de Tailwind, que le design system ne définit pas et que la règle 2
+  interdit. Aucun écart de périmètre : les cinq fichiers du plan, et le fichier de tests.
+
 ---
 
 ## Points ouverts
@@ -261,6 +287,17 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   comme bordures. T2.6 a repris ces deux mêmes choix sans en inventer un troisième, et c'était le
   but : ses neuf couples de couleurs sont tous des couples déjà mesurés. À faire remonter à qui
   maintient le design system ; d'ici là, tout nouveau formulaire reprend ces deux choix.
+  **T3.1 ajoute un troisième manque à la même liste : il n'existe aucun jeton d'interlettrage.**
+  Les intitulés en capitales des maquettes portent `letter-spacing: .04em` ; `app/tokens.css` n'a
+  rien de tel, et `tracking-wide` de Tailwind ferait entrer une valeur hors thème. Les capitales
+  sont donc rendues sans interlettrage, comme le bandeau de colonnes de `ListHeader` depuis T1.6.
+
+- **Une activité annulée est invisible entre T3.1 et T3.5.** La roadmap de T3.1 écarte l'état
+  `cancelled` de sa lecture, sa fiche lui interdisant le cinquième groupe : c'est T3.5 qui l'ouvre,
+  parce que c'est lui qui peut le peupler. La donnée est en base et n'est pas perdue — elle n'est
+  pas affichée. Sans conséquence aujourd'hui, la fixture ne contenant aucune activité annulée et
+  aucun écran ne pouvant en produire. **Le jour venu, T3.5 retire le `ne(state, 'cancelled')` de
+  `listProjectRoadmap` et ajoute une cinquième entrée à `GROUPS` — rien d'autre.**
 - **Les filtres ne survivent pas à un aller-retour par la navigation principale.** `docs/06` §9
   demande qu'ils soient conservés quand on entre dans un projet et qu'on revient. Ils vivent dans
   l'URL, donc le retour navigateur les restitue ; un clic sur « Projets » dans la barre latérale

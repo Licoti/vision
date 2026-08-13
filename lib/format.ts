@@ -54,6 +54,38 @@ export function formatPeriod(
 }
 
 /**
+ * La période d'une **activité**, au mois (D13).
+ *
+ * « août 2026 » · « mars 2026 → mai 2026 » · « À planifier » ·
+ * « Période non renseignée ».
+ *
+ * `formatPeriod` ne conviendrait pas : une activité tient le plus souvent dans
+ * un seul mois — du 1er au 31 août —, et elle s'afficherait
+ * « août 2026 → août 2026 ». Le mois se replie donc quand les deux bornes
+ * tombent dedans, et c'est toute la différence avec la période d'un
+ * accompagnement, qui s'étale par nature.
+ *
+ * Une activité sans date **et** sans « à planifier » reste possible dans le
+ * schéma — seuls `planned` et `done` sont contraints —, d'où la dernière
+ * formule : on dit l'absence plutôt que de laisser un blanc.
+ */
+export function formatActivityPeriod(
+  periodStart: string | null,
+  periodEnd: string | null,
+  isUnscheduled: boolean,
+): string {
+  if (isUnscheduled) return "À planifier";
+
+  const start = periodStart ? formatMonth(parseDay(periodStart)) : null;
+  const end = periodEnd ? formatMonth(parseDay(periodEnd)) : null;
+
+  if (start && end) return start === end ? start : `${start} → ${end}`;
+  if (start) return start;
+  if (end) return end;
+  return "Période non renseignée";
+}
+
+/**
  * « Camille Roux » → « CR ».
  *
  * Premier et dernier mot : un prénom composé ne produit pas trois lettres, et

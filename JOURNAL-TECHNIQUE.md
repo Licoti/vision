@@ -909,3 +909,93 @@ chaque fixture. **Le risque est atténué, pas éliminé** : deux activités ré
 même projet dans le même mois collisionneraient encore — assumé, comme pour le renommage d'un
 produit, faute d'écran d'administration des référentiels (D25, C7). Rejoué : `npm run db:seed` reste
 sans écriture sur les 12 activités, 33 participants, 2 résultats et 1 ressource existants.
+
+**T3.1 — L'ordre interne des groupes : le passé se lit à rebours, le reste dans le sens de la
+marche.** Le point ouvert laissé par le découpage de C3 se referme ici. `docs/03` §6 n'impose que
+« Terminé, du plus récent au plus ancien » ; les trois autres groupes sont tranchés avec l'humain
+avant écriture. **En cours** et **Prévu** se lisent par période croissante — ce qui a commencé en
+premier en tête, puis la prochaine échéance —, **Terminé** par période décroissante, et **À
+planifier**, qui n'a par définition aucune date, dans l'ordre de déclaration (`created_at`). Un
+départage par libellé de type a été écarté : il se réorganiserait le jour où un domaine renomme un
+type, alors que l'ordre affiché doit être stable d'un affichage à l'autre. L'option « tout à
+rebours », plus courte à écrire, a été écartée aussi : elle mettrait l'échéance la plus lointaine en
+tête de « Prévu ».
+
+**T3.1 — Le rang de groupe a été écrit dans le `order by`, puis retiré : il ne portait rien.** La
+requête triait d'abord sur un `case` donnant son rang à chacun des quatre groupes. Neutralisé pour
+vérification, il n'a **fait tomber aucun test** — et c'est correct : le regroupement se fait en
+mémoire et l'ordre des groupes vient de la constante `GROUPS`. Ce que le SQL doit garantir est
+l'ordre **à l'intérieur** de chaque groupe, et les deux clés de période y suffisent, un état donné
+n'en activant jamais qu'une. Le rang a été supprimé plutôt que laissé : du code qu'on croit
+structurant et qui ne l'est pas est pire qu'absent. Noter au passage que les `nulls last` des deux
+clés sont, eux, explicites sans être porteurs — PostgreSQL trie déjà `nulls last` en `asc`, et pour
+la clé décroissante les valeurs nulles ne rencontrent jamais les autres, puisqu'elles vivent dans
+des groupes distincts. Ils sont conservés comme documentation de l'intention, pas comme garde-fou.
+
+**T3.1 — Les activités annulées sont écartées de la lecture, faute de groupe pour les recevoir.**
+Elles sont en base, la fiche de T3.1 interdit le groupe « Annulé », et T3.5 est le ticket qui peut
+le peupler. Une activité `cancelled` disparaît donc de l'écran entre T3.1 et T3.5 — sans
+conséquence sur la fixture, qui n'en contient aucune, mais c'est une donnée métier temporairement
+invisible et non une donnée perdue. Le jour où T3.5 ouvre le cinquième groupe, il retire le
+`ne(state, 'cancelled')` et rien d'autre.
+
+**T3.1 — La période d'une activité « à planifier » s'écrit « À planifier », et non rien.**
+Arbitrage rendu avec l'humain. C'est redondant avec l'intitulé du groupe, et c'est voulu : l'entrée
+reste autoporteuse si on la lit seule — ce que fera le panneau d'édition de T3.4 —, et elle reprend
+le vocabulaire de D14 plutôt que d'en inventer un. `formatActivityPeriod` porte les quatre cas, dont
+« Période non renseignée » : le schéma ne contraint la période ni d'une activité `in_progress` ni
+d'une activité `cancelled`, et une entrée sans date doit dire l'absence plutôt que laisser un blanc.
+
+**T3.1 — `formatPeriod` ne convenait pas à une activité : le mois se replie.** La période d'un
+accompagnement s'étale par nature — « mars 2024 → septembre 2024 » —, celle d'une activité tient le
+plus souvent dans un seul mois, du 1er au 31 août. `formatPeriod` aurait affiché
+« août 2026 → août 2026 ». `formatActivityPeriod` replie donc les deux bornes quand elles tombent
+dans le même mois. Les deux fonctions se ressemblent et ne fusionnent pas : ce qu'elles décrivent
+n'a pas la même granularité d'usage.
+
+**T3.1 — Cinquième vérification de la propriété relevée depuis T2.2 : les filtres de domaine se
+rattrapent l'un l'autre.** Retirer `filter(activities)` **seul** ne fait tomber aucun test ; retirer
+`filter(activityTypes)` **seul** non plus. Il faut retirer les deux pour voir l'étanchéité céder —
+le test de la roadmap lue depuis un autre domaine tombe alors, et lui seul. La cause est la même
+qu'en T2.2, T2.3 et T2.4 : la jointure interne sur le référentiel du domaine courant ne ramène
+aucune ligne pour une activité étrangère. Le `filter` du `leftJoin` sur les approches, lui, n'est
+**éprouvable par aucun test** : `assertPreconditions` garantit qu'une activité ne pointe jamais une
+approche d'un autre domaine, si bien qu'il ne peut pas y avoir de fuite à observer. Il est écrit
+quand même — c'est la condition posée par l'en-tête de `joinedRead`, et une défense en profondeur
+ne se juge pas à ce qu'elle attrape aujourd'hui.
+
+**T3.1 — Le libellé d'un type d'activité archivé continue de s'afficher.** Même nuance qu'en T2.6
+pour les entités et les produits : décrire et proposer au choix n'appellent pas le même filtre. La
+roadmap **décrit** ce qui a eu lieu, donc elle joint `activity_types` sans écarter les lignes
+archivées ; T3.4, qui **propose** un type à la sélection, aura à les écarter — sauf pour celui que
+l'activité éditée pointe déjà, sa fiche le dit. Éprouvé ici pour la première fois, `activity_types`
+étant le premier référentiel dont un ticket archive une ligne dans ses tests.
+
+**T3.1 — L'interlettrage de la maquette n'a pas été repris : le design system n'en a pas.** Les
+intitulés de groupe de `vision.html` portent `letter-spacing: .04em`. `tracking-wide` de Tailwind
+aurait fait entrer `.025em` — une valeur visuelle venue d'ailleurs que du thème, ce qu'interdit la
+règle 2, et `app/tokens.css` ne définit aucun jeton d'interlettrage. Les capitales sont donc rendues
+sans, comme le bandeau de colonnes de `ListHeader` depuis T1.6, qui remplit exactement le même rôle.
+**À faire remonter à qui maintient le design system**, avec les deux jetons de bordure déjà
+demandés depuis T2.3.
+
+**T3.1 — Contraste mesuré avant d'être cru, sur les huit couples de l'écran. Aucune correction n'en
+est sortie — c'était le but.** Intitulé et compteur de groupe sur le fond de page : 5,07:1. Type
+d'activité sur la carte : 17,87:1. Objectif et période sur la carte : 4,98:1. Puce d'approche,
+texte sur son fond : 6,84:1 ; sur la carte : 7,11:1. Le filet de la carte tombe à 1,27:1 sur le fond
+de page, et c'est retenu tel quel pour la raison déjà écrite en tête de `tag.tsx` : la limite à 3:1
+vaut pour un composant qu'il faut savoir viser, pas pour un cerne posé autour d'un texte lisible —
+et l'entrée de roadmap n'est cliquable ni en T3.1 ni nulle part avant T3.4. Tous ces couples étaient
+déjà en service depuis T1.6 à T2.4 ; l'écran n'en a introduit aucun.
+
+**T3.1 — Le composant porte la section entière, en-tête compris, et la page n'en garde rien.**
+`components/projects/roadmap.tsx` rend le `SectionHeader` aussi bien que les groupes et l'état vide.
+Le motif est T3.2 : « Ajouter une activité » doit apparaître **en tête du bloc** (`docs/06` §5) *et*
+dans l'état vide, et les deux emplacements vivent alors dans un seul fichier. La page projet ne
+connaît plus de la roadmap que son nom.
+
+**T3.1 — Écarts de périmètre.** Aucun, au sens strict : les cinq fichiers touchés sont ceux du plan
+annoncé — `lib/queries/activities.ts`, ses tests, `components/projects/roadmap.tsx`,
+`app/(app)/projets/[id]/page.tsx` et `lib/format.ts`, ce dernier explicitement prévu par la fiche
+« si un libellé de période manque ». Le fichier de tests reste, comme à chaque ticket depuis T1.3,
+un ajout que le périmètre ne nomme pas dans ces termes.
