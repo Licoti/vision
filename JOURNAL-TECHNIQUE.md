@@ -1413,3 +1413,72 @@ défaut trouvé puis corrigé à cette étape) ; édition tentée sous le cookie
 non-contributrice de ce projet, refusée avec la ligne intacte. L'activité de vérification a été
 archivée en fin de parcours (règle 4), et non reprise en base autrement — contrairement à T3.3 et
 T3.5, aucune trace de vérification n'est restée visible dans la roadmap.
+
+**C4 (découpage) — Aucun chemin de correction pour une ressource ni pour un résultat, et c'est une
+lecture stricte de `docs/05`.** Le document écrit « Création et édition de projet » et « Activités :
+création, édition, changement d'état » ; pour les deux lignes de C4 il n'écrit que « Saisie
+déclarative : libellé, valeur, unité, date, lien vers l'outil » et « Lien, titre, type saisi,
+rattachement facultatif à une activité ». Le verbe manque, donc le découpage n'a pas créé le ticket
+— arbitrage rendu avec l'humain en ouverture de session. **Conséquence assumée** : une URL mal
+collée ou une valeur d'audit mal recopiée reste telle quelle dans l'interface, alors que le produit,
+le projet et l'activité se corrigent tous depuis T2.5, T2.6 et T3.4. C'est le premier objet de Vision
+qui s'écrit sans se relire. À reprendre avec le ticket d'archivage déjà attendu en C7 pour le produit
+et le projet, qui traitera les deux gestes manquants du même mouvement — corriger et ranger.
+
+**C4 (découpage) — `resources.source_updated_at` n'est saisi par aucun ticket.** La colonne existe
+depuis T1.2 (`docs/04` §4, « date de mise à jour côté source, si connue »), mais la ligne de
+`docs/05` §3 ne nomme que le lien, le titre, le type et le rattachement. Elle restera nulle sur toute
+ressource créée par l'interface. Deux façons de la remplir un jour : une saisie à la main, qui
+demanderait à quelqu'un d'aller lire une date dans SharePoint, ou la synchronisation des métadonnées
+— explicitement hors périmètre du POC (`docs/05` §4, « le lien suffit ; la synchronisation demande
+des autorisations Graph longues à obtenir »). La seconde est la seule qui vaille, et elle n'est pas
+pour ce POC.
+
+**C4 (découpage) — Relier une ressource ne déplace pas la fraîcheur du projet, et `docs/03` §8 peut
+se lire autrement.** Le document dit « la date la plus récente parmi ses activités **et
+modifications** ». T2.1 a tranché le calcul sur les seules activités, `planned` exclues, et T3.3 à
+T3.6 l'ont vérifié par l'écran quatre fois. Le découpage de C4 ne rouvre pas cette décision : aucun
+de ses tickets n'appelle `refreshLastActivity`. **Le désaccord potentiel est consigné, pas arbitré**
+— si l'usage montre qu'un projet vivant paraît figé parce que ses contributeurs y attachent des
+liens sans saisir d'activité, c'est cette note qu'il faudra relire, et la question sera celle du sens
+de la colonne : « dernière activité » ou « dernière écriture ».
+
+**C4 (découpage) — Trois colonnes du schéma restent sans aucun geste après C4.** `tools.base_url`,
+`results.external_ref` et `results.synced_at` ont été créées en T1.2 pour éviter une migration le
+jour où Ergonome exposera son API (`docs/04` §4, D15). Aucun ticket de C4 ne les écrit ni ne les lit :
+le lien profond se colle en entier dans `results.external_url` plutôt que de se composer à partir de
+`base_url` et d'un identifiant, parce que rien du POC ne connaît la forme d'une URL d'Ergonome.
+`tools.base_url` est d'ailleurs vide sur les quatre outils de la fixture. À reprendre avec le
+branchement de niveau 3, pas avant.
+
+**C4 (découpage) — Les deux résultats de la fixture n'ont pas de lien profond, et T4.3 en fait un cas
+normal plutôt qu'un manque à combler.** Le point était déjà ouvert dans `ETAT.md` depuis T1.5 : le
+brief §7 nomme l'outil (« résultat 62/100, lien Ergonome ») sans donner d'adresse, et rien n'a été
+inventé. La conséquence est un critère de validation, et c'est ce qui en fait un bon critère : sur les
+deux entrées de roadmap qui portent un résultat, la valeur s'affiche et **aucun lien sortant n'est
+rendu**. Une ressource, elle, n'existe pas sans URL — la colonne est non nulle, et
+`scripts/seed.ts` a dû inventer une adresse en `.invalid` pour la seule ressource semée. Les deux
+objets ne traitent donc pas l'absence de lien de la même façon, et c'est le schéma qui le décide :
+`resources.url` est obligatoire, `results.external_url` ne l'est pas.
+
+**C4 (découpage) — Deux panneaux latéraux sur une même page, l'inconnue technique de C4.** T3.2 a
+posé un panneau ouvert par un paramètre d'URL, le contenu rendu `inert` derrière lui. C4 en ajoute
+deux — `?ressource=` en T4.2, `?resultat=` en T4.4 —, et la page projet portera donc trois
+paramètres d'ouverture pour trois panneaux. Le découpage impose leur **exclusion mutuelle** dès T4.2
+plutôt que de la laisser arriver en T4.4 : deux `role="dialog"` simultanés, ou deux `inert`
+concurrents, ne sont pas rattrapables après coup. C'est le seul endroit de C4 où le ticket rencontre
+quelque chose que C3 n'a pas déjà éprouvé. Noter aussi que le point ouvert d'`ETAT.md` sur la
+coquille de navigation — focalisable derrière le voile sans JavaScript, le layout ne recevant pas les
+`searchParams` — vaudra pour ces deux panneaux comme pour le premier, et qu'une seconde modale est
+exactement la condition que cette note se donnait pour être reprise.
+
+**C4 (découpage) — La maquette place la saisie du résultat dans le panneau d'activité ; le découpage
+l'en sort.** `vision.html` ligne 667 montre une case « Activité terminée — ajouter un résultat » qui
+révèle quatre champs en pied du panneau. T3.2 avait déjà renvoyé ce bloc à C4 dans ses interdits.
+Écarté en découpage, pour deux raisons, arbitrage rendu avec l'humain : sans JavaScript une case ne
+révèle rien — la limite déjà rencontrée par « à planifier » en T3.3, où la note sous la case a dû
+énoncer la règle que le refus fait respecter — et une soumission unique écrirait `activities` puis
+`results` sans transaction, ce qui aggraverait la note de non-atomicité ouverte par T2.6 et rouverte
+par T3.6. Le résultat se saisit donc dans un panneau à lui, ouvert depuis l'entrée de roadmap. **Ce
+que ce choix coûte** : le geste « je termine mon audit et je pose sa valeur » demande deux ouvertures
+de panneau au lieu d'une. À rouvrir si l'usage montre que la seconde ne se fait jamais.

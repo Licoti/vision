@@ -2,10 +2,10 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** T3.6 terminé — participants d'une activité. **C3 est terminé, et avec lui
-le POC minimal démontrable (C1 à C3).**
-**Chantier en cours :** aucun — C4 (ressources et résultats) reste à découper en tickets
-**Ticket en cours :** aucun
+**Dernière mise à jour :** C4 découpé en quatre tickets — `tickets-C4.md`. **C3 est terminé, et avec
+lui le POC minimal démontrable (C1 à C3).**
+**Chantier en cours :** C4 — ressources et résultats, découpé, aucun ticket ouvert
+**Ticket suivant :** T4.1 — bloc « Ressources » de la page projet, lecture
 
 ---
 
@@ -16,7 +16,7 @@ le POC minimal démontrable (C1 à C3).**
 | C1 — Socle technique | T1.1 → T1.6 | **terminé** |
 | C2 — Produits et projets | T2.1 → T2.6 | **terminé** |
 | C3 — Activités et roadmap | T3.1 → T3.6 | **terminé** |
-| C4 — Ressources et résultats | à découper | à faire |
+| C4 — Ressources et résultats | T4.1 → T4.4 | découpé, à faire |
 | C5 — Indicateurs et temps long | à découper | à faire |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
@@ -465,6 +465,19 @@ terminés.
 
 ## Points ouverts
 
+- **Une ressource et un résultat s'écriront sans pouvoir se relire.** Le découpage de C4 s'en tient
+  à la lettre de `docs/05` §3, qui écrit « création et édition » pour le projet et l'activité mais
+  seulement « saisie déclarative » et « lien, titre, type saisi, rattachement » pour les deux objets
+  de C4 — arbitrage rendu avec l'humain, consigné au journal. Ce seront donc les premiers objets de
+  Vision qui n'ont aucun chemin de correction, là où le produit, le projet et l'activité se
+  corrigent tous depuis T2.5, T2.6 et T3.4. **À reprendre avec le ticket d'archivage déjà attendu en
+  C7** — corriger et ranger sont les deux gestes qui manquent, et ils manquent au même endroit.
+- **La page projet portera trois panneaux latéraux et trois paramètres d'ouverture.** `?activite=`
+  depuis T3.2, puis `?ressource=` en T4.2 et `?resultat=` en T4.4. T4.2 doit rendre les paramètres
+  **mutuellement exclusifs** — deux `role="dialog"` ou deux `inert` concurrents ne se rattrapent pas
+  après coup. C'est aussi la « seconde modale » que le point ouvert sur la coquille de navigation
+  ci-dessous se donnait pour condition d'être repris.
+
 - **Pas de tokens d'élévation ni de gradient.** Le design system les nomme sans leur donner de
   valeur. Rien n'a été inventé. **T3.2 est le composant que cette dette attendait**, et la question
   est désormais posée plutôt que théorique : le panneau latéral se sépare du fond par un voile et un
@@ -777,6 +790,13 @@ terminés.
 
 ## Rappels de contexte
 
+- **Modèle par ticket pour C4, arbitré au découpage du 13/08/2026** : **T4.1 et T4.3 sur Opus 4.6
+  Thinking (Antigravity CLI)** — deux lectures qui rejouent T3.1 et le rapprochement des participants
+  de T3.6, sans décision neuve ; **T4.2 sur Sonnet 5 (Claude Code)** — le seul point non rejoué de
+  C4, deux panneaux sur une même page et l'exclusion mutuelle de leurs paramètres d'URL, sur la page
+  la plus consultée du produit ; **T4.4 sur Opus 5 (Claude Code)** — le pivot du chantier et son seul
+  ticket à logique neuve. Le raisonnement de la ligne suivante vaut toujours : le levier reste les
+  disciplines de vérification, pas le modèle.
 - Modèle : **Opus pour C1**, Sonnet à partir de C2 — ce que disent aussi les en-têtes de
   `tickets-C1-C2.md` et de `tickets-C3.md`. **En pratique, C2 puis T3.1 et T3.2 ont été menés avec
   Opus** : un sur-provisionnement par rapport au plan écrit, pas un rattrapage. Arbitrage du
