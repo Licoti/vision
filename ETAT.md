@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** T3.1 terminé — la roadmap est branchée en lecture
+**Dernière mise à jour :** T3.2 terminé — le panneau de saisie s'ouvre et se ferme sans JavaScript
 **Chantier en cours :** C3 — activités et roadmap
-**Ticket en cours :** aucun — prochain ticket : **T3.2 — Panneau latéral de saisie**
+**Ticket en cours :** aucun — prochain ticket : **T3.3 — Création d'une activité**
 
 ---
 
@@ -14,7 +14,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 |---|---|---|
 | C1 — Socle technique | T1.1 → T1.6 | **terminé** |
 | C2 — Produits et projets | T2.1 → T2.6 | **terminé** |
-| C3 — Activités et roadmap | T3.1 → T3.6 | **en cours** — T3.1 fait |
+| C3 — Activités et roadmap | T3.1 → T3.6 | **en cours** — T3.1, T3.2 faits |
 | C4 — Ressources et résultats | à découper | à faire |
 | C5 — Indicateurs et temps long | à découper | à faire |
 | C6 — Liens et journal | à découper | à faire |
@@ -250,13 +250,62 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   prix d'un `.025em` venu de Tailwind, que le design system ne définit pas et que la règle 2
   interdit. Aucun écart de périmètre : les cinq fichiers du plan, et le fichier de tests.
 
+- **T3.2 — 13/08/2026 — panneau latéral de saisie.** L'inconnue technique de tout C3, levée : **un
+  panneau modal sans une ligne de JavaScript.** La réponse tient en deux mécaniques HTML.
+  L'ouverture est une **URL** — `?activite=nouvelle` sur la page projet, qui n'est pas un écran de
+  plus mais le même avec un paramètre : il n'y a pas d'état client à conserver, donc le contexte est
+  conservé par construction. La tabulation est **l'ordre du DOM** — le panneau est rendu avant le
+  contenu, et le contenu porte l'attribut `inert` tant qu'il est ouvert. **Les critères sont tenus
+  et lus dans le HTML servi** : le panneau s'ouvre depuis les deux points d'entrée — en tête du bloc
+  roadmap sur « Autonomie des opérations courantes », et dans l'état vide sur « Refonte de l'espace
+  documents » —, et les **trois** sorties (la croix, « Annuler », le voile) pointent toutes sur la
+  page nue, qui ne contient alors ni `role="dialog"` ni attribut `inert`. L'ordre de tabulation a été
+  **extrait du rendu et non supposé** : lien d'évitement · logo · les quatre entrées de navigation ·
+  la croix · les six contrôles du formulaire · « Annuler », et **rien après** — les cinq éléments
+  focalisables de la page sont sous le `inert`, et le voile porte `tabIndex="-1"`. **Un cinquième
+  fichier s'est ajouté après livraison, à la demande de l'humain** : le panneau laissait la
+  tabulation en sortir, et un cycle fermé n'a aucun équivalent HTML — `tabindex` réordonne, il ne
+  boucle pas. La moitié qui ne coûte rien est restée sans script : `autofocus` sur la croix, un
+  attribut que React 19 rend bien dans le balisage servi, si bien qu'à l'ouverture le focus est déjà
+  dans le panneau et sur la sortie. L'autre moitié est `components/ui/focus-trap.tsx`, un composant
+  client de la même forme que `project-form.tsx` depuis T2.5 — le socle marche sans lui, il ferme le
+  cycle, ajoute Échap, et pose `aria-modal` **au moment seulement où l'attribut devient vrai**. Le
+  tout a été **éprouvé dans Chrome, touches réellement dépêchées** : la 13ᵉ tabulation atteint
+  « Annuler », la 14ᵉ revient sur la croix, aucun arrêt ne sort du panneau, Maj+Tab reboucle dans
+  l'autre sens, un focus posé de force dans la barre latérale est ramené, et Échap ferme. Puis
+  **JavaScript désactivé** : le panneau se rend, `aria-modal` est absent, `inert` est là, la croix
+  ferme vraiment, et le focus repose sur « Fermer le panneau » — lu dans l'arbre d'accessibilité,
+  faute de pouvoir évaluer quoi que ce soit dans ce mode. Le droit a été
+  éprouvé sur **quatre couples personne × projet**, et il fallait bien quatre : Léa Fontaine, témoin
+  de refus de T2.5 et T2.6, est contributrice désignée sur les deux projets d'essai — elle testait
+  `manageDomain`, pas `writeProject`. Repris avec Inès Kaddour (contributrice sur le premier
+  seulement) et Sofia Marchand (sur aucun), ce qui montre ce qu'un seul témoin aurait manqué : le
+  droit est **par projet**, la même personne voit l'action sur l'un et pas sur l'autre. Chez qui ne
+  peut pas écrire, l'URL d'ouverture rend la page nue — 200 et non 404, la page projet restant
+  lisible par tout le domaine (D9). Le contraste a été **mesuré avant d'être cru sur les quatorze
+  couples de l'écran, et une correction en est sortie** : le filet retenu partout depuis T2.3,
+  `content-neutral-normal`, tombe à **1,46:1 contre le voile** — une limite de panneau qu'on devine ;
+  `content-neutral-dark` la rétablit à 3,05:1 côté voile et 8,12:1 côté panneau. C'est ce filet qui
+  porte la séparation, l'ombre de la maquette étant interdite — le design system nomme ses élévations
+  sans les définir, et ce ticket est exactement le composant que cette dette attendait depuis T1.1.
+  Deux arbitrages rendus avec l'humain avant écriture : le formulaire est posé **en entier** dès
+  maintenant, ses deux référentiels lus dans la page faute de pouvoir toucher `lib/queries` — T3.3
+  les déplacera —, et un **seul** paramètre d'URL dont la valeur porte le cas, que T3.4 réutilisera
+  tel quel avec un identifiant d'activité. **Un seul écart de périmètre**, consigné :
+  `components/ui/focus-trap.tsx`, le cinquième fichier ci-dessus. Aucun fichier de tests — le premier
+  ticket depuis T1.3 à n'en ajouter aucun, le ticket ne posant aucune fonction pure à éprouver.
+
 ---
 
 ## Points ouverts
 
 - **Pas de tokens d'élévation ni de gradient.** Le design system les nomme sans leur donner de
-  valeur. Rien n'a été inventé. La question se posera au premier composant qui porte une ombre —
-  panneau latéral (C3) ou modale.
+  valeur. Rien n'a été inventé. **T3.2 est le composant que cette dette attendait**, et la question
+  est désormais posée plutôt que théorique : le panneau latéral se sépare du fond par un voile et un
+  filet, l'ombre de la maquette (`-8px 0 32px rgba(21,21,27,.16)`) n'étant pas inventable. Le voile
+  seul ne suffisait pas — mesuré, il laisse la surface du panneau à 2,66:1 de lui —, et c'est le
+  filet qui a dû être relevé d'un cran pour tenir les 3:1. **À faire remonter à qui maintient le
+  design system**, avec les jetons de bordure et d'interlettrage déjà demandés.
 - **Le contenu rédigé d'`/a-propos` reste à écrire.** La page a son en-tête et son état vide comme
   les cinq autres. Son contenu — ce qu'est Vision, le vocabulaire, ce qu'elle ne fait pas, l'état
   daté — ne demande aucune lecture en base : il aurait pu tenir dans T1.6, et n'y a pas tenu parce
@@ -291,7 +340,36 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   Les intitulés en capitales des maquettes portent `letter-spacing: .04em` ; `app/tokens.css` n'a
   rien de tel, et `tracking-wide` de Tailwind ferait entrer une valeur hors thème. Les capitales
   sont donc rendues sans interlettrage, comme le bandeau de colonnes de `ListHeader` depuis T1.6.
+  **T3.2 en ajoute un quatrième, et il tient au voile de modale** : la couche sémantique n'expose
+  que cinq surfaces à opacité, la plus dense à 40 % (`surface-neutral-opacity-distinct`, exactement
+  la valeur de la maquette). Un voile qui porterait **seul** la séparation du panneau demanderait
+  plus — mesuré, celui-ci laisse le panneau à 2,66:1 de lui. Le panneau s'en sort par son filet, à
+  `content-neutral-dark` : c'est le seul endroit du produit où un filet est plus sombre que celui
+  des contrôles, et il ne le doit qu'à ce manque.
 
+- **La coquille de navigation reste focalisable derrière le voile, sans JavaScript.** Le contenu de
+  la page projet porte `inert` quand le panneau est ouvert, mais la barre latérale vit dans
+  `app/(app)/layout.tsx` — hors du périmètre de T3.2 — et un layout Next ne reçoit pas les
+  `searchParams` : la page ne peut pas la rendre inerte. Avec JavaScript, `FocusTrap` la met hors
+  d'atteinte au clavier et `aria-modal` la retire de l'arbre d'accessibilité, donc le cas ne se
+  produit pas. Sans JavaScript, sortir du panneau par le bas ramène au lien d'évitement, au logo puis
+  aux quatre entrées de navigation avant de revenir sur la croix : le cycle existe, il passe par la
+  coquille. Le tenir vraiment demanderait que le layout connaisse l'état du panneau — à reprendre si
+  une seconde modale arrive, ou avec le ticket qui rebranche les deux blocs manquants de la barre
+  latérale.
+- **Le panneau de saisie affiche un « Enregistrer » inactif entre T3.2 et T3.3.** La fiche de T3.2
+  interdit toute écriture et annonce « le formulaire vide — qui n'enregistre rien à ce stade » : un
+  bouton actif aurait soit ne rien fait, soit rechargé la page en jetant la saisie, et les deux
+  mentent davantage. Il n'est donc pas un arrêt de tabulation, qui se termine sur « Annuler ».
+  **T3.3 lui donne son action et referme ce point** — c'est la première chose que son critère
+  vérifie.
+- **Le formulaire du panneau est posé, sa validation ne l'est pas.** T3.2 rend les cinq champs de
+  `docs/06` §9 — type groupé par famille, case « à planifier », période, approche, objectif — sans
+  aucune règle : rien n'empêche aujourd'hui de cocher « à planifier » **et** de saisir une période,
+  ni de donner une fin antérieure au début. Sans conséquence, le formulaire n'écrivant nulle part.
+  **T3.3 tranche le conflit** et éprouve les trois refus que son critère nomme. Noter au passage que
+  la case ne masque pas la période, comme le fait la maquette : sans JavaScript un champ ne
+  disparaît pas, et c'est la note sous la case qui énonce la règle.
 - **Une activité annulée est invisible entre T3.1 et T3.5.** La roadmap de T3.1 écarte l'état
   `cancelled` de sa lecture, sa fiche lui interdisant le cinquième groupe : c'est T3.5 qui l'ouvre,
   parce que c'est lui qui peut le peupler. La donnée est en base et n'est pas perdue — elle n'est

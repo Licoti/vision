@@ -999,3 +999,119 @@ annoncé — `lib/queries/activities.ts`, ses tests, `components/projects/roadma
 `app/(app)/projets/[id]/page.tsx` et `lib/format.ts`, ce dernier explicitement prévu par la fiche
 « si un libellé de période manque ». Le fichier de tests reste, comme à chaque ticket depuis T1.3,
 un ajout que le périmètre ne nomme pas dans ces termes.
+
+**T3.2 — Un panneau modal sans JavaScript : la réponse est `?activite=` plus `inert`.** C'était
+l'inconnue technique de tout C3, et elle se résout en deux mécaniques HTML, aucune ligne de script.
+L'**ouverture** est une URL : le panneau n'est pas un état de la page projet, c'est une variante de
+cette page — donc rien à sauvegarder, rien à restaurer, et le contexte conservé par construction
+plutôt que par un effort. La **tabulation** est l'ordre du DOM : le panneau est rendu **avant** le
+contenu, et le contenu porte l'attribut `inert` tant qu'il est ouvert. Trois sorties — la croix,
+« Annuler », le voile — mènent au même `href`, la page nue. Bénéfice non recherché de l'URL : le
+panneau ouvert se copie, se partage et s'ouvre dans un onglet, ce qu'un bouton piloté par du
+JavaScript n'aurait fait dans aucun des trois cas.
+
+**T3.2 — `aria-modal` n'est posé que par le script, parce qu'il n'est vrai qu'à partir de là.**
+L'attribut annonce à l'assistance que l'extérieur du dialogue est hors d'atteinte : c'est faux tant
+que rien ne piège le focus, et vrai dès que `FocusTrap` s'exécute. Il est donc **absent du balisage
+servi** et ajouté au montage — vérifié dans les deux sens. `role="dialog"` + `aria-labelledby`
+nomment le panneau dans tous les cas, et `inert` produit l'effet réel sur le contenu de page. Le
+voile, lui, est un `<a>` `aria-hidden` **et** `tabIndex={-1}` : une cible de fermeture à la souris,
+jamais un arrêt de tabulation muet.
+
+**T3.2 — Le cycle de tabulation n'a pas d'équivalent HTML, et c'est la seule chose du panneau qui
+ait demandé du JavaScript.** `tabindex` réordonne les arrêts ; il n'en fait pas une boucle. Après le
+dernier élément, le focus sort dans la barre du navigateur, revient en haut du document et traverse
+le lien d'évitement, le logo et les quatre entrées de navigation — **qui sont derrière le voile et
+restent focalisables**. Rendre la coquille inerte depuis la page est impossible : elle vit dans
+`app/(app)/layout.tsx`, et un layout Next ne reçoit pas les `searchParams`. `components/ui/focus-trap.tsx`
+ferme donc le cycle, ajoute Échap, et ramène dans le panneau un focus parti ailleurs. **La moitié du
+comportement modal, elle, ne coûte rien** : `autofocus` sur la croix est un attribut HTML que React 19
+rend bien dans le balisage servi — vérifié — si bien qu'à l'ouverture le focus est déjà dans le
+panneau, et sur la sortie. Même forme que `project-form.tsx` depuis T2.5 : un composant client dont
+le seul rôle est le confort, posé sur un socle qui fonctionne sans lui. Les enfants sont passés en
+`children` et restent rendus sur le serveur — le référentiel lu en base ne traverse jamais la
+frontière du client.
+
+**T3.2 — Le piège de focus a été éprouvé dans un navigateur, pas déduit du code.** Chrome en mode
+headless, piloté par le protocole DevTools, touches réellement dépêchées. **Avec JavaScript** : le
+focus s'ouvre sur « Fermer le panneau » ; treize tabulations parcourent les six contrôles et
+atteignent « Annuler » ; la quatorzième **revient sur la croix**, et le cycle se répète à l'identique
+— aucun arrêt hors du panneau, la barre latérale n'est jamais atteinte. Maj+Tab depuis le premier
+arrêt donne « Annuler », Tab depuis le dernier donne la croix, et un focus posé de force sur un lien
+de la barre latérale est ramené dans le panneau à la tabulation suivante. Échap ramène à
+`/projets/{id}` et le dialogue disparaît. `aria-modal` vaut `true` après hydratation. **Sans
+JavaScript** (`Emulation.setScriptExecutionDisabled`) : le panneau est rendu, `aria-modal` est
+absent, `inert` est là, les trois sorties pointent sur la page nue, un clic sur la croix ferme
+vraiment — et le focus repose sur « Fermer le panneau », **lu dans l'arbre d'accessibilité** puisque
+`Runtime.evaluate` n'est pas disponible dans ce mode. À noter au passage : un `input type="date"`
+consomme trois ou quatre arrêts de tabulation à lui seul, ses segments jour/mois/année en prenant un
+chacun. Ce n'est pas un défaut, c'est le contrôle natif — mais cela fait treize tabulations là où le
+formulaire n'a que six contrôles, et c'est à savoir avant de compter les arrêts à la main.
+
+**T3.2 — L'ombre du panneau reste absente, et le filet a dû être mesuré pour la remplacer.** La
+maquette sépare le panneau du fond par `-8px 0 32px rgba(21,21,27,.16)` ; le design system nomme
+ses trois élévations sans leur donner de valeur (dette ouverte depuis T1.1, et ce ticket est
+exactement le composant qu'elle y attendait). L'interdit du ticket est explicite : la question se
+fait remonter, elle ne se comble pas. La séparation repose donc sur deux choses, et **la première
+mesure a fait tomber un défaut** : le voile `surface-neutral-opacity-distinct` — `greyscale-900` à
+40 %, soit exactement la valeur de la maquette mais prise au thème — laisse la surface du panneau à
+2,66:1 de lui, et le filet `content-neutral-normal` retenu partout depuis T2.3 s'y effondre à
+**1,46:1**, c'est-à-dire une limite de panneau qu'on devine. `content-neutral-dark` la rétablit à
+3,05:1 côté voile et 8,12:1 côté panneau. C'est le seul endroit du produit où un filet est plus
+sombre que celui des contrôles, et la raison est écrite dans le fichier. **Note pour qui maintient
+le design system** : la couche sémantique n'expose que cinq surfaces à opacité, la plus dense à
+40 % ; un voile de modale qui porterait seul la séparation demanderait plus.
+
+**T3.2 — « Enregistrer » est rendu inactif, faute d'action à lui donner.** La fiche annonce un
+formulaire « qui n'enregistre rien à ce stade » et interdit toute écriture. Un bouton actif aurait
+soit ne rien fait, soit rechargé la page en jetant la saisie — les deux mentent davantage qu'un
+bouton visiblement inactif. Il n'est donc pas un arrêt de tabulation entre T3.2 et T3.3 : l'ordre
+de tabulation se termine sur « Annuler ». `opacity-60` reprend le `disabled:opacity-60` du
+formulaire de projet ; mesuré, il donne 3,99:1, sous les 4,5:1 — un contrôle désactivé en est
+dispensé, mais la mesure est écrite ici plutôt que passée sous silence. **T3.3 lui donne son action
+et referme ce point.**
+
+**T3.2 — La case « à planifier » ne masque pas la période, et c'est du texte qui le dit.** La
+maquette bascule le champ au clic (`sc-if` sur `drawerPlanned`), ce qui suppose du script. Sans lui,
+les deux restent affichés et la note sous la case énonce la règle : cochée, elle remplace la
+période. C'est T3.3 qui arbitre le conflit — période saisie **et** case cochée —, puisque c'est lui
+qui valide.
+
+**T3.2 — `FormField` est redit dans le panneau plutôt qu'importé. Dette assumée.**
+`components/projects/project-form.tsx` porte un `FormField` et une constante `CONTROL` qui font
+exactement ce qu'il faut, mais ce fichier est `"use client"` — l'importer entraînerait un module
+client dans un composant serveur pour quinze lignes de balisage. Le panneau les redit localement.
+**Troisième occurrence du même motif** (produit, projet, activité) : c'est le seuil à partir duquel
+l'extraction se justifie. T3.4 reprend ce fichier et sera le bon moment pour poser
+`components/ui/form-field.tsx`, si le besoin se confirme.
+
+**T3.2 — Les deux référentiels sont lus dans la page, pas dans `lib/queries`. Écart assumé, et
+provisoire.** Le type d'activité groupé par famille et l'approche viennent du domaine ; la fiche de
+T3.2 exclut `lib/queries/*` de son périmètre alors que celle de T3.3 nomme explicitement
+`lib/queries/activities.ts`. Le choix — arbitré avec l'humain avant écriture — est de poser le
+formulaire complet dès maintenant et de lire les deux référentiels dans
+`app/(app)/projets/[id]/page.tsx`, fichier du périmètre, par `session.db.list` : la règle 1 tient,
+et T3.3 déplacera la lecture là où sa propre fiche la place. Les deux requêtes ne sont émises **que
+si le panneau s'ouvre** — la page la plus consultée du produit ne les paie pas pour un panneau
+fermé.
+
+**T3.2 — Léa Fontaine n'est pas le témoin « non contributeur » que T2.5 et T2.6 en avaient fait.**
+Les deux tickets précédents l'ont utilisée pour éprouver un refus, et à juste titre : ils testaient
+`manageDomain`, qu'elle n'a pas. Mais elle est contributrice désignée sur « Autonomie des opérations
+courantes » **et** sur « Refonte de l'espace documents », les deux projets d'essai de ce ticket —
+elle a donc `writeProject` sur les deux. La vérification a été refaite avec Inès Kaddour
+(contributrice sur le premier, pas sur le second) et Sofia Marchand (sur aucun des deux), ce qui a
+au passage éprouvé ce qu'un seul témoin n'aurait pas montré : le droit est **par projet**, et la
+même personne voit l'action sur l'un et pas sur l'autre. **À retenir pour C3 et C4** : le témoin
+d'un refus dépend du droit testé, et la fixture n'a pas de personne sans aucun droit d'écriture.
+
+**T3.2 — Écarts de périmètre : un seul, `components/ui/focus-trap.tsx`.** Les quatre fichiers de la
+fiche sont ceux du plan — `components/projects/activity-panel.tsx`,
+`app/(app)/projets/[id]/page.tsx`, `components/projects/roadmap.tsx`, `lib/navigation.ts`. Le
+cinquième est venu d'une demande de l'humain après livraison, le panneau laissant sortir la
+tabulation ; il vit dans `components/ui/` et non dans `components/projects/` parce qu'il ne sait
+rien des activités — T3.4 et T3.5 rouvrent le même panneau, et une modale de C4 s'en servira. Il ne
+pouvait pas tenir dans `activity-panel.tsx` : `"use client"` s'applique au module entier, et le
+panneau importe l'énuméré `activityFamily` du schéma. Aucun fichier de tests n'est ajouté, pour la
+première fois depuis T1.3 : le ticket ne pose aucune fonction pure à éprouver — ses arbitrages sont
+de rendu, et se vérifient dans le HTML servi et dans un navigateur, comme ceux de T1.6.

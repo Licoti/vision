@@ -22,6 +22,21 @@ export type NavEntry = {
 };
 
 /**
+ * Le panneau de saisie d'activité s'ouvre par un paramètre d'URL sur la page du
+ * projet, qui reste rendue derrière lui (D30). Le contexte est alors conservé
+ * **par construction** : il n'y a pas d'état client à préserver, puisqu'il n'y
+ * a pas d'état client.
+ *
+ * Une seule clé, dont la **valeur** porte le cas : `nouvelle` ici, et
+ * l'identifiant de l'activité à corriger en T3.4. Deux paramètres auraient fait
+ * deux lectures à tenir cohérentes pour une seule décision.
+ */
+export const ACTIVITY_PANEL_PARAM = "activite";
+
+/** La valeur d'ouverture en création. T3.4 y mettra un UUID d'activité. */
+export const ACTIVITY_PANEL_NEW = "nouvelle";
+
+/**
  * Les adresses des six écrans, et des formulaires qui les alimentent. Les
  * pages de détail prennent un identifiant : le schéma en pose des UUID, et
  * rien ne promet encore de slug — ce choix revient à C2, avec l'écran qui
@@ -51,6 +66,13 @@ export const ROUTES = {
   projectNewForProduct: (productId: string) =>
     `/projets/nouveau?produit=${productId}`,
   projectEdit: (id: string) => `/projets/${id}/modifier`,
+  /**
+   * La page du projet, panneau de saisie ouvert. **Ce n'est pas un écran de
+   * plus** : c'est le même, avec un paramètre — et la fermeture est donc
+   * `project(id)`, qui n'a pas besoin d'entrée à elle.
+   */
+  projectActivityNew: (id: string) =>
+    `/projets/${id}?${ACTIVITY_PANEL_PARAM}=${ACTIVITY_PANEL_NEW}`,
   about: "/a-propos",
 } as const;
 

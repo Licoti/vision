@@ -4,9 +4,15 @@
  * `docs/06` §5 : elle vient immédiatement après l'en-tête, avant tout bloc de
  * référence. C'est le récit de l'accompagnement, et la raison d'être de Vision.
  *
- * Le composant porte **la section entière**, son en-tête compris. T3.2 doit
- * poser « Ajouter une activité » en tête du bloc *et* dans l'état vide : les
- * deux emplacements vivent ici, et la page n'aura pas à connaître ce détail.
+ * Le composant porte **la section entière**, son en-tête compris. T3.2 tient la
+ * promesse écrite ici par T3.1 : « Ajouter une activité » est en tête du bloc
+ * *et* dans l'état vide, les deux emplacements vivent ici, et la page n'a pas à
+ * connaître ce détail. En **tête**, jamais en pied (`docs/06` §5) : l'action
+ * doit être visible sans avoir à parcourir la roadmap entière.
+ *
+ * `addHref` à `null` retire les deux : l'action n'existe que pour qui peut
+ * écrire dans ce projet (D9). Le composant, lui, ne connaît aucun droit — c'est
+ * l'appelant qui les lit, comme pour `PageHeader` depuis T1.6.
  *
  * Quatre groupes seulement (`docs/03` §6) : le cinquième — annulé — arrive avec
  * T3.5, le ticket qui peut le peupler.
@@ -14,6 +20,8 @@
  * Aucune lecture en base : le composant reçoit ce que `listProjectRoadmap` a
  * déjà groupé et trié.
  */
+
+import Link from "next/link";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeader } from "@/components/ui/section";
@@ -43,12 +51,29 @@ const GROUP_TONE: Record<RoadmapGroupKey, { dot: string; edge: string }> = {
   done: { dot: "bg-surface-success-base", edge: "border-l-surface-success-base" },
 };
 
-export function Roadmap({ groups }: { groups: RoadmapGroup[] }) {
+export function Roadmap({
+  groups,
+  addHref,
+}: {
+  groups: RoadmapGroup[];
+  /** L'ouverture du panneau de saisie, ou `null` pour qui ne peut pas écrire. */
+  addHref: string | null;
+}) {
   return (
     <section className="flex flex-col gap-4">
       <SectionHeader
         title="Roadmap des activités"
         note="Le récit de l'accompagnement, au mois."
+        {...(addHref
+          ? {
+              action: (
+                <AddActivity
+                  href={addHref}
+                  className="border border-content-neutral-normal bg-surface-neutral-pale text-content-primary-dark"
+                />
+              ),
+            }
+          : {})}
       />
 
       {groups.length > 0 ? (
@@ -61,9 +86,47 @@ export function Roadmap({ groups }: { groups: RoadmapGroup[] }) {
         <EmptyState
           title="Aucune activité pour l'instant"
           description="La roadmap réunira ici les ateliers, tests, audits et restitutions de l'accompagnement, groupés par état : en cours, prévu, à planifier, terminé. Chaque activité portera son type, son objectif, sa période, son approche et, le cas échéant, son résultat avec le lien vers l'outil qui l'a produit."
+          {...(addHref
+            ? {
+                action: (
+                  <AddActivity
+                    href={addHref}
+                    className="bg-surface-primary-base text-content-neutral-pale"
+                  />
+                ),
+              }
+            : {})}
         />
       )}
     </section>
+  );
+}
+
+/**
+ * L'action d'ouverture du panneau, aux deux emplacements.
+ *
+ * C'est un lien et non un bouton, parce que c'en est un : il mène à une URL,
+ * celle de la page du projet portant `?activite=nouvelle`. Il se copie, se
+ * partage, s'ouvre dans un onglet — ce qu'un bouton d'ouverture piloté par du
+ * JavaScript n'aurait fait dans aucun des trois cas.
+ *
+ * Le `+` de la maquette est décoratif : « Ajouter une activité » se lit seul.
+ */
+function AddActivity({
+  href,
+  className,
+}: {
+  href: string;
+  className: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold ${className}`}
+    >
+      <span aria-hidden="true">+</span>
+      Ajouter une activité
+    </Link>
   );
 }
 
