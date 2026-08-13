@@ -43,9 +43,18 @@
  * quand le script est là, et **`aria-modal` n'est posé que par lui** — annoncer
  * que l'extérieur est hors d'atteinte serait faux tant que rien ne l'empêche.
  *
+ * **Un seul formulaire, deux points d'entrée** (T3.4). Corriger une activité
+ * ouvre ce panneau-ci, pré-rempli : mêmes champs, mêmes règles, même
+ * validation. Ce qui change tient en trois props d'affichage — le titre,
+ * l'intitulé du bouton, la saisie de départ — et **rien dans le comportement**.
+ * Le panneau ne sait pas s'il crée ou s'il corrige : c'est l'action qui le
+ * sait, et elle est liée côté serveur.
+ *
  * **L'état ne se saisit pas, il se déduit de la période** (`docs/06` §9). Le
  * panneau ne porte donc aucun choix d'état : la règle vit dans
- * `lib/forms/activity.ts`, et la correction à la main est le geste de T3.5.
+ * `lib/forms/activity.ts`, et la correction à la main est le geste de T3.5. En
+ * correction, cette dérivation n'a lieu **que si la période a bougé** — même
+ * fichier, même raison.
  *
  * **Aucune ombre.** Le design system nomme ses élévations sans leur donner de
  * valeur (`docs/design/design-system.md` §8) ; la séparation vient du voile et
@@ -59,6 +68,7 @@ import { FocusTrap } from "@/components/ui/focus-trap";
 import {
   EMPTY_ACTIVITY_VALUES,
   type ActivityFormState,
+  type ActivityFormValues,
 } from "@/lib/forms/activity";
 import type {
   ActivityFamily,
@@ -110,20 +120,37 @@ export function ActivityPanel({
   action,
   activityTypes,
   approaches,
+  title = "Nouvelle activité",
+  submitLabel = "Enregistrer",
+  initial = EMPTY_ACTIVITY_VALUES,
 }: {
   projectName: string;
   /** La page du projet, sans son paramètre. Les trois sorties y mènent. */
   closeHref: string;
-  /** L'action serveur, **déjà liée au projet** côté serveur. */
+  /**
+   * L'action serveur, **déjà liée** côté serveur : au projet en création, au
+   * projet **et** à l'activité en correction. Le panneau ne connaît ni l'un ni
+   * l'autre — il ne sait même pas lequel des deux gestes il sert.
+   */
   action: (
     state: ActivityFormState,
     formData: FormData,
   ) => Promise<ActivityFormState>;
   activityTypes: readonly ActivityTypeOption[];
   approaches: readonly ApproachOption[];
+  /** « Nouvelle activité », ou le type de celle qu'on corrige. */
+  title?: string;
+  submitLabel?: string;
+  /**
+   * La saisie de départ — vide en création, la ligne existante en correction
+   * (T3.4). C'est l'**état initial** de `useActionState` : un refus le remplace
+   * par ce qui vient d'être tapé, et le pré-remplissage ne réapparaît jamais
+   * par-dessus une saisie en cours.
+   */
+  initial?: ActivityFormValues;
 }) {
   const [state, submit, pending] = useActionState(action, {
-    values: EMPTY_ACTIVITY_VALUES,
+    values: initial,
     errors: {},
   });
 
@@ -178,7 +205,7 @@ export function ActivityPanel({
               id={titleId}
               className="text-md font-semibold text-content-neutral-darkest"
             >
-              Nouvelle activité
+              {title}
             </h2>
             {/* Le nom du projet : le panneau ne quitte pas son contexte, il
                 le rappelle. */}
@@ -425,7 +452,7 @@ export function ActivityPanel({
               disabled={pending}
               className="rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale disabled:opacity-60"
             >
-              {pending ? "Enregistrement…" : "Enregistrer"}
+              {pending ? "Enregistrement…" : submitLabel}
             </button>
             <Link
               href={closeHref}

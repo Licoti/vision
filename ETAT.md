@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** T3.3 terminé — une activité se saisit, et son état se déduit de sa période
+**Dernière mise à jour :** T3.4 terminé — une activité se corrige, et l'état ne se redérive que si la période a bougé
 **Chantier en cours :** C3 — activités et roadmap
-**Ticket en cours :** aucun — prochain ticket : **T3.4 — Édition d'une activité**
+**Ticket en cours :** aucun — prochain ticket : **T3.5 — Cycle de vie : changement d'état et annulation**
 
 ---
 
@@ -14,7 +14,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 |---|---|---|
 | C1 — Socle technique | T1.1 → T1.6 | **terminé** |
 | C2 — Produits et projets | T2.1 → T2.6 | **terminé** |
-| C3 — Activités et roadmap | T3.1 → T3.6 | **en cours** — T3.1, T3.2, T3.3 faits |
+| C3 — Activités et roadmap | T3.1 → T3.6 | **en cours** — T3.1, T3.2, T3.3, T3.4 faits |
 | C4 — Ressources et résultats | à découper | à faire |
 | C5 — Indicateurs et temps long | à découper | à faire |
 | C6 — Liens et journal | à découper | à faire |
@@ -343,6 +343,54 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   passage `listActivityFormOptions` — et deux lignes de commentaire devenues fausses dans
   `components/ui/focus-trap.tsx`.
 
+- **T3.4 — 13/08/2026 — édition d'une activité.** Le ticket qui consomme **l'arbitrage (c)** rendu
+  d'avance, et le premier de C3 à ne rien ajouter au vocabulaire : mêmes champs, mêmes règles, même
+  panneau — un seul formulaire, deux points d'entrée. **Le critère est tenu et lu dans le HTML
+  servi**, dans les deux sens : la Formation « à planifier » d'« Autonomie des opérations
+  courantes » datée de novembre 2026 quitte son groupe pour « Prévu », **derrière l'Audit UX
+  d'octobre** — l'ordre interne de T3.1 se vérifie au passage —, et recochée sans date elle revient.
+  Un type et un objectif modifiés se lisent sur la roadmap : « Audit UX » devient « Revue experte »
+  avec sa phrase. **La re-soumission à l'identique ne change aucune ligne au sens strict** :
+  `updated_at` est relu **à la milliseconde près de part et d'autre** et n'a pas bougé — l'action
+  compare les sept colonnes et n'appelle pas `update`. C'était un arbitrage rendu avec l'humain en
+  ouverture : le journal de C6 n'aura rien à enregistrer d'une modification qui n'en est pas une.
+  **L'arbitrage (c) a été éprouvé sur le vrai chemin, pas seulement en test** : un `state` posé à la
+  main en base — ce que fera T3.5 — sur une activité de mars 2026 que la dérivation dirait `done`
+  survit à la correction de son seul objectif, et **retombe à `done` dès que la période bouge d'un
+  seul jour**. La fraîcheur suit : une fin de période portée au 15 septembre fait passer la liste
+  transverse d'août à **septembre 2026**, puis revenir. Le parcours entier a été joué **sans une
+  ligne de JavaScript**, par soumissions `multipart` reconstituées sans en-tête `Next-Action` — ce
+  sont les champs `$ACTION_…` du balisage servi qui portent l'action. **Nuance à consigner : aucun
+  navigateur n'a été piloté cette fois**, faute d'outil dans la session, là où T3.2 et T3.3
+  dépêchaient de vraies touches dans Chrome ; le panneau n'ayant pas changé de forme, ce qui restait
+  à éprouver était le chemin serveur, et il l'a été. **Le droit a été éprouvé par l'action** : chez
+  Sofia Marchand — contributrice sur « Refonte du parcours de virement » et sur lui seul — la
+  roadmap ne porte **aucun** lien « Modifier », l'URL d'édition rend la page nue en 200, et les
+  champs récoltés chez Camille Roux puis repostés sous son cookie laissent **la ligne inchangée en
+  base**. Deux liaisons forgées ont été refusées de la même façon, la ligne relue intacte : une
+  activité **d'un autre projet**, et une activité **annulée** — passée telle à la main pour
+  l'occasion, la fixture n'en contenant aucune. **Cinq refus de saisie éprouvés séparément** sur le
+  chemin d'édition, et dans les cinq cas la saisie revient dans le panneau : case cochée avec une
+  période, fin avant début, type effacé, fin sans début, date impossible. **Le type archivé est
+  éprouvé pour la première fois du projet** : « Formation » archivé en base, son activité garde son
+  option **sélectionnée** — 25 options dans le panneau d'édition, 24 dans celui de création, où il a
+  disparu —, et l'objectif se corrige sans qu'on impose un changement de type. Les 17 tests ajoutés
+  ont été **mis en défaut six fois**, et deux d'entre eux n'ont pas résisté à l'exercice : la
+  neutralisation de la conservation de l'état n'en faisait tomber que deux sur quatre, et celle de
+  la case **aucun** — les deux tests concernés comparaient des valeurs que la dérivation rendait
+  identiques par hasard. Ils ont été récrits sur des cas discriminants, et le second a mis au jour
+  une propriété qui n'était écrite nulle part : **le schéma autorise `is_unscheduled` avec une
+  période**, si bien que décocher la case sans toucher aux dates ne change *que* la case — sans ce
+  terme dans la comparaison, la case serait restée cochée. Un défaut a été fermé avant livraison
+  sans avoir jamais été atteignable : `ActivityPanel` porte une `key`, faute de quoi un panneau
+  réutilisé d'une activité à l'autre afficherait la saisie de la précédente — `useActionState` ne
+  relit son état initial qu'au montage. Le contraste a été **mesuré** : le seul couple neuf par sa
+  position, « Modifier » sur l'entrée de roadmap, donne **15,72:1**, et le lien est souligné.
+  Écarts de périmètre, tous quatre annoncés avant écriture : `app/(app)/projets/[id]/page.tsx` —
+  elle seule lit `?activite=` —, `lib/navigation.ts`, `lib/queries/activities.ts` et son fichier de
+  tests. **La base de développement est revenue exactement à son état d'avant le ticket** : le
+  critère de T3.1 s'y relit mot pour mot, et la fraîcheur du projet est de nouveau août 2026.
+
 ---
 
 ## Points ouverts
@@ -398,6 +446,10 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   `content-neutral-normal` pour ses contrôles et `content-danger-base` pour un champ en erreur, sans
   en inventer un troisième — les neuf couples de l'écran ont été mesurés et aucune correction n'en
   est sortie.
+  **T3.4 n'ajoute rien non plus** : son seul couple neuf par la position, le lien « Modifier » sur
+  l'entrée de roadmap, est `content-primary-dark` sur `surface-neutral-pale` — celui d'« Annuler »
+  dans le panneau depuis T3.2, **mesuré à 15,72:1**. Le lien est souligné : sa nature ne dépend pas
+  de sa couleur.
 
 - **La coquille de navigation reste focalisable derrière le voile, sans JavaScript.** Le contenu de
   la page projet porte `inert` quand le panneau est ouvert, mais la barre latérale vit dans
@@ -446,6 +498,13 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   lient déjà un identifiant — tous deux exigent `manageDomain`, un droit qui ne dépend d'aucun
   identifiant, donc rien à reprendre. À revoir le jour où une action liera une valeur **dont dépend**
   un droit.
+  **T3.4 est ce jour-là, et la règle a tenu.** `updateActivity` lie **deux** valeurs, et la seconde —
+  l'identifiant de l'activité — désigne la ligne écrite : elle a été relue en clair dans le champ
+  `$ACTION_1:1` du balisage servi, à côté du projet. La parade n'est pas de la cacher mais de ne
+  jamais lui faire confiance : l'action rapproche l'activité **reçue** du projet **reçu**, et refuse
+  si elle n'en relève pas, si elle est archivée ou si elle est annulée. Les deux premiers cas ont été
+  forgés et refusés, la ligne relue intacte en base ; le troisième a demandé de rendre une activité
+  annulée à la main, la fixture n'en portant aucune.
 - **La base de développement porte cinq activités archivées de plus depuis T3.3.** Les cinq saisies
   de vérification ont été **archivées et non supprimées** (règle 4) une fois les critères lus : la
   roadmap les écarte, si bien que le critère de T3.1 se relit mot pour mot sur « Autonomie des
@@ -462,13 +521,17 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   activité saisie **par erreur** n'a donc aucun chemin. À joindre au ticket d'archivage déjà
   attendu en C7 pour le produit et le projet.
 
-- **Trois arbitrages rendus d'avance pour T3.3, T3.4 et T3.5 — 13/08/2026.** Ils ne sont dans aucun
-  document, ils ont été tranchés avec l'humain hors ticket, et ils sont à consommer tels quels.
-  **(a) et (b) ont été consommés par T3.3**, sans écart : la table de dérivation est écrite telle
-  quelle dans `deriveActivityState`, et le refus (b) est le quatrième des sept. **(c) attend T3.4**,
-  et reste à lire avant d'écrire une ligne de ce ticket. T3.3 lui laisse le terrain net : la
-  dérivation est une fonction pure qui reçoit la période et le jour, donc T3.4 n'aura qu'à décider
-  **s'il l'appelle**, jamais à la réécrire.
+- ~~**Trois arbitrages rendus d'avance pour T3.3, T3.4 et T3.5 — 13/08/2026.**~~ **Les trois sont
+  consommés.** Ils ne sont dans aucun document, ils ont été tranchés avec l'humain hors ticket.
+  **(a) et (b) l'ont été par T3.3**, sans écart : la table de dérivation est écrite telle quelle
+  dans `deriveActivityState`, et le refus (b) est le quatrième des sept. **(c) l'a été par T3.4**,
+  sans écart non plus et sans colonne ajoutée : `resolveActivityPeriod` compare la période soumise à
+  celle de la ligne — **normalisée des deux côtés**, `""` et `null` étant la même absence — et rend
+  la ligne existante telle quelle si rien n'a bougé, la dérivation sinon. La prédiction de T3.3 s'est
+  vérifiée : T3.4 n'a eu qu'à décider **s'il appelle** la dérivation, sans en réécrire une ligne.
+  **Ce que T3.4 a découvert et que l'arbitrage ne disait pas** : la comparaison doit porter sur
+  `is_unscheduled` **aussi**, le schéma n'interdisant pas la case avec une période — sans ce terme,
+  décocher la case sans toucher aux dates n'aurait rien changé du tout.
 
   **a. Dérivation période → état. Vision ne fabrique aucune date.** « À planifier » cochée sans
   date → `planned` + `is_unscheduled`. Deux bornes saisies → `planned`, `in_progress` ou `done`
@@ -500,6 +563,12 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   pas affichée. Sans conséquence aujourd'hui, la fixture ne contenant aucune activité annulée et
   aucun écran ne pouvant en produire. **Le jour venu, T3.5 retire le `ne(state, 'cancelled')` de
   `listProjectRoadmap` et ajoute une cinquième entrée à `GROUPS` — rien d'autre.**
+  **T3.4 ajoute une décision à reprendre là** : une activité annulée **ne s'édite pas** — ni par le
+  panneau, ni par l'action, éprouvé sur une activité rendue annulée à la main. La raison est qu'une
+  période déplacée la ferait sortir de `cancelled` sans qu'on l'ait demandé, et que ce geste
+  appartient à T3.5. Quand le cinquième groupe s'ouvrira, ses entrées porteront donc un lien
+  « Modifier » qui, en l'état, ne mènerait à rien : **soit T3.5 le retire pour ce groupe, soit il
+  autorise l'édition d'une annulée en décidant ce que devient son état.** Le choix lui revient.
 - **Les filtres ne survivent pas à un aller-retour par la navigation principale.** `docs/06` §9
   demande qu'ils soient conservés quand on entre dans un projet et qu'on revient. Ils vivent dans
   l'URL, donc le retour navigateur les restitue ; un clic sur « Projets » dans la barre latérale
@@ -535,6 +604,15 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   rattachement absent des options. Noter la nuance retenue au passage — dans le même formulaire,
   les entités servant à **décrire** un produit sont lues archivées comprises, parce qu'on ne
   choisit pas une entité, on la lit. Décrire et proposer n'appellent pas le même filtre.
+  **T3.4 tranche le même cas autrement, et l'écart est à connaître.** Sa fiche l'exigeait — « un type
+  d'activité archivé, si l'activité éditée le pointe, reste sélectionné et disparaît des autres
+  options » — et `listActivityFormOptions` porte donc une **exception nominative**,
+  `or(archived_at is null, id = celui-ci)`, le motif de `findAccompanimentRank`. C'est le seul
+  endroit du produit qui la porte : **le formulaire de produit et celui de projet exigeraient encore
+  un nouveau choix** là où celui d'activité conserve la valeur. Le comportement de T3.4 est le bon —
+  on n'oblige pas à changer un type pour corriger un objectif —, et il est désormais **éprouvé** :
+  25 options en édition, 24 en création. Les deux autres formulaires sont à aligner dessus au premier
+  ticket qui les touchera, et le point ci-dessus n'est plus théorique nulle part.
 
 - **La création d'un projet n'est pas atomique, et ne peut pas l'être.** `neon-http` n'a pas de
   transaction interactive — la couche n'a que `batch`. Le formulaire écrit `persons`, `projects`
@@ -545,7 +623,10 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
   plus large arrive en C3. **T3.3 ne rouvre pas la question** : la saisie d'une activité écrit **une
   seule table**, et le recalcul de `last_activity_at` part dans le même `batch` que l'insertion,
   donc dans la même transaction. C'est **T3.6** qui la rouvrira, lui qui écrira
-  `activity_participants` à côté d'`activities`.
+  `activity_participants` à côté d'`activities`. **T3.4 ne la rouvre pas davantage** : la correction
+  écrit la même table unique, et le recalcul part dans le même `batch` que la modification —
+  `update` le fait pour les activités comme `insert`, ce que la fraîcheur passée d'août à septembre
+  puis revenue a vérifié par l'écran.
 
 - **On n'ajoute qu'une personne par enregistrement.** Sans JavaScript, un champ répétable n'existe
   pas : le bloc d'ajout de T2.6 crée une personne, et pour en ajouter deux il faut enregistrer puis

@@ -1209,3 +1209,96 @@ de bord instructif** : l'archivage a fait redescendre `last_activity_at` de sept
 l'archivage comme à l'insertion. Noter enfin qu'**aucun écran n'archive une activité** : il a fallu
 passer par la couche. L'annulation de T3.5 ne remplace pas ce geste, elle exige un motif et laisse
 l'activité visible.
+
+**T3.4 — L'arbitrage (c) tient dans une comparaison, mais elle doit porter sur trois champs et pas
+deux.** « L'état n'est redérivé que si la période a bougé » se lit comme une comparaison de deux
+dates. C'en est une de trois valeurs : `is_unscheduled` en fait partie, et l'oublier ne se voit sur
+aucun écran d'aujourd'hui. La raison est dans le schéma :
+`activities_planned_requires_period_or_unscheduled` autorise la case **avec** une période — c'est le
+formulaire de T3.3 qui refuse la combinaison, pas la base. Une telle ligne peut donc exister
+(amorçage, T3.5, écriture par la couche), et décocher sa case sans toucher aux dates ne changerait
+alors *que* la case : sans le troisième terme, la ligne existante serait rendue telle quelle et la
+case resterait cochée. Le défaut a été trouvé **en neutralisant**, pas en relisant : le test écrit
+d'abord comparait des valeurs que la dérivation rendait identiques de toute façon, et la
+neutralisation ne faisait tomber aucun test.
+
+**T3.4 — Deux tests écrits ce jour-là ne discriminaient rien, et la mise en défaut l'a montré.** Le
+premier neutralisation de la conservation de l'état ne faisait tomber que deux tests sur les quatre
+qui prétendaient l'éprouver ; les deux autres comparaient `resolveActivityPeriod` à une valeur que
+`deriveActivityState` rendait identique par hasard — « à planifier » réenregistrée telle quelle, et
+une borne vide contre une borne nulle. Ils ont été récrits : le premier sur l'**identité** de l'objet
+rendu (`toBe`), qui distingue « la ligne existante est rendue » de « une ligne équivalente est
+refabriquée » ; le second sur un cas où l'état diverge — une activité `planned` à début seul, que la
+dérivation dirait `in_progress`. **La leçon n'est pas nouvelle mais elle s'est payée ici** : un test
+vert ne prouve rien tant qu'on ne l'a pas vu rouge, et « il passe » n'est pas « il éprouve ».
+
+**T3.4 — Le second argument lié d'une action désigne la ligne écrite, et il est réécrivable.** T3.3
+avait établi qu'un argument lié n'est pas un secret. T3.4 en lie deux, et le second — l'identifiant
+de l'activité — n'est pas de même nature que le premier : il ne sert pas à vérifier un droit, il
+**désigne ce qu'on écrit**. La parade n'est donc pas la même : `writeProject` ne dit rien de
+l'activité, et il a fallu un contrôle d'appartenance explicite — l'activité reçue relève-t-elle du
+projet reçu, est-elle vivante, n'est-elle pas annulée. Sans lui, une liaison repointée aurait écrit
+dans l'activité d'un autre accompagnement en toute légalité de droit, et l'interdit « aucun
+changement de projet de rattachement » serait tombé par la porte de derrière. Éprouvé : liaison
+repointée vers une activité d'un autre projet, refus rendu, les deux lignes relues intactes.
+
+**T3.4 — Une activité annulée ne s'édite pas. Décision de ticket, à reprendre par T3.5.** La roadmap
+n'affiche pas les annulées (T3.1), donc aucun lien n'y mène ; mais une URL se tape, et l'action est
+un point d'entrée HTTP. Le refus est explicite plutôt qu'implicite, pour une raison de fond : une
+période déplacée sur une activité annulée la ferait sortir de `cancelled` **sans qu'on l'ait
+demandé**, la dérivation ne connaissant pas cet état. Décider ce que devient l'état d'une annulée
+qu'on rouvre est le geste de T3.5, pas celui-ci. **Conséquence pour T3.5** : le jour où le cinquième
+groupe s'affiche, ses entrées porteront un lien « Modifier » qui refusera — à retirer pour ce
+groupe, ou à autoriser en tranchant l'état.
+
+**T3.4 — L'écriture est évitée quand rien n'a changé, et c'est un arbitrage, pas une optimisation.**
+« Une re-soumission à l'identique ne change aucune ligne » peut se lire au sens métier — aucune
+donnée ne bouge — ou au sens strict — aucune ligne n'est touchée. Le second a été retenu avec
+l'humain : `session.db.update` repousse `updated_at` et recalcule la fraîcheur, si bien qu'au sens
+métier la ligne aurait quand même porté la trace d'une modification qui n'en est pas une, et le
+journal de C6 l'aurait enregistrée. `activityRowUnchanged` compare les sept colonnes que ce
+formulaire écrit. Vérifié en relisant `updated_at` **à la milliseconde** de part et d'autre d'une
+re-soumission : inchangé. Le panneau se referme quand même — refuser de fermer parce que rien n'a
+changé aurait été une confirmation intermédiaire de plus, que `docs/06` §9 écarte.
+
+**T3.4 — Le type archivé est conservé par une exception nominative, et le produit n'est plus
+cohérent sur ce point.** `listActivityFormOptions` accepte `keepActivityTypeId` et lit alors
+`or(archived_at is null, id = celui-ci)` — le motif de `findAccompanimentRank`, le seul autre endroit
+du code qui excepte une ligne archivée par son identifiant. C'est ce que la fiche exigeait, et c'est
+le bon comportement : obliger à changer le type d'une activité pour en corriger l'objectif serait
+absurde. **Mais la fiche se trompe en présentant cela comme « le même comportement que T2.5 et
+T2.6 »** : ces deux formulaires ne conservent rien — une entité ou un produit archivés disparaissent
+de leurs options et le formulaire exige un nouveau choix, comme le note le point ouvert d'`ETAT.md`
+depuis T2.5. Désaccord consigné plutôt que rejoué : T3.4 fait ce que sa fiche décrit, et les deux
+autres formulaires restent à aligner.
+
+**T3.4 — `ActivityPanel` porte une `key`, pour un défaut qui n'est pas atteignable.**
+`useActionState` ne relit son état initial qu'au montage : un panneau réutilisé d'une activité à
+l'autre afficherait la saisie de la précédente. Le chemin n'existe pas aujourd'hui — le contenu de
+la page est `inert` tant que le panneau est ouvert, donc on repasse toujours par la page nue, où le
+panneau se démonte. La `key` coûte un attribut et rend la garantie indépendante de ce raisonnement,
+qui tomberait le jour où une navigation d'un panneau à l'autre deviendrait possible.
+
+**T3.4 — Ni `lib/forms/dates.ts`, ni `components/ui/form-field.tsx`. Les deux dettes de T3.3 restent
+ouvertes.** T3.3 désignait T3.4 comme le candidat pour l'une et pour l'autre. Aucune n'a été
+refermée, et la raison est la même : ce sont des **fichiers neufs**, hors de la fiche, et le ticket
+portait déjà quatre écarts annoncés. En ajouter deux de plus sans les avoir annoncés aurait été le
+contraire de ce que la règle 3 protège. Noter que T3.4 n'a pas aggravé la première — il n'a écrit
+aucune règle de date nouvelle, `resolveActivityPeriod` comparant des valeurs déjà normalisées par
+`deriveActivityState`. `PanelField` n'a pas bougé non plus.
+
+**T3.4 — Écarts de périmètre : quatre, tous annoncés avant écriture.**
+`app/(app)/projets/[id]/page.tsx` — elle seule lit `?activite=`, donc elle seule peut distinguer
+`nouvelle` d'un identifiant, lire l'activité et lier la bonne action ; `lib/navigation.ts` pour
+`ROUTES.projectActivityEdit`, l'entrée que T3.2 annonçait ; `lib/queries/activities.ts` pour
+l'exception ci-dessus, qu'il aurait fallu sinon écrire dans la page ; et son fichier de tests, dont
+la fixture portait déjà un type d'activité archivé depuis T3.1.
+
+**T3.4 — Aucun navigateur n'a été piloté, et c'est une différence avec T3.2 et T3.3.** Ces deux
+tickets dépêchaient de vraies touches dans Chrome, scripts coupés. La session de T3.4 n'avait pas
+d'outil de pilotage de navigateur. Ce qui a été fait à la place : des soumissions `multipart`
+reconstituées à partir des champs `$ACTION_…` du balisage servi, **sans en-tête `Next-Action`** —
+c'est-à-dire exactement ce qu'envoie un navigateur sans JavaScript. Ce qui n'a donc pas été
+re-vérifié cette fois : le cycle de tabulation et la fermeture par Échap, qui dépendent de
+`FocusTrap`. Le panneau n'a pas changé de forme — mêmes contrôles, même ordre, l'ordre du DOM a été
+relu dans le rendu — mais la vérification est de seconde main sur ce point, et il faut le savoir.

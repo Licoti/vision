@@ -12,7 +12,7 @@
  * sous test, qui est précisément ce que l'écran appelle.
  */
 
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { db } from "@/lib/db/client";
@@ -28,7 +28,11 @@ import {
   projects,
 } from "@/lib/db/schema";
 
-import { listProjectRoadmap, type RoadmapGroup } from "./activities";
+import {
+  listActivityFormOptions,
+  listProjectRoadmap,
+  type RoadmapGroup,
+} from "./activities";
 
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
 const teardownOrder = [
@@ -53,6 +57,10 @@ type Fixture = {
   /** Les deux lignes que la lecture doit écarter, identifiées nommément. */
   cancelledId: string;
   archivedActivityId: string;
+  /** Le type d'activité archivé : proposé à personne, sauf à qui le pointe. */
+  retiredTypeId: string;
+  /** Un type vivant, pour éprouver que l'exception ne duplique rien. */
+  liveTypeId: string;
 };
 
 const suffix = Math.random().toString(36).slice(2, 10);
@@ -221,6 +229,8 @@ async function seedDomain(label: string): Promise<Fixture> {
     doneOnlyId: doneOnly.id,
     cancelledId: cancelled.id,
     archivedActivityId: archived.id,
+    retiredTypeId: retired.id,
+    liveTypeId: audit.id,
   };
 }
 
@@ -423,5 +433,71 @@ describe("listProjectRoadmap — étanchéité du domaine", () => {
 
     expect(flat.length).toBeGreaterThan(0);
     expect(flat.every((label) => label.endsWith(" b"))).toBe(true);
+  });
+});
+
+/* ==========================================================================
+   Le référentiel proposé au choix — T3.4
+
+   « On propose des lignes vivantes » (T3.3), avec **une exception nominative** :
+   le type que l'activité éditée pointe déjà, fût-il archivé depuis. Sans elle,
+   corriger l'objectif d'une activité obligerait à lui changer son type.
+   ========================================================================== */
+
+describe("listActivityFormOptions — le type archivé", () => {
+  /** Les identifiants proposés au choix, dans l'ordre rendu. */
+  async function optionIds(
+    scope: ScopedDb,
+    options?: { keepActivityTypeId?: string },
+  ): Promise<string[]> {
+    const { activityTypes: proposed } = await listActivityFormOptions(
+      scope,
+      options,
+    );
+    return proposed.map((type) => type.id);
+  }
+
+  test("sans exception, un type archivé n'est proposé à personne", async () => {
+    const ids = await optionIds(a.scope);
+    expect(ids).not.toContain(a.retiredTypeId);
+    expect(ids).toContain(a.liveTypeId);
+  });
+
+  test("le type de l'activité éditée reste proposé, archivé compris", async () => {
+    const ids = await optionIds(a.scope, {
+      keepActivityTypeId: a.retiredTypeId,
+    });
+    expect(ids).toContain(a.retiredTypeId);
+  });
+
+  test("l'exception ne retient que celui-là", async () => {
+    // Un second type est archivé le temps du test : conserver l'un ne doit pas
+    // rouvrir la porte à l'autre.
+    await a.scope.archive(activityTypes, a.liveTypeId);
+    try {
+      const ids = await optionIds(a.scope, {
+        keepActivityTypeId: a.retiredTypeId,
+      });
+      expect(ids).toContain(a.retiredTypeId);
+      expect(ids).not.toContain(a.liveTypeId);
+    } finally {
+      await db
+        .update(activityTypes)
+        .set({ archivedAt: null })
+        .where(eq(activityTypes.id, a.liveTypeId));
+    }
+  });
+
+  test("un type vivant conservé ne se dédouble pas", async () => {
+    const ids = await optionIds(a.scope, { keepActivityTypeId: a.liveTypeId });
+    expect(ids.filter((id) => id === a.liveTypeId)).toHaveLength(1);
+  });
+
+  test("l'exception ne traverse pas la frontière de domaine", async () => {
+    const ids = await optionIds(b.scope, {
+      keepActivityTypeId: a.retiredTypeId,
+    });
+    expect(ids).not.toContain(a.retiredTypeId);
+    expect(ids.length).toBeGreaterThan(0);
   });
 });

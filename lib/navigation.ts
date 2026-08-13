@@ -27,13 +27,15 @@ export type NavEntry = {
  * **par construction** : il n'y a pas d'état client à préserver, puisqu'il n'y
  * a pas d'état client.
  *
- * Une seule clé, dont la **valeur** porte le cas : `nouvelle` ici, et
- * l'identifiant de l'activité à corriger en T3.4. Deux paramètres auraient fait
- * deux lectures à tenir cohérentes pour une seule décision.
+ * Une seule clé, dont la **valeur** porte le cas : `nouvelle` en création, et
+ * l'identifiant de l'activité en correction (T3.4). Deux paramètres auraient
+ * fait deux lectures à tenir cohérentes pour une seule décision — la promesse
+ * de T3.2 est tenue sans qu'un caractère de cette forme ait bougé, un UUID ne
+ * pouvant pas valoir `nouvelle`.
  */
 export const ACTIVITY_PANEL_PARAM = "activite";
 
-/** La valeur d'ouverture en création. T3.4 y mettra un UUID d'activité. */
+/** La valeur d'ouverture en création. Toute autre valeur est un identifiant. */
 export const ACTIVITY_PANEL_NEW = "nouvelle";
 
 /**
@@ -73,6 +75,14 @@ export const ROUTES = {
    */
   projectActivityNew: (id: string) =>
     `/projets/${id}?${ACTIVITY_PANEL_PARAM}=${ACTIVITY_PANEL_NEW}`,
+  /**
+   * Le même panneau, sur une activité existante (T3.4) : un seul formulaire,
+   * deux points d'entrée. La fermeture reste `project(id)` — corriger une
+   * activité ne fait pas davantage quitter la page du projet que d'en saisir
+   * une.
+   */
+  projectActivityEdit: (id: string, activityId: string) =>
+    `/projets/${id}?${ACTIVITY_PANEL_PARAM}=${activityId}`,
   about: "/a-propos",
 } as const;
 

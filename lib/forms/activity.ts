@@ -31,6 +31,20 @@
  * Les deux contraintes `CHECK` du schéma tiennent **par construction**, jamais
  * par un rattrapage. C'est aussi pourquoi une fin de période sans début est
  * refusée plutôt que dérivée : une fin seule à venir n'a pas d'état légal.
+ *
+ * ## L'édition ne redérive pas toujours — T3.4
+ *
+ * Arbitrage du 13/08/2026, point (c), rendu d'avance pour ce ticket :
+ * **l'état n'est redérivé que si la période a bougé.** Corriger un objectif, un
+ * type ou une approche ne dit rien de l'état ; déplacer une période, si. Sans
+ * cette règle, T3.4 déferait en silence la correction manuelle de T3.5, et le
+ * défaut ne se verrait qu'en T3.5 — donc en reprise de T3.4.
+ *
+ * Les deux propriétés ci-dessus survivent à l'édition, et il vaut de dire
+ * pourquoi : une période inchangée garde l'état **qui était déjà en base avec
+ * elle**, donc une combinaison que les `CHECK` ont déjà acceptée ; une période
+ * modifiée repasse entièrement par la dérivation. Aucun chemin ne fabrique un
+ * couple neuf.
  */
 
 import { activityState } from "@/lib/db/schema";
@@ -80,6 +94,34 @@ export const EMPTY_ACTIVITY_VALUES: ActivityFormValues = {
   approachId: "",
   objective: "",
 };
+
+/**
+ * La ligne existante, remise en champs de formulaire — le pré-remplissage de
+ * T3.4.
+ *
+ * Le trajet inverse de `readActivityForm`, et il n'en prend que ce que le
+ * formulaire porte : `state` n'y figure pas, puisqu'il ne se saisit pas. Les
+ * colonnes nulles redeviennent des chaînes vides, la forme que rendent les
+ * contrôles HTML — sans quoi un `defaultValue` recevrait `null` et React
+ * rendrait le champ non contrôlé pour de mauvaises raisons.
+ */
+export function toActivityFormValues(row: {
+  activityTypeId: string;
+  isUnscheduled: boolean;
+  periodStart: string | null;
+  periodEnd: string | null;
+  approachId: string | null;
+  objective: string | null;
+}): ActivityFormValues {
+  return {
+    activityTypeId: row.activityTypeId,
+    isUnscheduled: row.isUnscheduled,
+    periodStart: row.periodStart ?? "",
+    periodEnd: row.periodEnd ?? "",
+    approachId: row.approachId ?? "",
+    objective: row.objective ?? "",
+  };
+}
 
 /** Le champ, lu et rogné. Absent ou d'un type inattendu, il vaut « vide ». */
 function field(formData: FormData, name: string): string {
@@ -248,6 +290,45 @@ export function deriveActivityState(
   return { state, periodStart, periodEnd, isUnscheduled: false };
 }
 
+/**
+ * La période et l'état d'une activité déjà en base, tels que l'édition doit
+ * les comparer. `DerivedPeriod` a exactement cette forme : c'est ce qui permet
+ * à `resolveActivityPeriod` de rendre l'un ou l'autre sans les distinguer.
+ */
+export type ActivityCurrent = DerivedPeriod;
+
+/**
+ * La période soumise, telle qu'elle part en base — **et l'état seulement si
+ * la période a bougé.**
+ *
+ * L'arbitrage (c) du 13/08/2026, et la seule chose que T3.4 ajoute à la règle
+ * de T3.3 : `current` à `null` — une création — dérive comme avant ; `current`
+ * fourni et période identique rend la ligne existante **telle quelle**, état
+ * compris, si bien que la correction manuelle de T3.5 survit à l'édition d'un
+ * objectif, d'un type ou d'une approche.
+ *
+ * La comparaison est faite sur les valeurs **normalisées** : `""` et `null`
+ * sont la même absence, et une activité « à planifier » réenregistrée sans
+ * toucher à ses dates ne doit pas passer pour modifiée. C'est aussi pourquoi
+ * elle porte sur les trois champs à la fois — la case fait partie de la
+ * période, elle en tient lieu (D14).
+ */
+export function resolveActivityPeriod(
+  values: ActivityFormValues,
+  today: string,
+  current: ActivityCurrent | null,
+): DerivedPeriod {
+  const derived = deriveActivityState(values, today);
+  if (!current) return derived;
+
+  const unmoved =
+    derived.isUnscheduled === current.isUnscheduled &&
+    derived.periodStart === current.periodStart &&
+    derived.periodEnd === current.periodEnd;
+
+  return unmoved ? current : derived;
+}
+
 /* ==========================================================================
    De la saisie aux lignes
    ========================================================================== */
@@ -269,15 +350,55 @@ export type ActivityRowInput = {
 };
 
 /**
- * Lit le formulaire, le valide, dérive l'état, et rend la ligne à écrire.
+ * Une activité déjà en base, telle que l'édition la compare : sa période, son
+ * état, et les trois colonnes que le formulaire peut changer.
+ */
+export type ActivityCurrentRow = ActivityCurrent & {
+  activityTypeId: string;
+  approachId: string | null;
+  objective: string | null;
+};
+
+/**
+ * La ligne calculée est-elle celle qui est déjà en base ?
+ *
+ * Une re-soumission à l'identique ne doit **rien** écrire : ni `updated_at`
+ * repoussé, ni recalcul de fraîcheur, ni ligne dans le journal de C6 pour une
+ * modification qui n'en est pas une. Sept colonnes, toutes celles que ce
+ * formulaire écrit — les comparer est plus honnête que de laisser la base
+ * absorber une écriture vide.
+ */
+export function activityRowUnchanged(
+  input: ActivityRowInput,
+  current: ActivityCurrentRow,
+): boolean {
+  return (
+    input.activityTypeId === current.activityTypeId &&
+    input.approachId === current.approachId &&
+    input.objective === current.objective &&
+    input.state === current.state &&
+    input.periodStart === current.periodStart &&
+    input.periodEnd === current.periodEnd &&
+    input.isUnscheduled === current.isUnscheduled
+  );
+}
+
+/**
+ * Lit le formulaire, le valide, résout l'état, et rend la ligne à écrire.
  *
  * `input` est non nul **si et seulement si** `errors` est vide : la propriété
  * posée en T2.5, qui évite d'affirmer par un `as` un type que la validation
  * venait de prouver.
+ *
+ * `current` est absent à la création et fourni à l'édition : c'est le seul
+ * paramètre qui distingue les deux gestes, et il ne change que le sort de
+ * l'état (arbitrage (c) — cf. `resolveActivityPeriod`). Le formulaire, sa
+ * lecture et sa validation sont les mêmes des deux côtés.
  */
 export function parseActivityForm(
   formData: FormData,
   today: string,
+  current: ActivityCurrent | null = null,
 ): {
   values: ActivityFormValues;
   errors: ActivityFormErrors;
@@ -288,7 +409,7 @@ export function parseActivityForm(
 
   if (Object.keys(errors).length > 0) return { values, errors, input: null };
 
-  const period = deriveActivityState(values, today);
+  const period = resolveActivityPeriod(values, today, current);
 
   return {
     values,

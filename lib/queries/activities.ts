@@ -13,7 +13,7 @@
  * courant. Règle 1.
  */
 
-import { and, asc, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, ne, or, sql } from "drizzle-orm";
 
 import type { ScopedDb } from "@/lib/db/scoped";
 import {
@@ -52,15 +52,39 @@ export type ActivityFormOptions = {
  * les libellés archivés compris. Décrire et proposer n'appellent pas le même
  * filtre — la même règle qu'en T2.6 pour les entités et les produits.
  *
+ * **Une exception, et une seule : `keepActivityTypeId`** (T3.4). L'activité que
+ * l'on édite peut pointer un type archivé depuis. Il reste alors dans la liste
+ * — donc sélectionné — et n'apparaît nulle part ailleurs : le panneau de
+ * création ne le propose pas, celui d'une autre activité non plus. La règle
+ * n'est pas contredite mais précisée : ce type **est déjà** la valeur de cette
+ * activité, on ne l'offre à personne. Le motif est celui de
+ * `findAccompanimentRank` — `or(is null, = celui-ci)` —, et c'est le seul
+ * endroit du produit où une exception d'archivage est nominative.
+ *
  * `position` est l'ordre du domaine et prime sur l'alphabet ; la famille le
  * précède pour le type, son énuméré portant l'ordre de `docs/03` §2. C'est ce
  * tri qui permet au panneau de grouper en un seul passage, sans retrier.
  */
 export async function listActivityFormOptions(
   scope: ScopedDb,
+  options: { keepActivityTypeId?: string } = {},
 ): Promise<ActivityFormOptions> {
+  const keep = options.keepActivityTypeId;
+
   const [typeRows, approachRows] = await Promise.all([
     scope.list(activityTypes, {
+      /* Sans exception, c'est la couche qui écarte les archivés. Avec, le
+         filtre passe dans le `where` — `includeArchived` ne lève rien de plus
+         que ce que la condition ci-dessous rétablit nommément. */
+      ...(keep
+        ? {
+            includeArchived: true,
+            where: or(
+              isNull(activityTypes.archivedAt),
+              eq(activityTypes.id, keep),
+            ),
+          }
+        : {}),
       orderBy: [
         asc(activityTypes.family),
         asc(activityTypes.position),

@@ -12,7 +12,9 @@
  *
  * `addHref` à `null` retire les deux : l'action n'existe que pour qui peut
  * écrire dans ce projet (D9). Le composant, lui, ne connaît aucun droit — c'est
- * l'appelant qui les lit, comme pour `PageHeader` depuis T1.6.
+ * l'appelant qui les lit, comme pour `PageHeader` depuis T1.6. `editHref` suit
+ * la même règle pour le lien de correction de chaque entrée (T3.4) : chez qui
+ * ne peut pas écrire, la roadmap se lit et ne s'ouvre nulle part.
  *
  * Quatre groupes seulement (`docs/03` §6) : le cinquième — annulé — arrive avec
  * T3.5, le ticket qui peut le peupler.
@@ -27,7 +29,11 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeader } from "@/components/ui/section";
 import { Tag } from "@/components/ui/tag";
 import { formatActivityPeriod } from "@/lib/format";
-import type { RoadmapGroup, RoadmapGroupKey } from "@/lib/queries/activities";
+import type {
+  RoadmapActivity,
+  RoadmapGroup,
+  RoadmapGroupKey,
+} from "@/lib/queries/activities";
 
 /**
  * La pastille d'un groupe, et le filet qui reprend sa couleur sur l'entrée.
@@ -54,10 +60,17 @@ const GROUP_TONE: Record<RoadmapGroupKey, { dot: string; edge: string }> = {
 export function Roadmap({
   groups,
   addHref,
+  editHref,
 }: {
   groups: RoadmapGroup[];
   /** L'ouverture du panneau de saisie, ou `null` pour qui ne peut pas écrire. */
   addHref: string | null;
+  /**
+   * L'ouverture du panneau sur une activité donnée (T3.4), ou `null` pour qui
+   * ne peut pas écrire — la même règle que `addHref`, et le composant ne lit
+   * toujours aucun droit.
+   */
+  editHref: ((activityId: string) => string) | null;
 }) {
   return (
     <section className="flex flex-col gap-4">
@@ -79,7 +92,7 @@ export function Roadmap({
       {groups.length > 0 ? (
         <div className="flex flex-col gap-6">
           {groups.map((group) => (
-            <RoadmapSection key={group.key} group={group} />
+            <RoadmapSection key={group.key} group={group} editHref={editHref} />
           ))}
         </div>
       ) : (
@@ -137,7 +150,13 @@ function AddActivity({
  * l'assistance par le `role="list"` qu'elle expose. Le titre est un `h3` — la
  * section porte le `h2`, et la hiérarchie ne saute pas de niveau.
  */
-function RoadmapSection({ group }: { group: RoadmapGroup }) {
+function RoadmapSection({
+  group,
+  editHref,
+}: {
+  group: RoadmapGroup;
+  editHref: ((activityId: string) => string) | null;
+}) {
   const tone = GROUP_TONE[group.key];
 
   return (
@@ -165,36 +184,82 @@ function RoadmapSection({ group }: { group: RoadmapGroup }) {
 
       <ul role="list" className="flex flex-col gap-2">
         {group.activities.map((activity) => (
-          <li
+          <RoadmapEntry
             key={activity.id}
-            className={`flex flex-wrap items-start justify-between gap-x-6 gap-y-2 rounded-lg border border-surface-neutral-lighter border-l-3 ${tone.edge} bg-surface-neutral-pale px-5 py-4`}
-          >
-            <div className="min-w-55 flex-1">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                <span className="text-sm font-semibold text-content-neutral-darkest">
-                  {activity.typeLabel}
-                </span>
-                {activity.approachLabel ? (
-                  <Tag label={activity.approachLabel} />
-                ) : null}
-              </div>
-              {activity.objective ? (
-                <p className="mt-1.5 text-xs leading-175 text-content-neutral-base">
-                  {activity.objective}
-                </p>
-              ) : null}
-            </div>
-
-            <span className="text-xs whitespace-nowrap text-content-neutral-base">
-              {formatActivityPeriod(
-                activity.periodStart,
-                activity.periodEnd,
-                activity.isUnscheduled,
-              )}
-            </span>
-          </li>
+            activity={activity}
+            edge={tone.edge}
+            {...(editHref ? { editHref: editHref(activity.id) } : {})}
+          />
         ))}
       </ul>
     </div>
+  );
+}
+
+/**
+ * Une entrée : son type, son approche, son objectif, sa période — et le lien
+ * qui la corrige (T3.4).
+ *
+ * **L'entrée n'est pas cliquable en entier**, et c'est un choix : un `<a>` n'en
+ * contient pas un autre, or T3.5 posera dans cette même entrée les boutons de
+ * transition du cycle de vie. C'est le raisonnement tenu en T2.3 pour la ligne
+ * de projet, et il vaut ici pour une raison de plus — l'entrée porte déjà un
+ * texte long, l'objectif, qu'un lien engloberait sans rien y gagner.
+ *
+ * Le nom accessible du lien porte l'activité qu'il ouvre : « Modifier » répété
+ * quinze fois dans une liste de liens ne dit rien à qui les parcourt sans le
+ * contexte visuel. Le mot reste écrit à l'écran — l'`aria-label` complète, il
+ * ne remplace pas.
+ */
+function RoadmapEntry({
+  activity,
+  edge,
+  editHref,
+}: {
+  activity: RoadmapActivity;
+  edge: string;
+  editHref?: string;
+}) {
+  const period = formatActivityPeriod(
+    activity.periodStart,
+    activity.periodEnd,
+    activity.isUnscheduled,
+  );
+
+  return (
+    <li
+      className={`flex flex-wrap items-start justify-between gap-x-6 gap-y-2 rounded-lg border border-surface-neutral-lighter border-l-3 ${edge} bg-surface-neutral-pale px-5 py-4`}
+    >
+      <div className="min-w-55 flex-1">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <span className="text-sm font-semibold text-content-neutral-darkest">
+            {activity.typeLabel}
+          </span>
+          {activity.approachLabel ? (
+            <Tag label={activity.approachLabel} />
+          ) : null}
+        </div>
+        {activity.objective ? (
+          <p className="mt-1.5 text-xs leading-175 text-content-neutral-base">
+            {activity.objective}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="flex flex-col items-end gap-1.5">
+        <span className="text-xs whitespace-nowrap text-content-neutral-base">
+          {period}
+        </span>
+        {editHref ? (
+          <Link
+            href={editHref}
+            aria-label={`Modifier l'activité ${activity.typeLabel} — ${period}`}
+            className="text-xs font-semibold text-content-primary-dark underline"
+          >
+            Modifier
+          </Link>
+        ) : null}
+      </div>
+    </li>
   );
 }

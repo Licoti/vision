@@ -22,7 +22,10 @@
  * modifie pas son identité, qui reste au responsable.
  *
  * **Le panneau de saisie d'activité est cette page, plus un paramètre** (D30,
- * T3.2). `?activite=nouvelle` l'ouvre ; la page reste rendue derrière lui, et
+ * T3.2). `?activite=nouvelle` l'ouvre vide, `?activite=<identifiant>` l'ouvre
+ * sur une activité à corriger (T3.4) — une seule clé, dont la valeur porte le
+ * cas, et un seul formulaire pour les deux gestes. La page reste rendue
+ * derrière lui, et
  * porte alors l'attribut HTML `inert` — sans JavaScript, c'est l'ordre du DOM
  * qui décide de la tabulation, et `inert` est ce qui empêche d'entrer au
  * clavier dans le contenu masqué par le voile.
@@ -39,7 +42,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
-import { createActivity } from "./actions";
+import { createActivity, updateActivity } from "./actions";
 import { ActivityPanel } from "@/components/projects/activity-panel";
 import { Roadmap } from "@/components/projects/roadmap";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
@@ -50,6 +53,8 @@ import { Section, SectionHeader } from "@/components/ui/section";
 import { StatusDot } from "@/components/ui/status-dot";
 import { Tag } from "@/components/ui/tag";
 import { requireSession } from "@/lib/auth/provider";
+import { activities } from "@/lib/db/schema";
+import { toActivityFormValues } from "@/lib/forms/activity";
 import { formatPeriod, formatRank } from "@/lib/format";
 import { ACTIVITY_PANEL_NEW, ROUTES } from "@/lib/navigation";
 import {
@@ -112,7 +117,27 @@ export default async function ProjectPage({
      ici. */
   const canWrite = session.can.writeProject(project.id);
   const { activite } = await searchParams;
-  const panelOpen = canWrite && activite === ACTIVITY_PANEL_NEW;
+
+  /* Une seule clé, dont la **valeur** porte le cas (T3.2) : `nouvelle` crée,
+     un identifiant corrige, tout le reste n'ouvre rien. L'activité est
+     confrontée au projet, à l'archivage et à l'annulation — la roadmap n'en
+     affiche aucune des deux dernières, donc aucun lien n'y mène, mais une URL
+     se tape. Une activité annulée s'édite en T3.5, pas ici. */
+  const edited =
+    canWrite && activite && activite !== ACTIVITY_PANEL_NEW && isUuid(activite)
+      ? await session.db.find(activities, activite)
+      : undefined;
+
+  const activity =
+    edited &&
+    edited.projectId === project.id &&
+    edited.archivedAt === null &&
+    edited.state !== "cancelled"
+      ? edited
+      : null;
+
+  const panelOpen =
+    canWrite && (activite === ACTIVITY_PANEL_NEW || activity !== null);
 
   const [rank, roadmap] = await Promise.all([
     findAccompanimentRank(session.db, project),
@@ -122,28 +147,57 @@ export default async function ProjectPage({
   /* Les deux référentiels ne sont lus **que** si le panneau s'ouvre : la page
      la plus consultée du produit ne paie pas deux requêtes pour un panneau
      fermé. Le tri et le filtre d'archivage vivent dans `lib/queries` depuis
-     T3.3, avec la raison qui les motive. */
+     T3.3, avec la raison qui les motive.
+
+     En correction, le type de l'activité éditée est conservé **même s'il a été
+     archivé depuis** : il reste sélectionné et n'est proposé nulle part
+     ailleurs. Décrire et proposer n'appellent pas le même filtre — la règle de
+     T2.6, ici éprouvable pour la première fois. */
   const panelOptions = panelOpen
-    ? await listActivityFormOptions(session.db)
+    ? await listActivityFormOptions(
+        session.db,
+        activity ? { keepActivityTypeId: activity.activityTypeId } : {},
+      )
     : null;
 
   return (
     <>
       {panelOptions ? (
-        /* L'action est liée **côté serveur** au projet courant, comme
-           `updateProject` l'est dans `/projets/[id]/modifier` : l'identifiant
-           sort ainsi de la saisie, et le panneau ne connaît pas le projet dans
-           lequel il écrit. Ce n'est pas pour autant un verrou — Next sérialise
-           l'argument lié dans un champ `$ACTION_…`, réécrivable. Le verrou est
-           dans l'action, qui interroge `writeProject` sur l'identifiant reçu ;
-           un panneau absent du rendu n'a jamais protégé le point d'entrée HTTP
-           qui l'accompagne. */
+        /* L'action est liée **côté serveur** — au projet courant en création,
+           au projet et à l'activité en correction —, comme `updateProject`
+           l'est dans `/projets/[id]/modifier` : les identifiants sortent ainsi
+           de la saisie, et le panneau ne connaît ni le projet ni l'activité
+           qu'il écrit. Ce n'est pas pour autant un verrou — Next sérialise les
+           arguments liés dans un champ `$ACTION_…`, réécrivable. Le verrou est
+           dans l'action, qui interroge `writeProject` sur l'identifiant reçu et
+           rapproche l'activité reçue de ce projet ; un panneau absent du rendu
+           n'a jamais protégé le point d'entrée HTTP qui l'accompagne. */
         <ActivityPanel
+          /* La `key` change avec ce que le panneau édite, et c'est ce qui
+             garantit un composant neuf : `useActionState` ne relit son état
+             initial qu'au montage, si bien qu'un panneau réutilisé d'une
+             activité à l'autre afficherait la saisie de la précédente. Le
+             chemin n'est pas atteignable aujourd'hui — le contenu est `inert`
+             tant que le panneau est ouvert, donc on repasse toujours par la
+             page nue —, et c'est exactement pourquoi la garantie doit être
+             dans le code plutôt que dans ce raisonnement. */
+          key={activity ? activity.id : ACTIVITY_PANEL_NEW}
           projectName={project.name}
           closeHref={ROUTES.project(project.id)}
-          action={createActivity.bind(null, project.id)}
+          action={
+            activity
+              ? updateActivity.bind(null, project.id, activity.id)
+              : createActivity.bind(null, project.id)
+          }
           activityTypes={panelOptions.activityTypes}
           approaches={panelOptions.approaches}
+          {...(activity
+            ? {
+                title: "Modifier l'activité",
+                submitLabel: "Enregistrer les modifications",
+                initial: toActivityFormValues(activity),
+              }
+            : {})}
         />
       ) : null}
 
@@ -259,6 +313,12 @@ export default async function ProjectPage({
           <Roadmap
             groups={roadmap}
             addHref={canWrite ? ROUTES.projectActivityNew(project.id) : null}
+            editHref={
+              canWrite
+                ? (activityId) =>
+                    ROUTES.projectActivityEdit(project.id, activityId)
+                : null
+            }
           />
 
           <div className="grid gap-5 md:grid-cols-2">
