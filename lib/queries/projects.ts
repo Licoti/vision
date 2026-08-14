@@ -410,6 +410,13 @@ export type ProjectDetail = {
   /** Les approches déclarées, dans l'ordre du référentiel du domaine. */
   approachLabels: string[];
   team: ProjectTeamMember[];
+  /**
+   * Nul tant que l'accompagnement est vivant (T4bis.3). La ligne était déjà
+   * rendue archivée ou non — cet en-tête n'a jamais filtré `archived_at` ; ce
+   * qui manquait était de **le dire** à l'écran, qui la servait à l'identique
+   * dans les deux cas. C'est aussi ce qui commande la lecture seule du rendu.
+   */
+  archivedAt: Date | null;
 };
 
 /**
@@ -422,6 +429,11 @@ export type ProjectDetail = {
  * produit est archivé aussi — règle 4, une donnée archivée reste lisible. La
  * liste transverse les masque tous deux ; les masquer ici casserait un lien
  * déjà distribué.
+ *
+ * `archived_at` sort désormais du `select` (T4bis.3) : la page n'avait aucun
+ * moyen de dire ce qu'elle servait déjà. C'est la même colonne qui porte la
+ * mention datée et la lecture seule de l'écran — une seule lecture, deux
+ * conséquences, plutôt qu'un second aller-retour pour la seconde.
  *
  * Trois requêtes plutôt qu'un `json_agg` : c'est le choix déjà motivé plus
  * haut dans ce module — un type qu'aucune vérification ne couvre à la sortie
@@ -447,6 +459,7 @@ export function findProjectDetail(
         productId: products.id,
         productName: products.name,
         entityLabel: entities.label,
+        archivedAt: projects.archivedAt,
       })
       .from(projects)
       .innerJoin(

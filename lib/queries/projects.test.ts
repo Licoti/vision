@@ -850,6 +850,21 @@ describe("findProjectDetail", () => {
     expect(project?.name).toBe("Archivé c");
   });
 
+  /* T4bis.3 — la page d'un accompagnement archivé reste servie (règle 4,
+     F1-D3), et c'est cette colonne qui lui permet de le **dire** : sans elle,
+     l'écran servait une page rigoureusement identique à celle d'un
+     accompagnement vivant, panneaux de saisie compris. */
+
+  test("un accompagnement vivant n'a pas de date d'archivage", async () => {
+    const project = await findProjectDetail(c.scope, c.secondId);
+    expect(project?.archivedAt).toBeNull();
+  });
+
+  test("un accompagnement archivé porte sa date", async () => {
+    const project = await findProjectDetail(c.scope, c.archivedId);
+    expect(project?.archivedAt).toBeInstanceOf(Date);
+  });
+
   test("un identifiant inconnu ne rend rien", async () => {
     const project = await findProjectDetail(
       c.scope,

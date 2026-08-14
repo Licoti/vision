@@ -91,8 +91,12 @@ export const RESULT_PANEL_PARAM = "resultat";
  * donc rien — elle ouvre, et c'est tout ; toute autre n'ouvre rien.
  *
  * Une clé distincte des trois autres, et pour la même raison qu'elles le sont
- * entre elles : ce sont des gestes différents, pas deux formes du même. T4bis.3
- * reprend cette paire telle quelle sur la page du projet.
+ * entre elles : ce sont des gestes différents, pas deux formes du même.
+ *
+ * **T4bis.3 a repris cette paire telle quelle sur la page du projet**, comme
+ * annoncé : les deux pages de détail ouvrent leur confirmation par le même
+ * couple clé/valeur, et l'objet visé reste celui de la page dans les deux cas.
+ * Rien n'avait à changer ici — c'est la propriété qu'on cherchait.
  */
 export const ARCHIVE_PANEL_PARAM = "archiver";
 
@@ -136,6 +140,14 @@ export const ROUTES = {
   projectNewForProduct: (productId: string) =>
     `/projets/nouveau?produit=${productId}`,
   projectEdit: (id: string) => `/projets/${id}/modifier`,
+  /**
+   * La page du projet, panneau de confirmation d'archivage ouvert (T4bis.3).
+   * **Ce n'est pas un écran de plus** : c'est le même, avec un paramètre — et la
+   * fermeture est donc `project(id)`, qui n'a pas besoin d'entrée à elle. Même
+   * forme que `productArchive`, jusqu'au nom de la clé.
+   */
+  projectArchive: (id: string) =>
+    `/projets/${id}?${ARCHIVE_PANEL_PARAM}=${ARCHIVE_PANEL_CONFIRM}`,
   /**
    * La page du projet, panneau de saisie ouvert. **Ce n'est pas un écran de
    * plus** : c'est le même, avec un paramètre — et la fermeture est donc

@@ -20,13 +20,34 @@
  * défense est de vérifier d'abord et d'écrire ensuite, pour que
  * `assertPreconditions` soit un second filet et non le premier.
  *
- * Ce que ces actions ne font pas : archiver. Hors du périmètre de T2.6.
+ * **L'archivage arrive en T4bis.3**, sur le modèle de `produits/actions.ts` :
+ * même droit `manageDomain` — c'est l'identité de l'accompagnement qui change
+ * de place, pas son contenu —, même panneau de confirmation, même refus muet au
+ * rétablissement. Deux règles l'accompagnent, et toutes deux vivent ici plutôt
+ * qu'à l'écran :
+ *   — un accompagnement déjà archivé ne se modifie plus, sur l'identifiant
+ *     **reçu** (arbitrage (a) de `tickets-C4bis.md` : aucune écriture sur un
+ *     projet archivé, et le formulaire d'identité en est une) ;
+ *   — aucune cascade, jamais (arbitrage (f)) : les activités d'un projet
+ *     archivé gardent leur `archived_at` nul et cessent de s'afficher parce que
+ *     leur parent ne s'affiche plus.
+ *
+ * Ce que l'archivage d'un accompagnement ne porte **pas**, à la différence de
+ * celui d'un produit : aucun refus fondé sur ce qu'il contient. L'arbitrage (e)
+ * est écrit pour le produit et pour sa raison propre — masquer des
+ * accompagnements vivants de deux listes. La page d'un projet archivé, elle,
+ * reste servie **entière**, roadmap comprise : rien ne disparaît de la lecture,
+ * donc rien ne s'oppose au rangement.
+ *
+ * Aucune suppression, jamais (règle 4) : la couche n'expose pas de `delete`, et
+ * ce qui est archivé se rétablit.
  */
 
 import { eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import type { ConfirmState } from "@/components/ui/confirm-panel";
 import { requireSession } from "@/lib/auth/provider";
 import type { Session } from "@/lib/auth/session";
 import {
@@ -40,7 +61,7 @@ import {
   projectStatuses,
   projects,
 } from "@/lib/db/schema";
-import { DomainScopeError } from "@/lib/db/scoped";
+import { DomainScopeError, type Row } from "@/lib/db/scoped";
 import {
   parseProjectForm,
   type ProjectFormErrors,
@@ -298,6 +319,11 @@ async function addManualPerson(
  * — celui qu'on vient de créer, ou celui qu'on vient de modifier — avec les
  * pages produit à réactualiser : deux si le rattachement a changé (D20).
  *
+ * `null` reste le cas de la ligne introuvable, dont le message est le même pour
+ * les deux actions. **Un refus nommé** est ce qui permet à T4bis.3 de dire
+ * « archivé » plutôt que « n'existe plus », qui serait faux — la forme est celle
+ * de `produits/actions.ts` depuis T4bis.2, reprise sans en changer un caractère.
+ *
  * `editing` porte l'identifiant du projet dont les liaisons se tolèrent
  * (T4bis.1). Il n'est fourni qu'en modification : en création, rien n'est
  * encore lié, et l'exception n'aurait rien à désigner.
@@ -307,7 +333,9 @@ async function submit(
   write: (
     session: Session,
     input: ProjectInput,
-  ) => Promise<{ projectId: string; productIds: string[] } | null>,
+  ) => Promise<
+    { projectId: string; productIds: string[] } | { refused: string } | null
+  >,
   editing?: string,
 ): Promise<Outcome> {
   const { values, errors, input } = parseProjectForm(formData);
@@ -346,6 +374,11 @@ async function submit(
 
   try {
     const written = await write(session, input);
+
+    if (written && "refused" in written) {
+      return { state: { values, errors: {}, message: written.refused } };
+    }
+
     if (!written) {
       // `update` ne trouve rien : identifiant inconnu, ou d'un autre domaine.
       // La couche est scopée, elle ne distingue pas les deux — et l'écran non
@@ -431,6 +464,18 @@ export async function updateProject(
     const before = await session.db.find(projects, id);
     if (!before) return null;
 
+    /* Un accompagnement archivé ne se modifie plus (T4bis.3, arbitrage (a)).
+       Le contrôle porte sur l'identifiant **reçu**, et il est le seul qui
+       protège : la page de modification rend 404 sur un projet archivé, mais
+       une route interdite n'a jamais protégé l'action qu'elle affichait — les
+       champs récoltés avant l'archivage se repostent tels quels ensuite. */
+    if (before.archivedAt) {
+      return {
+        refused:
+          "Cet accompagnement est archivé : il ne se modifie plus. Rétablissez-le d'abord.",
+      };
+    }
+
     const manual = await addManualPerson(session, input);
 
     // `input.row` ne porte que les colonnes du ticket : `update` refuse `id` et
@@ -455,4 +500,114 @@ export async function updateProject(
 
   if ("state" in outcome) return outcome.state;
   goToProject(outcome.projectId, outcome.productIds);
+}
+
+/* ==========================================================================
+   Archiver, et rétablir — T4bis.3
+   ========================================================================== */
+
+/**
+ * Le droit, puis l'accompagnement, sur l'identifiant **reçu**.
+ *
+ * **Le nom la distingue d'`openProject`** (`projets/[id]/actions.ts`), et ce
+ * n'est pas une coquetterie : l'une exige `manageDomain`, l'autre
+ * `writeProject`, et les confondre serait le seul moyen d'ouvrir l'archivage à
+ * un contributeur désigné. D9 pose deux niveaux ; le partage est celui de T2.6,
+ * où le contributeur saisit et le responsable modifie l'identité.
+ *
+ * `bind(null, project.id)` fait sortir l'identifiant de la saisie, mais Next le
+ * sérialise dans un champ `$ACTION_…` du balisage, en clair en développement, et
+ * une soumission peut le réécrire. **Une action ne tire jamais une autorisation
+ * de la valeur qu'on lui a liée** — elle interroge le droit sur la valeur reçue.
+ */
+async function openProjectAsManager(
+  projectId: string,
+): Promise<
+  | { session: Session; project: Row<typeof projects> }
+  | { message: string }
+> {
+  const session = await requireSession();
+
+  if (!session.can.manageDomain) {
+    return {
+      message:
+        "L'archivage et le rétablissement d'un accompagnement sont réservés au responsable de domaine.",
+    };
+  }
+
+  const project = await session.db.find(projects, projectId);
+  if (!project) {
+    return { message: "Cet accompagnement n'existe plus dans ce domaine." };
+  }
+
+  return { session, project };
+}
+
+/**
+ * Les quatre écrans que l'archivage et le rétablissement changent.
+ *
+ * La liste des produits et la page du produit en font partie : toutes deux
+ * comptent les accompagnements **vivants** et agrègent leur fraîcheur
+ * (`listProductsWithCounts` filtre `isNull(projects.archived_at)` dans sa
+ * jointure), et les deux valeurs viennent de changer.
+ */
+function refreshAround(projectId: string, productId: string): void {
+  revalidatePath(ROUTES.projects);
+  revalidatePath(ROUTES.products);
+  revalidatePath(ROUTES.product(productId));
+  revalidatePath(ROUTES.project(projectId));
+}
+
+/**
+ * Archiver un accompagnement : il quitte les listes, sa page reste lisible.
+ *
+ * Un accompagnement archivé est **la mémoire du centre** (F1-D3) : sa page se
+ * lit entière — en-tête, roadmap, ressources, résultats. Ce qui disparaît est
+ * l'écriture, et elle disparaît **dans les deux portes** de
+ * `projets/[id]/actions.ts`, pas ici.
+ *
+ * Aucune cascade — arbitrage (f) : les activités gardent leur `archived_at` nul
+ * et cessent de s'afficher parce que leur projet ne s'affiche plus. Une cascade
+ * rendrait le rétablissement impossible à écrire, faute de pouvoir distinguer
+ * ce qui a été archivé de ce qui l'a été par ricochet.
+ *
+ * `last_activity_at` n'est pas touché : c'est la date du dernier fait
+ * d'accompagnement, et archiver le projet n'efface pas ce qui a eu lieu.
+ */
+export async function archiveProject(
+  projectId: string,
+  _previous: ConfirmState,
+  _formData: FormData,
+): Promise<ConfirmState> {
+  const gate = await openProjectAsManager(projectId);
+  if ("message" in gate) return gate;
+  const { session, project } = gate;
+
+  // Déjà archivé : le geste n'a rien à faire, et `archive` ne toucherait rien.
+  if (project.archivedAt) return {};
+
+  await session.db.archive(projects, projectId);
+
+  refreshAround(projectId, project.productId);
+  redirect(ROUTES.project(projectId));
+}
+
+/**
+ * Rétablir un accompagnement archivé — le retour que sa page porte
+ * (arbitrage (b)).
+ *
+ * **Un refus est muet**, comme `restoreProduct` depuis T4bis.2 et
+ * `transitionActivity` depuis T3.5 : ce geste n'a aucune saisie à rendre, et
+ * rien ne justifie de lui inventer un message que l'écran n'atteint jamais en
+ * usage normal — le point d'entrée n'est rendu qu'au responsable de domaine,
+ * sur un accompagnement archivé.
+ */
+export async function restoreProject(projectId: string): Promise<void> {
+  const gate = await openProjectAsManager(projectId);
+  if ("message" in gate) return;
+  const { session, project } = gate;
+
+  await session.db.restore(projects, projectId);
+
+  refreshAround(projectId, project.productId);
 }

@@ -22,29 +22,41 @@
  * contributeur désigné écrit dans le projet — activités, ressources — mais ne
  * modifie pas son identité, qui reste au responsable.
  *
- * **Les panneaux de saisie sont cette page, plus un paramètre** (D30, T3.2).
+ * **Les panneaux sont cette page, plus un paramètre** (D30, T3.2).
  * `?activite=nouvelle` ouvre le panneau d'activité vide, `?activite=<identifiant>`
  * l'ouvre sur une activité à corriger (T3.4) — une seule clé, dont la valeur
  * porte le cas, et un seul formulaire pour les deux gestes. `?ressource=nouvelle`
- * ouvre celui de T4.2, et `?resultat=<identifiant d'activité>` celui de T4.4.
- * La page reste rendue derrière eux, et porte alors l'attribut HTML `inert` —
- * c'est l'ordre du DOM qui décide de la tabulation, et `inert` est ce qui
- * empêche d'entrer au clavier dans le contenu masqué par le voile.
+ * ouvre celui de T4.2, `?resultat=<identifiant d'activité>` celui de T4.4, et
+ * `?archiver=confirmation` le panneau de confirmation de T4bis.2, repris tel
+ * quel. La page reste rendue derrière eux, et porte alors l'attribut HTML
+ * `inert` — c'est l'ordre du DOM qui décide de la tabulation, et `inert` est ce
+ * qui empêche d'entrer au clavier dans le contenu masqué par le voile.
  *
- * **Les trois clés sont mutuellement exclusives, et le sont par une règle unique :
+ * **Les quatre clés sont mutuellement exclusives, et le sont par une règle unique :
  * plusieurs présentes ensemble n'ouvrent rien** (T4.2). Deux `role="dialog"` ou
  * deux `inert` concurrents ne se rattrapent pas après coup, et aucune préséance
  * n'est inventée entre des gestes de même rang — c'est déjà ce que la page fait
  * de toute valeur d'`?activite=` qu'elle ne reconnaît pas. T4.4 a tenu la règle
  * et changé son écriture : une comparaison binaire ne se généralise pas à trois
- * clés, un décompte oui. Un seul `panelOpen`, un seul `inert`, un seul panneau
- * monté : la propriété se lit dans le code, elle ne se déduit pas de trois
- * conditions éparses.
+ * clés, un décompte oui — **et c'est ce qui a permis à T4bis.3 d'en ajouter une
+ * quatrième sans toucher à l'énoncé.** Un seul `panelOpen`, un seul `inert`, un
+ * seul panneau monté : la propriété se lit dans le code, elle ne se déduit pas
+ * de quatre conditions éparses.
  *
  * **Le droit décide du rendu, pas seulement de l'affichage d'un bouton.** Un
  * membre non contributeur qui tape l'URL d'ouverture obtient la page nue — pas
  * un 404 : la page projet reste lisible par tout le domaine (D9), seul le
  * panneau disparaît.
+ *
+ * **Un accompagnement archivé garde sa page** (règle 4, F1-D3, T4bis.3) : elle
+ * reste servie **entière** — en-tête, roadmap, ressources, résultats —, mention
+ * datée en tête, parce qu'un accompagnement rangé est la mémoire du centre. Ce
+ * qui disparaît est l'écriture, et elle disparaît d'un seul point de bascule :
+ * `canWrite` porte la lecture seule, si bien que les trois panneaux, les gestes
+ * de roadmap et l'ajout de ressource tombent ensemble. Ce n'est pas ce rendu qui
+ * protège : `openProject` et `openActivity` refusent le projet archivé **reçu**,
+ * un panneau absent n'ayant jamais protégé le point d'entrée HTTP qui
+ * l'accompagne.
  *
  * Aucune requête directe : tout passe par `session.db`, déjà scopé sur le
  * domaine courant. Règle 1.
@@ -61,6 +73,7 @@ import {
   transitionActivity,
   updateActivity,
 } from "./actions";
+import { archiveProject, restoreProject } from "../actions";
 import { ActivityPanel } from "@/components/projects/activity-panel";
 import {
   ResourcePanel,
@@ -71,6 +84,7 @@ import { Resources } from "@/components/projects/resources";
 import { Roadmap } from "@/components/projects/roadmap";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
 import { Avatar } from "@/components/ui/avatar";
+import { ConfirmPanel } from "@/components/ui/confirm-panel";
 import { Field, FieldRow } from "@/components/ui/field";
 import { Page, PageHeader } from "@/components/ui/page";
 import { Section, SectionHeader } from "@/components/ui/section";
@@ -79,9 +93,15 @@ import { Tag } from "@/components/ui/tag";
 import { requireSession } from "@/lib/auth/provider";
 import { activities } from "@/lib/db/schema";
 import { toActivityFormValues } from "@/lib/forms/activity";
-import { formatActivityPeriod, formatPeriod, formatRank } from "@/lib/format";
+import {
+  formatActivityPeriod,
+  formatMonth,
+  formatPeriod,
+  formatRank,
+} from "@/lib/format";
 import {
   ACTIVITY_PANEL_NEW,
+  ARCHIVE_PANEL_CONFIRM,
   RESOURCE_PANEL_NEW,
   ROUTES,
 } from "@/lib/navigation";
@@ -137,6 +157,7 @@ export default async function ProjectPage({
     activite?: string;
     ressource?: string;
     resultat?: string;
+    archiver?: string;
   }>;
 }) {
   const { id } = await params;
@@ -147,11 +168,20 @@ export default async function ProjectPage({
   const project = await findProjectDetail(session.db, id);
   if (!project) notFound();
 
+  const archived = project.archivedAt !== null;
+
   /* D9 — responsable de domaine, ou contributeur désigné de ce projet. La
      règle est déjà écrite dans le contexte de session : elle ne se rejoue pas
-     ici. */
-  const canWrite = session.can.writeProject(project.id);
-  const { activite, ressource, resultat } = await searchParams;
+     ici.
+
+     **La lecture seule d'un accompagnement archivé tient à ce `&&`** (T4bis.3,
+     arbitrage (a)) : un seul point de bascule fait tomber ensemble les trois
+     panneaux, les cinq gestes de roadmap et l'ajout de ressource — tous déjà
+     gouvernés par un `| null` que cette page fournit, si bien qu'aucun composant
+     n'a eu à changer. Le rendu n'est pas le verrou pour autant : les deux portes
+     de `./actions` refusent le projet archivé reçu. */
+  const canWrite = session.can.writeProject(project.id) && !archived;
+  const { activite, ressource, resultat, archiver } = await searchParams;
 
   /* L'exclusivité, avant tout le reste : plusieurs clés d'ouverture
      concurrentes n'en ouvrent aucune (T4.2). Tout ce qui suit lit `asked`, pas
@@ -160,8 +190,9 @@ export default async function ProjectPage({
 
      **La règle n'a pas changé, son écriture si** : T4.2 la posait en une
      comparaison binaire, qui ne se généralise pas à trois clés. Un décompte dit
-     la même chose pour trois, et restera juste quand C5 ajoutera la sienne. */
-  const keys = { activite, ressource, resultat };
+     la même chose pour trois — et T4bis.3 y a ajouté `archiver` sans toucher à
+     l'énoncé, ce qui était précisément la propriété cherchée. */
+  const keys = { activite, ressource, resultat, archiver };
   const conflict =
     Object.values(keys).filter((value) => value !== undefined).length > 1;
   const asked: Partial<typeof keys> = conflict ? {} : keys;
@@ -232,7 +263,21 @@ export default async function ProjectPage({
 
   const resultPanelOpen = resultTarget !== null;
 
-  const panelOpen = activityPanelOpen || resourcePanelOpen || resultPanelOpen;
+  /* La confirmation d'archivage (T4bis.3). Le droit décide de tout ce qui suit,
+     et l'archivage avec lui : on ne confirme pas l'archivage de ce qui est déjà
+     rangé. Un membre qui tape l'URL d'ouverture obtient la page nue — pas un
+     404 : la page projet reste lisible par tout le domaine (D9), seul le panneau
+     disparaît. **Aucune lecture en base ne s'ajoute pour en décider.** */
+  const archivePanelOpen =
+    session.can.manageDomain &&
+    !archived &&
+    asked.archiver === ARCHIVE_PANEL_CONFIRM;
+
+  const panelOpen =
+    activityPanelOpen ||
+    resourcePanelOpen ||
+    resultPanelOpen ||
+    archivePanelOpen;
 
   /* Le référentiel des outils n'est lu **que** si le panneau de résultat
      s'ouvre — la discipline de `panelOptions` ci-dessous, posée en T3.3 : la
@@ -299,6 +344,44 @@ export default async function ProjectPage({
 
   return (
     <>
+      {archivePanelOpen ? (
+        /* Le panneau de T4bis.2, repris tel quel — comme T4.3 a repris
+           `external-link.tsx` de T4.1. L'action est liée **côté serveur** au
+           projet courant : l'identifiant sort de la saisie, et le panneau ne
+           connaît pas ce qu'il archive. Ce n'est pas un verrou — Next sérialise
+           les arguments liés dans un champ `$ACTION_…`, réécrivable. Le verrou
+           est dans l'action, qui interroge `manageDomain` puis rapproche le
+           projet reçu du domaine courant. */
+        <ConfirmPanel
+          title="Archiver cet accompagnement"
+          context={project.name}
+          closeHref={ROUTES.project(project.id)}
+          action={archiveProject.bind(null, project.id)}
+          submitLabel="Archiver cet accompagnement"
+          pendingLabel="Archivage…"
+        >
+          {/* Ce que le geste retire, et ce qu'il laisse. Le texte est rendu sur
+              le serveur et traverse en `children` : le panneau est client pour
+              son seul refus. */}
+          <div className="flex flex-col gap-3 text-sm text-content-neutral-dark">
+            <p>
+              Cet accompagnement disparaît de la liste des projets et de la page
+              de son produit. Rien n&apos;est supprimé.
+            </p>
+            <p>
+              Sa page reste lisible par son adresse, avec sa roadmap, ses
+              ressources et ses résultats : c&apos;est la mémoire du centre, elle
+              ne se perd pas.
+            </p>
+            <p>
+              Plus aucune saisie n&apos;y est possible tant qu&apos;il est
+              archivé — ni activité, ni ressource, ni résultat.
+            </p>
+            <p>Le geste se défait : « Rétablir » ramène l&apos;accompagnement.</p>
+          </div>
+        </ConfirmPanel>
+      ) : null}
+
       {resultTarget ? (
         /* Deux identifiants liés **côté serveur** — le projet et l'activité —,
            comme `updateActivity` depuis T3.4 : ils sortent de la saisie, et le
@@ -392,6 +475,17 @@ export default async function ProjectPage({
           ]}
         />
         <Page>
+          {/* La mention datée, au mois (D13) : c'est une date de rangement, pas
+              un horodatage — le jour n'apprendrait rien de plus. Le trio de
+              jetons est celui de la page produit, mesuré en T2.4 et repris sans
+              qu'un couple neuf apparaisse. */}
+          {project.archivedAt ? (
+            <p className="rounded-xl border border-surface-neutral-lighter bg-surface-neutral-pale px-7 py-4 text-sm text-content-neutral-dark">
+              <span className="font-semibold">Accompagnement archivé</span>
+              {` en ${formatMonth(project.archivedAt)}. Il n'apparaît plus dans la liste des projets ni sur la page de son produit, et ne reçoit plus de saisie ; sa page, sa roadmap et ses ressources restent lisibles.`}
+            </p>
+          ) : null}
+
           <div className="rounded-xl border border-surface-neutral-lighter bg-surface-neutral-pale px-7 py-6">
             <p className="mb-2 flex flex-wrap items-center gap-2 text-xs">
               <span className="flex items-center gap-2 font-semibold text-content-neutral-dark">
@@ -411,12 +505,37 @@ export default async function ProjectPage({
               {...(project.objective ? { lead: project.objective } : {})}
               action={
                 session.can.manageDomain ? (
-                  <Link
-                    href={ROUTES.projectEdit(project.id)}
-                    className="rounded-lg border border-content-neutral-normal px-4 py-2 text-sm font-semibold text-content-neutral-dark"
-                  >
-                    Modifier cet accompagnement
-                  </Link>
+                  <span className="flex flex-wrap items-center gap-3">
+                    {archived ? (
+                      /* Un formulaire nu : le rétablissement n'a rien à saisir
+                         et rien à confirmer — c'est le geste qui **défait**, et
+                         `docs/06` §9 proscrit la confirmation là où elle ne
+                         protège rien. */
+                      <form action={restoreProject.bind(null, project.id)}>
+                        <button
+                          type="submit"
+                          className="rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale"
+                        >
+                          Rétablir cet accompagnement
+                        </button>
+                      </form>
+                    ) : (
+                      <>
+                        <Link
+                          href={ROUTES.projectEdit(project.id)}
+                          className="rounded-lg border border-content-neutral-normal px-4 py-2 text-sm font-semibold text-content-neutral-dark"
+                        >
+                          Modifier cet accompagnement
+                        </Link>
+                        <Link
+                          href={ROUTES.projectArchive(project.id)}
+                          className="rounded-lg border border-content-neutral-normal px-4 py-2 text-sm font-semibold text-content-neutral-dark"
+                        >
+                          Archiver
+                        </Link>
+                      </>
+                    )}
+                  </span>
                 ) : null
               }
             />

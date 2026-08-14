@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 14/08/2026 — T4bis.2 livré, **vérifications non exécutées** (voir plus bas).
-**Chantier en cours :** C4bis — archivage et correction, six tickets, deux livrés
-**Geste suivant :** T4bis.3 — archiver un accompagnement, et ce qu'un accompagnement archivé autorise
+**Dernière mise à jour :** 15/08/2026 — T4bis.3 livré, quatre disciplines jouées.
+**Chantier en cours :** C4bis — archivage et correction, six tickets, trois livrés
+**Ticket suivant :** T4bis.4 — archiver une activité saisie par erreur
 
 ---
 
@@ -16,7 +16,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C2 — Produits et projets | T2.1 → T2.6 | **terminé** |
 | C3 — Activités et roadmap | T3.1 → T3.6 | **terminé** |
 | C4 — Ressources et résultats | T4.1 → T4.4 | **terminé** |
-| C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **en cours**, T4bis.1 et T4bis.2 livrés |
+| C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **en cours**, T4bis.1 à T4bis.3 livrés |
 | C5 — Indicateurs et temps long | à découper | à faire |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
@@ -54,9 +54,13 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   re-soumission de la fiche ne pouvait pas se lire.
 - **T4bis.2 — 14/08/2026 — archiver un produit, et le rétablir.** Écart déclaré et tranché avant
   écriture : `lib/db/scoped.ts` et ses tests, pour `restore()` et rien d'autre — sans lui,
-  « Rétablir » n'avait aucun chemin. **Vérifications non exécutées** : la session n'a pas obtenu le
-  droit de lancer une commande — ni `tsc`, ni `lint`, ni `vitest`, ni `next dev`. Les quatre
-  disciplines de l'étape 4 restent **à jouer** avant que ce ticket puisse être dit terminé.
+  « Rétablir » n'avait aucun chemin. Ses vérifications, non exécutées le jour même, ont été jouées
+  en tête de T4bis.3 pour ce qui est mécanisable.
+- **T4bis.3 — 15/08/2026 — archiver un accompagnement, et la lecture seule qui va avec.** Aucun
+  écart de périmètre. Trois arbitrages tranchés avant écriture : `updateProject` refuse le projet
+  archivé reçu ; aucun garde-fou au rétablissement sous un produit archivé ; le trou `createProject`
+  reste ouvert. Les quatre disciplines jouées, dont sept charges repostées refusées puis, les mêmes
+  non retouchées, acceptées après rétablissement.
 
 ---
 
@@ -71,32 +75,44 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   dans la conversation le 12/08/2026 — la base de développement, puis la branche de test. Elles ne
   sont que dans `.env.local`, hors dépôt, mais restent valides. → **action humaine.**
 
-- **Les quatre disciplines de T4bis.2 n'ont pas été jouées, et c'est le premier ticket dans ce cas.**
-  Le code est écrit et relu ; aucune commande n'a pu tourner, la session n'ayant obtenu le droit de
-  lancer ni `tsc`, ni `lint`, ni `vitest`, ni `next dev`. Restent à faire, dans l'ordre de la fiche :
-  le critère lu dans le HTML servi — le produit quitte `/produits`, sa page reste servie avec sa
-  mention datée, ses deux actions d'écriture ont disparu, `/produits/{id}/modifier` rend 404,
-  « Rétablir » ramène tout ; le droit éprouvé par l'action **trois fois séparément** — `updateProduct`
-  reposté après archivage, `archiveProduct` et `restoreProduct` sous le cookie d'un membre —, base
-  relue inchangée à chaque fois ; le refus (e), dont le message doit dire combien ; les tests mis en
-  défaut — neutraliser l'`isNotNull` de `restore` doit faire tomber **exactement** le test de la
-  ligne vivante, retirer `archivedAt` du `select` de `findProductDetail` **exactement** les trois
-  tests neufs de `products.test.ts`. Le contraste, lui, n'est pas à mesurer : aucun couple n'est neuf
-  par la position, tout est repris de `resource-panel.tsx`, de l'en-tête projet et de « Modifier ».
-  → **à jouer avant d'ouvrir T4bis.3**, qui reprend le panneau de confirmation tel quel.
+- **Le parcours d'archivage d'un produit n'a jamais été joué à l'écran.** T4bis.3 a lancé les
+  commandes que T4bis.2 n'avait pas pu lancer — `tsc`, `lint`, `vitest` (379 verts), `next dev` — et
+  a mis en défaut le `select` de `findProjectDetail`. Ce qu'aucune commande ne joue reste dû, et ne
+  concerne que le **produit** : le parcours archiver / rétablir depuis sa page, `/produits/{id}/modifier`
+  en 404, `updateProduct` reposté après archivage, `archiveProduct` et `restoreProduct` sous le cookie
+  d'un membre, et surtout le **refus (e) dont le message doit dire combien** — le seul de C4bis qui
+  n'ait aucun équivalent côté projet. Le protocole de re-soumission de T4bis.3 s'y transpose tel quel
+  (`JOURNAL-TECHNIQUE.md`). → **à jouer à la première session qui ouvre `produits/`.**
+
+- **Rétablir un accompagnement sous un produit archivé le laisse invisible.** L'arbitrage (e)
+  n'autorise l'archivage d'un produit que si tous ses accompagnements sont archivés : « produit rangé,
+  accompagnements rangés » est donc l'état courant. En rétablir un depuis sa page donne un projet
+  vivant qu'aucune liste n'affiche, les deux jointures écartant les projets d'un produit archivé — le
+  geste paraît ne rien faire. Arbitrage du 15/08/2026, tranché avant écriture : **aucun garde-fou**,
+  l'arbitrage (f) posant qu'il n'y a pas de cascade et le chantier interdisant d'en ouvrir un
+  septième en cours de ticket. Rien n'est perdu ; le geste est trompeur.
+  → **ticket propre, C7 au plus tard** — aucun ticket de C4bis, C5 ni C6 ne touche ce couple.
 
 ### b. Assignés à un ticket
 
-- **C4bis est découpé, et ses deux premiers tickets sont livrés.** Les six manques — archivage du
+- **C4bis est découpé, et ses trois premiers tickets sont livrés.** Les six manques — archivage du
   produit, du projet, de l'activité, correction de la ressource et du résultat, lecture seule d'un
   projet archivé, valeur archivée dans un formulaire — sont distribués en six tickets, avec les six
   arbitrages rendus avant écriture (lecture seule stricte, rétablissement limité au produit et au
   projet, confirmation pour ces deux-là seulement, vocabulaire « Archiver / Rétablir », refus
   d'archiver un produit portant un accompagnement vivant, aucune cascade). **T4bis.1 a refermé le
-  manque (6)** — les six valeurs des deux formulaires portent l'exception nominative de T3.4 — et
-  **T4bis.2 le manque (1)**, premier appelant d'`archive()` et unique auteur de `restore()`.
-  `components/ui/confirm-panel.tsx` porte la confirmation une fois pour toutes, et T4bis.3 le
-  reprend. → **`tickets-C4bis.md`, reprendre à T4bis.3.**
+  manque (6)**, **T4bis.2 le manque (1)** — premier appelant d'`archive()`, unique auteur de
+  `restore()` —, et **T4bis.3 les manques (2) et (5)**, la lecture seule tenant en deux lignes,
+  `openProject` et `openActivity` étant les deux seules portes des cinq écritures de la page projet.
+  `components/ui/confirm-panel.tsx` a servi deux fois sans être modifié.
+  → **`tickets-C4bis.md`, reprendre à T4bis.4.**
+- **`createProject` accepte encore un produit archivé.** Le formulaire ne le propose plus et la page
+  produit n'y mène plus, mais l'action ne relit pas l'`archived_at` du produit **reçu** : une
+  soumission forgée rattacherait un accompagnement neuf à un produit rangé, invisible partout. Relevé
+  par T4bis.2, non refermé par T4bis.3 malgré le fichier ouvert — sa fiche porte l'interdit « ce
+  ticket ne rouvre pas T4bis.2 », règle 3, arbitrage tranché le 15/08/2026.
+  → **le prochain ticket qui ouvre `app/(app)/projets/actions.ts` sans que sa fiche l'en empêche ;
+  C7 au plus tard.**
 - **L'outil par défaut d'un type d'activité ne présélectionne rien.** `activity_types.default_tool_id`
   existe depuis T1.2, `docs/04` §2 le dit « habituellement associé », et la fixture le pose sur les
   deux types d'audit du brief. Le panneau de T4.4 ne l'a pas lu — la fiche ne le demandait pas,

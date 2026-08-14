@@ -29,6 +29,16 @@
  * l'on n'écrit pas, ou vers une activité d'ailleurs, est donc refusé comme le
  * reste.
  *
+ * **Un accompagnement archivé est en lecture seule, strictement** (T4bis.3,
+ * arbitrage (a) de `tickets-C4bis.md`). Deux portes couvrent les cinq écritures
+ * de ce fichier : `openProject` pour la création et la correction d'activité, la
+ * ressource et le résultat ; `openActivity` pour la transition et l'annulation.
+ * Toutes deux exigent désormais un projet non archivé, et **c'est le seul
+ * endroit où la règle s'écrit** — une règle posée à cinq exemplaires diverge un
+ * jour, et ces deux fonctions existent précisément pour qu'elle n'ait qu'une
+ * adresse. Les trois panneaux disparaissent aussi du rendu, et les gestes de
+ * roadmap avec eux ; ce n'est pas ce rendu qui protège.
+ *
  * **`last_activity_at` n'est pas recalculé ici.** `lib/db/scoped.ts` le fait
  * pour toute écriture d'activité, dans le même `batch` que l'insertion ou la
  * modification. Le refaire ici poserait une seconde autorité sur un champ
@@ -162,6 +172,10 @@ function refusal(formData: FormData, message: string): ActivityFormState {
  * `refused` dit **quel geste** est réservé — l'activité par défaut, la ressource
  * depuis T4.2. Le droit, lui, est rigoureusement le même : `docs/02` §5 range
  * les deux dans ce que le contributeur désigné écrit.
+ *
+ * Le refus d'archivage, lui, n'est **pas** paramétrable, et c'est voulu : ce
+ * n'est pas le geste qui est réservé, c'est l'accompagnement qui est fermé.
+ * Quatre gestes, un seul message.
  */
 async function openProject(
   session: Session,
@@ -178,6 +192,18 @@ async function openProject(
   const project = await session.db.find(projects, projectId);
   if (!project) {
     return { message: "Cet accompagnement n'existe plus dans ce domaine." };
+  }
+
+  /* La lecture seule d'un accompagnement archivé, première des deux adresses
+     (T4bis.3). `find` rend les lignes archivées — délibérément, une donnée
+     archivée restant lisible —, et rien n'en tirait les conséquences ici.
+     Quatre écritures passent par cette ligne : la création et la correction
+     d'activité, la ressource, le résultat. */
+  if (project.archivedAt !== null) {
+    return {
+      message:
+        "Cet accompagnement est archivé : il ne reçoit plus de saisie. Rétablissez-le d'abord.",
+    };
   }
 
   return { project };
@@ -472,6 +498,11 @@ export async function updateActivity(
  * s'atteignent en usage normal que par un bouton que l'écran n'affiche que
  * lorsque le geste est légal — le contrôle protège la requête forgée, pas un
  * parcours que l'interface est censée emprunter.
+ *
+ * **Seconde adresse de la lecture seule** (T4bis.3) : un projet archivé ferme
+ * la transition et l'annulation comme il ferme le formulaire complet. Le refus
+ * y est muet, comme les deux autres refus de cette porte — la roadmap d'un
+ * accompagnement archivé n'affiche plus aucun de ces deux gestes.
  */
 async function openActivity(
   session: Session,
@@ -484,7 +515,7 @@ async function openActivity(
   if (!session.can.writeProject(activity.projectId)) return null;
 
   const project = await session.db.find(projects, activity.projectId);
-  if (!project) return null;
+  if (!project || project.archivedAt !== null) return null;
 
   return { activity, project };
 }

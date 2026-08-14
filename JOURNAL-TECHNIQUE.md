@@ -2163,3 +2163,100 @@ mesure d'un résultat, que D39 autorise nommément comme « valeur reportée d'u
 date ». Une date de rangement n'est ni l'une ni l'autre : c'est un fait interne, et savoir qu'un
 produit a été rangé le 14 plutôt qu'en août n'ajoute rien à la lecture. `formatMonth` était déjà
 exporté et prend un `Date` — `lib/format.ts` n'est donc pas entré au périmètre.
+
+**T4bis.3 — les vérifications de T4bis.2 ont enfin pu tourner, et elles passent.** La dette la plus
+lourde du chantier était que T4bis.2 n'avait obtenu le droit de lancer aucune commande. Cette
+session les a jouées : `tsc --noEmit` muet, `lint` sans erreur (quatre avertissements
+`no-unused-vars` sur les `_previous`/`_formData` des deux actions de confirmation, motif imposé par
+la signature de `useActionState`), `vitest` à 379 tests verts sur 12 fichiers, `next dev` servant les
+écrans. Les trois tests neufs de `products.test.ts` passent, et la mise en défaut du `select` de
+`findProjectDetail` a été jouée sur le modèle qu'ils posaient. **Le point ouvert de T4bis.2 se
+referme donc pour ce qui est mécanisable** — reste ce qui ne l'est pas : le parcours d'archivage
+d'un **produit** dans le navigateur, et le refus (e) avec son compte, qu'aucune commande ne joue.
+
+**T4bis.3 — une règle de lecture seule à cinq exemplaires aurait divergé ; deux portes existaient
+déjà.** La tentation était d'ajouter le contrôle dans chacune des cinq actions, là où chacune
+commence. `openProject` et `openActivity` couvraient déjà les cinq à elles deux — la première pour
+les quatre gestes à formulaire, la seconde pour la transition et l'annulation. Deux lignes ont suffi,
+et la propriété « aucune écriture sur un projet archivé » se **lit** dans le code au lieu de se
+vérifier en relisant cinq fonctions. C'est le même geste qu'`assertPreconditions` dans la couche : la
+règle vit à l'endroit que tout le monde traverse, pas à celui où elle se manifeste.
+
+**T4bis.3 — le décompte d'exclusivité de T4.4 a servi dès le ticket suivant, et sans être touché.**
+T4.2 posait la règle en une comparaison binaire ; T4.4 l'a récrite en décompte « pour rester juste
+quand C5 ajoutera sa clé ». C'est T4bis.3 qui en a profité le premier, avec `archiver` : la ligne
+`const keys = { … }` gagne une entrée, et **rien d'autre ne bouge** — ni la condition, ni `asked`, ni
+le raisonnement. Un cas rare où une généralisation écrite en prévision d'un besoin lointain a été
+payée par le ticket suivant.
+
+**T4bis.3 — aucun composant n'a eu à changer, et c'est la discipline des `| null` qui l'a permis.**
+`Roadmap` reçoit `addHref`, `editHref`, `resultHref`, `transitionActivity` et `cancelActivity`
+nullables depuis T3.1 à T3.6, `Resources` son `addHref` depuis T4.1 — tous introduits pour le
+**droit**. La lecture seule d'un accompagnement archivé est un second motif de les annuler, et il a
+suffi d'un `&& !archived` sur `canWrite`. Aucun composant du périmètre n'a été ouvert : la fiche
+listait sept fichiers, sept ont été touchés.
+
+**T4bis.3 — arbitrage (a) posé pour cinq actions, appliqué à six.** La fiche énumère
+`createActivity`, `updateActivity`, `transitionActivity`, `createResource` et `createResult`, toutes
+dans `projets/[id]/actions.ts`. `updateProject` — le formulaire d'identité, dans `projets/actions.ts`
+— est une **sixième** écriture, que la fiche ne nomme pas mais que la phrase d'ouverture de
+l'arbitrage (a) couvre : « aucune écriture sur un projet archivé ». Le précédent était à portée :
+T4bis.2 avait fait exactement ce contrôle sur `updateProduct`, et pour la même raison — une route en
+404 ne protège pas l'action qu'elle affichait. Arbitrage rendu **avant écriture**, le fichier étant
+déjà au périmètre pour l'archivage. La transposition a demandé le refus **nommé** `{ refused }` dans
+`submit`, copie de celui de `produits/actions.ts` : sans lui, le seul canal était le `null` dont le
+message dit « n'existe plus dans ce domaine », qui aurait été faux.
+
+**T4bis.3 — rétablir un accompagnement sous un produit archivé le laisse invisible, et c'est
+assumé.** L'état est atteignable, et même normal : l'arbitrage (e) n'autorise l'archivage d'un
+produit que si **tous** ses accompagnements sont archivés, donc « produit rangé, accompagnements
+rangés » est l'état courant après un archivage de produit. En rétablir un depuis sa page — qui reste
+servie, et porte « Rétablir » pour le responsable — donne un projet vivant sous un produit rangé :
+`listProjects` et `listProductProjects` l'écartent toutes deux par jointure, si bien que le geste
+paraît ne rien faire. Deux options se présentaient : refuser muettement en retirant le point d'entrée
+et en disant pourquoi à l'écran, au prix d'une colonne de plus dans `findProjectDetail` et **d'une
+règle absente de la fiche** ; ou ne rien garder, l'arbitrage (f) posant qu'il n'y a pas de cascade et
+le chantier interdisant d'ouvrir un septième arbitrage en cours de ticket. La seconde a été retenue,
+et l'humain l'a tranchée avant écriture. Rien n'est perdu — rétablir le produit rend tout cohérent —
+mais le geste est trompeur, et c'est un point ouvert. → **destination posée dans `ETAT.md`.**
+
+**T4bis.3 — le trou `createProject` × produit archivé reste ouvert, contre l'attente du journal de
+T4bis.2.** L'entrée précédente désignait « le ticket qui touchera `app/(app)/projets/actions.ts`,
+T4bis.3 étant le premier candidat ». Le fichier a bien été touché, et le trou n'a **pas** été
+refermé : la fiche de T4bis.3 porte l'interdit « aucun archivage de produit — T4bis.2 l'a livré, ce
+ticket ne le rouvre pas », et règle 3. L'arbitrage a été posé avant écriture et tranché avec
+l'humain. La note de T4bis.2 reste donc valide, son candidat en moins : **le prochain ticket qui
+ouvrira `projets/actions.ts` sans en être empêché par sa fiche.**
+
+**T4bis.3 — comment le droit a été éprouvé par l'action, et pourquoi le second temps compte.** La
+première moitié de la discipline est facile à jouer et facile à mal jouer : reposter les cinq actions
+après archivage et constater qu'elles sont refusées ne prouve rien à soi seul, puisqu'une charge
+malformée, une clé d'action périmée ou un harnais qui n'atteint pas l'action produisent exactement le
+même refus. Le protocole retenu, en expérience contrôlée : (1) récolter les sept charges sur la page
+servie **avant** archivage — les champs `$ACTION_<n>:0` et `$ACTION_<n>:1` du balisage, où les
+arguments liés se lisent **en clair**, comme les rappels de contexte le disent depuis T3.3 ; (2)
+prouver que le harnais écrit, par une soumission témoin acceptée ; (3) archiver ; (4) reposter les
+sept — toutes refusées, base relue **inchangée** au diff près d'`archived_at` ; (5) rétablir ; (6)
+reposter **les mêmes charges, non retouchées** — les sept acceptées. C'est l'étape (6) qui ferme le
+raisonnement : même charge, même cookie, deux états, deux issues. La garde d'`updateProject` a
+demandé un pas de plus, sa route rendant 404 : elle a été **isolée** en neutralisant le `notFound()`
+de `modifier/page.tsx` le temps d'une soumission — la page rend alors 200, l'action refuse seule, la
+base ne bouge pas, et la ligne a été rétablie à l'identique aussitôt. **Un panneau absent du rendu n'a
+jamais protégé le point d'entrée HTTP qui l'accompagne, et une route en 404 non plus.**
+
+**T4bis.3 — dette assumée : les gardes d'action ne sont couvertes par aucun test.** Les deux lignes
+qui portent toute la lecture seule — dans `openProject` et `openActivity` — ne sont vérifiées que par
+la discipline de re-soumission ci-dessus, jouée à la main. Il n'existe pas de banc d'essai pour les
+actions serveur dans ce dépôt : `vitest` couvre `lib/`, jamais `app/`. La mise en défaut a donc porté
+sur ce qui est testable — retirer `archivedAt` du `select` de `findProjectDetail` fait tomber
+exactement les deux tests neufs — et **pas** sur les gardes elles-mêmes. Neutraliser une garde ne
+ferait tomber aucun test, et c'est un fait à dire plutôt qu'à laisser croire couvert. → **le jour où
+un ticket d'outillage montera un banc d'essai pour les actions.**
+
+**T4bis.3 — la base de développement a servi de terrain, et la règle du jetable a tenu.** Deux
+activités de sonde ont été semées sur « Refonte du parcours de virement » pour que la roadmap offre
+une transition et un rattachement de résultat — la fixture n'en portait aucune dans ces états. Les
+sept re-soumissions acceptées de l'étape (6) ont ensuite écrit sept lignes « REPOST … » et renommé le
+projet. Tout a été retiré en fin de session, et le projet remis sous son nom, son objectif et sa
+fraîcheur d'origine. La dérive inventoriée dans `ETAT.md` n'a donc pas augmenté ; elle n'a pas
+diminué non plus.

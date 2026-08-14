@@ -57,6 +57,13 @@ export default async function EditProjectPage({
   const project = await session.db.find(projects, id);
   if (!project) notFound();
 
+  /* Un accompagnement archivé n'a plus de formulaire (T4bis.3). `find` rend les
+     lignes archivées — délibérément, une donnée archivée restant lisible —, et
+     rien n'en tirait les conséquences ici. **Ce n'est pas cette route qui
+     protège** : les champs récoltés avant l'archivage se repostent tels quels
+     ensuite, et c'est `updateProject` qui les refuse, sur l'identifiant reçu. */
+  if (project.archivedAt) notFound();
+
   // Les deux lectures ne sont plus parallèles, et c'est la conséquence directe
   // de T4bis.1 : l'exception d'archivage est **nominative**, elle ne peut donc
   // pas se construire avant de savoir ce que la ligne porte. Un aller-retour de

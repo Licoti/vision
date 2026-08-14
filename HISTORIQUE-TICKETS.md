@@ -80,6 +80,13 @@ elles sont recopiées ici au fil de l'eau pour que le récit détaillé garde so
 
 - **T4bis.1 — 14/08/2026 — ce qu'un formulaire fait d'une valeur archivée.** Écart déclaré et
   tranché avec l'humain avant écriture : `app/(app)/projets/actions.ts`, un septième fichier.
+- **T4bis.2 — 14/08/2026 — archiver un produit, et le rétablir.** Écart déclaré et tranché avant
+  écriture : `lib/db/scoped.ts` et ses tests, pour `restore()` et rien d'autre. **Vérifications non
+  exécutées** — jouées depuis, en tête de T4bis.3.
+- **T4bis.3 — 15/08/2026 — archiver un accompagnement, et la lecture seule qui va avec.** Aucun
+  écart de périmètre. Trois arbitrages posés et tranchés avant écriture : `updateProject` refuse le
+  projet archivé reçu ; aucun garde-fou au rétablissement sous un produit archivé ; le trou
+  `createProject` × produit archivé reste ouvert.
 
 ---
 
@@ -822,6 +829,58 @@ elles sont recopiées ici au fil de l'eau pour que le récit détaillé garde so
   une à une. Rien de ce qui suit n'est affirmé ici : le critère n'a pas été lu dans le HTML servi, le
   droit n'a pas été éprouvé par l'action, les tests n'ont pas été mis en défaut. Seule la mesure de
   contraste est légitimement absente — aucun couple n'est neuf par la position.
+
+- **T4bis.3 — 15/08/2026 — archiver un accompagnement, et ce qu'un accompagnement archivé
+  autorise.** Les manques (2) et (5) ensemble : le geste, et **la règle écrite dans le code** que
+  archivé veut dire lecture seule (arbitrage (a)). Les deux sont indissociables — livrer l'archivage
+  sans la lecture seule laisserait un projet rangé recevoir des activités par simple re-soumission.
+  Sept fichiers, **aucun écart de périmètre**.
+  **Deux portes pour cinq écritures, et c'est tout le ticket.** `openProject` couvre la création et
+  la correction d'activité, la ressource et le résultat ; `openActivity` couvre la transition et
+  l'annulation. Deux lignes ajoutées, une dans chacune, et la règle n'a **qu'une adresse** — une
+  règle posée à cinq exemplaires diverge un jour. Le message est commun aux quatre gestes du
+  formulaire, là où `refused` est propre à chacun : ce n'est pas le geste qui est réservé, c'est
+  l'accompagnement qui est fermé.
+  **`canWrite` porte la lecture seule à l'écran, d'un seul `&&`.** Les trois panneaux, les cinq
+  gestes de roadmap et l'ajout de ressource tombent ensemble — tous déjà gouvernés par un `| null`
+  que la page fournit, si bien qu'**aucun composant n'a eu à changer** : ni `roadmap.tsx`, ni
+  `resources.tsx`, ni les trois panneaux. La discipline de T3.6, qui avait mis ces `null` en place
+  pour le droit, a servi telle quelle pour l'archivage.
+  **La quatrième clé d'ouverture n'a pas fait bouger l'énoncé de l'exclusivité.** T4.4 avait remplacé
+  la comparaison binaire de T4.2 par un décompte « en prévision de C5 » ; c'est T4bis.3 qui en a
+  profité le premier, `archiver` rejoignant `keys` sans qu'une ligne de la règle change.
+  **Trois arbitrages, posés avant écriture et tranchés avec l'humain.** (1) `updateProject` refuse le
+  projet archivé **reçu** : la fiche n'énumère que cinq écritures, toutes dans `[id]/actions.ts`,
+  mais l'arbitrage (a) dit « aucune écriture », et T4bis.2 avait fait ce contrôle exact sur
+  `updateProduct`. Le tronc `submit` gagne le refus **nommé** `{ refused }` que
+  `produits/actions.ts` porte déjà — sans lui, un projet archivé aurait été annoncé « n'existe
+  plus », qui est faux. (2) Rétablir un accompagnement dont le **produit** est archivé reste permis,
+  sans garde-fou : arbitrage (f), et inventer un septième refus en cours de ticket serait rouvrir un
+  arbitrage que le chantier ferme. Le point ouvert est consigné. (3) Le trou `createProject` ×
+  produit archivé n'est **pas** refermé, bien que le journal de T4bis.2 ait désigné ce ticket comme
+  premier candidat : l'interdit de la fiche est explicite, et règle 3.
+  **Aucun refus fondé sur ce que l'accompagnement contient**, à la différence du produit. L'arbitrage
+  (e) protège une lecture — masquer des accompagnements vivants de deux listes ; la page d'un projet
+  archivé, elle, reste servie **entière**, roadmap comprise. Rien ne disparaît, donc rien ne s'oppose
+  au rangement. Aucune cascade non plus, et `last_activity_at` n'est pas touché.
+  **`ProjectDetail` gagne `archivedAt`**, seule modification de la lecture : les trois listes
+  filtraient déjà. La même colonne porte la mention datée **et** la lecture seule — une lecture, deux
+  conséquences.
+  **Les quatre disciplines, jouées.** Le critère lu dans le HTML servi sur dix-sept points, sous trois
+  cookies. Le droit éprouvé par l'action en **expérience contrôlée** : sept charges récoltées sur la
+  page servie avant l'archivage — `createActivity`, `updateActivity`, `transitionActivity`,
+  `cancelActivity`, `createResource`, `createResult`, `updateProject` —, toutes refusées après, base
+  relue **inchangée** (seul `archived_at` diffère), puis **les mêmes charges, non retouchées**,
+  toutes acceptées après rétablissement. C'est ce second temps qui fait la preuve : sans lui, un
+  refus pouvait venir d'une charge malformée plutôt que de l'archivage. La garde d'`updateProject` a
+  été **isolée** du 404 de sa route en neutralisant celui-ci : la page rend alors 200, l'action
+  refuse seule, la base ne bouge pas. `archiveProject` et `restoreProject` repostés sous le cookie
+  d'un membre : refusés, base inchangée. Tests mis en défaut : retirer `archivedAt` du `select` de
+  `findProjectDetail` fait tomber **exactement** les deux tests neufs, 38 des 40 restant verts.
+  Contraste : rien à mesurer, aucun couple n'étant neuf par la position — tout est repris de la page
+  produit et de l'en-tête projet.
+  **Ce que les gardes d'actions ne portent pas :** aucun test unitaire, faute de banc d'essai pour
+  les actions serveur dans ce dépôt. C'est la seconde discipline qui les couvre, et elle seule.
 
 ---
 
