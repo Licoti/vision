@@ -5,7 +5,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 **Dernière mise à jour :** 14/08/2026 — session d'entretien, hors ticket. Le récit détaillé des
 tickets est parti dans `HISTORIQUE-TICKETS.md` et les points ouverts sont regroupés : ce fichier
 passe de 855 à ~230 lignes, pour redevenir lisible en tête de session. **Un chantier a été ajouté
-au découpage** — C8, archivage et correction, qui s'exécute entre C4 et C5.
+au découpage** — C4bis, archivage et correction, qui s'exécute entre C4 et C5.
 **Chantier en cours :** C4 — ressources et résultats, 1 ticket sur 4 terminé
 **Ticket suivant :** T4.2 — relier une ressource
 
@@ -19,7 +19,7 @@ au découpage** — C8, archivage et correction, qui s'exécute entre C4 et C5.
 | C2 — Produits et projets | T2.1 → T2.6 | **terminé** |
 | C3 — Activités et roadmap | T3.1 → T3.6 | **terminé** |
 | C4 — Ressources et résultats | T4.1 → T4.4 | **T4.1 terminé**, T4.2 → T4.4 à faire |
-| C8 — Archivage et correction | à découper | à faire — **s'exécute ici**, décidé le 14/08/2026 |
+| C4bis — Archivage et correction | à découper | à faire — décidé le 14/08/2026 |
 | C5 — Indicateurs et temps long | à découper | à faire |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
@@ -27,13 +27,11 @@ au découpage** — C8, archivage et correction, qui s'exécute entre C4 et C5.
 **Point de bascule atteint :** C1 à C3 constituent le POC minimal démontrable, et les trois sont
 terminés.
 
-**Sur le numéro de C8, qui n'est pas son rang.** `docs/05` §5 pose sept chantiers et n'a jamais
-prévu l'archivage ni la correction : le cadrage distribue la création et l'édition, jamais le
-rangement. Le chantier ajouté prend donc **un numéro libre plutôt que de décaler les autres** —
-« C7 » est écrit dans D25, D28 et D37, que la règle 6 interdit de rouvrir, et dans `tickets-C4.md`.
-**Le numéro identifie, il ne classe pas** : l'ordre d'exécution est celui de cette table, et C5, C6,
-C7 gardent exactement le sens que `docs/05` leur donne. Ses tickets s'appellent T8.1, T8.2…
-**Il se découpe à la clôture de C4**, en session de découpage.
+**Sur C4bis.** `docs/05` §5 pose sept chantiers et n'a jamais prévu l'archivage ni la correction :
+le cadrage distribue la création et l'édition, jamais le rangement. Le chantier ajouté s'intercale
+donc **sans décaler les autres** — « C7 » est écrit dans D25, D28 et D37, que la règle 6 interdit de
+rouvrir. C5, C6 et C7 gardent ainsi exactement le sens que `docs/05` leur donne. Ses tickets
+s'appellent T4bis.1, T4bis.2… **Il se découpe à la clôture de C4**, en session de découpage.
 
 ---
 
@@ -43,6 +41,11 @@ C7 gardent exactement le sens que `docs/05` leur donne. Ses tickets s'appellent 
 Le récit — critères lus dans le HTML servi, mises en défaut de tests, mesures de contraste — va
 dans `HISTORIQUE-TICKETS.md`, qui n'est pas lu au démarrage. Les pièges et dettes vont dans
 `JOURNAL-TECHNIQUE.md`.)*
+
+**Repliage dû à la clôture de C4.** C1, C2 et C3 sont clos et occupent encore 18 lignes. À la
+session de découpage de C4bis — geste 1 du protocole —, les quatre chantiers clos se replient en
+quatre lignes et leurs tickets partent dans `HISTORIQUE-TICKETS.md`. Reporté volontairement le
+14/08/2026 : le geste s'éprouve sur C4 fraîchement clos plutôt que sur trois chantiers anciens.
 
 - **T1.1 — 11/08/2026 — initialisation du projet.** Écarts : couleurs d'aires thérapeutiques
   Servier non traduites ; `next dev` bridé pour cesser d'écrire dans `CLAUDE.md`.
@@ -93,16 +96,21 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   dans la conversation le 12/08/2026 — la base de développement, puis la branche de test. Elles ne
   sont que dans `.env.local`, hors dépôt, mais restent valides. → **action humaine.**
 - **`CLAUDE.md` et `AGENTS.md` ont été modifiés par Claude le 14/08/2026, sur instruction
-  explicite** — trois collages dont l'humain avait validé le texte : la ligne
+  explicite, en deux fois.** D'abord trois collages dont l'humain avait validé le texte : la ligne
   `HISTORIQUE-TICKETS.md` dans la table « Où écrire quoi », les cinq disciplines de vérification à
-  l'étape 4 du protocole, et le passage de trois à quatre fichiers ouverts dans `AGENTS.md`. **C'est
-  une exception à la règle 7**, consignée au journal. Elle ne vaut pas précédent : hors instruction
-  explicite portant sur un texte déjà validé, ces deux fichiers restent fermés.
+  l'étape 4 du protocole, et le passage de trois à quatre fichiers ouverts dans `AGENTS.md`. Puis le
+  mécanisme anti-embonpoint : l'étape 5 augmentée (une ligne par ticket, un point ouvert se récrit,
+  seuil de 250 lignes) et la section neuve **« Session de découpage »** — six gestes, de 0
+  (trancher les points « À trancher ») à 5 (plan mode avant d'écrire le fichier de tickets) —, qui
+  n'existait nulle part alors que deux sessions de ce type ont déjà eu lieu.
+  **Ce sont des exceptions à la règle 7**,
+  consignées au journal, et **elles ne valent pas précédent** : hors instruction explicite portant
+  sur un texte validé, ces deux fichiers restent fermés.
   → **à relire, et à confirmer ou annuler (`git checkout CLAUDE.md AGENTS.md`).**
 
 ### b. Assignés à un ticket
 
-- **C8 — archivage et correction : six manques en constituent la matière.** Le chantier doit
+- **C4bis — archivage et correction : six manques en constituent la matière.** Le chantier doit
   couvrir, ensemble : (1) l'archivage d'un **produit** — aucun écran ne l'archive, et `find` rend
   les lignes archivées, si bien que `/produits/{id}/modifier` ouvrirait le formulaire d'un produit
   archivé ; (2) l'archivage d'un **projet**, dans le même cas depuis T2.6 ; (3) l'archivage d'une
@@ -118,7 +126,7 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   **Conséquence connue de T4.1** : une ressource rattachée à une activité archivée continue
   d'afficher son libellé, que la roadmap ne montre plus — non atteignable par l'interface tant que
   rien n'archive une activité, et à retrancher avec le même ticket.
-  → **C8, à découper à la clôture de C4.**
+  → **C4bis, à découper à la clôture de C4.**
 - **Trois panneaux latéraux et trois paramètres d'ouverture sur la page projet.** `?activite=`
   depuis T3.2, puis `?ressource=` en T4.2 et `?resultat=` en T4.4. T4.2 doit rendre les paramètres
   **mutuellement exclusifs** — deux `role="dialog"` ou deux `inert` concurrents ne se rattrapent pas

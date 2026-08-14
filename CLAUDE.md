@@ -129,11 +129,40 @@ personne.
    - **Le droit s'éprouve par l'action**, jamais par l'écran : un panneau absent du rendu n'a
      jamais protégé le point d'entrée HTTP qui l'accompagne.
    - **Le parcours se joue sans une ligne de JavaScript.**
-5. Mettre à jour `ETAT.md` : ticket terminé, écarts éventuels, ticket suivant.
+5. Mettre à jour `ETAT.md` : ticket terminé, écarts éventuels, ticket suivant. **Une ligne par
+   ticket, jamais plus** — le récit va dans `HISTORIQUE-TICKETS.md`. Un point ouvert se **récrit**,
+   il ne reçoit pas d'addendum. **`ETAT.md` ne dépasse pas 250 lignes** : au-delà, le balayer avant
+   de continuer.
 6. Ajouter à `JOURNAL-TECHNIQUE.md` tout piège rencontré, contournement, dette assumée,
    incohérence documentaire ou désaccord avec une décision.
 7. Proposer le message de commit, préfixé de l'identifiant : `T2.3 — liste des projets`.
 8. S'arrêter là. Le commit et le vidage de contexte sont faits par l'humain.
+
+## Session de découpage
+
+**À appliquer intégralement dès qu'une clôture de chantier est annoncée, sans qu'on ait à le
+rappeler.** Un chantier ne s'ouvre pas sans elle : elle écrit `tickets-C<n>.md`, et elle est le seul
+moment où `ETAT.md` se balaie.
+
+Le contenu du chantier se lit dans `docs/05` §5, complété par les documents que désigne la lecture
+conditionnelle ci-dessus — **elle vaut pour un découpage comme pour un ticket.**
+
+0. **Trancher les points ouverts du groupe « À trancher »**, ou les reporter explicitement avec
+   leur raison. Ce sont ceux qui changent le contenu du découpage : les laisser ouverts, c'est
+   découper sur une base qui bougera.
+1. **Replier le chantier qui se termine en une ligne.** Ses lignes de ticket partent dans
+   `HISTORIQUE-TICKETS.md`. Sans ce geste, `ETAT.md` croît à chaque ticket ; avec lui, sa section
+   « Journal des tickets » reste bornée quel que soit le nombre de chantiers.
+2. **Sortir les points refermés** vers `HISTORIQUE-TICKETS.md`. Un point barré ne reste pas en
+   place.
+3. **Récrire** les points qui ont pris un addendum, plutôt que d'empiler.
+4. **Vérifier les 250 lignes.** Un seuil se contrôle, « court par conception » ne se contrôle pas.
+5. **Plan mode.** Présenter le découpage — objectif, périmètre, critère de validation et interdits
+   de chaque ticket — et n'écrire `tickets-C<n>.md` qu'après validation explicite.
+
+Les tickets du chantier se tirent des points ouverts qui portent sa destination
+(`grep '→ \*\*C<n>' ETAT.md`). **Un point ouvert sans destination est un point qu'on n'a pas
+tranché** — pas une note.
 
 ## Où écrire quoi
 

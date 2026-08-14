@@ -17,6 +17,18 @@ Trois choses à distinguer : quand découper, qui découpe, et comment cadrer la
 
 **Le prompt de session de découpage**
 
+Nouvelle mécanique de découpage :
+
+> Clôture de Cx, découpage de Cy.
+
+Elle déclenche le chargement de CLAUDE.md (dans les deux harnais — AGENTS.md l'impose en première action sous Antigravity), puis les six gestes : trancher les points « À trancher », replier le chantier clos, sortir les points refermés, récrire ceux qui ont pris un addendum, vérifier les 250 lignes, et présenter le découpage en plan mode. Avec, désormais, l'instruction de lire docs/05 §5 et les documents de la lecture conditionnelle — qui ne valait jusqu'ici que pour les tickets.
+
+Rappel des deux arrêts prévus : le geste 0 te posera les décisions en attente, le geste 5 te rendra un plan et non un fichier.
+
+Une observation que je consigne parce qu'elle s'est vérifiée deux fois aujourd'hui. Les quatre manques de cette section — déclencheur, plan mode, geste 0, lecture conditionnelle — n'ont été trouvés ni en la rédigeant, ni en la relisant. Je l'avais relue et déclarée bonne. Ils sont apparus en simulant son usage : d'abord en cherchant quel prompt taper, puis en la testant sur C5 plutôt que sur C4bis. Le premier test tombait juste parce que la matière de C4bis est déjà dans ETAT.md ; c'est le chantier d'après qui a révélé le trou. Un rituel se teste sur le cas qu'il ne traite pas encore, pas sur le prochain.
+
+État : CLAUDE.md 175 lignes, ETAT.md 242 (seuil 250), lint passe, aucun fichier applicatif touché depuis 59651c3
+
 > Session de découpage, aucun code.
 >
 > Lis `CLAUDE.md`, `ETAT.md`, `tickets-C1-C2.md`, `docs/05-perimetre.md` section C3, `docs/03-accompagnement.md` et `docs/06-architecture-info.md`.

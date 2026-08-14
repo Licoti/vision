@@ -1659,3 +1659,79 @@ en défaut avant d'être crus », « le contraste a été mesuré avant d'être 
 Aucune n'a été ajoutée ni reformulée au passage. **Ce qui change en les écrivant** : elles cessent
 d'être une habitude que chaque session redécouvre en lisant les récits — ce qui était précisément
 l'argument pour alléger `ETAT.md`, et qui l'aurait sinon vidé de sa substance.
+
+**14/08/2026, hors ticket — pourquoi le mécanisme anti-embonpoint n'est pas une règle de plus.**
+`ETAT.md` portait déjà en sous-titre « une ligne par ticket terminé », et dix-neuf tickets d'affilée
+ont écrit entre 15 et 32 lignes. **Une règle écrite avait donc déjà échoué dix-neuf fois**, et en
+ajouter une seconde aurait reproduit l'échec. Le diagnostic retenu : ce n'était pas un oubli mais une
+pression — le récit de vérification était vrai et utile, et n'avait aucun autre endroit où aller.
+Trois leviers ont été posés à la place, dans cet ordre d'efficacité décroissante. **(1) La cause est
+supprimée** : `HISTORIQUE-TICKETS.md` existe et `CLAUDE.md` le nomme, la soupape est ouverte.
+**(2) Le repliage de fin de chantier** — un chantier clos devient une ligne — est ce qui rend
+`ETAT.md` **borné** et non pas seulement lent à croître : sans lui, une ligne par ticket donne
+encore ~90 lignes de journal en fin de projet (≈45 tickets × 2 lignes) ; avec lui, la section reste
+à ~15 lignes pour toujours. **(3) Un seuil chiffré, 250 lignes**, parce que « court par conception »
+figure dans `CLAUDE.md` depuis T1.1 et n'a rien arrêté, là qu'un nombre se contrôle en une commande.
+Régime permanent estimé : ~165 lignes / 13 Ko, quel que soit le nombre de chantiers restants.
+
+**14/08/2026, hors ticket — `CLAUDE.md` ne décrivait pas la session de découpage, qui avait pourtant
+déjà eu lieu deux fois.** `877c740` et `cb93744` ont découpé C3 et C4 sans qu'aucun document ne dise
+ce qu'une telle session fait, ni qu'elle écrit `tickets-C<n>.md`. Le protocole de ticket la
+présupposait — son étape 1 dit « lire la fiche du ticket dans `tickets-*.md` » — sans dire d'où la
+fiche vient. La section neuve comble ce trou et y accroche le balayage d'`ETAT.md`, au moment exact
+où un lot de points ouverts se referme. **Deuxième exception à la règle 7 dans la même journée**, sur
+instruction explicite et texte validé d'avance ; elle ne vaut pas plus précédent que la première.
+
+**14/08/2026, hors ticket — le repliage de C1 à C3 est volontairement reporté.** Les trois chantiers
+clos occupent 18 des 19 lignes du journal des tickets et pourraient se replier immédiatement.
+Arbitrage rendu avec l'humain : **le geste s'éprouvera d'abord sur C4 fraîchement clos**, à la
+session de découpage de C8, où les quatre chantiers se replieront ensemble. Un geste de fin de
+chantier vaut mieux d'être essayé sur un chantier dont on se souvient que sur trois qu'on relit.
+`ETAT.md` porte la dette en tête de sa section « Journal des tickets » pour qu'elle ne se perde pas.
+
+**14/08/2026, hors ticket — le chantier « C8 » est renommé « C4bis », quelques heures après avoir
+été nommé. La note ci-dessus sur « le numéro identifie, il ne classe pas » est caduque.** Son
+analyse de contrainte reste juste — renuméroter falsifierait D25, D28 et D37 —, mais sa
+**conclusion était fausse** : j'en avais déduit qu'il fallait un numéro libre, alors qu'un nom
+intercalaire satisfait les deux exigences à la fois. C5, C6 et C7 gardent le sens de `docs/05`,
+**et** le nom dit sa place sans qu'on ait rien à expliquer. **Ce qui l'a révélé** : l'humain, auteur
+de la décision de placement la veille, a lu « découpage de C8 » comme « on saute à la fin » et a
+demandé pourquoi on ne procédait pas dans l'ordre. **Le coût réel avait été sous-estimé** : j'avais
+noté le risque en décidant — « seule nouveauté à expliquer, une ligne de la table n'est pas à sa
+place numérique » — et je l'avais rangé comme une gêne cosmétique, compensable par sept lignes de
+note sous la table. Il s'est manifesté en moins d'une journée, sur la personne la mieux informée du
+projet. **La leçon à garder** : un identifiant qu'il faut expliquer à chaque lecture est un mauvais
+identifiant, et le nombre de lignes de note nécessaires pour le défendre en est la mesure — sept
+ici, zéro pour `C4bis`. Les tickets s'appellent T4bis.1, T4bis.2… La note sous la table d'avancement
+est supprimée, devenue inutile. Les mentions de « C8 » qui subsistent dans les trois entrées de
+journal précédentes sont laissées telles quelles : elles datent la décision, celle-ci la corrige.
+
+**14/08/2026, hors ticket — la session de découpage gagne un déclencheur, un geste 0 et un plan
+mode.** La première version de la section, écrite le matin même, avait trois manques qui n'ont été
+vus qu'en cherchant quel prompt taper en fin de chantier — la question de l'humain a servi de test.
+**(1) Aucun déclencheur.** Le protocole de ticket dit « à appliquer intégralement dès qu'un ticket
+est annoncé, sans qu'on ait à le rappeler » ; la section de découpage ne disait rien d'équivalent,
+donc rien ne garantissait qu'une session future s'y réfère au lieu d'improviser. La phrase est
+calquée sur celle du protocole. **(2) Aucun plan mode.** C'était le manque sérieux : une session de
+découpage écrit `tickets-C<n>.md`, qui gouverne **tout un chantier**, là où un ticket isolé — bien
+moins engageant — exige déjà une validation explicite à l'étape 2. Rien n'empêchait d'écrire le
+fichier directement. **(3) Aucun geste sur les points « À trancher ».** Ce groupe est défini dans
+`ETAT.md` par « sinon les tickets suivants héritent du problème » : une session de découpage est donc
+le moment exact où il se paie, et il devient le geste 0. La preuve était sous la main — la décision
+sur l'archivage, prise hors rituel, a changé l'ordre de tous les chantiers restants. **À retenir sur
+la méthode** : les trois manques n'ont pas été trouvés en relisant la section, mais en se demandant
+ce qu'il faudrait taper pour la déclencher. Un rituel se teste par son point d'entrée.
+
+**14/08/2026, hors ticket — la lecture conditionnelle ne couvrait pas le découpage, et le trou ne
+se voyait pas sur C4bis.** La table de `CLAUDE.md` s'ouvre sur « **Si le ticket touche à…** » : une
+session de découpage n'étant pas un ticket, rien n'instruisait de lire `docs/05` §5, qui est
+pourtant le seul endroit où le contenu de chaque chantier est défini. **Le trou était invisible sur
+le prochain découpage** — la matière de C4bis vit dans `ETAT.md`, six manques numérotés qu'un `grep`
+suffit à rassembler. Il devient béant sur le suivant : `ETAT.md` ne dit de C5 que son titre,
+« Indicateurs et temps long », soit quatre mots, là où `docs/05` §5 lui donne trois lignes et où
+`docs/04` porte `indicators`, `indicator_readings` et `project_indicators`. Une session aurait
+découpé six tickets sur quatre mots sans que rien ne le signale. Une phrase dans l'intro de la
+section étend explicitement la table au découpage. **Deuxième manque trouvé en simulant l'usage
+plutôt qu'en relisant** — comme le déclencheur, le plan mode et le geste 0 quelques heures plus tôt.
+Le rituel a été éprouvé sur le chantier suivant, où il tombait juste, puis sur celui d'après, où il
+tombait à côté : **un rituel se teste sur le cas qu'il ne traite pas encore.**
