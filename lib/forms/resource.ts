@@ -112,9 +112,15 @@ export function readResourceForm(formData: FormData): ResourceFormValues {
    `new URL` rejette du même geste ce qui n'est pas absolu : « exemple.fr » et
    « /rapport.pdf » n'ont pas de schéma, donc pas de cible hors de Vision — et
    une ressource est par définition un document hébergé ailleurs.
+
+   **Exportée depuis T4.4**, où le lien profond d'un résultat court exactement
+   le même risque : `Result` le rend lui aussi par `ExternalLink`. Une quatrième
+   copie d'un contrôle de sécurité vaut moins qu'un `export` — deux copies
+   divergent un jour, et c'est celle qu'on a oublié de corriger qui laisse
+   passer.
    ========================================================================== */
 
-function isWebUrl(value: string): boolean {
+export function isWebUrl(value: string): boolean {
   let parsed: URL;
   try {
     parsed = new URL(value);

@@ -83,6 +83,7 @@ export function Roadmap({
   groups,
   addHref,
   editHref,
+  resultHref,
   transitionActivity,
   cancelActivity,
 }: {
@@ -95,6 +96,12 @@ export function Roadmap({
    * toujours aucun droit.
    */
   editHref: ((activityId: string) => string) | null;
+  /**
+   * L'ouverture du panneau de résultat sur une activité donnée (T4.4). Même
+   * règle que `editHref` pour le droit ; **les trois autres conditions se
+   * lisent dans la donnée**, et l'entrée les tient elle-même.
+   */
+  resultHref: ((activityId: string) => string) | null;
   /**
    * « Marquer en cours », « Marquer terminée » (T3.5) — l'action serveur non
    * liée, à lier par activité au moment du rendu. `null` pour qui ne peut pas
@@ -128,6 +135,7 @@ export function Roadmap({
               key={group.key}
               group={group}
               editHref={editHref}
+              resultHref={resultHref}
               transitionActivity={transitionActivity}
               cancelActivity={cancelActivity}
             />
@@ -198,11 +206,13 @@ function AddActivity({
 function RoadmapSection({
   group,
   editHref,
+  resultHref,
   transitionActivity,
   cancelActivity,
 }: {
   group: RoadmapGroup;
   editHref: ((activityId: string) => string) | null;
+  resultHref: ((activityId: string) => string) | null;
   transitionActivity: TransitionAction;
   cancelActivity: CancelAction;
 }) {
@@ -247,6 +257,12 @@ function RoadmapSection({
           transitionActivity={transitionActivity}
           cancelActivity={cancelActivity}
           {...(editHref && !cancelled ? { editHref: editHref(activity.id) } : {})}
+          {...(resultHref &&
+          group.key === "done" &&
+          activity.producesResult &&
+          activity.result === null
+            ? { resultHref: resultHref(activity.id) }
+            : {})}
         />
       ))}
     </ul>
@@ -341,7 +357,8 @@ const ACTION_LINK = "text-xs font-semibold text-content-primary-dark underline";
 /**
  * Une entrée : son type, son approche, son objectif, sa période, et le cas
  * échéant son résultat avec le lien vers l'outil (T4.3, `docs/06` §5) — le lien
- * qui la corrige (T3.4), et les gestes de son cycle de vie (T3.5).
+ * qui la corrige (T3.4), les gestes de son cycle de vie (T3.5), et le point
+ * d'entrée qui saisit son résultat (T4.4).
  *
  * **L'entrée n'est pas cliquable en entier**, et c'est un choix : un `<a>` n'en
  * contient pas un autre, et elle porte désormais jusqu'à trois formulaires. La
@@ -369,6 +386,7 @@ function RoadmapEntry({
   edge,
   groupKey,
   editHref,
+  resultHref,
   transitionActivity,
   cancelActivity,
 }: {
@@ -376,6 +394,7 @@ function RoadmapEntry({
   edge: string;
   groupKey: RoadmapGroupKey;
   editHref?: string;
+  resultHref?: string;
   transitionActivity: TransitionAction;
   cancelActivity: CancelAction;
 }) {
@@ -454,6 +473,22 @@ function RoadmapEntry({
             className={ACTION_LINK}
           >
             Modifier
+          </Link>
+        ) : null}
+        {/* Le point d'entrée de T4.4, et ses quatre conditions réunies par
+            l'appelant et par l'entrée : le droit d'écrire, l'état terminé —
+            « le seul état qui autorise le rattachement d'un résultat »
+            (`docs/03` §4) —, un type qui en produit (`docs/04` §2), et aucun
+            résultat déjà posé, `results_activity_unique` n'en autorisant qu'un.
+            **Il disparaît donc de lui-même une fois le résultat saisi** : c'est
+            la même donnée qui l'affiche et qui le retire. */}
+        {resultHref ? (
+          <Link
+            href={resultHref}
+            aria-label={`Saisir un résultat pour l'activité ${activity.typeLabel} — ${period}`}
+            className={ACTION_LINK}
+          >
+            Saisir un résultat
           </Link>
         ) : null}
         {canMarkInProgress ? (

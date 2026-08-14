@@ -64,6 +64,24 @@ export const RESOURCE_PANEL_PARAM = "ressource";
 export const RESOURCE_PANEL_NEW = "nouvelle";
 
 /**
+ * Le panneau de saisie d'un **résultat** (T4.4), troisième clé d'ouverture de la
+ * page projet — même mécanique, une URL et non un état.
+ *
+ * **Aucune valeur d'ouverture fixe, à la différence des deux autres.** La valeur
+ * est l'identifiant de l'**activité** sur laquelle le résultat se saisit : un
+ * résultat n'existe pas hors de l'activité qui l'a produit (`docs/02` §5,
+ * `results.activity_id` étant `not null`). C'est la forme d'`?activite=<uuid>`
+ * de T3.4, pour la même raison — la cible fait partie du geste, et `nouvelle`
+ * n'aurait rien désigné.
+ *
+ * **La règle d'exclusivité passe de deux clés à trois sans changer d'énoncé** :
+ * plusieurs clés d'ouverture présentes ensemble n'ouvrent **rien**. La page la
+ * porte par un décompte, non par une condition binaire — ce qui la laisse juste
+ * quand C5 ajoutera la sienne.
+ */
+export const RESULT_PANEL_PARAM = "resultat";
+
+/**
  * Les adresses des six écrans, et des formulaires qui les alimentent. Les
  * pages de détail prennent un identifiant : le schéma en pose des UUID, et
  * rien ne promet encore de slug — ce choix revient à C2, avec l'écran qui
@@ -115,6 +133,13 @@ export const ROUTES = {
    */
   projectResourceNew: (id: string) =>
     `/projets/${id}?${RESOURCE_PANEL_PARAM}=${RESOURCE_PANEL_NEW}`,
+  /**
+   * La page du projet, panneau de résultat ouvert sur une activité donnée
+   * (T4.4). Le geste part de l'entrée de roadmap de l'activité terminée qui a
+   * produit le résultat — jamais d'ailleurs. La fermeture reste `project(id)`.
+   */
+  projectResultNew: (id: string, activityId: string) =>
+    `/projets/${id}?${RESULT_PANEL_PARAM}=${activityId}`,
   about: "/a-propos",
 } as const;
 

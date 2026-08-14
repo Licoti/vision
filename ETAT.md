@@ -2,11 +2,12 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 14/08/2026 — T4.3. **Le fichier est à son plafond de 250 lignes** : le
-repliage qui l'y ramènera durablement appartient à la session de découpage de C4bis, à la clôture de
-C4. **Un chantier a été ajouté au découpage** — C4bis, archivage et correction, entre C4 et C5.
-**Chantier en cours :** C4 — ressources et résultats, 3 tickets sur 4 terminés
-**Ticket suivant :** T4.4 — saisie déclarative d'un résultat, qui clôt C4
+**Dernière mise à jour :** 14/08/2026 — T4.4. **Le fichier est à son plafond de 250 lignes** : le
+repliage qui l'y ramènera durablement appartient à la session de découpage de C4bis, **qui est le
+geste suivant**. **Un chantier a été ajouté au découpage** — C4bis, archivage et correction, entre
+C4 et C5.
+**Chantier en cours :** aucun — **C4 est clos**, ressources et résultats livrés
+**Geste suivant :** session de découpage de C4bis, qui écrit `tickets-C4bis.md`
 
 ---
 
@@ -17,20 +18,20 @@ C4. **Un chantier a été ajouté au découpage** — C4bis, archivage et correc
 | C1 — Socle technique | T1.1 → T1.6 | **terminé** |
 | C2 — Produits et projets | T2.1 → T2.6 | **terminé** |
 | C3 — Activités et roadmap | T3.1 → T3.6 | **terminé** |
-| C4 — Ressources et résultats | T4.1 → T4.4 | **T4.1 à T4.3 terminés**, T4.4 à faire |
+| C4 — Ressources et résultats | T4.1 → T4.4 | **terminé** |
 | C4bis — Archivage et correction | à découper | à faire — décidé le 14/08/2026 |
 | C5 — Indicateurs et temps long | à découper | à faire |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
-**Point de bascule atteint :** C1 à C3 constituent le POC minimal démontrable, et les trois sont
-terminés.
+**Point de bascule atteint :** C1 à C3 constituent le POC minimal démontrable ; C4 y ajoute la
+boucle complète de `docs/05` §2 — saisir, attacher le lien, reporter le résultat.
 
 **Sur C4bis.** `docs/05` §5 pose sept chantiers et n'a jamais prévu l'archivage ni la correction :
 le cadrage distribue la création et l'édition, jamais le rangement. Le chantier ajouté s'intercale
 donc **sans décaler les autres** — « C7 » est écrit dans D25, D28 et D37, que la règle 6 interdit de
-rouvrir. C5, C6 et C7 gardent ainsi exactement le sens que `docs/05` leur donne. Ses tickets
-s'appellent T4bis.1, T4bis.2… **Il se découpe à la clôture de C4**, en session de découpage.
+rouvrir. C5, C6 et C7 gardent le sens que `docs/05` leur donne. Ses tickets s'appellent T4bis.1,
+T4bis.2… **C4 étant clos, sa session de découpage est le geste suivant.**
 
 ---
 
@@ -82,6 +83,8 @@ session de découpage de C4bis ils se replient en quatre, leurs tickets partant 
   écart de périmètre.
 - **T4.3 — 14/08/2026 — le résultat sur l'entrée de roadmap.** Écart : `lib/format.test.ts`, qui
   n'existait pas.
+- **T4.4 — 14/08/2026 — saisie déclarative d'un résultat.** Clôt C4. Écarts déclarés avant
+  écriture : `lib/queries/activities.ts` et ses tests ; `isWebUrl` exporté de `lib/forms/resource.ts`.
 
 ---
 
@@ -129,15 +132,14 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   **Piège relevé par T4.3, qui pèse sur le point (4)** : `results_activity_unique` porte sur
   `activity_id` seul et ignore `archived_at`, donc archiver un résultat ne libère pas l'activité. Le
   chemin de correction ne peut pas être « archiver puis ressaisir » : il faudra une édition en place,
-  ou une unicité partielle — donc une migration.
-  → **C4bis, à découper à la clôture de C4.**
-- **Trois paramètres d'ouverture sur la page projet, dont deux posés.** `?activite=` depuis T3.2,
-  `?ressource=` depuis T4.2, `?resultat=` en T4.4. **La règle d'exclusivité est écrite et éprouvée** :
-  deux clés présentes ensemble n'ouvrent **rien**, aucune préséance entre gestes de même rang — et
-  c'est déjà ce que la page fait d'une valeur d'`?activite=` qu'elle ne reconnaît pas. Elle tient par
-  une **valeur** et non par une discipline : `conflict` puis `asked` en tête de la page, que tout le
-  reste lit à la place des paramètres bruts. **T4.4 ajoute sa clé à `asked` et n'écrit aucune
-  condition neuve.** → **T4.4**.
+  ou une unicité partielle — donc une migration. **T4.4 a épousé cette contrainte plutôt que de la
+  contourner** : son contrôle d'unicité lit `includeArchived`, sans quoi une ligne archivée bloquerait
+  l'insertion sans que la lecture par défaut la voie.
+  → **C4bis, à découper maintenant — C4 est clos.**
+- **L'outil par défaut d'un type d'activité ne présélectionne rien.** `activity_types.default_tool_id`
+  existe depuis T1.2, `docs/04` §2 le dit « habituellement associé », et la fixture le pose sur les
+  deux types d'audit du brief. Le panneau de T4.4 ne l'a pas lu — la fiche ne le demandait pas,
+  règle 3. Trois lignes suffiraient, et la colonne n'a **aucun lecteur**. → **ticket propre.**
 - **La coquille de navigation reste focalisable derrière le voile, sans JavaScript.** La page projet
   porte `inert` quand un panneau est ouvert, mais la barre latérale vit dans `app/(app)/layout.tsx`,
   et un layout Next ne reçoit pas les `searchParams`. Avec JavaScript, `FocusTrap` la met hors
@@ -168,8 +170,10 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   un accompagnement de plus — « Refonte de l'espace documents » sur « Espace client web », créé en
   vérification de T2.6, avec un commanditaire renseigné et une personne `source = manual` (Nadia
   Berthier) ; cinq activités archivées depuis T3.3 ; quatre transitions non revenues en arrière depuis
-  T3.5 ; une ressource de plus depuis T4.2, **sans chemin d'archivage** jusqu'à C4bis ; un « Test
-  projet » et un produit « test » d'une session antérieure.
+  T3.5 ; une ressource de plus depuis T4.2 et **un résultat de plus depuis T4.4**, l'un et l'autre
+  **sans chemin d'archivage** jusqu'à C4bis ; un « Test projet » et un produit « test » d'une session
+  antérieure. La dérive a servi T4.4 : elle avait déjà mis un Audit UX en « terminée » sans résultat,
+  soit le cas exact que la fixture ne porte pas.
   **Règle posée le 14/08/2026 : la base de développement est jetable.** La règle 4 protège la donnée
   métier, pas une fixture locale. Conséquence : un critère de ticket passé ne s'y relit pas
   nécessairement — T2.1 à T2.4 se lisaient sur « 2 accompagnements », il y en a 3 — et ce n'est pas un
@@ -242,9 +246,5 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   `lib/auth/provider.ts` est le seul fichier que C7 réécrit.
 - **Les maquettes `docs/design/maquettes/` sont une référence visuelle**, jamais branchées.
 - **Modèle par ticket.** Le plan écrit disait Opus pour C1, Sonnet à partir de C2 ; en pratique C2,
-  T3.1 et T3.2 ont été menés sur Opus. Arbitrage du 13/08/2026 pour C4 : **T4.1 sur Opus 4.6 Thinking
-  (Antigravity)**, **T4.2 sur Sonnet 5 (Claude Code)**, **T4.4 sur Opus 5 (Claude Code)** — le pivot
-  du chantier et son seul ticket à logique neuve. **T4.3 a été mené sur Opus 5**, non sur
-  Antigravity : rangé parmi les lectures sans décision neuve, il en portait trois — l'ancre du lien,
-  la date au jour, l'espace de l'unité. **Le levier n'est pas le modèle mais les quatre disciplines
-  de vérification** — voir le point ouvert (a) ci-dessus.
+  T3.1, T3.2 et tout C4 sauf T4.1 et T4.2 ont été menés sur Opus, T4.1 sur Antigravity. **Le levier
+  n'est pas le modèle mais les quatre disciplines de vérification** — point ouvert (a) ci-dessus.

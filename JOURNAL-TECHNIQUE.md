@@ -1900,3 +1900,71 @@ La règle 7 vise l'écriture **silencieuse** par un outil — elle a été posé
 moi. **L'exception ne vaut toujours pas précédent** : hors instruction explicite portant sur un
 texte déjà validé, `CLAUDE.md` et `AGENTS.md` restent fermés. Le garde-fou technique est inchangé
 (`agentRules: false` dans `next.config.ts`).
+
+**T4.4 — `Number` n'est pas un validateur de colonne `numeric`, et le croire aurait rendu un 500.**
+Le premier jet validait la valeur par `Number.isFinite(Number(v))`, puis écrivait la chaîne **telle
+qu'elle avait été tapée**. Trois entrées passent ce contrôle et font lever PostgreSQL : « 0x10 »
+(hexadécimal, 16), « 1e5 » (notation scientifique, 100000) et « Infinity ». Une soumission forgée
+aurait donc obtenu une erreur de base, donc un 500, exactement là où l'on attend un message de champ
+— le même piège que celui de `lib/uuid.ts`, à un type près. **Le contrôle est devenu une forme**
+(`/^-?(?:\d+|\d*[.,]\d+)$/`), calée sur ce que la colonne accepte et non sur ce que JavaScript sait
+lire, plus un plafond de quatorze chiffres avant la virgule — `numeric(18, 4)` : la précision moins
+l'échelle. Les décimales, elles, sont arrondies par la colonne et n'ont rien à refuser. **À retenir
+au-delà de ce ticket** : valider avec les outils du langage puis écrire dans la base, ce sont deux
+grammaires, et la seconde est la seule qui compte.
+
+**T4.4 — la virgule décimale est acceptée, et c'est une conséquence de T4.3.** `formatResultValue`
+rend « 74,5 » à l'écran, `fr-FR` oblige. Refuser « 74,5 » en saisie aurait tendu un piège à qui
+recopie le chiffre qu'il voit juste à côté. La normalisation vit donc dans `lib/forms/result.ts`, et
+`values` (ce qui revient à la personne) diverge volontairement d'`input` (ce qui part en base) :
+« 74,5 » d'un côté, « 74.5 » de l'autre. **L'aller-retour complet a été vérifié**, pas supposé —
+tapé « 74,5 », relu « 74,5/100 » dans le HTML servi.
+
+**T4.4 — un sixième refus que la fiche ne listait pas, et pourquoi il n'est pas hors périmètre.**
+La fiche en énumère cinq et pose par ailleurs que le point d'entrée n'existe que sur une activité
+terminée **dont le type porte `produces_result`**. Ces deux phrases ne peuvent pas être vraies
+ensemble sans un contrôle dans l'action : une soumission forgée vers une activité terminée d'un type
+non producteur passait les cinq refus. Le contrôle a donc été ajouté, forgé et vu refuser. **Ce n'est
+pas une fonctionnalité de plus au sens de la règle 3** : c'est la quatrième discipline de
+vérification appliquée à une condition que la fiche énonce elle-même. La distinction à garder : un
+écran qui montre moins que ce que l'action accepte est un défaut, pas une simplification.
+
+**T4.4 — la règle du résultat sur activité terminée vit dans `lib/db/scoped.ts`, et elle y reste.**
+`assertPreconditions` lève `IntegrityError` — et non `DomainScopeError`, ce que le premier jet du
+`catch` avait supposé. Deux classes distinctes, deux messages distincts. La fiche demandait de
+« laisser refuser » plutôt que de réécrire la règle dans l'action : c'est la première écriture du
+produit dont une règle métier est portée par la couche d'accès, parce qu'elle traverse deux tables
+et qu'aucune clé étrangère ne sait le faire. L'action ne fait que rendre le refus lisible.
+
+**T4.4 — le contrôle d'unicité lit `includeArchived`, et ce n'est pas un excès de prudence.**
+`results_activity_unique` porte sur `activity_id` **seul** et ignore `archived_at` — le piège relevé
+par T4.3, consigné à `ETAT.md`. Un `list` par défaut écarte les archivées : une ligne archivée
+aurait donc bloqué l'insertion sans que la pré-vérification la voie, transformant un message en 500.
+Le chemin n'est pas atteignable — rien n'archive un résultat avant C4bis — et c'est exactement
+pourquoi le contrôle épouse la **contrainte** plutôt que le cas courant. **Course résiduelle
+assumée** : entre ce contrôle et l'insertion, `neon-http` n'offre aucune transaction interactive, et
+deux soumissions simultanées sur la même activité verraient la seconde lever une violation
+d'unicité non rattrapée. C'est la dette de non-atomicité déjà inscrite, ni élargie ni refermée.
+
+**T4.4 — la dérive de la base de développement a servi le ticket, et il faut le dire.** Le plan
+prévoyait de fabriquer le cas manquant — aucune activité de la **fixture** n'est terminée, d'un type
+producteur et sans résultat — en faisant passer un Audit UX par les gestes de T3.5. Inutile : la
+base de développement portait déjà ce cas, l'une des « quatre transitions non revenues en arrière
+depuis T3.5 ». **Le ticket a donc été vérifié sur un état que `db:seed` ne reproduit pas.** La règle
+du 14/08 tient — la base de développement est jetable — mais la conséquence mérite d'être écrite :
+qui rejouera cette vérification sur une base fraîche devra d'abord terminer une activité d'audit.
+
+**T4.4 — quatrième copie de `PanelField`, et la dette a maintenant un coût mesurable.**
+`project-form.tsx` (T2.5), `activity-panel.tsx` (T3.3), `resource-panel.tsx` (T4.2), et celle-ci.
+Aucun des trois ne l'exporte, et aucun n'appartenait au périmètre. Le composant est identique aux
+quatre exemplaires — même balisage, mêmes jetons, même règle du « (obligatoire) » écrit et non
+marqué d'une étoile. **L'extraction appartient au ticket qui pourra toucher les quatre fichiers
+ensemble** ; à quatre copies, ce ticket devient difficile à repousser encore.
+
+**T4.4 — `$ACTION_REF_1` est rendu sans attribut `value`, et l'omettre fait échouer l'action.**
+Piège de vérification, pas de production. Le harnais de rejeu récoltait les champs cachés par
+`name="…" value="…"` et manquait donc celui-là, rendu `<input type="hidden" name="$ACTION_REF_1"/>`.
+Next répondait « Failed to find Server Action », ce qui **ressemble à un refus** et n'en est pas un —
+de quoi conclure faussement qu'un droit a tenu. **À retenir pour tout rejeu futur** : un navigateur
+poste les champs cachés sans `value` avec une valeur vide, et le harnais doit faire pareil ; un
+message d'erreur de Next n'est jamais la preuve qu'une règle du produit a joué.

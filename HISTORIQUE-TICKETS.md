@@ -566,6 +566,73 @@ commit `9afa52f`, à la ligne près.
   aucun écran. **La base de développement n'a pas bougé** : la seule écriture, celle du lien profond,
   a été défaite.
 
+- **T4.4 — 14/08/2026 — saisie déclarative d'un résultat.** **Clôt C4**, et avec lui la boucle
+  complète de `docs/05` §2 : un contributeur trouve son projet, saisit l'activité qu'il vient de
+  terminer, attache le lien de sa restitution, et **reporte le chiffre que l'outil a produit**. Le
+  niveau 1 de `docs/03` §5, et lui seul (D15) — la valeur se saisit, elle ne se demande à personne.
+  Un panneau ouvert par `?resultat=<identifiant d'activité>`, troisième clé de la page projet et la
+  première dont la **valeur** désigne la cible du geste plutôt qu'un mot fixe.
+  **L'arbitrage d'ouverture : est obligatoire ce que la colonne rend obligatoire.** Rendu avec
+  l'humain avant écriture — `label` et `measured_on` sont `not null`, `value`, `unit`, `tool_id` et
+  `external_url` ne le sont pas. Ce qui a emporté la décision est la liste des cinq refus de la fiche
+  elle-même : ses deux seuls refus d'**absence** portent exactement sur les deux colonnes `not null`,
+  et la valeur y est refusée sur sa **forme** — « valeur qui n'est pas un nombre », jamais « valeur
+  vide ». `formatResultValue` savait déjà rendre `null` depuis T4.3 : la lecture était prête avant
+  que l'écriture n'existe.
+  **Le point d'entrée et le panneau lisent la même donnée, et c'est la propriété du ticket.** La
+  cible se cherche dans la roadmap **déjà lue** pour l'écran : aucune requête ne s'ajoute pour en
+  décider, et les quatre conditions s'y lisent d'un coup — la roadmap est scopée au projet et exclut
+  les archivées, le groupe `done` donne l'état, `producesResult` le drapeau du type, `result` ce qui
+  est déjà posé. **Conséquence vérifiée** : une URL tapée à la main n'ouvre jamais plus que ce que
+  l'écran propose, et le lien ne peut pas survivre au résultat qu'il a servi à écrire.
+  **Le critère lu dans le HTML servi, en trois temps sur la même activité.** Le point d'entrée rendu
+  sur le seul Audit UX — « Observation terrain » et « Atelier de cadrage », terminées elles aussi
+  mais d'un type qui ne produit rien, n'en portent pas, et les deux audits déjà pourvus non plus.
+  Après saisie : « Résultat : Score d'audit UX ↗ · Valeur : 74,5/100 · Mesuré le 28 septembre 2026 ·
+  Outil : Ergonome », **avec son ancre** — `href` relu à `https://ergonome.invalid/rapports/1187`,
+  **la première fois du produit**, les deux résultats de la fixture n'ayant pas d'adresse. Puis le
+  point d'entrée disparu de cette entrée.
+  **Le droit éprouvé par l'action, pas par l'écran.** Les champs `$ACTION_…` récoltés sur la page
+  servie à Camille Roux (responsable de domaine), repostés **sans en-tête `Next-Action`** sous le
+  cookie de Sofia Marchand, membre non contributrice de cet accompagnement : refusé, base inchangée.
+  Chez elle, l'URL d'ouverture rend la page nue — pas un 404, la page projet restant lisible par tout
+  le domaine (D9). **Les deux identifiants liés ont été relus en clair** dans `$ACTION_1:1`, troisième
+  confirmation du rappel de contexte d'`ETAT.md`, et c'est en les réécrivant que les refus forgés ont
+  été obtenus.
+  **Six refus éprouvés séparément**, chacun par sa propre soumission : libellé vide ; valeur qui
+  n'est pas un nombre ; date de mesure absente ; **activité non terminée forgée** — la règle de T1.3,
+  portée par `assertPreconditions` à travers deux tables, laissée refuser et seulement rendue
+  lisible ; seconde saisie sur une activité qui porte déjà un résultat ; et **un sixième que la fiche
+  ne listait pas**, un type sans `produces_result` forgé — elle en fait la condition du point
+  d'entrée, et un panneau absent du rendu n'a jamais protégé le point d'entrée HTTP qui l'accompagne.
+  Une septième soumission a visé une activité d'un autre accompagnement : refusée aussi. **Base
+  inchangée après les six**, vérifié avant la saisie réelle.
+  **Les tests mis en défaut, huit fois.** Chaque règle de `validateResultForm` neutralisée à son
+  tour, et les deux moitiés du contrôle de la valeur séparément — la forme et le plafond de quatorze
+  chiffres, qui tombent bien indépendamment. À chaque fois exactement les tests attendus, et rien
+  d'autre. La huitième porte sur la lecture : `producesResult` forcé à `false` dans le `select` fait
+  tomber le seul test qui l'éprouve.
+  **Un détour motivé sur la valeur.** `Number` accepte « 0x10 », « 1e5 » et « Infinity », qu'une
+  colonne `numeric` refuse : valider par `Number` puis écrire la chaîne telle quelle aurait rendu un
+  500 sur soumission forgée. Le contrôle est donc une **forme**, calée sur ce que la colonne accepte,
+  plafond de précision compris. Dans l'autre sens, la **virgule décimale est acceptée et
+  normalisée** : `formatResultValue` rend « 74,5 » à l'écran, et refuser en saisie ce que l'écran
+  affiche juste à côté aurait été un piège. L'aller-retour a été vérifié — « 74,5 » tapé, « 74.5 » en
+  base, « 74,5/100 » rendu.
+  **Le contraste n'a pas été mesuré, et la raison est écrite** : aucun couple de couleurs n'est neuf
+  par la position. Le panneau reprend les jetons de `resource-panel.tsx` sur la même surface, et le
+  lien « Saisir un résultat » reprend `ACTION_LINK` sur `surface-neutral-pale` — exactement le couple
+  de « Modifier », sur la même entrée de roadmap.
+  **Deux écarts de périmètre, déclarés avant écriture.** `lib/queries/activities.ts` et ses tests :
+  `producesResult` remonté par la roadmap — une colonne de plus dans un `select` qui joignait déjà
+  `activityTypes`, pas une requête de plus — et `listResultToolOptions`, que lire dans la page aurait
+  défait le geste de T3.3. Et `isWebUrl` **exporté** de `lib/forms/resource.ts` plutôt que recopié une
+  quatrième fois : ce contrôle n'est pas une politesse de formulaire, `ExternalLink` rendant le `href`
+  tel quel sur le libellé du résultat comme sur le titre d'une ressource.
+  **Ce qui n'a pas été fait, et pourquoi.** `activity_types.default_tool_id` est semé sur les deux
+  types d'audit du brief et aurait présélectionné l'outil en trois lignes. La fiche ne le demandait
+  pas — règle 3. Le point part dans `ETAT.md` avec sa destination.
+
 ---
 
 ## Points ouverts refermés
@@ -573,6 +640,17 @@ commit `9afa52f`, à la ligne près.
 *(archivés depuis `ETAT.md` le 14/08/2026 — ils étaient barrés dans la section « Points ouverts »,
 où ils occupaient encore la place. Conservés tels quels : un point refermé documente comment il
 l%s été.)*
+
+- ~~**Trois paramètres d'ouverture sur la page projet, dont deux posés.**~~ **Refermé par T4.4**,
+  qui a posé le troisième — `?resultat=`, après `?activite=` en T3.2 et `?ressource=` en T4.2. Le
+  point pariait que T4.4 « ajoute sa clé à `asked` et n'écrit aucune condition neuve » : **la règle
+  n'a pas changé, son écriture si.** L'exclusivité de T4.2 était une comparaison binaire — `activite
+  !== undefined && ressource !== undefined` —, qui ne se généralise pas à trois clés. Elle est
+  devenue un décompte sur les clés définies, qui dit la même chose pour trois et restera juste quand
+  C5 ajoutera la sienne. Éprouvé sur les sept combinaisons : chaque clé seule ouvre son panneau,
+  chacune des trois paires et le triplet n'ouvrent **rien** — zéro `role="dialog"`, zéro `inert`.
+  À retenir : **un point ouvert qui promet « aucune condition neuve » promet sur la règle, pas sur
+  le code.**
 
 - ~~**Le commanditaire est vide sur toute la fixture.**~~ **Refermé par T2.6**, par l'écran et non
   par l'amorçage : le formulaire saisit `sponsor` (D6, texte libre), et le projet créé en

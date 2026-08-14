@@ -2,7 +2,8 @@
 
 /**
  * Les écritures de la page projet — le geste critique du produit (`docs/06` §9) :
- * les activités depuis T3.3, et **relier une ressource** depuis T4.2.
+ * les activités depuis T3.3, **relier une ressource** depuis T4.2, et **saisir
+ * un résultat** depuis T4.4.
  *
  * D9 : **saisir dans un projet est ouvert au contributeur désigné**, pas
  * seulement au responsable de domaine. C'est ce qui distingue ce fichier de
@@ -67,6 +68,16 @@
  * ressource n'étant pas une activité** — la fraîcheur d'un produit ne bouge pas
  * parce qu'un lien a été attaché.
  *
+ * **Saisir un résultat (T4.4)** suit `createResource` de bout en bout — même
+ * porte d'entrée, même revalidation restreinte à la page du projet, même refus
+ * qui rend la saisie. Ce qui lui est propre tient en deux points. Elle lie
+ * **deux** identifiants plutôt qu'un, le projet et l'activité, comme
+ * `updateActivity` : un résultat n'existe pas hors de l'activité qui l'a
+ * produit. Et elle est la première écriture du produit dont une règle est
+ * portée par `lib/db/scoped.ts` plutôt que par ce fichier — « un résultat ne
+ * se rattache qu'à une activité terminée », qui traverse deux tables. Elle la
+ * laisse refuser et se contente de rendre son refus lisible.
+ *
  * Aucune suppression, aucun archivage, jamais.
  */
 
@@ -83,8 +94,10 @@ import {
   approaches,
   projects,
   resources,
+  results,
+  tools,
 } from "@/lib/db/schema";
-import { DomainScopeError, type Row } from "@/lib/db/scoped";
+import { DomainScopeError, IntegrityError, type Row } from "@/lib/db/scoped";
 import {
   activityRowUnchanged,
   canTransitionActivity,
@@ -105,6 +118,11 @@ import {
   type ResourceFormState,
   type ResourceRowInput,
 } from "@/lib/forms/resource";
+import {
+  parseResultForm,
+  readResultForm,
+  type ResultFormState,
+} from "@/lib/forms/result";
 import { ROUTES } from "@/lib/navigation";
 
 /**
@@ -649,5 +667,163 @@ export async function createResource(
   // l'ordre tranché par T4.1 —, et c'est toute la confirmation. `redirect`
   // lève : elle est appelée hors de tout `try`, faute de quoi le `catch`
   // ci-dessus avalerait la navigation.
+  redirect(ROUTES.project(projectId));
+}
+
+/* ==========================================================================
+   Saisir un résultat — T4.4
+
+   Le niveau 1 de `docs/03` §5, et lui seul (D15) : la valeur se saisit et le
+   lien se colle. Vision n'appelle jamais l'outil qu'elle référence.
+   ========================================================================== */
+
+/** Le troisième jumeau de `refusal`, pour le troisième formulaire de la page. */
+function resultRefusal(formData: FormData, message: string): ResultFormState {
+  return { values: readResultForm(formData), errors: {}, message };
+}
+
+/**
+ * L'activité **reçue**, confrontée au projet reçu et à ce qui autorise un
+ * résultat.
+ *
+ * Trois contrôles, et un quatrième laissé à la couche :
+ *
+ * 1. elle existe, elle appartient à **ce** projet, elle n'est pas archivée —
+ *    le contrôle de `checkResourceActivity`, pour la même raison : sans lui,
+ *    une soumission forgée poserait le résultat d'un accompagnement sur
+ *    l'activité d'un autre, et la roadmap afficherait fidèlement ce mensonge ;
+ * 2. **son type porte `produces_result`** — `docs/04` §2 : le drapeau
+ *    « conditionne la saisie d'un résultat ». L'écran ne montre le point
+ *    d'entrée que là ; un panneau absent du rendu n'a jamais protégé le point
+ *    d'entrée HTTP qui l'accompagne, et ce refus-ci n'est donc pas une règle
+ *    de plus mais la même règle, éprouvée là où elle tient ;
+ * 3. **aucun résultat n'y est déjà posé** — `results_activity_unique` n'en
+ *    autorise qu'un. Sans ce contrôle, la seconde saisie ne serait pas refusée
+ *    mais **plantée** : une violation d'unicité est une exception PostgreSQL,
+ *    donc un 500, là où l'on attend un message.
+ *
+ * Le quatrième — l'activité est **terminée** — n'est pas réécrit ici :
+ * `assertPreconditions` le porte depuis T1.3, à travers deux tables, et le
+ * ticket se contente de le laisser refuser puis de rendre son refus lisible.
+ * Deux autorités sur une même règle divergent un jour.
+ */
+async function checkResultActivity(
+  session: Session,
+  projectId: string,
+  activityId: string,
+): Promise<string | null> {
+  const activity = await session.db.find(activities, activityId);
+  if (
+    !activity ||
+    activity.projectId !== projectId ||
+    activity.archivedAt !== null
+  ) {
+    return "Cette activité n'existe plus dans cet accompagnement.";
+  }
+
+  /* `find` rend les lignes archivées, et c'est voulu ici comme en T3.4 : un
+     type archivé depuis reste celui de l'activité, et son drapeau reste vrai.
+     Ce qu'on ne propose plus, on continue de l'accepter. */
+  const type = await session.db.find(activityTypes, activity.activityTypeId);
+  if (!type || !type.producesResult) {
+    return "Ce type d'activité ne produit pas de résultat chiffré.";
+  }
+
+  /* `includeArchived` **et ce n'est pas une précaution de style** :
+     `results_activity_unique` porte sur `activity_id` seul et ignore
+     `archived_at` (piège relevé par T4.3). Une ligne archivée bloquerait donc
+     l'insertion sans que la lecture par défaut la voie. Le chemin n'est pas
+     atteignable — rien n'archive un résultat avant C4bis — et c'est exactement
+     pourquoi le contrôle doit épouser la contrainte plutôt que le cas courant. */
+  const existing = await session.db.list(results, {
+    includeArchived: true,
+    where: eq(results.activityId, activityId),
+  });
+  if (existing.length > 0) {
+    return "Cette activité porte déjà un résultat.";
+  }
+
+  return null;
+}
+
+/**
+ * Reporter dans Vision la valeur qu'un outil externe a produite, depuis
+ * l'activité terminée qui l'a produite.
+ *
+ * `projectId` et `activityId` sont liés côté serveur, comme `updateActivity`
+ * depuis T3.4. **Ce ne sont pas des secrets** : Next les sérialise en clair
+ * dans un champ `$ACTION_…`, et une soumission peut les réécrire. Ce qui
+ * protège est `openProject` interrogé sur le projet **reçu**, puis
+ * `checkResultActivity` sur l'activité **reçue**.
+ *
+ * **Aucune requête sortante vers l'adresse saisie**, ni vers l'outil : le POC
+ * s'en tient au niveau 1 déclaratif (D15). Aucun pré-remplissage, aucun bouton
+ * de lancement délégué — c'est le niveau 2, après le POC.
+ */
+export async function createResult(
+  projectId: string,
+  activityId: string,
+  _previous: ResultFormState,
+  formData: FormData,
+): Promise<ResultFormState> {
+  const session = await requireSession();
+
+  const gate = await openProject(
+    session,
+    projectId,
+    "La saisie d'un résultat est réservée au responsable de domaine et aux contributeurs désignés de cet accompagnement.",
+  );
+  if ("message" in gate) return resultRefusal(formData, gate.message);
+
+  const { values, errors, input } = parseResultForm(formData);
+  if (!input) return { values, errors };
+
+  const refused = await checkResultActivity(session, projectId, activityId);
+  if (refused) return resultRefusal(formData, refused);
+
+  /* L'outil reçu, rapproché du domaine — le modèle de `checkReferences`. Il est
+     facultatif (`results.tool_id` est nullable) : rien à vérifier quand il est
+     absent. `assertPreconditions` reste le second filet, pas le premier. */
+  if (input.toolId) {
+    const tool = await session.db.find(tools, input.toolId);
+    if (!tool) {
+      return {
+        values,
+        errors: { toolId: "Cet outil n'existe pas dans ce domaine." },
+      };
+    }
+  }
+
+  try {
+    await session.db.insert(results, { activityId, ...input });
+  } catch (error) {
+    /* La règle de T1.3, laissée refuser et rendue lisible. Elle traverse deux
+       tables — le résultat et l'état de son activité —, ce qu'aucune clé
+       étrangère ne sait faire, et c'est pourquoi elle vit dans la couche. */
+    if (error instanceof IntegrityError) {
+      return resultRefusal(
+        formData,
+        "Un résultat ne se rattache qu'à une activité terminée.",
+      );
+    }
+    if (error instanceof DomainScopeError) {
+      return resultRefusal(
+        formData,
+        "Une référence de ce formulaire n'appartient pas au domaine : la saisie n'a pas été enregistrée.",
+      );
+    }
+    throw error;
+  }
+
+  /* **Cette page-là, et elle seule**, pour la raison de `createResource` :
+     saisir un résultat n'est pas écrire une activité. `last_activity_at` n'a
+     pas bougé, et revalider la fraîcheur du produit ferait croire le contraire
+     au lecteur de ce fichier. */
+  revalidatePath(ROUTES.project(projectId));
+
+  // La page nue, panneau refermé : « enregistrement sans confirmation
+  // intermédiaire » (`docs/06` §9). Le résultat paraît sur l'entrée de roadmap
+  // de son activité — la lecture de T4.3 —, et le point d'entrée en disparaît :
+  // c'est toute la confirmation. `redirect` lève, donc hors de tout `try`.
   redirect(ROUTES.project(projectId));
 }

@@ -26,19 +26,20 @@
  * `?activite=nouvelle` ouvre le panneau d'activité vide, `?activite=<identifiant>`
  * l'ouvre sur une activité à corriger (T3.4) — une seule clé, dont la valeur
  * porte le cas, et un seul formulaire pour les deux gestes. `?ressource=nouvelle`
- * ouvre celui de T4.2. La page reste rendue derrière eux, et porte alors
- * l'attribut HTML `inert` — sans JavaScript, c'est l'ordre du DOM qui décide de
- * la tabulation, et `inert` est ce qui empêche d'entrer au clavier dans le
- * contenu masqué par le voile.
+ * ouvre celui de T4.2, et `?resultat=<identifiant d'activité>` celui de T4.4.
+ * La page reste rendue derrière eux, et porte alors l'attribut HTML `inert` —
+ * c'est l'ordre du DOM qui décide de la tabulation, et `inert` est ce qui
+ * empêche d'entrer au clavier dans le contenu masqué par le voile.
  *
- * **Les deux clés sont mutuellement exclusives, et le sont par une règle unique :
- * présentes ensemble, elles n'ouvrent rien** (T4.2). Deux `role="dialog"` ou deux
- * `inert` concurrents ne se rattrapent pas après coup, et aucune préséance n'est
- * inventée entre deux gestes de même rang — c'est déjà ce que la page fait de
- * toute valeur d'`?activite=` qu'elle ne reconnaît pas. T4.4 reprendra la règle
- * telle quelle avec `?resultat=`. Un seul `panelOpen`, un seul `inert`, un seul
- * panneau monté : la propriété se lit dans le code, elle ne se déduit pas de
- * trois conditions éparses.
+ * **Les trois clés sont mutuellement exclusives, et le sont par une règle unique :
+ * plusieurs présentes ensemble n'ouvrent rien** (T4.2). Deux `role="dialog"` ou
+ * deux `inert` concurrents ne se rattrapent pas après coup, et aucune préséance
+ * n'est inventée entre des gestes de même rang — c'est déjà ce que la page fait
+ * de toute valeur d'`?activite=` qu'elle ne reconnaît pas. T4.4 a tenu la règle
+ * et changé son écriture : une comparaison binaire ne se généralise pas à trois
+ * clés, un décompte oui. Un seul `panelOpen`, un seul `inert`, un seul panneau
+ * monté : la propriété se lit dans le code, elle ne se déduit pas de trois
+ * conditions éparses.
  *
  * **Le droit décide du rendu, pas seulement de l'affichage d'un bouton.** Un
  * membre non contributeur qui tape l'URL d'ouverture obtient la page nue — pas
@@ -56,6 +57,7 @@ import {
   cancelActivity,
   createActivity,
   createResource,
+  createResult,
   transitionActivity,
   updateActivity,
 } from "./actions";
@@ -64,6 +66,7 @@ import {
   ResourcePanel,
   type ResourceActivityOption,
 } from "@/components/projects/resource-panel";
+import { ResultPanel } from "@/components/projects/result-panel";
 import { Resources } from "@/components/projects/resources";
 import { Roadmap } from "@/components/projects/roadmap";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
@@ -86,6 +89,7 @@ import {
   listActivityFormOptions,
   listActivityParticipantIds,
   listProjectRoadmap,
+  listResultToolOptions,
 } from "@/lib/queries/activities";
 import { findAccompanimentRank, findProjectDetail } from "@/lib/queries/projects";
 import { listProjectResources } from "@/lib/queries/resources";
@@ -129,7 +133,11 @@ export default async function ProjectPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ activite?: string; ressource?: string }>;
+  searchParams: Promise<{
+    activite?: string;
+    ressource?: string;
+    resultat?: string;
+  }>;
 }) {
   const { id } = await params;
   if (!isUuid(id)) notFound();
@@ -143,14 +151,20 @@ export default async function ProjectPage({
      règle est déjà écrite dans le contexte de session : elle ne se rejoue pas
      ici. */
   const canWrite = session.can.writeProject(project.id);
-  const { activite, ressource } = await searchParams;
+  const { activite, ressource, resultat } = await searchParams;
 
-  /* L'exclusivité, en une ligne et avant tout le reste : deux clés d'ouverture
+  /* L'exclusivité, avant tout le reste : plusieurs clés d'ouverture
      concurrentes n'en ouvrent aucune (T4.2). Tout ce qui suit lit `asked`, pas
      les paramètres bruts, si bien qu'aucun chemin ne peut ouvrir deux panneaux
-     à la fois — la garantie est dans le code, pas dans la relecture. */
-  const conflict = activite !== undefined && ressource !== undefined;
-  const asked = conflict ? {} : { activite, ressource };
+     à la fois — la garantie est dans le code, pas dans la relecture.
+
+     **La règle n'a pas changé, son écriture si** : T4.2 la posait en une
+     comparaison binaire, qui ne se généralise pas à trois clés. Un décompte dit
+     la même chose pour trois, et restera juste quand C5 ajoutera la sienne. */
+  const keys = { activite, ressource, resultat };
+  const conflict =
+    Object.values(keys).filter((value) => value !== undefined).length > 1;
+  const asked: Partial<typeof keys> = conflict ? {} : keys;
 
   /* Une seule clé, dont la **valeur** porte le cas (T3.2) : `nouvelle` crée,
      un identifiant corrige, tout le reste n'ouvre rien. L'activité est
@@ -181,8 +195,6 @@ export default async function ProjectPage({
      nécessaire pour en décider — le panneau ne pré-remplit rien. */
   const resourcePanelOpen = canWrite && asked.ressource === RESOURCE_PANEL_NEW;
 
-  const panelOpen = activityPanelOpen || resourcePanelOpen;
-
   /* Trois lectures indépendantes, un seul aller-retour : les ressources
      rejoignent le rang et la roadmap plutôt que d'attendre leur tour (T4.1). */
   const [rank, roadmap, resources] = await Promise.all([
@@ -190,6 +202,45 @@ export default async function ProjectPage({
     listProjectRoadmap(session.db, project.id),
     listProjectResources(session.db, project.id),
   ]);
+
+  /* L'activité sur laquelle un résultat se saisit (T4.4). **Aucune lecture en
+     base ne s'ajoute pour en décider** : elle se cherche dans la roadmap déjà
+     lue pour l'écran, et les quatre conditions de la fiche s'y lisent d'un
+     coup — la roadmap est scopée à ce projet et exclut déjà les archivées, le
+     groupe `done` donne l'état (« le seul état qui autorise le rattachement
+     d'un résultat », `docs/03` §4), `producesResult` donne le drapeau du type
+     (`docs/04` §2), et `result` donne ce qui est déjà posé.
+
+     **C'est ce qui fait disparaître le point d'entrée une fois le résultat
+     saisi** : la même donnée décide du lien dans la roadmap et de l'ouverture
+     du panneau, si bien que l'un ne peut pas survivre à l'autre. Une URL tapée
+     à la main n'ouvre donc rien de plus que ce que l'écran propose.
+
+     La forme est vérifiée avant la base, comme pour `?activite=` : une colonne
+     `uuid` interrogée avec n'importe quoi rend une erreur PostgreSQL. */
+  const resultTarget =
+    canWrite && asked.resultat && isUuid(asked.resultat)
+      ? (roadmap
+          .find((group) => group.key === "done")
+          ?.activities.find(
+            (entry) =>
+              entry.id === asked.resultat &&
+              entry.producesResult &&
+              entry.result === null,
+          ) ?? null)
+      : null;
+
+  const resultPanelOpen = resultTarget !== null;
+
+  const panelOpen = activityPanelOpen || resourcePanelOpen || resultPanelOpen;
+
+  /* Le référentiel des outils n'est lu **que** si le panneau de résultat
+     s'ouvre — la discipline de `panelOptions` ci-dessous, posée en T3.3 : la
+     page la plus consultée du produit ne paie pas cette requête pour un
+     panneau fermé. */
+  const resultTools = resultPanelOpen
+    ? await listResultToolOptions(session.db)
+    : [];
 
   /* Les référentiels — dont les personnes, depuis T3.6 — ne sont lus **que**
      si le panneau s'ouvre : la page la plus consultée du produit ne paie pas
@@ -248,6 +299,27 @@ export default async function ProjectPage({
 
   return (
     <>
+      {resultTarget ? (
+        /* Deux identifiants liés **côté serveur** — le projet et l'activité —,
+           comme `updateActivity` depuis T3.4 : ils sortent de la saisie, et le
+           panneau n'écrit pas ce qu'il ne connaît pas. Ce n'est pas un verrou,
+           Next les sérialisant dans un champ `$ACTION_…` réécrivable ; le
+           verrou est dans l'action, qui interroge `writeProject` sur le projet
+           reçu et rapproche l'activité reçue de ce projet, de son type
+           producteur et de l'absence d'un résultat déjà posé. */
+        <ResultPanel
+          projectName={project.name}
+          activityLabel={`${resultTarget.typeLabel} · ${formatActivityPeriod(
+            resultTarget.periodStart,
+            resultTarget.periodEnd,
+            resultTarget.isUnscheduled,
+          )}`}
+          closeHref={ROUTES.project(project.id)}
+          action={createResult.bind(null, project.id, resultTarget.id)}
+          tools={resultTools}
+        />
+      ) : null}
+
       {resourcePanelOpen ? (
         /* L'action est liée **côté serveur** au projet courant, comme celle du
            panneau d'activité : l'identifiant sort de la saisie, et le panneau
@@ -424,6 +496,12 @@ export default async function ProjectPage({
               canWrite
                 ? (activityId) =>
                     ROUTES.projectActivityEdit(project.id, activityId)
+                : null
+            }
+            resultHref={
+              canWrite
+                ? (activityId) =>
+                    ROUTES.projectResultNew(project.id, activityId)
                 : null
             }
             transitionActivity={canWrite ? transitionActivity : null}

@@ -142,13 +142,20 @@ async function seedDomain(label: string): Promise<Fixture> {
 
   const approach = await scope.insert(approaches, { label: `Research ${label}` });
 
-  const type = async (name: string) =>
-    scope.insert(activityTypes, { label: `${name} ${label}`, family: "research" });
+  /* `producesResult` suit la fixture d'amorçage : vrai pour les audits, et
+     pour eux seuls (`docs/04` §2). C'est ce drapeau qui conditionne le point
+     d'entrée de saisie d'un résultat (T4.4), et la roadmap doit le remonter. */
+  const type = async (name: string, producesResult = false) =>
+    scope.insert(activityTypes, {
+      label: `${name} ${label}`,
+      family: "research",
+      producesResult,
+    });
 
   const workshop = await type("Atelier de priorisation");
-  const audit = await type("Audit UX");
+  const audit = await type("Audit UX", true);
   const training = await type("Formation");
-  const accessibility = await type("Audit d'accessibilité");
+  const accessibility = await type("Audit d'accessibilité", true);
   const userTest = await type("Test utilisateur");
   const observation = await type("Observation terrain");
   const handover = await type("Passation");
@@ -530,6 +537,26 @@ describe("listProjectRoadmap — le périmètre et les champs", () => {
       isUnscheduled: true,
       approachLabel: null,
     });
+  });
+
+  test("l'entrée porte le `producesResult` de son type (T4.4)", async () => {
+    // C'est ce drapeau, et lui seul, qui distingue une activité terminée qui
+    // peut recevoir un résultat d'une activité terminée qui ne le peut pas. Le
+    // point d'entrée de saisie en dépend entièrement : sans ce champ, la
+    // roadmap l'offrirait sur un atelier.
+    const groups = await listProjectRoadmap(a.scope, a.fullId);
+    const flags = new Map(
+      groups.flatMap((group) =>
+        group.activities.map(
+          (activity) =>
+            [activity.typeLabel, activity.producesResult] as const,
+        ),
+      ),
+    );
+
+    expect(flags.get("Audit d'accessibilité a")).toBe(true);
+    expect(flags.get("Formation a")).toBe(false);
+    expect(flags.get("Test utilisateur a")).toBe(false);
   });
 });
 

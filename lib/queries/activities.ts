@@ -1,7 +1,8 @@
 /**
  * Les lectures liées aux activités : la roadmap d'un accompagnement — le récit
- * du projet, et la raison d'être de Vision (`docs/06` §5) — et les deux
- * référentiels que le panneau de saisie propose.
+ * du projet, et la raison d'être de Vision (`docs/06` §5) — et les référentiels
+ * que ses panneaux de saisie proposent : types, approches et personnes pour
+ * celui de l'activité, outils pour celui du résultat (T4.4).
  *
  * La première joint, donc elle passe par `joinedRead`. **Toute table jointe porte
  * `filter(table)`**, les `leftJoin` sur les approches et sur les outils
@@ -138,6 +139,34 @@ export async function listActivityFormOptions(
   };
 }
 
+/** Un outil proposé au choix : le référentiel du domaine (`docs/04` §2). */
+export type ResultToolOption = { id: string; name: string };
+
+/**
+ * Les outils que le panneau de résultat propose (T4.4).
+ *
+ * `list` écarte déjà les lignes archivées : **on propose des lignes vivantes**,
+ * là où `listProjectRoadmap` décrit avec les outils archivés compris — c'est
+ * elle qui rend le nom d'un résultat déjà posé. Décrire et proposer n'appellent
+ * pas le même filtre, la règle de T2.6.
+ *
+ * **Aucune exception nominative** comme le `keepActivityTypeId` de T3.4 : C4
+ * n'écrit aucune correction de résultat (arbitrage (a) de `tickets-C4.md`),
+ * donc aucun panneau ne s'ouvre sur une ligne existante dont l'outil aurait pu
+ * être archivé depuis. La question se posera avec le ticket de correction, en
+ * C4bis.
+ *
+ * Tri par nom : `tools` ne porte pas de `position`, à la différence des types
+ * et des approches — l'alphabet est alors le seul ordre qui ne varie pas d'un
+ * affichage à l'autre.
+ */
+export async function listResultToolOptions(
+  scope: ScopedDb,
+): Promise<ResultToolOption[]> {
+  const rows = await scope.list(tools, { orderBy: [asc(tools.name)] });
+  return rows.map((row) => ({ id: row.id, name: row.name }));
+}
+
 /**
  * Les identifiants des personnes déjà liées à une activité — le
  * pré-remplissage du panneau en édition (T3.6), sur le modèle de
@@ -196,6 +225,16 @@ export type RoadmapActivity = {
   id: string;
   /** Le libellé du type, **archivé compris** : on décrit, on ne propose pas. */
   typeLabel: string;
+  /**
+   * Le drapeau du **type**, pas de l'activité — `docs/04` §2 : « vrai pour les
+   * audits, conditionne la saisie d'un résultat ». C'est lui qui décide, avec
+   * l'état terminé et l'absence de résultat, si l'entrée porte le point
+   * d'entrée de T4.4.
+   *
+   * Il vient de `activityTypes`, **déjà jointe** pour le libellé : une colonne
+   * de plus dans un `select` existant, pas une requête de plus.
+   */
+  producesResult: boolean;
   objective: string | null;
   /** Colonnes `date` : chaînes `YYYY-MM-DD`, formatées par `lib/format`. */
   periodStart: string | null;
@@ -289,6 +328,7 @@ export function listProjectRoadmap(
         id: activities.id,
         state: activities.state,
         typeLabel: activityTypes.label,
+        producesResult: activityTypes.producesResult,
         objective: activities.objective,
         periodStart: activities.periodStart,
         periodEnd: activities.periodEnd,
@@ -431,6 +471,7 @@ export function listProjectRoadmap(
       group.push({
         id: row.id,
         typeLabel: row.typeLabel,
+        producesResult: row.producesResult,
         objective: row.objective,
         periodStart: row.periodStart,
         periodEnd: row.periodEnd,
