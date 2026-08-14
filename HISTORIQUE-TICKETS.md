@@ -14,6 +14,67 @@ commit `9afa52f`, à la ligne près.
 
 ---
 
+## Journal des tickets — une ligne par ticket
+
+*(replié d'`ETAT.md` le 14/08/2026, geste 1 de la session de découpage de C4bis. Les 22 lignes sont
+reprises verbatim : elles y occupaient la place que quatre lignes de chantier occupent désormais.
+Elles servent ici de sommaire au récit détaillé qui suit, qui porte chacun de ces 22 tickets.)*
+
+**C1 — Socle technique**
+
+- **T1.1 — 11/08/2026 — initialisation du projet.** Écarts : couleurs d'aires thérapeutiques
+  Servier non traduites ; `next dev` bridé pour cesser d'écrire dans `CLAUDE.md`.
+- **T1.2 — 12/08/2026 — schéma de la base de données.** Écart : `domain_id` ajouté sur les tables
+  de liaison, que `docs/04` ne détaille pas.
+- **T1.3 — 12/08/2026 — couche d'accès scopée.** Écart : mise en place de Vitest.
+- **T1.4 — 12/08/2026 — contexte de session (stub).** Écarts : le responsable de domaine écrit sur
+  tous les projets, arbitrage sur un silence de D9 ; les tests.
+- **T1.5 — 12/08/2026 — référentiels et données factices.** Écarts : `tsx` déclaré ; un 25ᵉ type
+  d'activité ; trois inventions hors brief.
+- **T1.6 — 12/08/2026 — coquille applicative.** Écarts : deux blocs de maquette écartés (carte de
+  la personne courante, entrée Administration) ; `/a-propos` laissée vide.
+
+**C2 — Produits et projets**
+
+- **T2.1 — 12/08/2026 — liste des produits.** Écart : débordement sur `lib/db/scoped.ts`, ses tests
+  et `scripts/seed.ts` — le prix d'une décision sur un champ dénormalisé.
+- **T2.2 — 12/08/2026 — page produit, version socle.** Écarts : fichier de tests ; alias `@/` dans
+  `vitest.config.mts` ; motif d'UUID déplacé dans `lib/uuid.ts`.
+- **T2.3 — 12/08/2026 — liste transverse des projets.** Écarts : `formatProjects` ;
+  `components/ui/status-dot.tsx` ; fichier de tests.
+- **T2.4 — 12/08/2026 — page projet, en-tête et équipe.** Écarts : `formatRank` ; `Avatar` extrait
+  d'`AvatarGroup` ; `field.tsx` et `tag.tsx` ; fichier de tests.
+- **T2.5 — 12/08/2026 — création et édition d'un produit.** Premier écran d'écriture. Écarts :
+  `action` sur `PageHeader` ; deux routes dans `ROUTES` ; fichier de tests.
+- **T2.6 — 13/08/2026 — création et édition d'un projet.** Clôt C2. Écarts :
+  `lib/queries/projects.ts` ; trois entrées dans `ROUTES` ; fichier de tests.
+
+**C3 — Activités et roadmap**
+
+- **T3.1 — 13/08/2026 — roadmap du projet, lecture.** Aucun écart de périmètre.
+- **T3.2 — 13/08/2026 — panneau latéral de saisie.** Écart : `components/ui/focus-trap.tsx`, ajouté
+  après livraison. Aucun fichier de tests.
+- **T3.3 — 13/08/2026 — création d'une activité.** Écarts : `app/(app)/projets/[id]/page.tsx` ;
+  deux commentaires devenus faux dans `focus-trap.tsx`.
+- **T3.4 — 13/08/2026 — édition d'une activité.** Écarts : `app/(app)/projets/[id]/page.tsx` ;
+  `lib/navigation.ts` ; `lib/queries/activities.ts` et son fichier de tests.
+- **T3.5 — 13/08/2026 — cycle de vie d'une activité.** Écarts : `app/(app)/projets/[id]/page.tsx` ;
+  `lib/queries/activities.ts` et son fichier de tests.
+- **T3.6 — 13/08/2026 — participants d'une activité.** Clôt C3, et avec lui le POC minimal
+  démontrable. Écarts : `app/(app)/projets/[id]/page.tsx` ; `components/projects/roadmap.tsx`.
+
+**C4 — Ressources et résultats**
+
+- **T4.1 — 13/08/2026 — bloc « Ressources » de la page projet, lecture.** Aucun écart de périmètre.
+- **T4.2 — 14/08/2026 — relier une ressource.** Ferme la boucle minimale de `docs/05` §2. Aucun
+  écart de périmètre.
+- **T4.3 — 14/08/2026 — le résultat sur l'entrée de roadmap.** Écart : `lib/format.test.ts`, qui
+  n'existait pas.
+- **T4.4 — 14/08/2026 — saisie déclarative d'un résultat.** Clôt C4. Écarts déclarés avant
+  écriture : `lib/queries/activities.ts` et ses tests ; `isWebUrl` exporté de `lib/forms/resource.ts`.
+
+---
+
 ## Journal des tickets — récit détaillé
 
 *(une entrée par ticket terminé, dans l'ordre chronologique)*
@@ -640,6 +701,21 @@ commit `9afa52f`, à la ligne près.
 *(archivés depuis `ETAT.md` le 14/08/2026 — ils étaient barrés dans la section « Points ouverts »,
 où ils occupaient encore la place. Conservés tels quels : un point refermé documente comment il
 l%s été.)*
+
+- ~~**`CLAUDE.md` et `AGENTS.md` ont été modifiés par Claude le 14/08/2026, sur instruction
+  explicite, en trois fois.**~~ **Refermé le 14/08/2026 par la session de découpage de C4bis, geste
+  0 : l'humain a relu les trois lots et les a confirmés en l'état.** Les trois lots étaient (1) trois
+  collages dont le texte avait été validé — la ligne `HISTORIQUE-TICKETS.md` dans la table « Où
+  écrire quoi », les disciplines de vérification à l'étape 4, et le passage de trois à quatre
+  fichiers ouverts dans `AGENTS.md` ; (2) le mécanisme anti-embonpoint — étape 5 augmentée (une ligne
+  par ticket, un point ouvert se récrit, seuil de 250 lignes) et la section neuve **« Session de
+  découpage »**, six gestes, qui n'existait nulle part alors que deux sessions de ce type avaient
+  déjà eu lieu ; (3) le **retrait de la cinquième discipline** — « le parcours se joue sans une ligne
+  de JavaScript » —, qui rendait le lot (1) caduc sur ce point.
+  **Conséquence tenue :** l'étape 4 compte **quatre** disciplines, et **aucune fiche de
+  `tickets-C4bis.md` n'exige le parcours sans JavaScript.** Les six tickets du chantier ont été
+  découpés sur cette base. **Ces modifications restent des exceptions à la règle 7 et ne valent pas
+  précédent** : `CLAUDE.md` s'écrit par l'humain.
 
 - ~~**Trois paramètres d'ouverture sur la page projet, dont deux posés.**~~ **Refermé par T4.4**,
   qui a posé le troisième — `?resultat=`, après `?activite=` en T3.2 et `?ressource=` en T4.2. Le

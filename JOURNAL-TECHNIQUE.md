@@ -1968,3 +1968,77 @@ Next répondait « Failed to find Server Action », ce qui **ressemble à un ref
 de quoi conclure faussement qu'un droit a tenu. **À retenir pour tout rejeu futur** : un navigateur
 poste les champs cachés sans `value` avec une valeur vide, et le harnais doit faire pareil ; un
 message d'erreur de Next n'est jamais la preuve qu'une règle du produit a joué.
+
+**C4bis (découpage) — `archive()` existe depuis T1.3 et n'a jamais eu un seul appelant.** C'est le
+constat qui fonde le chantier, et il se mesure : `grep -rn '\.archive('` sur `app/`, `components/`,
+`lib/` et `scripts/` ne rend rien. La fonction est écrite, documentée, couverte par les tests de
+`lib/db/scoped.test.ts` — et morte. **À retenir : une couche testée ne prouve pas qu'un geste
+existe.** Les quatre chantiers livrés ont tous branché ce qu'ils écrivaient ; celui-ci existe parce
+que personne n'a vérifié qu'une fonction de la couche avait un chemin depuis l'interface. Le même
+`grep` passé sur les autres membres de l'API rend au moins un appelant partout — `unlink` dans
+`syncParticipants` et `syncMembers`, `refreshLastActivity` dans `scripts/seed.ts:1053`. **`archive`
+était le seul orphelin**, et c'est ce qui rend le chantier borné.
+
+**C4bis (découpage) — « un projet archivé est-il en lecture seule ? » n'a de réponse nulle part.**
+F1-D3 dit qu'un projet s'archive et ne se supprime jamais ; `docs/04` §1 pose l'archivage
+systématique ; D42 dit que ce n'est pas un statut. **Aucun des trois ne dit ce qu'un projet archivé
+autorise.** Le silence n'était pas neutre : depuis T1.4, `writeProject` ignore `archived_at`, donc un
+contributeur désigné écrit dans un projet archivé — ce qui vide le geste de son sens avant même qu'il
+existe. Tranché en session : **lecture seule stricte**, portée par `openProject` et `openActivity`,
+les deux seules portes des cinq écritures de la page projet. Ce n'est pas une décision de `docs/07`
+rouverte, c'est un silence comblé — mais il valait d'être noté comme tel.
+
+**C4bis (découpage) — le rétablissement est asymétrique, et c'est assumé.** Produit et projet se
+rétablissent, activité, ressource et résultat non. La raison est topographique, pas doctrinale : les
+deux premiers ont une page qui reste servie après archivage et peut donc porter le retour ; les trois
+autres n'existent qu'à l'intérieur d'un écran dont ils viennent de disparaître. Leur donner un retour
+demanderait un écran des éléments archivés — un septième écran (`docs/06` §2) pour un geste rare, là
+où une activité se ressaisit en moins d'une minute (`docs/05` §7, signal 1). **Si le POC montre qu'on
+archive par erreur plus souvent qu'on ne le croit, c'est cet arbitrage qu'il faudra rouvrir en
+premier**, et non la lecture seule.
+
+**C4bis (découpage) — « Rétablir » n'est nommé par aucun document.** `docs/02` et `docs/04` donnent
+« archiver » ; le verbe inverse n'apparaît nulle part, ni dans le glossaire, ni dans les décisions.
+« Désarchiver » était l'autre candidat, dérivé du mot documenté mais laid à l'écran. Choix retenu :
+**« Rétablir »**, sans appui documentaire. Le vocabulaire du CLAUDE.md n'est pas enfreint — il porte
+des concepts, pas des verbes d'interface —, mais c'est une invention, et elle est consignée pour être
+corrigée d'un seul geste si le glossaire tranche autrement.
+
+**C4bis (découpage) — T4bis.6 portera la première migration depuis T1.2, et T4.4 l'avait annoncée.**
+`results_activity_unique` porte sur `activity_id` seul et ignore `archived_at` : archiver un résultat
+ne libère pas son activité. T4.3 a relevé le piège, T4.4 l'a **épousé** plutôt que contourné — son
+contrôle d'unicité lit `includeArchived: true`, ce qui était juste tant que rien n'archivait un
+résultat. L'index partiel de T4bis.6 rend ce `includeArchived` **faux** : il interdirait la ressaisie
+que la migration vient d'autoriser. Les deux se relisent dans le même ticket, jamais l'un sans
+l'autre — c'est écrit dans la fiche, et c'est le seul endroit du chantier où un ticket doit défaire
+une ligne écrite par un ticket antérieur.
+
+**C4bis (découpage) — la perte silencieuse d'une liaison pèse plus lourd qu'un `select` amputé, et
+c'est ce qui met T4bis.1 en tête.** Le point ouvert hérité de C4 parlait d'« une entité ou un produit
+archivé [qui] exigerait un nouveau choix » : vrai, visible, réparable par l'utilisateur. Le cas grave
+est ailleurs. `project_jobs`, `project_approaches` et `project_members` se saisissent par cases à
+cocher, et une case absente du rendu **ne revient pas dans le `FormData`** : les diffs de
+`projets/actions.ts` concluent alors que la liaison a été retirée. Un métier archivé disparaît donc du
+projet à la première re-soumission, sans que rien ne s'affiche. Le ticket vient en tête du chantier
+pour cette raison, et son critère se compte **en base** — l'écran ne peut pas témoigner de ce qu'il
+n'affiche plus.
+
+**C4bis (découpage) — `events` connaît le verbe `archived`, et le chantier ne l'écrit pas.**
+`docs/04` §4 liste `archived` parmi les cinq verbes du journal, aux côtés de `created`, `updated`,
+`state_changed` et `linked`. C4bis livre cinq gestes d'archivage et **n'écrit aucune ligne
+d'`events`** : le journal est le chantier C6 entier, et l'ouvrir à moitié ici poserait une seconde
+autorité sur une table que personne n'a encore branchée. Conséquence à connaître : **quand C6
+arrivera, le journal démarrera vide sur des archivages déjà effectués.** C'est la même situation que
+pour toutes les écritures de C2 à C4bis, et elle n'est pas propre à l'archivage.
+
+**C4bis (découpage) — le mécanisme d'entretien d'`ETAT.md` a tenu, et voici sa mesure.** Le fichier
+était à 250 lignes exactement, son plafond. Après les quatre gestes : **188 lignes**, soit 62 de
+marge pour six tickets. Les trois postes, mesurés section par section : la section « Journal des
+tickets » passe de 52 lignes à 17 — les 22 lignes de ticket repliées en quatre lignes de chantier,
+la note de repliage exécutée —, soit **35 rendues** ; la sortie du point sur `CLAUDE.md` en rend
+**12** ; la récriture du point C4bis, 23 lignes d'addenda accumulés de T4.1 à T4.4 devenues six, en
+rend **17**. Le total dépasse le delta observé de deux lignes, reprises par les destinations posées
+sur deux points de la section b. **Ce qui compte n'est pas le compte mais son classement : le
+repliage rend le plus, la récriture vient juste après, et c'est elle qu'on saute** — un addendum
+coûte une ligne à l'écrire et n'en coûte aucune à ne pas replier. Le seuil de 250 lignes dit quand
+agir, jamais quoi replier.
