@@ -96,17 +96,17 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   dans la conversation le 12/08/2026 — la base de développement, puis la branche de test. Elles ne
   sont que dans `.env.local`, hors dépôt, mais restent valides. → **action humaine.**
 - **`CLAUDE.md` et `AGENTS.md` ont été modifiés par Claude le 14/08/2026, sur instruction
-  explicite, en deux fois.** D'abord trois collages dont l'humain avait validé le texte : la ligne
-  `HISTORIQUE-TICKETS.md` dans la table « Où écrire quoi », les cinq disciplines de vérification à
-  l'étape 4 du protocole, et le passage de trois à quatre fichiers ouverts dans `AGENTS.md`. Puis le
-  mécanisme anti-embonpoint : l'étape 5 augmentée (une ligne par ticket, un point ouvert se récrit,
-  seuil de 250 lignes) et la section neuve **« Session de découpage »** — six gestes, de 0
-  (trancher les points « À trancher ») à 5 (plan mode avant d'écrire le fichier de tickets) —, qui
-  n'existait nulle part alors que deux sessions de ce type ont déjà eu lieu.
-  **Ce sont des exceptions à la règle 7**,
-  consignées au journal, et **elles ne valent pas précédent** : hors instruction explicite portant
-  sur un texte validé, ces deux fichiers restent fermés.
-  → **à relire, et à confirmer ou annuler (`git checkout CLAUDE.md AGENTS.md`).**
+  explicite, en trois fois.** (1) Trois collages dont l'humain avait validé le texte : la ligne
+  `HISTORIQUE-TICKETS.md` dans la table « Où écrire quoi », les disciplines de vérification à
+  l'étape 4 du protocole, et le passage de trois à quatre fichiers ouverts dans `AGENTS.md`.
+  (2) Le mécanisme anti-embonpoint : l'étape 5 augmentée (une ligne par ticket, un point ouvert se
+  récrit, seuil de 250 lignes) et la section neuve **« Session de découpage »** — six gestes, de 0
+  (trancher les points « À trancher ») à 5 (plan mode) —, qui n'existait nulle part alors que deux
+  sessions de ce type avaient déjà eu lieu. (3) Le **retrait de la cinquième discipline** — « le
+  parcours se joue sans une ligne de JavaScript » — : l'étape 4 en compte désormais **quatre**, ce
+  qui rend le lot (1) caduc sur ce point. **Exceptions à la règle 7**, consignées au journal, qui
+  **ne valent pas précédent**. → **à relire, et à confirmer ou annuler — mais un
+  `git checkout CLAUDE.md AGENTS.md` rétablirait aussi la cinquième discipline.**
 
 ### b. Assignés à un ticket
 
@@ -157,10 +157,10 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
 - **Le contenu rédigé d'`/a-propos` reste à écrire.** La page a son en-tête et son état vide. Son
   contenu — ce qu'est Vision, le vocabulaire, ce qu'elle ne fait pas, l'état daté — ne demande
   aucune lecture en base. → **ticket propre, C7 au plus tard.**
-- **On n'ajoute qu'une personne par enregistrement.** Sans JavaScript, un champ répétable n'existe
-  pas : le bloc d'ajout de T2.6 crée une personne, et pour en ajouter deux il faut enregistrer puis
-  rouvrir le formulaire. La limite est écrite dans l'écran. → **écran d'administration des
-  personnes (D25, C7).**
+- **On n'ajoute qu'une personne par enregistrement.** Le bloc d'ajout de T2.6 crée une personne, et
+  pour en ajouter deux il faut enregistrer puis rouvrir le formulaire. La limite est écrite dans
+  l'écran, et **sa raison a disparu le 14/08** : le champ répétable exigeait le JavaScript que la
+  cinquième discipline interdisait. Elle est levable. → **administration des personnes (D25, C7).**
 
 ### c. Dettes assumées, sans échéance
 
@@ -246,5 +246,5 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   (Antigravity)**, **T4.2 sur Sonnet 5 (Claude Code)**, **T4.4 sur Opus 5 (Claude Code)** — le pivot
   du chantier et son seul ticket à logique neuve. **T4.3 a été mené sur Opus 5**, non sur
   Antigravity : rangé parmi les lectures sans décision neuve, il en portait trois — l'ancre du lien,
-  la date au jour, l'espace de l'unité. **Le levier n'est pas le modèle mais les cinq disciplines de
-  vérification** — voir le point ouvert (a) ci-dessus.
+  la date au jour, l'espace de l'unité. **Le levier n'est pas le modèle mais les quatre disciplines
+  de vérification** — voir le point ouvert (a) ci-dessus.

@@ -1848,3 +1848,55 @@ dans le HTML servi, elles ne se vérifient que sur les deux résultats de la fix
 limite ne l'est — décimale, millier, unité absente, premier du mois. Le fichier ne couvre **que les
 deux fonctions du ticket** : un fichier de tests neuf n'est pas une invitation à couvrir les six
 autres, qui appartiennent aux tickets qui les ont écrites.
+
+**14/08/2026, hors ticket — la cinquième discipline de vérification est retirée, le jour même où
+elle avait été écrite.** « Le parcours se joue sans une ligne de JavaScript » quitte l'étape 4 du
+protocole, qui compte désormais **quatre disciplines**. Décision de l'humain, prise après enquête.
+
+**Ce que la règle n'était pas.** Ni une décision de `docs/07`, ni une contrainte de fondation :
+le mot « JavaScript » n'apparaît **nulle part** dans `docs/01` à `docs/07`. La règle 6 ne la
+protégeait donc pas. Elle datait de la veille au plus, extraite des dix-neuf récits de T1.1 à T4.1
+— voir l'entrée « les cinq disciplines n'étaient pas une invention, mais une extraction » plus haut
+dans ce fichier. **Elle n'a jamais interdit d'écrire du JavaScript**, et il faut le dire clairement
+pour qu'aucune session ne la relise après coup comme une interdiction rétroactive : six composants
+portent `"use client"` — `focus-trap`, `main-nav`, `product-form`, `project-form`, `activity-panel`,
+`resource-panel` — et `useActionState` est employé depuis T2.5. La formulation disait « se joue »,
+donc une discipline de **vérification** ; elle a été lue et appliquée comme une contrainte de
+**conception**, et c'est cet écart entre les deux lectures qui a fini par coûter.
+
+**Ce qu'elle a coûté, trois fois.** (1) **T2.6** — « on n'ajoute qu'une personne par
+enregistrement », faute de champ répétable, limite écrite dans l'écran et reportée jusqu'à C7.
+(2) **T2.4** — l'édition en place des champs simples du produit écartée au profit d'une page
+`/produits/{id}/modifier`, l'un des trois motifs étant qu'un second état de la page produit aurait
+fait deux rendus à tenir. (3) **Arbitrage (b) de `tickets-C4.md`** — la case « Activité terminée —
+ajouter un résultat » de la maquette écartée parce qu'une case « ne peut rien révéler sans
+JavaScript ». **Et elle n'a pas protégé l'accessibilité, contrairement à l'intuition** : sans
+JavaScript, la coquille de navigation reste focalisable derrière le voile et `aria-modal` est
+absent. C'est `FocusTrap` — donc JavaScript — qui répare. La règle a donc payé un prix de
+conception pour une garantie qu'elle ne rendait pas.
+
+**Ce que le retrait fait perdre, et c'est une dette assumée, pas un oubli.** Le rejeu d'une
+soumission `multipart` reconstituée à la main **sans en-tête `Next-Action`** n'est plus nommé nulle
+part dans `CLAUDE.md`. Or c'est exactement ce qu'envoie un client hostile, et c'était l'unique mode
+opératoire de la discipline qui reste — « le droit s'éprouve par l'action, jamais par l'écran ».
+Sans lui, cette quatrième discipline risque de redevenir une intention que chaque session
+réinterprète. **La réserve a été formulée avant décision et écartée en connaissance de cause.**
+La technique, elle, reste décrite en détail dans ce journal, aux entrées **T2.5** (les champs
+`$ACTION_REF_1`, `$ACTION_1:0`, `$ACTION_KEY` du balisage servi), **T3.4** (« sans en-tête
+`Next-Action` — c'est-à-dire exactement ce qu'envoie un navigateur sans JavaScript ») et **T4.2**.
+Une session qui doit éprouver un droit va les y chercher.
+
+**Ce qui n'a pas bougé.** `tickets-C4.md` garde la contrainte dans la validation de **T4.4**,
+ticket suivant : un `tickets-*.md` n'est ouvert qu'en session de découpage, et le coût y est nul —
+T4.4 reprend les mécaniques d'URL de T3.2 et T4.2, déjà éprouvées. `docs/` est figé et muet sur le
+sujet. `AGENTS.md` ne mentionne pas la règle. Aucun fichier de `app/`, `components/` ou `lib/`
+n'est touché : **rien de ce qui est livré n'est rouvert**, la règle change ce qui est exigé demain,
+pas ce qui a été fait hier.
+
+**Seconde exception à la règle 7, et le raisonnement est celui du 14/08.** L'édition de `CLAUDE.md`
+a été faite par moi, sur instruction explicite et sur un texte présenté puis validé avant écriture.
+La règle 7 vise l'écriture **silencieuse** par un outil — elle a été posée en T1.1 après que
+`next dev` eut ajouté de lui-même un bloc en fin de fichier —, pas la main de l'humain passant par
+moi. **L'exception ne vaut toujours pas précédent** : hors instruction explicite portant sur un
+texte déjà validé, `CLAUDE.md` et `AGENTS.md` restent fermés. Le garde-fou technique est inchangé
+(`agentRules: false` dans `next.config.ts`).

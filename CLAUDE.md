@@ -121,14 +121,13 @@ personne.
 2. **Plan mode.** Présenter le plan et la liste exacte des fichiers à créer ou modifier.
    N'écrire aucun fichier avant validation explicite.
 3. Implémenter, strictement dans le périmètre annoncé.
-4. Vérifier le critère de validation du ticket et le rapporter. Cinq disciplines, toutes exigées :
+4. Vérifier le critère de validation du ticket et le rapporter. Quatre disciplines, toutes exigées :
    - **Le critère se lit dans le HTML servi**, jamais il ne s'affirme.
    - **Les tests se mettent en défaut** avant d'être crus : neutraliser la règle, voir tomber
      exactement les tests attendus, et rien d'autre.
    - **Le contraste se mesure** avant d'être cru, sur tout couple de couleurs neuf par la position.
    - **Le droit s'éprouve par l'action**, jamais par l'écran : un panneau absent du rendu n'a
      jamais protégé le point d'entrée HTTP qui l'accompagne.
-   - **Le parcours se joue sans une ligne de JavaScript.**
 5. Mettre à jour `ETAT.md` : ticket terminé, écarts éventuels, ticket suivant. **Une ligne par
    ticket, jamais plus** — le récit va dans `HISTORIQUE-TICKETS.md`. Un point ouvert se **récrit**,
    il ne reçoit pas d'addendum. **`ETAT.md` ne dépasse pas 250 lignes** : au-delà, le balayer avant
