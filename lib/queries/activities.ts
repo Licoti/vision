@@ -4,10 +4,10 @@
  * référentiels que le panneau de saisie propose.
  *
  * La première joint, donc elle passe par `joinedRead`. **Toute table jointe porte
- * `filter(table)`**, le `leftJoin` sur les approches compris : c'est la
- * condition posée par l'en-tête de `joinedRead`, et la propriété relevée par
- * T2.2 à T2.4 — les filtres de domaine se rattrapent l'un l'autre — ne
- * dispense d'aucun d'eux.
+ * `filter(table)`**, les `leftJoin` sur les approches et sur les outils
+ * compris : c'est la condition posée par l'en-tête de `joinedRead`, et la
+ * propriété relevée par T2.2 à T2.4 — les filtres de domaine se rattrapent
+ * l'un l'autre — ne dispense d'aucun d'eux.
  *
  * Ce module n'importe pas `db` : il reçoit un `ScopedDb` déjà lié au domaine
  * courant. Règle 1.
@@ -23,6 +23,8 @@ import {
   activityTypes,
   approaches,
   persons,
+  results,
+  tools,
 } from "@/lib/db/schema";
 import type { PersonKind } from "@/lib/forms/project";
 
@@ -165,6 +167,30 @@ export type RoadmapGroupKey =
   | "done"
   | "cancelled";
 
+/**
+ * Le résultat d'une activité — **le contrat unique** de `docs/02` §5, et rien
+ * de plus : un libellé, une valeur, une unité, une date, le nom de l'outil, un
+ * lien profond. Vision n'affiche jamais le détail des constats : il vit dans
+ * l'outil qui l'a produit.
+ *
+ * C'est une valeur **reportée**, jamais un indice calculé par Vision (D39).
+ */
+export type ActivityResult = {
+  label: string;
+  /**
+   * `numeric(18,4)` : le pilote rend la chaîne brute — « 62.0000 » et non 62.
+   * Le formatage appartient à `lib/format`, pas à la lecture.
+   */
+  value: string | null;
+  unit: string | null;
+  /** Colonne `date` : chaîne `YYYY-MM-DD`, formatée par `lib/format`. */
+  measuredOn: string;
+  /** `tool_id` est nullable (`on delete set null`). */
+  toolName: string | null;
+  /** Le lien profond. Nul pour les deux résultats de la fixture — cas normal. */
+  externalUrl: string | null;
+};
+
 /** Une entrée de roadmap : type, objectif, période, approche. Rien d'autre. */
 export type RoadmapActivity = {
   id: string;
@@ -181,6 +207,12 @@ export type RoadmapActivity = {
   cancellationReason: string | null;
   /** Facultatif (`docs/03` §4), triés par nom. Vide la plupart du temps — T3.6. */
   participants: ActivityFormPerson[];
+  /**
+   * Le résultat, s'il y en a un — T4.3. Un au plus
+   * (`results_activity_unique`), et seulement sur une activité terminée, seul
+   * état qui l'autorise (`docs/03` §4).
+   */
+  result: ActivityResult | null;
 };
 
 export type RoadmapGroup = {
@@ -326,6 +358,62 @@ export function listProjectRoadmap(
       participantsByActivity.set(row.activityId, list);
     }
 
+    /* Les résultats (T4.3) : **une troisième lecture, pas une jointure de
+       plus**. La requête principale en porte déjà deux, et `results` en
+       amènerait deux — la table et son outil — pour un champ que la plupart des
+       activités n'ont pas. La fiche du ticket tranche pour la seconde lecture,
+       « pour la raison qui sépare déjà les participants de leur activité ».
+
+       `activities` est jointe pour porter `filter(activities)` sur la table
+       réellement lue, et pour ne lire que les résultats d'activités non
+       archivées de ce projet ; `tools` l'est pour le seul nom. Chaque table
+       jointe filtrée sur le domaine, la règle du fichier — `tools` comprise :
+       sans elle, un `tool_id` pointant l'outil d'un autre domaine en rendrait
+       le nom.
+
+       Aucune condition sur l'état de l'activité : `assertPreconditions` refuse
+       déjà d'écrire un résultat ailleurs que sur une activité terminée (T1.3).
+       La lecture décrit ce que la base porte, elle ne repose pas une règle
+       d'écriture. */
+    const resultRows = await database
+      .select({
+        activityId: results.activityId,
+        label: results.label,
+        value: results.value,
+        unit: results.unit,
+        measuredOn: results.measuredOn,
+        toolName: tools.name,
+        externalUrl: results.externalUrl,
+      })
+      .from(results)
+      .innerJoin(
+        activities,
+        and(eq(activities.id, results.activityId), filter(activities)),
+      )
+      .leftJoin(tools, and(eq(tools.id, results.toolId), filter(tools)))
+      .where(
+        and(
+          filter(results),
+          eq(activities.projectId, projectId),
+          isNull(activities.archivedAt),
+          isNull(results.archivedAt),
+        ),
+      );
+
+    /* Un résultat par activité au plus — `results_activity_unique` —, donc une
+       valeur et non une liste, contrairement aux participants. */
+    const resultByActivity = new Map<string, ActivityResult>();
+    for (const row of resultRows) {
+      resultByActivity.set(row.activityId, {
+        label: row.label,
+        value: row.value,
+        unit: row.unit,
+        measuredOn: row.measuredOn,
+        toolName: row.toolName,
+        externalUrl: row.externalUrl,
+      });
+    }
+
     const byKey = new Map<RoadmapGroupKey, RoadmapActivity[]>();
     for (const row of rows) {
       const key: RoadmapGroupKey =
@@ -350,6 +438,7 @@ export function listProjectRoadmap(
         approachLabel: row.approachLabel,
         cancellationReason: row.cancellationReason,
         participants: participantsByActivity.get(row.id) ?? [],
+        result: resultByActivity.get(row.id) ?? null,
       });
       byKey.set(key, group);
     }

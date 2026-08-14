@@ -34,6 +34,33 @@ function parseDay(value: string): Date {
 }
 
 /**
+ * Le jour, pour la seule date de mesure d'un résultat (T4.3).
+ *
+ * **C'est la seule entorse au mois, et elle est bornée.** D13 pose « le mois »
+ * comme unité de temps *de la roadmap*, et `formatActivityPeriod` la respecte :
+ * une période d'accompagnement ne gagne rien à devenir un horodatage. Une date
+ * de mesure n'est pas une période — c'est le fait daté qu'un outil externe a
+ * produit, et D39 autorise « toute valeur reportée d'un outil externe, **avec
+ * sa date** ». Un audit rendu le 31 mai perdrait son sens en « mai 2024 », qui
+ * laisserait croire à un travail étalé sur tout le mois.
+ *
+ * Le fuseau explicite a la raison de `MONTH`, en plus serré encore : au jour,
+ * un serveur à l'ouest reculerait **toute** date d'une journée, pas seulement
+ * celles qui tombent un premier du mois.
+ */
+const DAY = new Intl.DateTimeFormat("fr-FR", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+/** « 31 mai 2024 ». Reçoit la chaîne `YYYY-MM-DD` d'une colonne `date`. */
+export function formatDay(value: string): string {
+  return DAY.format(parseDay(value));
+}
+
+/**
  * La période d'un accompagnement, au mois (D13).
  *
  * « mars 2024 → septembre 2024 » · « depuis février 2026 » ·
@@ -162,4 +189,41 @@ const RESOURCE_TYPES: Record<ResourceType, string> = {
 
 export function formatResourceType(type: ResourceType): string {
   return RESOURCE_TYPES[type];
+}
+
+/**
+ * La valeur d'un résultat, avec son unité : « 62/100 », « 68 % », « 1 234,5 s ».
+ *
+ * **Le chiffre.** `results.value` est un `numeric(18,4)` que le pilote rend en
+ * chaîne brute — « 62.0000 », et non 62. `maximumFractionDigits: 4` est la
+ * précision de la colonne, pas un choix : les zéros de queue tombent, une
+ * décimale réelle survit, et la virgule française remplace le point.
+ * **Limite connue** : au-delà de 2^53, `Number` perd des unités là où la
+ * colonne, elle, n'en perd pas. Aucun score ni taux d'audit n'en approche.
+ * Une chaîne que `Number` ne sait pas lire est rendue telle quelle plutôt
+ * qu'en « NaN » : mieux vaut la valeur brute qu'un mot qui ne veut rien dire.
+ *
+ * **L'espace.** L'unité se colle quand elle commence par `/` — « 62/100 » est
+ * une fraction, pas un nombre suivi d'un mot — et se sépare partout ailleurs
+ * par une **espace insécable** (U+00A0) : « 68 % », « 1 234,5 s ». Insécable
+ * parce qu'un chiffre resté seul en fin de ligne, coupé de son unité, ne veut
+ * plus rien dire. La règle se lit dans le critère de T4.3 lui-même, qui écrit
+ * les deux formes côte à côte.
+ *
+ * `null` quand il n'y a pas de valeur : la colonne est nullable, et une unité
+ * seule ne dit rien. L'appelant retire alors la part, séparateur compris.
+ */
+const DECIMAL = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 4 });
+
+export function formatResultValue(
+  value: string | null,
+  unit: string | null,
+): string | null {
+  if (value === null) return null;
+
+  const parsed = Number(value);
+  const number = Number.isFinite(parsed) ? DECIMAL.format(parsed) : value;
+
+  if (!unit) return number;
+  return unit.startsWith("/") ? `${number}${unit}` : `${number} ${unit}`;
 }

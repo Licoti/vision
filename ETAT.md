@@ -2,12 +2,11 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 14/08/2026 — T4.2. Le fichier tient sous le seuil de 250 lignes posé par
-le protocole ; le mécanisme d'entretien du 14/08/2026 a envoyé le récit détaillé dans
-`HISTORIQUE-TICKETS.md`. **Un chantier a été ajouté au découpage** — C4bis, archivage et correction,
-qui s'exécute entre C4 et C5.
-**Chantier en cours :** C4 — ressources et résultats, 2 tickets sur 4 terminés
-**Ticket suivant :** T4.3 — le résultat sur l'entrée de roadmap, lecture
+**Dernière mise à jour :** 14/08/2026 — T4.3. **Le fichier est à son plafond de 250 lignes** : le
+repliage qui l'y ramènera durablement appartient à la session de découpage de C4bis, à la clôture de
+C4. **Un chantier a été ajouté au découpage** — C4bis, archivage et correction, entre C4 et C5.
+**Chantier en cours :** C4 — ressources et résultats, 3 tickets sur 4 terminés
+**Ticket suivant :** T4.4 — saisie déclarative d'un résultat, qui clôt C4
 
 ---
 
@@ -18,7 +17,7 @@ qui s'exécute entre C4 et C5.
 | C1 — Socle technique | T1.1 → T1.6 | **terminé** |
 | C2 — Produits et projets | T2.1 → T2.6 | **terminé** |
 | C3 — Activités et roadmap | T3.1 → T3.6 | **terminé** |
-| C4 — Ressources et résultats | T4.1 → T4.4 | **T4.1 et T4.2 terminés**, T4.3 → T4.4 à faire |
+| C4 — Ressources et résultats | T4.1 → T4.4 | **T4.1 à T4.3 terminés**, T4.4 à faire |
 | C4bis — Archivage et correction | à découper | à faire — décidé le 14/08/2026 |
 | C5 — Indicateurs et temps long | à découper | à faire |
 | C6 — Liens et journal | à découper | à faire |
@@ -40,10 +39,9 @@ s'appellent T4bis.1, T4bis.2… **Il se découpe à la clôture de C4**, en sess
 *(une ligne par ticket : identifiant, date, titre, écarts de périmètre. **Rien d'autre.** Le récit va
 dans `HISTORIQUE-TICKETS.md`, les pièges et dettes dans `JOURNAL-TECHNIQUE.md`.)*
 
-**Repliage dû à la clôture de C4.** C1, C2 et C3 sont clos et occupent encore 18 lignes. À la
-session de découpage de C4bis — geste 1 du protocole —, les quatre chantiers clos se replient en
-quatre lignes et leurs tickets partent dans `HISTORIQUE-TICKETS.md`. Reporté le 14/08/2026 : le
-geste s'éprouve sur C4 fraîchement clos plutôt que sur trois chantiers anciens.
+**Repliage dû à la clôture de C4.** Les quatre chantiers clos occuperont 22 lignes ; au geste 1 de la
+session de découpage de C4bis ils se replient en quatre, leurs tickets partant dans
+`HISTORIQUE-TICKETS.md`. Reporté le 14/08/2026, le geste s'éprouvant mieux sur C4 fraîchement clos.
 
 - **T1.1 — 11/08/2026 — initialisation du projet.** Écarts : couleurs d'aires thérapeutiques
   Servier non traduites ; `next dev` bridé pour cesser d'écrire dans `CLAUDE.md`.
@@ -82,6 +80,8 @@ geste s'éprouve sur C4 fraîchement clos plutôt que sur trois chantiers ancien
 - **T4.1 — 13/08/2026 — bloc « Ressources » de la page projet, lecture.** Aucun écart de périmètre.
 - **T4.2 — 14/08/2026 — relier une ressource.** Ferme la boucle minimale de `docs/05` §2. Aucun
   écart de périmètre.
+- **T4.3 — 14/08/2026 — le résultat sur l'entrée de roadmap.** Écart : `lib/format.test.ts`, qui
+  n'existait pas.
 
 ---
 
@@ -126,36 +126,34 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   **Conséquence connue de T4.1** : une ressource rattachée à une activité archivée continue
   d'afficher son libellé, que la roadmap ne montre plus — non atteignable par l'interface tant que
   rien n'archive une activité, et à retrancher avec le même ticket.
+  **Piège relevé par T4.3, qui pèse sur le point (4)** : `results_activity_unique` porte sur
+  `activity_id` seul et ignore `archived_at`, donc archiver un résultat ne libère pas l'activité. Le
+  chemin de correction ne peut pas être « archiver puis ressaisir » : il faudra une édition en place,
+  ou une unicité partielle — donc une migration.
   → **C4bis, à découper à la clôture de C4.**
 - **Trois paramètres d'ouverture sur la page projet, dont deux posés.** `?activite=` depuis T3.2,
   `?ressource=` depuis T4.2, `?resultat=` en T4.4. **La règle d'exclusivité est écrite et éprouvée** :
-  deux clés présentes ensemble n'ouvrent **rien** — aucune préséance entre gestes de même rang, et
+  deux clés présentes ensemble n'ouvrent **rien**, aucune préséance entre gestes de même rang — et
   c'est déjà ce que la page fait d'une valeur d'`?activite=` qu'elle ne reconnaît pas. Elle tient par
   une **valeur** et non par une discipline : `conflict` puis `asked` en tête de la page, que tout le
   reste lit à la place des paramètres bruts. **T4.4 ajoute sa clé à `asked` et n'écrit aucune
-  condition neuve** — trois conditions qui s'excluent tiendraient encore, et cesseraient de tenir à la
-  quatrième. → **T4.4**.
+  condition neuve.** → **T4.4**.
 - **La coquille de navigation reste focalisable derrière le voile, sans JavaScript.** La page projet
   porte `inert` quand un panneau est ouvert, mais la barre latérale vit dans `app/(app)/layout.tsx`,
   et un layout Next ne reçoit pas les `searchParams`. Avec JavaScript, `FocusTrap` la met hors
   d'atteinte et `aria-modal` la retire de l'arbre d'accessibilité ; sans JavaScript, le cycle de
-  tabulation passe par elle. **La seconde modale est arrivée avec T4.2, et n'a rien changé** : la
-  fiche ne portait pas `layout.tsx`, le défaut ne se voit que scripts coupés, et le panneau de
-  ressource reprend `FocusTrap` tel quel — donc exactement la même couverture partielle, ni aggravée
-  ni refermée. Arbitrage du 14/08/2026, tenu. À joindre au **rebranchement des deux blocs manquants
-  de la barre latérale** —
-  carte de la personne courante et entrée Administration, dans les maquettes, écartés en T1.6 faute
-  de droit de lire la session. L'obstacle a disparu : les écrans lisent la session depuis T2.1 et
-  `can.manageDomain` depuis T2.5. Ce qui manque n'est plus un droit, c'est un ticket.
-  → **ticket barre latérale, C7 ou plus tôt.**
+  tabulation passe par elle. Les deux panneaux de la page reprenant `FocusTrap` tel quel, la
+  couverture partielle est la même pour l'un et pour l'autre — arbitrage du 14/08/2026, tenu.
+  À joindre au **rebranchement des deux blocs manquants de la barre latérale** — carte de la personne
+  courante et entrée Administration, écartés en T1.6 faute de droit de lire la session. L'obstacle a
+  disparu : les écrans lisent la session depuis T2.1 et `can.manageDomain` depuis T2.5. Ce qui manque
+  n'est plus un droit, c'est un ticket. → **ticket barre latérale, C7 ou plus tôt.**
 - **Deux colonnes saisies ne s'affichent nulle part.** (1) `products.kind` — « Produit accompagné » ou
   « Mission transverse » (D10) — se saisit depuis T2.5 et ne se voit sur aucun écran de lecture.
   (2) `persons.kind` : un intervenant côté entité est marqué sur la page projet depuis T2.4 et dans
-  le formulaire depuis T2.6 — pastille grise **et** mention « côté entité », le texte ne dépendant
-  jamais de la couleur — mais la page produit et la liste transverse affichent tous les membres à
-  l'identique, leurs lectures ne remontant pas la colonne. **Attention** : la formule « à reprendre
-  au premier ticket qui touche ces listes » n'est pas une destination — aucun ticket de C4, C5 ou C6
-  ne les touche. → **ticket propre, à découper.**
+  le formulaire depuis T2.6 — pastille grise **et** mention « côté entité » —, mais la page produit et
+  la liste transverse affichent tous les membres à l'identique, leurs lectures ne remontant pas la
+  colonne. Aucun ticket de C4, C5 ou C6 ne touche ces listes. → **ticket propre, à découper.**
 - **Le contenu rédigé d'`/a-propos` reste à écrire.** La page a son en-tête et son état vide. Son
   contenu — ce qu'est Vision, le vocabulaire, ce qu'elle ne fait pas, l'état daté — ne demande
   aucune lecture en base. → **ticket propre, C7 au plus tard.**
@@ -169,16 +167,14 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
 - **La base de développement a dérivé de la fixture, et c'est acté.** Inventaire au 14/08/2026 :
   un accompagnement de plus — « Refonte de l'espace documents » sur « Espace client web », créé en
   vérification de T2.6, avec un commanditaire renseigné et une personne `source = manual` (Nadia
-  Berthier) ; cinq activités archivées depuis T3.3 ; quatre transitions non revenues en arrière
-  depuis T3.5 ; une ressource de plus depuis T4.2 — « Compte rendu d'atelier — T4.2 » sur
-  « Autonomie des opérations courantes », le critère du ticket, et **sans chemin d'archivage** jusqu'à
-  C4bis ; un « Test projet » et un produit « test » d'une session antérieure.
+  Berthier) ; cinq activités archivées depuis T3.3 ; quatre transitions non revenues en arrière depuis
+  T3.5 ; une ressource de plus depuis T4.2, **sans chemin d'archivage** jusqu'à C4bis ; un « Test
+  projet » et un produit « test » d'une session antérieure.
   **Règle posée le 14/08/2026 : la base de développement est jetable.** La règle 4 protège la donnée
-  métier, pas une fixture locale. Conséquences à connaître : les critères de T2.1 à T2.4 se lisaient
-  sur « 2 accompagnements » pour ce produit et s'y liraient sur 3 ; un critère de ticket passé ne
-  s'y relit pas nécessairement, et ce n'est pas un défaut. Il n'existe **pas de `db:reset`** —
-  `db:seed` ignore ce qu'il n'a pas semé. → **sans échéance ; un ticket d'outillage si le besoin
-  devient réel.**
+  métier, pas une fixture locale. Conséquence : un critère de ticket passé ne s'y relit pas
+  nécessairement — T2.1 à T2.4 se lisaient sur « 2 accompagnements », il y en a 3 — et ce n'est pas un
+  défaut. Il n'existe **pas de `db:reset`**, `db:seed` ignorant ce qu'il n'a pas semé. → **sans
+  échéance ; un ticket d'outillage si le besoin devient réel.**
 - **Le design system a six manques, et aucun n'a été inventé.** (1) Les trois **élévations** et les
   deux **gradients** sont nommés sans valeur. (2) Aucun jeton de **bordure de contrôle** : le plus
   sombre des `border-*` ne dépasse pas 1,2:1 là où la limite d'un composant se mesure à 3:1.
@@ -198,8 +194,9 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   **création** dont l'activité s'écrirait puis dont les participants échoueraient laisserait
   l'activité sans eux. → **le jour où la couche exposera une transaction.**
 - **La fixture est incomplète sur les ressources et les résultats.** Les deux résultats factices
-  n'ont pas de lien profond, le brief §7 n'en donnant aucun — la fiche T4.3 en fait explicitement un
-  cas normal, donc rien ne bloque C4. Trois des quatre ressources du brief ne sont pas semées :
+  n'ont pas de lien profond, le brief §7 n'en donnant aucun — T4.3 a éprouvé la branche avec lien sur
+  une ligne posée à la main puis retirée, T4.4 l'écrira pour de bon. Trois des quatre ressources du
+  brief ne sont pas semées :
   « Grille d'entretien », « Maquettes v3 » et « Rapport d'audit d'accessibilité » attendent une ancre
   que le brief ne fournit pas. Même silence sur `tools.base_url` et sur les courriels des personnes.
   → **sans échéance, ou l'humain fournit les adresses.**
@@ -217,7 +214,9 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   comparaison ligne à ligne est le but de l'écran. → **si l'usage le réclame.**
 - **Une activité `in_progress` porte une fin de période à venir.** La fraîcheur retient
   `max(coalesce(period_end, period_start))` : pour un atelier en cours en août, c'est le 31 août. Au
-  mois, l'affichage reste juste. → **le jour où une date au jour s'affiche quelque part.**
+  mois, l'affichage reste juste. **T4.3 n'a pas déclenché ce point** : `formatDay` ne sert qu'à
+  `results.measured_on`. Ce qui déclenchera reste une **période d'activité** au jour. → **ce
+  jour-là.**
 
 ---
 
@@ -243,8 +242,9 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   `lib/auth/provider.ts` est le seul fichier que C7 réécrit.
 - **Les maquettes `docs/design/maquettes/` sont une référence visuelle**, jamais branchées.
 - **Modèle par ticket.** Le plan écrit disait Opus pour C1, Sonnet à partir de C2 ; en pratique C2,
-  T3.1 et T3.2 ont été menés sur Opus. Arbitrage du 13/08/2026 pour C4 : **T4.1 et T4.3 sur Opus 4.6
-  Thinking (Antigravity)** — deux lectures qui rejouent T3.1 et T3.6 sans décision neuve ; **T4.2 sur
-  Sonnet 5 (Claude Code)** — le seul point non rejoué, deux panneaux sur une même page ; **T4.4 sur
-  Opus 5 (Claude Code)** — le pivot du chantier et son seul ticket à logique neuve. **Le levier n'est
-  pas le modèle mais les cinq disciplines de vérification** — voir le point ouvert (a) ci-dessus.
+  T3.1 et T3.2 ont été menés sur Opus. Arbitrage du 13/08/2026 pour C4 : **T4.1 sur Opus 4.6 Thinking
+  (Antigravity)**, **T4.2 sur Sonnet 5 (Claude Code)**, **T4.4 sur Opus 5 (Claude Code)** — le pivot
+  du chantier et son seul ticket à logique neuve. **T4.3 a été mené sur Opus 5**, non sur
+  Antigravity : rangé parmi les lectures sans décision neuve, il en portait trois — l'ancre du lien,
+  la date au jour, l'espace de l'unité. **Le levier n'est pas le modèle mais les cinq disciplines de
+  vérification** — voir le point ouvert (a) ci-dessus.

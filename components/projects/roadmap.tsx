@@ -32,10 +32,16 @@
 import Link from "next/link";
 
 import { EmptyState } from "@/components/ui/empty-state";
+import { ExternalLink } from "@/components/ui/external-link";
 import { SectionHeader } from "@/components/ui/section";
 import { Tag } from "@/components/ui/tag";
-import { formatActivityPeriod } from "@/lib/format";
+import {
+  formatActivityPeriod,
+  formatDay,
+  formatResultValue,
+} from "@/lib/format";
 import type {
+  ActivityResult,
   RoadmapActivity,
   RoadmapGroup,
   RoadmapGroupKey,
@@ -268,12 +274,74 @@ function RoadmapSection({
   );
 }
 
+/**
+ * Le résultat d'une activité — **le contrat unique** de `docs/02` §5, et rien
+ * de plus : un libellé, une valeur, une unité, une date, le nom de l'outil, un
+ * lien profond. Vision n'affiche **jamais le détail des constats** : il vit
+ * dans l'outil qui l'a produit, et c'est ce qui garantit que brancher un outil
+ * de plus coûte une ligne de configuration.
+ *
+ * « Résultat : Score d'audit UX ↗ · 62/100 · 31 mai 2024 · Ergonome »
+ *
+ * **Le libellé porte l'ancre** quand le lien profond est renseigné, via
+ * `ExternalLink` de T4.1 **repris tel quel** — c'est la forme du titre d'une
+ * ressource, et une seule règle vaut mieux qu'une règle et son repli : `label`
+ * est `not null` en base, l'ancre a donc toujours un texte. **Un résultat sans
+ * lien profond est un cas normal**, celui des deux résultats de la fixture : la
+ * valeur s'affiche et aucun lien mort n'est rendu.
+ *
+ * Le couple de couleurs de l'ancre n'est pas neuf par la position :
+ * `content-info-base` sur `surface-neutral-pale` est celui du titre d'une
+ * ressource depuis T4.1, l'entrée de roadmap et `Section` portant la même
+ * surface.
+ *
+ * Les `·` sont décoratifs et chaque part porte son libellé pour l'assistance —
+ * la règle de `resources.tsx` : hors du contexte visuel, « 62/100 · 31 mai
+ * 2024 » ne dit pas lequel des deux est quoi. Une part absente disparaît avec
+ * son séparateur ; seules la date et le libellé sont garantis par le schéma.
+ *
+ * **Aucun seuil, aucun code couleur, aucune flèche de tendance** : Vision
+ * reporte une valeur, elle ne la juge pas et ne la compare à rien (D39).
+ */
+function Result({ result }: { result: ActivityResult }) {
+  const value = formatResultValue(result.value, result.unit);
+
+  return (
+    <p className="mt-1.5 text-xs leading-175 text-content-neutral-base">
+      {"Résultat : "}
+      {result.externalUrl ? (
+        <ExternalLink href={result.externalUrl}>{result.label}</ExternalLink>
+      ) : (
+        result.label
+      )}
+      {value ? (
+        <>
+          <span aria-hidden="true">{" · "}</span>
+          <span className="sr-only">Valeur : </span>
+          {value}
+        </>
+      ) : null}
+      <span aria-hidden="true">{" · "}</span>
+      <span className="sr-only">Mesuré le </span>
+      {formatDay(result.measuredOn)}
+      {result.toolName ? (
+        <>
+          <span aria-hidden="true">{" · "}</span>
+          <span className="sr-only">Outil : </span>
+          {result.toolName}
+        </>
+      ) : null}
+    </p>
+  );
+}
+
 /** Les classes d'un geste texte, communes à « Modifier » et aux gestes de T3.5. */
 const ACTION_LINK = "text-xs font-semibold text-content-primary-dark underline";
 
 /**
- * Une entrée : son type, son approche, son objectif, sa période — le lien qui
- * la corrige (T3.4), et les gestes de son cycle de vie (T3.5).
+ * Une entrée : son type, son approche, son objectif, sa période, et le cas
+ * échéant son résultat avec le lien vers l'outil (T4.3, `docs/06` §5) — le lien
+ * qui la corrige (T3.4), et les gestes de son cycle de vie (T3.5).
  *
  * **L'entrée n'est pas cliquable en entier**, et c'est un choix : un `<a>` n'en
  * contient pas un autre, et elle porte désormais jusqu'à trois formulaires. La
@@ -358,6 +426,12 @@ function RoadmapEntry({
               .join(", ")}
           </p>
         ) : null}
+        {/* Le résultat (T4.3), sur la forme exacte de la ligne des
+            participants : même balise, mêmes classes, donc aucun couple de
+            couleurs neuf par la position. Il ne croise jamais le motif
+            d'annulation — seule une activité terminée porte un résultat
+            (`docs/03` §4). */}
+        {activity.result ? <Result result={activity.result} /> : null}
         {/* `cancellationReason` n'est renseigné que dans ce groupe
             (`activities_cancelled_requires_reason`) : le motif remplace les
             gestes, il ne s'ajoute pas à côté d'eux. Texte, pas couleur seule

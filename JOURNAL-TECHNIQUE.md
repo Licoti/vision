@@ -1797,3 +1797,54 @@ activité est réservée… », ce qui aurait été faux sous le panneau de ress
 valeur par défaut égale au texte existant : **aucun appel existant ne change**, et les deux gestes
 gardent le même droit — `docs/02` §5 range activités et ressources dans ce que le contributeur
 désigné écrit. Seul le mot change, jamais la règle.
+
+**T4.3 — La date d'un résultat se lit au jour, et D13 n'est pas enfreinte.** D13 pose « le mois »
+comme unité de temps **de la roadmap**, et l'en-tête de `lib/format.ts` l'écrit en toutes lettres :
+« Un audit "de juin 2026" ne gagne rien à devenir "du 30 juin 2026" ». `formatDay` fait exactement
+cela, et le critère de la fiche l'exige — « 31 mai 2024 ». La contradiction n'est qu'apparente :
+D13 parle des **périodes d'accompagnement**, qui s'étalent, tandis que `results.measured_on` est un
+fait ponctuel produit par un outil externe, que D39 autorise à reporter « avec sa date ». Un audit
+rendu le 31 mai perdrait son sens en « mai 2024 », qui laisserait croire à un travail étalé.
+**L'entorse est bornée par le fait que `formatDay` n'a qu'un appelant** : le jour où une **période**
+d'activité s'affichera au jour, ce sera une infraction, pas une extension. La docstring de la
+fonction porte la raison, et `ETAT.md` a récrit le point ouvert qui guettait ce déclencheur — il n'a
+pas été déclenché.
+
+**T4.3 — `Intl.NumberFormat` sur un `numeric(18,4)` : une perte de précision assumée.** Le pilote
+rend « 62.0000 » ; l'affichage doit dire « 62 ». La voie retenue passe par `Number(value)`, donc par
+un flottant 64 bits : au-delà de 2^53 le chiffre affiché cesserait d'être celui de la colonne, qui
+va jusqu'à 10^14. Deux options ont été écartées. Découper la chaîne à la main donnait l'exactitude
+mais perdait la virgule française et le groupement des milliers, qu'il aurait fallu réécrire.
+`Intl.NumberFormat.format` accepte une **chaîne** depuis ES2023 et formaterait sans perte, mais
+c'est une nouveauté de plateforme dont rien d'autre dans le projet ne dépend. Retenu : le flottant,
+la limite écrite dans la docstring. **Aucun score, taux ou durée d'audit n'approche 2^53** — et le
+jour où une valeur le ferait, le contrat unique de `docs/02` §5 aurait un autre problème.
+
+**T4.3 — `results_activity_unique` ignore l'archivage, et cela ferme une porte à C4bis.** La
+contrainte porte sur `activity_id` **seul**. Un résultat archivé occupe donc toujours la place : la
+base refuse d'en écrire un second sur la même activité. Découvert en écrivant les tests, où une
+liaison forgée visait une activité qui portait déjà un résultat archivé — la contrainte a fait
+tomber le test avant qu'une lecture ne le fasse. **Conséquence pour C4bis** : « archiver puis
+ressaisir » n'est pas un chemin de correction possible pour un résultat. Il faudra une édition en
+place, ou une unicité partielle (`where archived_at is null`), donc une migration. Consigné au point
+ouvert du chantier plutôt qu'ici seul, parce qu'il en change la matière.
+
+**T4.3 — L'unité d'un résultat est du texte libre, et son espacement est une règle de deux lignes.**
+`results.unit` est un `text` nullable : rien n'en borne le contenu, et le critère de la fiche en met
+deux formes côte à côte — « 62/100 » collé, « 68 % » séparé. La règle retenue est la plus courte qui
+les produise toutes les deux : **collé si l'unité commence par `/`, insécable sinon**. Elle est
+typographiquement juste pour le français (`%`, `s`, `€`, `pts`) et pour les fractions. Ce qu'elle ne
+couvre pas : une unité qui commencerait par une autre ponctuation collante — `°` par exemple — se
+verrait séparée. Aucune n'existe, et inventer une liste de caractères collants aurait été une règle
+que rien ne demande. **L'insécable ne se vérifie pas à l'œil** : elle a été relue sur le point de
+code dans le HTML servi (`0xa0`), et un test l'éprouve par la négative — `not.toContain(" ")` avec
+une espace ordinaire, faute de quoi le test passerait le jour où la règle sauterait.
+
+**T4.3 — Un fichier de tests pour `lib/format.ts`, écart de périmètre déclaré.** La fiche ne nomme
+que `lib/format.ts`, qui n'avait aucun test depuis T1.1. Le ticket y pose trois règles muettes — les
+zéros de queue, l'insécable, le fuseau du jour — dont **aucune n'est éprouvable depuis les tests de
+lecture** : `listProjectRoadmap` remonte la chaîne brute, le formatage n'étant pas son travail. Lues
+dans le HTML servi, elles ne se vérifient que sur les deux résultats de la fixture, et aucun cas
+limite ne l'est — décimale, millier, unité absente, premier du mois. Le fichier ne couvre **que les
+deux fonctions du ticket** : un fichier de tests neuf n'est pas une invitation à couvrir les six
+autres, qui appartiennent aux tickets qui les ont écrites.

@@ -524,6 +524,48 @@ commit `9afa52f`, à la ligne près.
   fichiers de la fiche, et rien d'autre. **La base de développement a gagné une ressource**, celle du
   critère.
 
+- **T4.3 — 14/08/2026 — le résultat sur l'entrée de roadmap.** La table `results` portait deux lignes
+  de fixture qu'**aucun écran ne montrait**, alors que `docs/03` §6 et `docs/06` §5 écrivent à
+  l'identique que chaque entrée affiche « le cas échéant son résultat avec le lien vers l'outil » —
+  la phrase que l'état vide de `Roadmap` promet mot pour mot depuis T3.1. **Le critère est lu dans le
+  HTML servi**, extrait par `curl` — donc sans qu'aucun moteur de script n'ait tourné : sur « Refonte
+  du parcours de virement », l'Audit UX porte « Résultat : Score d'audit UX · 62/100 · 31 mai 2024 ·
+  Ergonome » ; sur « Autonomie des opérations courantes », l'Audit d'accessibilité porte « Taux de
+  conformité · 68 % · 30 juin 2026 · Audit d'accessibilité ». **Une ligne de résultat par page, zéro
+  sur les trois autres projets**, comptées dans le balisage ; et **aucun lien sortant neuf** — les
+  quatre `target="_blank"` des deux pages sont les titres de ressources de T4.1, aucun n'est un
+  libellé de résultat. Le cas « un résultat sans lien profond est un cas normal » n'est donc pas
+  affirmé : il est ce que la fixture rend. **Trois arbitrages.** (1) **L'ancre est le libellé**,
+  tranché avec l'humain contre le nom de l'outil : `label` est `not null`, donc une seule règle et
+  aucun repli, et c'est la forme du titre d'une ressource depuis T4.1 — `ExternalLink` repris tel
+  quel, non modifié. La branche n'étant pas atteignable sur la fixture, elle a été éprouvée sur une
+  **ligne posée à la main** en base de développement puis **retirée**, `external_url` relue à `null`
+  avant et après : le balisage rend alors `<a … target="_blank" rel="noreferrer">Score d'audit UX ↗
+  <span class="sr-only"> (lien externe, nouvel onglet)</span></a>`. (2) **La date se lit au jour**,
+  contre l'habitude de D13 — « 31 mai 2024 », que le critère de la fiche écrit lui-même : une date de
+  mesure n'est pas une période d'accompagnement, et D39 autorise la valeur reportée « avec sa date ».
+  L'entorse est bornée à ce seul champ, `formatDay` n'ayant aucun autre appelant. (3) **L'unité se
+  colle après un `/` et se sépare partout ailleurs d'une insécable** — « 62/100 » et « 68 % », les
+  deux formes que le critère met côte à côte. L'insécable a été **vérifiée sur le point de code** dans
+  le HTML servi, `0xa0` et non `0x20` : à l'œil, les deux sont indiscernables. **Le rapprochement est
+  une troisième lecture**, imposée par la fiche et non une jointure de plus — la requête principale en
+  portait déjà deux, et `results` en amenait deux. **Les tests ont été mis en défaut sept fois**, une
+  règle à la fois, et chacune fait tomber exactement les siennes : `isNull(results.archivedAt)` **1**,
+  `filter(tools)` **1**, `filter(results)` **1**, l'insécable **2**, le formatage du nombre **6**, le
+  collage du `/` **1**, le fuseau UTC de `formatDay` **2**. Les trois filtres de la lecture sont
+  **infalsifiables sur des données légitimes**, pour la raison relevée par T4.1 — la jointure porte
+  sur une clé primaire et `assertPreconditions` refuse déjà d'écrire hors domaine : deux tests
+  écrivent donc par `db`, hors de la couche, un `tool_id` et un `activity_id` étrangers. **Une
+  contrainte a corrigé une erreur d'écriture des tests** : `results_activity_unique` ne connaît ni le
+  domaine ni l'archivage, si bien qu'une activité qui porte déjà un résultat, **fût-il archivé**, en
+  refuse un second — la liaison forgée a dû viser une activité vierge. Le contraste a été **mesuré**
+  sans qu'aucun couple ne soit neuf par la position, l'entrée de roadmap et `Section` portant la même
+  surface : le texte **4,98:1**, l'ancre **6,41:1**. **Un écart de périmètre, déclaré** :
+  `lib/format.test.ts`, qui n'existait pas — trois règles muettes qu'aucun test n'aurait pu mettre en
+  défaut, et dont les cas limites (décimale, millier, unité absente, premier du mois) ne se lisent sur
+  aucun écran. **La base de développement n'a pas bougé** : la seule écriture, celle du lien profond,
+  a été défaite.
+
 ---
 
 ## Points ouverts refermés

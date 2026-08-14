@@ -28,12 +28,15 @@ import {
   products,
   projectStatuses,
   projects,
+  results,
+  tools,
 } from "@/lib/db/schema";
 
 import {
   listActivityFormOptions,
   listActivityParticipantIds,
   listProjectRoadmap,
+  type RoadmapActivity,
   type RoadmapGroup,
 } from "./activities";
 
@@ -43,6 +46,7 @@ import {
  * cascade` (T3.6), donc la suppression d'`activities` l'emporte déjà.
  */
 const teardownOrder = [
+  results,
   activities,
   projects,
   products,
@@ -51,6 +55,8 @@ const teardownOrder = [
   projectStatuses,
   entities,
   persons,
+  /* Après `activity_types` et `results`, qui référencent tous deux `tools`. */
+  tools,
 ];
 
 type Fixture = {
@@ -69,10 +75,19 @@ type Fixture = {
   retiredTypeId: string;
   /** Un type vivant, pour éprouver que l'exception ne duplique rien. */
   liveTypeId: string;
-  /** L'activité « Audit d'accessibilité », terminée — porte deux participants. */
+  /**
+   * L'activité « Audit d'accessibilité », terminée — porte deux participants,
+   * et le résultat au contrat complet (T4.3).
+   */
   accessibilityActivityId: string;
   /** L'activité « Atelier de priorisation », en cours — porte un participant. */
   workshopActivityId: string;
+  /** L'activité « Test utilisateur », terminée — porte le résultat dégradé. */
+  userTestActivityId: string;
+  /** L'unique activité du projet « Terminé seul » — porte le résultat archivé. */
+  doneOnlyActivityId: string;
+  /** L'outil du domaine — la cible de la liaison forgée sur `tools`. */
+  toolId: string;
   /** Côté centre de compétence — kind `center`. */
   centerPersonId: string;
   /** Côté entité accompagnée — kind `stakeholder` (T3.6, « côté entité »). */
@@ -85,8 +100,9 @@ let b: Fixture;
 
 /**
  * Un domaine complet : trois projets, huit types d'activité dont un archivé,
- * une approche, et onze activités couvrant les quatre groupes, l'annulée,
- * l'archivée, l'activité sans date et l'activité sans approche.
+ * une approche, onze activités couvrant les quatre groupes, l'annulée,
+ * l'archivée, l'activité sans date et l'activité sans approche — et trois
+ * résultats, dont un archivé (T4.3).
  *
  * Les activités sont insérées **dans le désordre** par rapport à l'ordre
  * attendu : c'est la requête qui doit trier, pas la saisie.
@@ -144,7 +160,7 @@ async function seedDomain(label: string): Promise<Fixture> {
   await scope.archive(activityTypes, retired.id);
 
   /* --- Terminé, inséré en premier alors qu'il se lit en dernier ---------- */
-  await scope.insert(activities, {
+  const userTestActivity = await scope.insert(activities, {
     projectId: full.id,
     activityTypeId: userTest.id,
     state: "done",
@@ -229,7 +245,7 @@ async function seedDomain(label: string): Promise<Fixture> {
   await scope.archive(activities, archived.id);
 
   /* --- Le projet qui n'a que du terminé ---------------------------------- */
-  await scope.insert(activities, {
+  const doneOnlyActivity = await scope.insert(activities, {
     projectId: doneOnly.id,
     activityTypeId: audit.id,
     state: "done",
@@ -259,6 +275,47 @@ async function seedDomain(label: string): Promise<Fixture> {
     { activityId: workshopActivity.id, personId: stakeholder.id },
   ]);
 
+  /* --- Les résultats (T4.3) ----------------------------------------------
+     Trois, tous sur des activités **terminées** : `assertPreconditions` refuse
+     tout autre rattachement depuis T1.3, et la fixture ne contourne pas la
+     règle qu'elle est censée décrire.
+
+     1. Le contrat complet, outil et lien profond compris ;
+     2. le contrat **dégradé** — valeur, unité, outil et lien nuls, les quatre
+        colonnes nullables du schéma en même temps : la lecture doit rendre la
+        ligne, pas la faire disparaître ;
+     3. un résultat **archivé**, posé sur un autre projet pour que sa
+        disparition ne dépende de rien d'autre — l'activité est vivante, le
+        projet se lit, seul le résultat est rangé. */
+  const tool = await scope.insert(tools, {
+    name: `Ergonome ${label}`,
+    kind: "audit",
+  });
+
+  await scope.insert(results, {
+    activityId: accessibilityActivity.id,
+    label: `Score d'audit UX ${label}`,
+    value: "62",
+    unit: "/100",
+    measuredOn: "2024-05-31",
+    toolId: tool.id,
+    externalUrl: `https://exemple.invalid/rapport-${label}`,
+  });
+
+  await scope.insert(results, {
+    activityId: userTestActivity.id,
+    label: `Synthèse de campagne ${label}`,
+    measuredOn: "2026-03-31",
+  });
+
+  const archivedResult = await scope.insert(results, {
+    activityId: doneOnlyActivity.id,
+    label: `Résultat rangé ${label}`,
+    value: "99",
+    measuredOn: "2025-02-28",
+  });
+  await scope.archive(results, archivedResult.id);
+
   return {
     domainId: domain.id,
     scope,
@@ -271,6 +328,9 @@ async function seedDomain(label: string): Promise<Fixture> {
     liveTypeId: audit.id,
     accessibilityActivityId: accessibilityActivity.id,
     workshopActivityId: workshopActivity.id,
+    userTestActivityId: userTestActivity.id,
+    doneOnlyActivityId: doneOnlyActivity.id,
+    toolId: tool.id,
     centerPersonId: center.id,
     stakeholderPersonId: stakeholder.id,
   };
@@ -680,5 +740,168 @@ describe("listActivityParticipantIds", () => {
     expect(
       await listActivityParticipantIds(b.scope, a.accessibilityActivityId),
     ).toEqual([]);
+  });
+});
+
+/* ==========================================================================
+   Les résultats (T4.3)
+   ========================================================================== */
+
+/** L'entrée d'une activité donnée, cherchée à plat dans les cinq groupes. */
+function entryOf(
+  groups: RoadmapGroup[],
+  activityId: string,
+): RoadmapActivity | undefined {
+  return groups
+    .flatMap((group) => group.activities)
+    .find((activity) => activity.id === activityId);
+}
+
+describe("listProjectRoadmap — les résultats", () => {
+  test("l'entrée porte son résultat, les six champs du contrat unique", async () => {
+    const groups = await listProjectRoadmap(a.scope, a.fullId);
+
+    expect(entryOf(groups, a.accessibilityActivityId)?.result).toEqual({
+      label: "Score d'audit UX a",
+      // `numeric(18,4)` : le pilote rend la chaîne brute, et c'est bien ce que
+      // la lecture doit remonter — le formatage est le travail de
+      // `lib/format`, pas le sien.
+      value: "62.0000",
+      unit: "/100",
+      measuredOn: "2024-05-31",
+      toolName: "Ergonome a",
+      externalUrl: "https://exemple.invalid/rapport-a",
+    });
+  });
+
+  test("les quatre colonnes nullables du contrat peuvent l'être ensemble", async () => {
+    const groups = await listProjectRoadmap(a.scope, a.fullId);
+
+    // La ligne se lit quand même : un résultat sans valeur, sans unité, sans
+    // outil et **sans lien profond** est un cas normal — c'est celui des deux
+    // résultats de la fixture d'amorçage.
+    expect(entryOf(groups, a.userTestActivityId)?.result).toEqual({
+      label: "Synthèse de campagne a",
+      value: null,
+      unit: null,
+      measuredOn: "2026-03-31",
+      toolName: null,
+      externalUrl: null,
+    });
+  });
+
+  test("une entrée sans résultat en porte `null`, pas un objet vide", async () => {
+    const groups = await listProjectRoadmap(a.scope, a.fullId);
+
+    expect(entryOf(groups, a.workshopActivityId)?.result).toBeNull();
+    expect(entryOf(groups, a.cancelledId)?.result).toBeNull();
+  });
+
+  test("la plupart des entrées n'en portent aucun", async () => {
+    const groups = await listProjectRoadmap(a.scope, a.fullId);
+    const carried = groups
+      .flatMap((group) => group.activities)
+      .filter((activity) => activity.result !== null);
+
+    expect(carried.map((activity) => activity.id).sort()).toEqual(
+      [a.accessibilityActivityId, a.userTestActivityId].sort(),
+    );
+  });
+
+  test("un résultat archivé n'apparaît pas, l'activité restât-elle vivante", async () => {
+    const groups = await listProjectRoadmap(a.scope, a.doneOnlyId);
+
+    // L'entrée se lit — son activité n'est pas archivée —, mais elle ne porte
+    // rien : c'est le résultat seul qui est rangé.
+    expect(entryOf(groups, a.doneOnlyActivityId)).toBeDefined();
+    expect(entryOf(groups, a.doneOnlyActivityId)?.result).toBeNull();
+  });
+});
+
+describe("listProjectRoadmap — étanchéité des résultats", () => {
+  test("chaque domaine ne lit que ses propres résultats", async () => {
+    const groups = await listProjectRoadmap(b.scope, b.fullId);
+
+    expect(entryOf(groups, b.accessibilityActivityId)?.result?.label).toBe(
+      "Score d'audit UX b",
+    );
+    const labels = groups
+      .flatMap((group) => group.activities)
+      .map((activity) => activity.result?.label)
+      .filter(Boolean);
+    expect(labels.every((label) => label?.endsWith(" b"))).toBe(true);
+  });
+
+  /* ------------------------------------------------------------------------
+     `filter(tools)` — éprouvé sur une liaison **forgée**.
+
+     La raison est celle relevée par T4.1 sur `filter(activities)` : la
+     jointure porte sur une clé primaire (`tools.id = results.tool_id`) et la
+     couche d'accès refuse déjà d'écrire un `tool_id` hors domaine —
+     `assertPreconditions` le vérifie parmi les clés étrangères de la table.
+     Aucune ligne honnête ne peut donc faire mentir la jointure : sans donnée
+     illégitime, ce filtre est **infalsifiable**.
+
+     Le test écrit donc directement par `db`, hors de la couche scopée,
+     exactement ce qu'`assertPreconditions` interdit — le second endroit du
+     projet qui la contourne, après `resources.test.ts`, et pour la même
+     raison : prouver que la lecture tient quand même.
+     ---------------------------------------------------------------------- */
+  test("un résultat pointant l'outil d'un autre domaine ne rend aucun nom", async () => {
+    const [forgedActivity] = await db
+      .insert(activities)
+      .values({
+        domainId: b.domainId,
+        projectId: b.fullId,
+        activityTypeId: b.liveTypeId,
+        state: "done",
+        periodStart: "2027-01-01",
+        periodEnd: "2027-01-31",
+      })
+      .returning();
+
+    await db.insert(results).values({
+      domainId: b.domainId,
+      activityId: forgedActivity?.id as string,
+      label: "Résultat à l'outil forgé b",
+      measuredOn: "2027-01-31",
+      // La liaison interdite : l'outil du domaine `a`.
+      toolId: a.toolId,
+    });
+
+    const groups = await listProjectRoadmap(b.scope, b.fullId);
+    const forged = entryOf(groups, forgedActivity?.id as string);
+
+    // Le résultat se lit — il est bien du domaine `b` — mais son outil ne rend
+    // rien : `filter(tools)` coupe la jointure, et le nom de l'outil voisin ne
+    // franchit pas la frontière.
+    expect(forged?.result?.label).toBe("Résultat à l'outil forgé b");
+    expect(forged?.result?.toolName).toBeNull();
+  });
+
+  test("un résultat forgé sur l'activité d'un autre domaine ne se lit pas", async () => {
+    // `results` n'a pas de `project_id` : c'est `innerJoin(activities)` qui
+    // porte à la fois l'appartenance au projet et le domaine. Une ligne du
+    // domaine `b` accrochée à une activité du domaine `a` ne doit sortir
+    // d'aucune des deux roadmaps.
+    //
+    // La cible est l'atelier, qui ne porte aucun résultat :
+    // `results_activity_unique` ne connaît pas le domaine, et une activité qui
+    // en porte déjà un refuserait la seconde ligne.
+    await db.insert(results).values({
+      domainId: b.domainId,
+      activityId: a.workshopActivityId,
+      label: "Résultat à l'activité forgée b",
+      measuredOn: "2027-02-28",
+    });
+
+    const seen = [
+      ...(await listProjectRoadmap(a.scope, a.fullId)),
+      ...(await listProjectRoadmap(b.scope, b.fullId)),
+    ]
+      .flatMap((group) => group.activities)
+      .map((activity) => activity.result?.label);
+
+    expect(seen).not.toContain("Résultat à l'activité forgée b");
   });
 });
