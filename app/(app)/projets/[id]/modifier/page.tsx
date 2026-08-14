@@ -57,10 +57,22 @@ export default async function EditProjectPage({
   const project = await session.db.find(projects, id);
   if (!project) notFound();
 
-  const [options, links] = await Promise.all([
-    listProjectFormOptions(session.db),
-    findProjectLinks(session.db, project.id),
-  ]);
+  // Les deux lectures ne sont plus parallèles, et c'est la conséquence directe
+  // de T4bis.1 : l'exception d'archivage est **nominative**, elle ne peut donc
+  // pas se construire avant de savoir ce que la ligne porte. Un aller-retour de
+  // plus, pour que le produit, le statut, les métiers, les approches et les
+  // personnes de cet accompagnement restent proposés — donc sélectionnés —
+  // même archivés depuis. Les cases pèsent plus lourd que les `select` : une
+  // case absente du rendu ne revient pas dans le `FormData`, et `syncMembers`
+  // conclurait au retrait à la première re-soumission.
+  const links = await findProjectLinks(session.db, project.id);
+  const options = await listProjectFormOptions(session.db, {
+    productId: project.productId,
+    statusId: project.statusId,
+    jobIds: links.jobIds,
+    approachIds: links.approachIds,
+    personIds: links.members.map((member) => member.personId),
+  });
 
   return (
     <>

@@ -2,12 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 14/08/2026 — session de découpage de C4bis. Le fichier est **replié** :
-les 22 lignes de ticket des quatre chantiers clos sont parties dans `HISTORIQUE-TICKETS.md`, le
-point sur `CLAUDE.md` est refermé, et le point C4bis — 23 lignes d'addenda — tient désormais en une
-ligne, sa matière vivant dans `tickets-C4bis.md`.
-**Chantier en cours :** C4bis — archivage et correction, découpé en six tickets
-**Geste suivant :** T4bis.1 — ce qu'un formulaire fait d'une valeur archivée
+**Dernière mise à jour :** 14/08/2026 — T4bis.1 livré.
+**Chantier en cours :** C4bis — archivage et correction, six tickets, un livré
+**Geste suivant :** T4bis.2 — archiver un produit, et le rétablir
 
 ---
 
@@ -19,7 +16,7 @@ ligne, sa matière vivant dans `tickets-C4bis.md`.
 | C2 — Produits et projets | T2.1 → T2.6 | **terminé** |
 | C3 — Activités et roadmap | T3.1 → T3.6 | **terminé** |
 | C4 — Ressources et résultats | T4.1 → T4.4 | **terminé** |
-| C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **découpé**, aucun ticket livré |
+| C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **en cours**, T4bis.1 livré |
 | C5 — Indicateurs et temps long | à découper | à faire |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
@@ -50,6 +47,12 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   geste qui relie, le résultat sur l'entrée de roadmap, sa saisie déclarative. Ferme la boucle
   minimale de `docs/05` §2.
 
+**C4bis — en cours** *(une ligne par ticket jusqu'au repliage du chantier)*
+
+- **T4bis.1 — 14/08/2026 — ce qu'un formulaire fait d'une valeur archivée.** Écart déclaré et
+  tranché avec l'humain avant écriture : `app/(app)/projets/actions.ts`, sans quoi le critère de
+  re-soumission de la fiche ne pouvait pas se lire.
+
 ---
 
 ## Points ouverts
@@ -65,12 +68,14 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
 
 ### b. Assignés à un ticket
 
-- **C4bis est découpé.** Les six manques qui le constituaient — archivage du produit, du projet, de
-  l'activité, correction de la ressource et du résultat, lecture seule d'un projet archivé, valeur
-  archivée dans un formulaire — sont distribués en six tickets, avec les six arbitrages rendus avant
-  écriture (lecture seule stricte, rétablissement limité au produit et au projet, confirmation pour
-  ces deux-là seulement, vocabulaire « Archiver / Rétablir », refus d'archiver un produit portant un
-  accompagnement vivant, aucune cascade). → **`tickets-C4bis.md`, à commencer par T4bis.1.**
+- **C4bis est découpé, et son premier ticket est livré.** Les six manques — archivage du produit, du
+  projet, de l'activité, correction de la ressource et du résultat, lecture seule d'un projet
+  archivé, valeur archivée dans un formulaire — sont distribués en six tickets, avec les six
+  arbitrages rendus avant écriture (lecture seule stricte, rétablissement limité au produit et au
+  projet, confirmation pour ces deux-là seulement, vocabulaire « Archiver / Rétablir », refus
+  d'archiver un produit portant un accompagnement vivant, aucune cascade). **T4bis.1 a refermé le
+  manque (6)** : les six valeurs des deux formulaires portent désormais l'exception nominative de
+  T3.4, et rien n'archive encore depuis l'interface. → **`tickets-C4bis.md`, reprendre à T4bis.2.**
 - **L'outil par défaut d'un type d'activité ne présélectionne rien.** `activity_types.default_tool_id`
   existe depuis T1.2, `docs/04` §2 le dit « habituellement associé », et la fixture le pose sur les
   deux types d'audit du brief. Le panneau de T4.4 ne l'a pas lu — la fiche ne le demandait pas,

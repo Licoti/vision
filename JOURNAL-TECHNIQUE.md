@@ -2042,3 +2042,53 @@ sur deux points de la section b. **Ce qui compte n'est pas le compte mais son cl
 repliage rend le plus, la récriture vient juste après, et c'est elle qu'on saute** — un addendum
 coûte une ligne à l'écrire et n'en coûte aucune à ne pas replier. Le seuil de 250 lignes dit quand
 agir, jamais quoi replier.
+
+**T4bis.1 — la fiche annonçait un critère que son périmètre ne pouvait pas produire.** « Une
+re-soumission à l'identique laisse `project_jobs`, `project_approaches` et `project_members`
+inchangés » : les quatre fichiers annoncés ne touchent que des lectures, et `checkReferences`
+(`app/(app)/projets/actions.ts`) valide ces trois liaisons par `list`, qui écarte les archivés. La
+case serait bien revenue cochée dans le HTML, et la soumission aurait été **refusée par un message
+de champ** — la perte silencieuse échangée contre un formulaire qu'on ne peut plus enregistrer.
+Deux options ont été posées à l'humain avant écriture : périmètre strict, avec le manque consigné
+pour un ticket ultérieur, ou extension d'un septième fichier. Tranché : **extension**. La leçon
+générale, pour les cinq tickets qui suivent : **une exception d'archivage écrite dans une lecture
+n'est pas terminée tant que l'écriture qui reçoit cette valeur n'a pas été relue.** Le couple
+lecture/validation est le vrai périmètre, jamais la lecture seule.
+
+**T4bis.1 — l'exception se rapproche de la base, jamais de la soumission.** `checkReferences` tolère
+les identifiants archivés que le projet **porte déjà**, et ces identifiants viennent de
+`findProjectLinks`, lecture scopée, pas du `FormData`. Écrire le contraire — un `includeArchived:
+true` sur les trois `list` — aurait été trois caractères de moins et une porte ouverte : n'importe
+quelle soumission forgée aurait pu lier une valeur archivée à un projet qui ne la portait pas. Les
+deux cas ont été éprouvés séparément, en modification et en création, et refusés tous les deux.
+C'est la même famille de vigilance que le rappel « un argument lié n'est pas un secret » : la
+soumission ne se valide jamais elle-même.
+
+**T4bis.1 — `is_active` et `archived_at` sont deux filtres, et un seul était visible.** La lecture
+des personnes portait `where: eq(persons.isActive, true)` ; le second filtre était posé par la
+couche, hors du fichier. Poser `includeArchived: true` pour l'exception **retire silencieusement**
+ce second filtre, et il faut le réécrire à la main dans le `where`. Le piège est propre à
+`scope.list` : le filtre qu'on ne voit pas est celui qu'on oublie de rétablir. Un test dédié le
+tient, sur une personne désactivée sans être archivée — cas que la fixture ne portait pas et qui
+n'existe nulle part en base de développement.
+
+**T4bis.1 — dette assumée : la lecture des entités est dupliquée entre deux écrans.**
+`/produits/[id]/modifier` passe désormais par `listProductFormOptions` ; `/produits/nouveau` garde
+son `session.db.list(entities, …)` en ligne, la fiche disant que le formulaire de création « ne
+change pas d'un caractère » et la page n'étant pas au périmètre (règle 3). Les deux tris ont été
+alignés sur `asc(entities.label)` pour que la duplication ne devienne pas une divergence. → **à
+refermer par le ticket qui touchera `/produits/nouveau`, sans urgence.**
+
+**T4bis.1 — un commentaire de `lib/queries/activities.ts` est devenu faux, et n'a pas été corrigé.**
+L'en-tête de `listActivityFormOptions` dit de `keepActivityTypeId` : « c'est le seul endroit du
+produit où une exception d'archivage est nominative ». Ce ticket en pose six autres. Le fichier
+n'est pas au périmètre, et la fiche interdit explicitement de rouvrir le panneau d'activité — « T3.4
+est déjà juste, et le rouvrir serait réécrire ce qui sert de modèle ». L'incohérence est donc
+consignée plutôt que corrigée. Même remarque sur `listResultToolOptions`, dont l'en-tête renvoie la
+question « en C4bis » : c'est T4bis.6 qui la traitera, et l'en-tête le dit déjà correctement.
+
+**T4bis.1 — la page de modification d'un accompagnement a perdu son `Promise.all`.** Les options du
+formulaire dépendent désormais des liaisons de la ligne éditée : l'exception est nominative, elle ne
+peut pas se construire avant de savoir ce que le projet porte. Deux allers-retours séquentiels là où
+il y en avait deux en parallèle. Le coût est réel et assumé ; le supprimer demanderait de fusionner
+`findProjectLinks` et `listProjectFormOptions` en une fonction qui ferait deux choses.

@@ -574,6 +574,20 @@ export type ProjectFormOptions = {
 };
 
 /**
+ * Ce que la ligne éditée porte déjà, et qui reste donc proposé — T4bis.1.
+ *
+ * Cinq entrées, toutes facultatives : le formulaire de **création** n'en
+ * fournit aucune et n'obtient aucune exception.
+ */
+export type ProjectFormKeep = {
+  productId?: string;
+  statusId?: string;
+  jobIds?: readonly string[];
+  approachIds?: readonly string[];
+  personIds?: readonly string[];
+};
+
+/**
  * Les référentiels et les personnes du domaine, pour la création comme pour
  * l'édition.
  *
@@ -588,12 +602,36 @@ export type ProjectFormOptions = {
  * que de s'afficher amputé — c'est le contraire du cas d'une valeur qu'on
  * offrirait à la sélection.
  *
+ * **Les cinq valeurs proposées, elles, reçoivent une exception nominative**
+ * (T4bis.1) : celles que la ligne éditée porte déjà restent dans leur liste —
+ * donc sélectionnées — quand bien même elles auraient été archivées depuis, et
+ * n'apparaissent nulle part ailleurs. Le motif est celui de
+ * `keepActivityTypeId` (`lib/queries/activities.ts`, T3.4), généralisé ici :
+ * `includeArchived: true` accompagné d'un `or(is null, celles-ci)`. La règle
+ * n'est pas contredite mais précisée — ces valeurs **sont déjà** celles de ce
+ * projet, on ne les offre à personne.
+ *
+ * **Les personnes cumulent deux conditions**, et c'est ce qui les distingue des
+ * quatre autres : `is_active` s'écrit dans le `where`, `archived_at` est porté
+ * par la couche. Lever la seconde oblige à réécrire la première à côté, faute
+ * de quoi l'exception ne rattraperait qu'une moitié du cas — une personne
+ * désactivée disparaîtrait des cases à cocher aussi sûrement qu'une archivée,
+ * et `syncMembers` conclurait au retrait à la première re-soumission.
+ *
  * Les référentiels portent un `position` : c'est l'ordre du domaine, et il
  * prime sur l'alphabet. Le libellé départage.
  */
 export async function listProjectFormOptions(
   scope: ScopedDb,
+  keep: ProjectFormKeep = {},
 ): Promise<ProjectFormOptions> {
+  /* Une liste d'identifiants vide n'est pas une exception : sans ce garde-fou,
+     `inArray(col, [])` se glisserait dans le `where` pour ne rien y rétablir,
+     au prix d'un `includeArchived` levé pour rien. */
+  const keptJobs = keep.jobIds?.length ? keep.jobIds : undefined;
+  const keptApproaches = keep.approachIds?.length ? keep.approachIds : undefined;
+  const keptPersons = keep.personIds?.length ? keep.personIds : undefined;
+
   const [
     productRows,
     entityRows,
@@ -602,17 +640,62 @@ export async function listProjectFormOptions(
     approachRows,
     personRows,
   ] = await Promise.all([
-    scope.list(products, { orderBy: [asc(products.name)] }),
+    scope.list(products, {
+      ...(keep.productId
+        ? {
+            includeArchived: true,
+            where: or(
+              isNull(products.archivedAt),
+              eq(products.id, keep.productId),
+            ),
+          }
+        : {}),
+      orderBy: [asc(products.name)],
+    }),
     scope.list(entities, { includeArchived: true }),
     scope.list(projectStatuses, {
+      ...(keep.statusId
+        ? {
+            includeArchived: true,
+            where: or(
+              isNull(projectStatuses.archivedAt),
+              eq(projectStatuses.id, keep.statusId),
+            ),
+          }
+        : {}),
       orderBy: [asc(projectStatuses.position), asc(projectStatuses.label)],
     }),
-    scope.list(jobs, { orderBy: [asc(jobs.position), asc(jobs.label)] }),
+    scope.list(jobs, {
+      ...(keptJobs
+        ? {
+            includeArchived: true,
+            where: or(isNull(jobs.archivedAt), inArray(jobs.id, keptJobs)),
+          }
+        : {}),
+      orderBy: [asc(jobs.position), asc(jobs.label)],
+    }),
     scope.list(approaches, {
+      ...(keptApproaches
+        ? {
+            includeArchived: true,
+            where: or(
+              isNull(approaches.archivedAt),
+              inArray(approaches.id, keptApproaches),
+            ),
+          }
+        : {}),
       orderBy: [asc(approaches.position), asc(approaches.label)],
     }),
     scope.list(persons, {
-      where: eq(persons.isActive, true),
+      ...(keptPersons
+        ? {
+            includeArchived: true,
+            where: or(
+              and(eq(persons.isActive, true), isNull(persons.archivedAt)),
+              inArray(persons.id, keptPersons),
+            ),
+          }
+        : { where: eq(persons.isActive, true) }),
       orderBy: [asc(persons.fullName)],
     }),
   ]);

@@ -35,7 +35,9 @@ import {
   findAccompanimentRank,
   findProjectDetail,
   listProjectFilterOptions,
+  listProjectFormOptions,
   listProjects,
+  type ProjectFormKeep,
 } from "./projects";
 
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
@@ -388,14 +390,180 @@ async function seedDetailDomain(): Promise<DetailFixture> {
   };
 }
 
+/* ==========================================================================
+   La fixture du formulaire — T4bis.1
+
+   Un quatrième domaine, et non des lignes de plus dans le premier : trois
+   tests de la liste transverse comptent leurs lignes, et c'est déjà la raison
+   pour laquelle le domaine `c` existe. Celui-ci porte une valeur archivée de
+   chaque sorte, plus une seconde non gardée pour éprouver que l'exception est
+   nominative.
+   ========================================================================== */
+
+type FormFixture = {
+  domainId: string;
+  scope: ScopedDb;
+  /** Ce que la ligne éditée porte : le `keep` complet de la page. */
+  keep: ProjectFormKeep;
+  liveProductId: string;
+  archivedProductId: string;
+  liveStatusId: string;
+  archivedStatusId: string;
+  liveJobId: string;
+  archivedJobId: string;
+  /** Archivé et **non gardé** : il doit rester absent. */
+  otherArchivedJobId: string;
+  liveApproachId: string;
+  archivedApproachId: string;
+  livePersonId: string;
+  archivedPersonId: string;
+  /** Désactivée sans être archivée : la seconde moitié du cas des personnes. */
+  inactivePersonId: string;
+  /** Désactivée, non gardée : elle doit rester absente. */
+  otherInactivePersonId: string;
+};
+
+let d: FormFixture;
+
+async function seedFormDomain(): Promise<FormFixture> {
+  const domain = await superAdmin.createDomain({
+    name: `__test__form__${suffix}`,
+    competenceCenterName: "Centre d",
+  });
+  const scope = forDomain({ domainId: domain.id });
+
+  const entity = await scope.insert(entities, { label: "Entité d" });
+
+  const liveProduct = await scope.insert(products, {
+    name: "Produit vivant d",
+    entityId: entity.id,
+  });
+  const archivedProduct = await scope.insert(products, {
+    name: "Produit archivé d",
+    entityId: entity.id,
+  });
+
+  const liveStatus = await scope.insert(projectStatuses, {
+    label: "Statut vivant d",
+    nature: "active",
+    position: "1",
+  });
+  const archivedStatus = await scope.insert(projectStatuses, {
+    label: "Statut archivé d",
+    nature: "active",
+    position: "2",
+  });
+
+  const liveJob = await scope.insert(jobs, { label: "Métier vivant d" });
+  const archivedJob = await scope.insert(jobs, { label: "Métier archivé d" });
+  const otherArchivedJob = await scope.insert(jobs, {
+    label: "Autre métier archivé d",
+  });
+
+  const liveApproach = await scope.insert(approaches, {
+    label: "Approche vivante d",
+  });
+  const archivedApproach = await scope.insert(approaches, {
+    label: "Approche archivée d",
+  });
+
+  const livePerson = await scope.insert(persons, {
+    fullName: "Personne vivante d",
+    source: "manual",
+    kind: "center",
+  });
+  const archivedPerson = await scope.insert(persons, {
+    fullName: "Personne archivée d",
+    source: "manual",
+    kind: "center",
+  });
+  // Désactivée sans être archivée : `is_active` et `archived_at` sont deux
+  // conditions distinctes, et l'exception doit lever les deux.
+  const inactivePerson = await scope.insert(persons, {
+    fullName: "Personne désactivée d",
+    source: "manual",
+    kind: "center",
+    isActive: false,
+  });
+  const otherInactivePerson = await scope.insert(persons, {
+    fullName: "Autre personne désactivée d",
+    source: "manual",
+    kind: "center",
+    isActive: false,
+  });
+
+  // Le projet édité pointe le produit et le statut qui seront archivés, et lie
+  // le métier, l'approche et les deux personnes qui le seront aussi.
+  const edited = await scope.insert(projects, {
+    name: "Édité d",
+    productId: archivedProduct.id,
+    statusId: archivedStatus.id,
+  });
+  await scope.insert(projectJobs, {
+    projectId: edited.id,
+    jobId: archivedJob.id,
+  });
+  await scope.insert(projectApproaches, {
+    projectId: edited.id,
+    approachId: archivedApproach.id,
+  });
+  await scope.insert(projectMembers, {
+    projectId: edited.id,
+    personId: archivedPerson.id,
+    isContributor: false,
+  });
+  await scope.insert(projectMembers, {
+    projectId: edited.id,
+    personId: inactivePerson.id,
+    isContributor: false,
+  });
+
+  // L'archivage vient **après** l'insertion : la couche refuserait le contraire
+  // sur le produit et le statut, dont elle vérifie l'appartenance au domaine.
+  await scope.archive(products, archivedProduct.id);
+  await scope.archive(projectStatuses, archivedStatus.id);
+  await scope.archive(jobs, archivedJob.id);
+  await scope.archive(jobs, otherArchivedJob.id);
+  await scope.archive(approaches, archivedApproach.id);
+  await scope.archive(persons, archivedPerson.id);
+
+  return {
+    domainId: domain.id,
+    scope,
+    keep: {
+      productId: archivedProduct.id,
+      statusId: archivedStatus.id,
+      jobIds: [archivedJob.id],
+      approachIds: [archivedApproach.id],
+      personIds: [archivedPerson.id, inactivePerson.id],
+    },
+    liveProductId: liveProduct.id,
+    archivedProductId: archivedProduct.id,
+    liveStatusId: liveStatus.id,
+    archivedStatusId: archivedStatus.id,
+    liveJobId: liveJob.id,
+    archivedJobId: archivedJob.id,
+    otherArchivedJobId: otherArchivedJob.id,
+    liveApproachId: liveApproach.id,
+    archivedApproachId: archivedApproach.id,
+    livePersonId: livePerson.id,
+    archivedPersonId: archivedPerson.id,
+    inactivePersonId: inactivePerson.id,
+    otherInactivePersonId: otherInactivePerson.id,
+  };
+}
+
 beforeAll(async () => {
   a = await seedDomain("a");
   b = await seedDomain("b");
   c = await seedDetailDomain();
-}, 180_000);
+  d = await seedFormDomain();
+}, 240_000);
 
 afterAll(async () => {
-  const ids = [a?.domainId, b?.domainId, c?.domainId].filter(Boolean) as string[];
+  const ids = [a?.domainId, b?.domainId, c?.domainId, d?.domainId].filter(
+    Boolean,
+  ) as string[];
   if (ids.length === 0) return;
   for (const table of teardownOrder) {
     await db.delete(table).where(inArray(table.domainId, ids));
@@ -757,5 +925,117 @@ describe("findAccompanimentRank", () => {
     // angle qu'un accompagnement rangé ne compte plus.
     await c.scope.archive(projects, inserted.id);
     expect(await rankOf(c.secondId)).toBe(2);
+  });
+});
+
+/* ==========================================================================
+   Les valeurs proposées au formulaire — T4bis.1
+
+   « On propose des lignes vivantes », avec **une exception nominative** : les
+   cinq valeurs que la ligne éditée porte déjà, fussent-elles archivées depuis.
+   Sans elle, corriger l'objectif d'un accompagnement lui ferait perdre son
+   rattachement, son statut, ses métiers, ses approches et son équipe — et pour
+   les trois listes à cocher, **sans que rien ne s'affiche** : une case absente
+   du rendu ne revient pas dans le `FormData`, et les diffs de `syncMembers`
+   concluent au retrait.
+   ========================================================================== */
+
+describe("listProjectFormOptions — les valeurs archivées", () => {
+  /** Les cinq listes réduites à leurs identifiants, dans l'ordre rendu. */
+  async function optionIds(scope: ScopedDb, keep?: ProjectFormKeep) {
+    const options = await listProjectFormOptions(scope, keep);
+    return {
+      products: options.products.map((row) => row.id),
+      statuses: options.statuses.map((row) => row.id),
+      jobs: options.jobs.map((row) => row.id),
+      approaches: options.approaches.map((row) => row.id),
+      people: options.people.map((row) => row.id),
+    };
+  }
+
+  test("sans exception, aucune valeur archivée n'est proposée", async () => {
+    const ids = await optionIds(d.scope);
+
+    expect(ids.products).not.toContain(d.archivedProductId);
+    expect(ids.statuses).not.toContain(d.archivedStatusId);
+    expect(ids.jobs).not.toContain(d.archivedJobId);
+    expect(ids.approaches).not.toContain(d.archivedApproachId);
+    expect(ids.people).not.toContain(d.archivedPersonId);
+    // Ni la personne désactivée : c'est l'autre moitié de la condition.
+    expect(ids.people).not.toContain(d.inactivePersonId);
+
+    // Les vivantes, elles, sont bien là — sans quoi le test ne dirait rien.
+    expect(ids.products).toContain(d.liveProductId);
+    expect(ids.statuses).toContain(d.liveStatusId);
+    expect(ids.jobs).toContain(d.liveJobId);
+    expect(ids.approaches).toContain(d.liveApproachId);
+    expect(ids.people).toContain(d.livePersonId);
+  });
+
+  test("les cinq valeurs de la ligne éditée reviennent, une fois chacune", async () => {
+    const ids = await optionIds(d.scope, d.keep);
+
+    expect(ids.products).toContain(d.archivedProductId);
+    expect(ids.statuses).toContain(d.archivedStatusId);
+    expect(ids.jobs).toContain(d.archivedJobId);
+    expect(ids.approaches).toContain(d.archivedApproachId);
+    expect(ids.people).toContain(d.archivedPersonId);
+
+    // Une valeur vivante conservée ne doit pas se dédoubler.
+    const live = await optionIds(d.scope, {
+      productId: d.liveProductId,
+      statusId: d.liveStatusId,
+      jobIds: [d.liveJobId],
+      approachIds: [d.liveApproachId],
+      personIds: [d.livePersonId],
+    });
+    expect(live.products.filter((id) => id === d.liveProductId)).toHaveLength(1);
+    expect(live.jobs.filter((id) => id === d.liveJobId)).toHaveLength(1);
+    expect(live.people.filter((id) => id === d.livePersonId)).toHaveLength(1);
+  });
+
+  test("l'exception est nominative : elle n'ouvre pas la liste aux archivés", async () => {
+    const ids = await optionIds(d.scope, d.keep);
+
+    // Un second métier archivé, que la ligne éditée ne porte pas.
+    expect(ids.jobs).not.toContain(d.otherArchivedJobId);
+    // Et une seconde personne désactivée, qu'elle ne porte pas non plus.
+    expect(ids.people).not.toContain(d.otherInactivePersonId);
+  });
+
+  test("la personne cumule les deux conditions, et l'exception les lève toutes deux", async () => {
+    // « Personne désactivée d » n'est pas archivée : seule `is_active` la
+    // masque. Si l'exception ne levait que `archived_at`, elle resterait
+    // absente des cases et son appartenance à l'équipe serait perdue.
+    const ids = await optionIds(d.scope, { personIds: [d.inactivePersonId] });
+
+    expect(ids.people).toContain(d.inactivePersonId);
+    expect(ids.people).not.toContain(d.archivedPersonId);
+    expect(ids.people).not.toContain(d.otherInactivePersonId);
+  });
+
+  test("l'exception ne traverse pas la frontière de domaine", async () => {
+    const ids = await optionIds(a.scope, d.keep);
+
+    expect(ids.products).not.toContain(d.archivedProductId);
+    expect(ids.statuses).not.toContain(d.archivedStatusId);
+    expect(ids.jobs).not.toContain(d.archivedJobId);
+    expect(ids.approaches).not.toContain(d.archivedApproachId);
+    expect(ids.people).not.toContain(d.archivedPersonId);
+    // Le domaine `a` continue de proposer les siennes.
+    expect(ids.jobs).toContain(a.researchJobId);
+  });
+
+  test("sans `keep`, le formulaire de création reste ce qu'il était", async () => {
+    // Le garde-fou : aucune des cinq listes ne bouge quand l'appelant ne
+    // fournit rien, et une liste vide n'est pas une exception.
+    const bare = await optionIds(d.scope);
+    const empty = await optionIds(d.scope, {
+      jobIds: [],
+      approachIds: [],
+      personIds: [],
+    });
+
+    expect(empty).toEqual(bare);
   });
 });

@@ -48,6 +48,7 @@ import {
   type ProjectInput,
 } from "@/lib/forms/project";
 import { ROUTES } from "@/lib/navigation";
+import { findProjectLinks } from "@/lib/queries/projects";
 
 /** L'issue d'une écriture : où aller, ou l'état à réafficher. */
 type Outcome =
@@ -62,9 +63,48 @@ type Outcome =
    message de champ, jamais une exception ni une ligne à moitié écrite.
    ========================================================================== */
 
+/**
+ * Les liaisons que l'accompagnement porte **déjà**, et qui échappent donc au
+ * filtre d'archivage — T4bis.1.
+ *
+ * `keep` est nul en création : rien n'est encore lié, rien n'est toléré.
+ */
+type ProjectLinksKeep = {
+  jobIds: readonly string[];
+  approachIds: readonly string[];
+  personIds: readonly string[];
+};
+
+/**
+ * Ce qui reste à confronter au domaine : les identifiants reçus, moins ceux
+ * que la ligne éditée porte déjà.
+ *
+ * C'est la forme **nominative** de l'exception, et non un `includeArchived`
+ * global : une valeur inconnue du domaine reste refusée, et une valeur
+ * archivée que ce projet ne porte pas déjà aussi. Les identifiants retranchés
+ * n'ont pas besoin d'être revérifiés — ils viennent de `findProjectLinks`,
+ * lecture scopée sur le domaine courant, pas de la soumission.
+ */
+function toCheck(
+  received: readonly string[],
+  tolerated: readonly string[] | undefined,
+): string[] {
+  if (!tolerated?.length) return [...received];
+  const kept = new Set(tolerated);
+  return received.filter((id) => !kept.has(id));
+}
+
+/**
+ * Les trois listes se vérifient par `list`, qui écarte les lignes archivées :
+ * **on n'accepte que des valeurs vivantes**, sauf celles que `keep` tolère
+ * nommément. Le produit et le statut passent, eux, par `find`, qui rend les
+ * lignes archivées — ils n'ont donc jamais eu besoin de cette exception, et
+ * n'en reçoivent pas.
+ */
 async function checkReferences(
   session: Session,
   input: ProjectInput,
+  keep: ProjectLinksKeep | null,
 ): Promise<ProjectFormErrors> {
   const errors: ProjectFormErrors = {};
 
@@ -76,30 +116,35 @@ async function checkReferences(
   if (!product) errors.productId = "Ce produit n'existe pas dans ce domaine.";
   if (!status) errors.statusId = "Ce statut n'existe pas dans ce domaine.";
 
-  if (input.jobIds.length > 0) {
+  const jobIds = toCheck(input.jobIds, keep?.jobIds);
+  if (jobIds.length > 0) {
     const known = await session.db.list(jobs, {
-      where: inArray(jobs.id, input.jobIds),
+      where: inArray(jobs.id, jobIds),
     });
-    if (known.length !== input.jobIds.length) {
+    if (known.length !== jobIds.length) {
       errors.jobIds = "Un métier sélectionné n'existe pas dans ce domaine.";
     }
   }
 
-  if (input.approachIds.length > 0) {
+  const approachIds = toCheck(input.approachIds, keep?.approachIds);
+  if (approachIds.length > 0) {
     const known = await session.db.list(approaches, {
-      where: inArray(approaches.id, input.approachIds),
+      where: inArray(approaches.id, approachIds),
     });
-    if (known.length !== input.approachIds.length) {
+    if (known.length !== approachIds.length) {
       errors.approachIds = "Une approche sélectionnée n'existe pas dans ce domaine.";
     }
   }
 
-  if (input.members.length > 0) {
-    const ids = input.members.map((member) => member.personId);
+  const personIds = toCheck(
+    input.members.map((member) => member.personId),
+    keep?.personIds,
+  );
+  if (personIds.length > 0) {
     const known = await session.db.list(persons, {
-      where: inArray(persons.id, ids),
+      where: inArray(persons.id, personIds),
     });
-    if (known.length !== ids.length) {
+    if (known.length !== personIds.length) {
       errors.team = "Une personne de l'équipe n'existe pas dans ce domaine.";
     }
   }
@@ -252,6 +297,10 @@ async function addManualPerson(
  * `write` reçoit une ligne déjà validée et rend l'identifiant du projet touché
  * — celui qu'on vient de créer, ou celui qu'on vient de modifier — avec les
  * pages produit à réactualiser : deux si le rattachement a changé (D20).
+ *
+ * `editing` porte l'identifiant du projet dont les liaisons se tolèrent
+ * (T4bis.1). Il n'est fourni qu'en modification : en création, rien n'est
+ * encore lié, et l'exception n'aurait rien à désigner.
  */
 async function submit(
   formData: FormData,
@@ -259,6 +308,7 @@ async function submit(
     session: Session,
     input: ProjectInput,
   ) => Promise<{ projectId: string; productIds: string[] } | null>,
+  editing?: string,
 ): Promise<Outcome> {
   const { values, errors, input } = parseProjectForm(formData);
   const session = await requireSession();
@@ -276,7 +326,20 @@ async function submit(
 
   if (!input) return { state: { values, errors } };
 
-  const unknown = await checkReferences(session, input);
+  /* Ce que le projet porte déjà, lu **en base** et non reçu du formulaire :
+     une soumission ne se tolère pas elle-même. Sans ce rapprochement, une
+     valeur archivée depuis serait refusée par `checkReferences` alors même que
+     le formulaire vient de la réafficher, sélectionnée — la moitié invisible
+     de T4bis.1. */
+  const keep = editing
+    ? await findProjectLinks(session.db, editing).then((links) => ({
+        jobIds: links.jobIds,
+        approachIds: links.approachIds,
+        personIds: links.members.map((member) => member.personId),
+      }))
+    : null;
+
+  const unknown = await checkReferences(session, input, keep);
   if (Object.keys(unknown).length > 0) {
     return { state: { values, errors: unknown } };
   }
@@ -388,7 +451,7 @@ export async function updateProject(
       projectId: id,
       productIds: [before.productId, input.row.productId],
     };
-  });
+  }, id);
 
   if ("state" in outcome) return outcome.state;
   goToProject(outcome.projectId, outcome.productIds);

@@ -1,16 +1,21 @@
 /**
- * Les lectures de l'écran Produits.
+ * Les lectures de l'écran Produits, et depuis T4bis.1 celles de son formulaire.
  *
- * Elles joignent, donc elles passent par `joinedRead` — le seul chemin que la
- * couche d'accès ouvre à une jointure. **Toute table jointe porte
- * `filter(table)`** : c'est la condition posée par l'en-tête de `joinedRead`,
- * et un oubli serait une fuite de domaine que rien d'autre ne rattraperait.
+ * Celles qui joignent passent par `joinedRead` — le seul chemin que la couche
+ * d'accès ouvre à une jointure. **Toute table jointe porte `filter(table)`** :
+ * c'est la condition posée par l'en-tête de `joinedRead`, et un oubli serait
+ * une fuite de domaine que rien d'autre ne rattraperait.
+ *
+ * Celle du formulaire ne joint pas, et ne passe donc pas par là : elle s'en
+ * tient à `list`, que la couche filtre d'elle-même. C'est le chemin le plus
+ * sûr ; il n'y a aucune raison de le quitter quand il suffit — la règle posée
+ * par `lib/queries/projects.ts`, dont ce module reprend la découpe.
  *
  * Ce module n'importe pas `db` : il reçoit un `ScopedDb` déjà lié au domaine
  * courant. Règle 1.
  */
 
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 import type { ScopedDb } from "@/lib/db/scoped";
 import {
@@ -264,4 +269,57 @@ export function listProductProjects(
 
     return rows.map((row) => ({ ...row, team: teams.get(row.id) ?? [] }));
   });
+}
+
+/* ==========================================================================
+   Le formulaire d'un produit
+   ========================================================================== */
+
+/** Tout ce que les deux écrans de saisie d'un produit proposent au choix. */
+export type ProductFormOptions = { entities: ProductEntity[] };
+
+/**
+ * Les entités du domaine, pour la création comme pour l'édition.
+ *
+ * **Aucune jointure** : une lecture scopée, et rien d'autre. C'est ce qui
+ * permet à cette fonction de ne pas passer par `joinedRead`.
+ *
+ * `list` écarte déjà les lignes archivées, et c'est la nuance qui compte : **on
+ * propose des lignes vivantes** là où `findProductDetail` décrit avec les
+ * entités archivées comprises. Décrire et proposer n'appellent pas le même
+ * filtre — la règle de T2.6.
+ *
+ * **Une exception, et une seule : `keepEntityId`** (T4bis.1). Le produit que
+ * l'on édite peut pointer une entité archivée depuis. Elle reste alors dans la
+ * liste — donc sélectionnée — et n'apparaît nulle part ailleurs : le formulaire
+ * de création ne la propose pas, celui d'un autre produit non plus. La règle
+ * n'est pas contredite mais précisée : cette entité **est déjà** la valeur de
+ * ce produit, on ne l'offre à personne. Le motif est celui de
+ * `keepActivityTypeId` (`lib/queries/activities.ts`, T3.4), dont ce ticket fait
+ * la règle des deux formulaires plutôt qu'un cas isolé.
+ *
+ * Tri par libellé : `entities` porte un `position`, mais le formulaire de
+ * produit lit par l'alphabet depuis T2.5, et les deux écrans de saisie ne
+ * doivent pas diverger d'ordre pour un ticket qui ne parle pas de tri.
+ */
+export async function listProductFormOptions(
+  scope: ScopedDb,
+  options: { keepEntityId?: string } = {},
+): Promise<ProductFormOptions> {
+  const keep = options.keepEntityId;
+
+  const rows = await scope.list(entities, {
+    /* Sans exception, c'est la couche qui écarte les archivées. Avec, le
+       filtre passe dans le `where` — `includeArchived` ne lève rien de plus
+       que ce que la condition ci-dessous rétablit nommément. */
+    ...(keep
+      ? {
+          includeArchived: true,
+          where: or(isNull(entities.archivedAt), eq(entities.id, keep)),
+        }
+      : {}),
+    orderBy: [asc(entities.label)],
+  });
+
+  return { entities: rows.map((row) => ({ id: row.id, label: row.label })) };
 }

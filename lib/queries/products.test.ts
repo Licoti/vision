@@ -26,7 +26,11 @@ import {
   projects,
 } from "@/lib/db/schema";
 
-import { findProductDetail, listProductProjects } from "./products";
+import {
+  findProductDetail,
+  listProductFormOptions,
+  listProductProjects,
+} from "./products";
 
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
 const teardownOrder = [
@@ -46,6 +50,12 @@ type Fixture = {
   otherProductId: string;
   recentProjectId: string;
   oldProjectId: string;
+  /** L'entité vivante du domaine : proposée à tout le monde. */
+  entityId: string;
+  /** L'entité archivée que le produit édité porte : proposée à lui seul. */
+  archivedEntityId: string;
+  /** Une seconde archivée : conserver l'une ne doit pas rouvrir l'autre. */
+  otherArchivedEntityId: string;
 };
 
 const suffix = Math.random().toString(36).slice(2, 10);
@@ -64,6 +74,19 @@ async function seedDomain(label: string): Promise<Fixture> {
   const scope = forDomain({ domainId: domain.id });
 
   const entity = await scope.insert(entities, { label: `Entité ${label}` });
+
+  // Deux entités archivées, et non une seule archivée en cours de test : la
+  // fixture reste immobile, et l'exception nominative s'éprouve sur l'une
+  // pendant que l'autre doit rester absente.
+  const archivedEntity = await scope.insert(entities, {
+    label: `Entité archivée ${label}`,
+  });
+  const otherArchivedEntity = await scope.insert(entities, {
+    label: `Autre entité archivée ${label}`,
+  });
+  await scope.archive(entities, archivedEntity.id);
+  await scope.archive(entities, otherArchivedEntity.id);
+
   const active = await scope.insert(projectStatuses, {
     label: "En cours",
     nature: "active",
@@ -159,6 +182,9 @@ async function seedDomain(label: string): Promise<Fixture> {
     otherProductId: otherProduct.id,
     recentProjectId: recent.id,
     oldProjectId: old.id,
+    entityId: entity.id,
+    archivedEntityId: archivedEntity.id,
+    otherArchivedEntityId: otherArchivedEntity.id,
   };
 }
 
@@ -263,5 +289,53 @@ describe("listProductProjects", () => {
     expect(theirs.flatMap((row) => row.team.map((m) => m.fullName))).toContain(
       "Alice b",
     );
+  });
+});
+
+/* ==========================================================================
+   Les entités proposées au choix — T4bis.1
+
+   « On propose des lignes vivantes », avec **une exception nominative** :
+   l'entité que le produit édité pointe déjà, fût-elle archivée depuis. Sans
+   elle, corriger le nom d'un produit obligerait à lui changer d'entité.
+   ========================================================================== */
+
+describe("listProductFormOptions — l'entité archivée", () => {
+  /** Les identifiants proposés au choix, dans l'ordre rendu. */
+  async function optionIds(
+    scope: ScopedDb,
+    options?: { keepEntityId?: string },
+  ): Promise<string[]> {
+    const { entities: proposed } = await listProductFormOptions(scope, options);
+    return proposed.map((entity) => entity.id);
+  }
+
+  test("sans exception, une entité archivée n'est proposée à personne", async () => {
+    const ids = await optionIds(a.scope);
+    expect(ids).not.toContain(a.archivedEntityId);
+    expect(ids).not.toContain(a.otherArchivedEntityId);
+    expect(ids).toContain(a.entityId);
+  });
+
+  test("l'entité du produit édité reste proposée, archivée comprise", async () => {
+    const ids = await optionIds(a.scope, { keepEntityId: a.archivedEntityId });
+    expect(ids).toContain(a.archivedEntityId);
+  });
+
+  test("l'exception ne retient que celle-là", async () => {
+    // Conserver l'une ne doit pas rouvrir la porte à la seconde archivée.
+    const ids = await optionIds(a.scope, { keepEntityId: a.archivedEntityId });
+    expect(ids).not.toContain(a.otherArchivedEntityId);
+  });
+
+  test("une entité vivante conservée ne se dédouble pas", async () => {
+    const ids = await optionIds(a.scope, { keepEntityId: a.entityId });
+    expect(ids.filter((id) => id === a.entityId)).toHaveLength(1);
+  });
+
+  test("l'exception ne traverse pas la frontière de domaine", async () => {
+    const ids = await optionIds(b.scope, { keepEntityId: a.archivedEntityId });
+    expect(ids).not.toContain(a.archivedEntityId);
+    expect(ids).toContain(b.entityId);
   });
 });

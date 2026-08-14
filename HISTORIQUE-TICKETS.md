@@ -73,6 +73,14 @@ Elles servent ici de sommaire au récit détaillé qui suit, qui porte chacun de
 - **T4.4 — 14/08/2026 — saisie déclarative d'un résultat.** Clôt C4. Écarts déclarés avant
   écriture : `lib/queries/activities.ts` et ses tests ; `isWebUrl` exporté de `lib/forms/resource.ts`.
 
+**C4bis — Archivage et correction**
+
+*(section ouverte le 14/08/2026. Ces lignes vivent dans `ETAT.md` jusqu'au repliage du chantier ;
+elles sont recopiées ici au fil de l'eau pour que le récit détaillé garde son sommaire.)*
+
+- **T4bis.1 — 14/08/2026 — ce qu'un formulaire fait d'une valeur archivée.** Écart déclaré et
+  tranché avec l'humain avant écriture : `app/(app)/projets/actions.ts`, un septième fichier.
+
 ---
 
 ## Journal des tickets — récit détaillé
@@ -693,6 +701,67 @@ Elles servent ici de sommaire au récit détaillé qui suit, qui porte chacun de
   **Ce qui n'a pas été fait, et pourquoi.** `activity_types.default_tool_id` est semé sur les deux
   types d'audit du brief et aurait présélectionné l'outil en trois lignes. La fiche ne le demandait
   pas — règle 3. Le point part dans `ETAT.md` avec sa destination.
+
+- **T4bis.1 — 14/08/2026 — ce qu'un formulaire fait d'une valeur archivée.** **Premier ticket de
+  C4bis**, et le seul du chantier qui n'archive rien : il répare ce que les cinq suivants vont
+  révéler. Le motif de T3.4 — `keepActivityTypeId`, jusqu'ici le seul endroit du produit où une
+  exception d'archivage soit nominative — devient la règle des deux formulaires, sur six valeurs :
+  l'**entité** du produit, et le **produit**, le **statut**, les **métiers**, les **approches** et
+  les **personnes** de l'accompagnement.
+  **L'écart de périmètre, tranché avec l'humain avant écriture.** La fiche annonçait quatre fichiers
+  et un critère que ces quatre fichiers ne pouvaient pas produire : `checkReferences`
+  (`app/(app)/projets/actions.ts`) valide métiers, approches et personnes par `list`, qui écarte les
+  archivés. La case serait revenue cochée dans le HTML **et la soumission aurait été refusée** — la
+  perte silencieuse remplacée par un formulaire qu'on ne peut plus enregistrer. Le choix a été posé
+  à l'humain, qui a tranché pour l'extension d'un septième fichier. L'exception y est **nominative**,
+  et non un `includeArchived` : seules les liaisons lues par `findProjectLinks` — donc **en base**,
+  jamais reçues du formulaire — échappent au filtre. Le produit et le statut n'en ont pas eu besoin,
+  `checkReferences` les vérifiant par `find`, qui rend les lignes archivées ; `updateProduct` non
+  plus, `assertPreconditions` ignorant `archived_at`.
+  **Le point de détail qui justifiait le ticket à lui seul : les personnes cumulent deux
+  conditions.** `is_active` s'écrivait dans le `where`, `archived_at` était porté par la couche.
+  Lever la seconde obligeait à réécrire la première à côté — sans quoi une personne **désactivée sans
+  être archivée** aurait disparu des cases aussi sûrement qu'une archivée. Le cas a son test dédié,
+  sur une personne de fixture qui n'est que désactivée.
+  **Le critère lu dans le HTML servi, six valeurs archivées à la main** en base de développement
+  (jetable, règle du 14/08/2026 ; précédent de T4.3), par SQL brut, **toutes remises à `null` en fin
+  de session** — vérifié à zéro ligne restante. Les deux formulaires d'édition les rendent toutes les
+  six : trois `<option … selected="">` (entité, produit, statut), deux `<input type="checkbox" …
+  checked="">` (métier, approche), et la personne archivée sur son `<select name="team:…">` à
+  `<option value="contributor" selected="">`. Les deux formulaires de **création** ne les portent
+  **nulle part** — zéro occurrence de chacun des six identifiants dans les deux balisages servis.
+  **La re-soumission, comptée en base avant et après**, l'écran ne pouvant pas témoigner de ce qu'il
+  n'affiche plus : `project_jobs` 3, `project_approaches` 2, `project_members` 3 avant ; la
+  soumission renvoyée à l'identique rend **303 vers la page projet**, pas un formulaire en erreur ;
+  3, 2, 3 après, et les trois liaisons archivées relues une à une, présentes. Le formulaire de
+  produit de même : 303, entité inchangée.
+  **Le droit éprouvé par l'action, trois soumissions séparées.** (1) Un **second** métier archivé,
+  que le projet ne porte pas, forgé dans la re-soumission : refusé, « Un métier sélectionné n'existe
+  pas dans ce domaine » — c'est la preuve que l'exception est nominative et non une porte ouverte.
+  (2) La même soumission sous le cookie d'un membre non responsable : refusée par la garde
+  `manageDomain`, inchangée. (3) `createProject` avec ce même identifiant archivé forgé : refusé,
+  aucun `keep` n'existant en création. Base inchangée après les trois — cinq projets avant, cinq
+  après.
+  **Les tests mis en défaut.** Le `or` neutralisé dans les deux fonctions de lecture fait tomber
+  **exactement trois tests, tous les trois neufs**, et rien d'autre sur les 370. Ce que ce geste ne
+  couvre pas, et qui est dit plutôt que tu : les tests neufs qui **assertent une absence** — « sans
+  exception », « l'exception ne retient que celle-là », la frontière de domaine — survivent
+  légitimement à la neutralisation, et la tolérance de `checkReferences` n'a **aucun test unitaire**,
+  le dépôt n'en portant aucun sur les actions serveur. Elle s'éprouve par la re-soumission comptée
+  ci-dessus, et par les trois refus forgés.
+  **Le contraste n'a pas été mesuré, et la raison est écrite** : aucun composant, aucune classe,
+  aucun jeton ne change. Les six valeurs archivées s'affichent dans les contrôles existants, sur les
+  couples déjà mesurés en T2.5 et T2.6.
+  **Onze tests neufs**, dans un **quatrième domaine de fixture** pour `projects.test.ts` — et non
+  des lignes de plus dans le premier, dont trois tests comptent leurs lignes : c'est déjà la raison
+  d'être du domaine `c`. Le domaine `d` porte une valeur archivée de chaque sorte, plus une seconde
+  non gardée pour éprouver la nominativité, plus deux personnes désactivées dont une seule est
+  gardée.
+  **Ce qui n'a pas été fait, et pourquoi.** `/produits/nouveau` garde sa lecture d'entités en ligne :
+  la fiche dit que le formulaire de création « ne change pas d'un caractère », et la page n'est pas
+  au périmètre — règle 3. La duplication qui en résulte part au journal technique. Et le
+  `Promise.all` de la page de modification d'un accompagnement est perdu, l'exception nominative ne
+  pouvant pas se construire avant de savoir ce que la ligne porte.
 
 ---
 

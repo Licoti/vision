@@ -18,15 +18,15 @@
  * Aucune requête directe : tout passe par `session.db`. Règle 1.
  */
 
-import { asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 
 import { ProductForm } from "@/components/products/product-form";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
 import { Page, PageHeader } from "@/components/ui/page";
 import { requireSession } from "@/lib/auth/provider";
-import { entities, products } from "@/lib/db/schema";
+import { products } from "@/lib/db/schema";
 import { ROUTES } from "@/lib/navigation";
+import { listProductFormOptions } from "@/lib/queries/products";
 import { isUuid } from "@/lib/uuid";
 
 import { updateProduct } from "../../actions";
@@ -52,8 +52,11 @@ export default async function EditProductPage({
   const product = await session.db.find(products, id);
   if (!product) notFound();
 
-  const options = await session.db.list(entities, {
-    orderBy: [asc(entities.label)],
+  // L'entité que ce produit porte déjà reste proposée, fût-elle archivée
+  // depuis (T4bis.1) : sans cette exception nominative, le `select` s'ouvrirait
+  // amputé et la première correction du nom changerait aussi le rattachement.
+  const options = await listProductFormOptions(session.db, {
+    keepEntityId: product.entityId,
   });
 
   return (
@@ -74,10 +77,7 @@ export default async function EditProductPage({
 
         <ProductForm
           action={updateProduct.bind(null, product.id)}
-          entities={options.map((entity) => ({
-            id: entity.id,
-            label: entity.label,
-          }))}
+          entities={options.entities}
           initial={{
             name: product.name,
             entityId: product.entityId,
