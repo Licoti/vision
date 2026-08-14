@@ -482,6 +482,48 @@ commit `9afa52f`, à la ligne près.
   les six fichiers de la fiche, et rien d'autre. **La base de développement n'a pas bougé** — le
   ticket ne pose aucune écriture.
 
+- **T4.2 — 14/08/2026 — relier une ressource.** Le geste qui **ferme la boucle minimale** de
+  `docs/05` §2, au deuxième ticket sur quatre : un contributeur trouve son projet, saisit son
+  activité (C3) et attache le lien de sa restitution (C4). **Le critère est lu dans le HTML servi**,
+  et le parcours entier a été joué **sans une ligne de JavaScript** — la vérification n'a employé que
+  `curl`, donc aucun moteur de script n'a jamais tourné : le panneau s'ouvre par un GET, le
+  formulaire est un `<form method="POST">` dont Next rend les champs `$ACTION_…` dans le balisage, et
+  les trois sorties sont trois `<a href>` vers la page nue, relus dans le rendu. « Compte rendu
+  d'atelier — T4.2 » posté sous le cookie de Camille Roux rend un **303**, et la ressource paraît
+  **en tête** du bloc de « Autonomie des opérations courantes » avec « Word · Test utilisateur » —
+  l'ordre tranché par T4.1, éprouvé pour la première fois sur une écriture réelle plutôt que sur une
+  fixture. **Le droit a été éprouvé par l'action** : champs et `$ACTION_KEY` récoltés sur la page
+  servie à Camille, **repostés sous le cookie de Sofia Marchand** — membre du domaine, absente de
+  l'équipe de ce projet — rendent le refus et laissent la base à 2 lignes, comptées avant et après.
+  Chez elle, « Relier une ressource » est absent des deux emplacements du bloc et
+  `?ressource=nouvelle` rend la page nue, en **200 et non en 404** : la page projet reste lisible par
+  tout le domaine (D9). **Quatre refus éprouvés séparément**, chacun par une soumission forgée et
+  chacun rendant un message distinct avec la saisie intacte : titre vide, URL vide, type `keynote`
+  hors de l'énuméré, et une activité de « Refonte du parcours de virement » postée sur
+  « Autonomie » — *« Cette activité n'appartient pas à cet accompagnement. »* Un cinquième s'y est
+  ajouté, et **il n'était pas dans la fiche** : `ExternalLink` rend le `href` tel quel, si bien
+  qu'une adresse `javascript:` enregistrée s'exécuterait au clic sur le titre. Le schéma se vérifie
+  donc à l'écriture — c'est la validation du champ URL, pas une fonctionnalité de plus. **Deux
+  arbitrages rendus avec l'humain avant écriture.** (1) **L'exclusivité des deux paramètres, par
+  non-ouverture** : `?activite=` et `?ressource=` présentes ensemble n'ouvrent **rien** — une seule
+  règle, aucune préséance inventée entre deux gestes de même rang, et c'est déjà ce que la page fait
+  de toute valeur d'`?activite=` qu'elle ne reconnaît pas. Lu dans le rendu : zéro `role="dialog"`,
+  zéro `inert`, zéro champ de l'un ou l'autre formulaire ; chacune seule en donne exactement un de
+  chaque. T4.4 reprend la règle telle quelle. (2) **Le groupe « Annulé » est écarté des activités
+  proposées** — une activité abandonnée n'a rien produit —, sans être refusé par l'action : « ce
+  qu'on ne propose pas, on continue de l'accepter », la règle de T3.4. Vérifié sur le projet qui
+  porte une activité annulée : elle est absente du `select` et présente dans la roadmap, avec son
+  motif. Les **34 tests** de `lib/forms/resource.ts` ont été **mis en défaut six fois**, une règle à
+  la fois, et chacune fait tomber exactement les siens : titre vide **2**, URL vide **2**, schéma
+  non-web **5**, type absent **1**, type hors énuméré **1**, `activityId` non-UUID **1**. La mise en
+  défaut du schéma a montré que la règle en contient **deux séparables** : les trois adresses
+  relatives restent refusées par `new URL` seul, seules les cinq absolues dépendent du contrôle de
+  protocole. Le contraste a été **mesuré** sur les couples neufs par la position : le filet du bouton
+  sur la surface du bloc **3,88:1**, son texte **15,72:1**, le bouton plein de l'état vide
+  **13,65:1** — aucun jeton neuf, aucun septième substitut. **Aucun écart de périmètre** : les sept
+  fichiers de la fiche, et rien d'autre. **La base de développement a gagné une ressource**, celle du
+  critère.
+
 ---
 
 ## Points ouverts refermés

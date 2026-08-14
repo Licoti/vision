@@ -39,6 +39,31 @@ export const ACTIVITY_PANEL_PARAM = "activite";
 export const ACTIVITY_PANEL_NEW = "nouvelle";
 
 /**
+ * Le panneau de saisie d'une **ressource** (T4.2), sur la même page et la même
+ * mécanique — une URL, pas un état.
+ *
+ * **Une clé distincte, et non une valeur de plus sur `activite`** : ce sont deux
+ * objets, pas deux gestes sur le même. Une seule clé les porterait tous les deux
+ * au prix d'une valeur polymorphe que rien ne désambiguïserait — un identifiant
+ * d'activité y voudrait dire « corriger cette activité » d'un côté et « relier
+ * une ressource à cette activité » de l'autre.
+ *
+ * **La contrepartie est une règle d'exclusivité**, qui vit dans la page :
+ * `activite` et `ressource` présentes ensemble n'ouvrent **rien**. Deux
+ * `role="dialog"` ou deux `inert` concurrents ne se rattrapent pas après coup,
+ * et aucune préséance n'est inventée entre deux gestes de même rang. T4.4
+ * reprendra la règle telle quelle avec `resultat`.
+ *
+ * Une **seule** valeur d'ouverture, là où `activite` en porte deux : C4 n'écrit
+ * aucune correction de ressource (arbitrage (a) de `tickets-C4.md`), donc aucun
+ * identifiant ne se glisse ici. Toute autre valeur n'ouvre rien.
+ */
+export const RESOURCE_PANEL_PARAM = "ressource";
+
+/** La seule valeur qui ouvre le panneau de ressource. */
+export const RESOURCE_PANEL_NEW = "nouvelle";
+
+/**
  * Les adresses des six écrans, et des formulaires qui les alimentent. Les
  * pages de détail prennent un identifiant : le schéma en pose des UUID, et
  * rien ne promet encore de slug — ce choix revient à C2, avec l'écran qui
@@ -83,6 +108,13 @@ export const ROUTES = {
    */
   projectActivityEdit: (id: string, activityId: string) =>
     `/projets/${id}?${ACTIVITY_PANEL_PARAM}=${activityId}`,
+  /**
+   * La page du projet, panneau de ressource ouvert (T4.2). Toujours depuis son
+   * projet — la règle de D17 transposée : ni la vue d'ensemble ni la liste
+   * transverse n'ont d'entrée vers ce geste. La fermeture reste `project(id)`.
+   */
+  projectResourceNew: (id: string) =>
+    `/projets/${id}?${RESOURCE_PANEL_PARAM}=${RESOURCE_PANEL_NEW}`,
   about: "/a-propos",
 } as const;
 

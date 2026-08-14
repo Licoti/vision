@@ -1735,3 +1735,65 @@ section étend explicitement la table au découpage. **Deuxième manque trouvé 
 plutôt qu'en relisant** — comme le déclencheur, le plan mode et le geste 0 quelques heures plus tôt.
 Le rituel a été éprouvé sur le chantier suivant, où il tombait juste, puis sur celui d'après, où il
 tombait à côté : **un rituel se teste sur le cas qu'il ne traite pas encore.**
+
+**T4.2 — `ExternalLink` rend le `href` tel quel, et c'est la saisie qui doit s'en occuper.** Le
+composant de T4.1 pose `<a href={resource.url}>` sans rien filtrer, ce qui est le comportement
+attendu d'un composant d'affichage. La conséquence ne l'était pas : une adresse `javascript:` ou
+`data:text/html,…` enregistrée dans `resources.url` **s'exécuterait au clic sur le titre**, sur la
+page la plus consultée du produit. Le contrôle est donc posé à l'écriture, dans
+`validateResourceForm` — `new URL()` puis `protocol === "http:" || "https:"` — et pas au rendu :
+c'est le dernier endroit où l'on décide encore de ce qui entre, et le seul qui puisse rendre un
+message de champ. **La fiche de T4.2 ne demandait que « URL vide » parmi ses quatre refus** ; celui-ci
+s'y ajoute comme partie de la validation du champ, pas comme fonctionnalité. `new URL` rejette du
+même geste les adresses relatives — une ressource est par définition hébergée ailleurs. **Rien
+n'appelle l'adresse** : on analyse une chaîne, on ne fait aucune requête sortante (interdit de la
+fiche). **À reprendre** si un jour une ressource peut se corriger (C4bis) ou s'importer autrement
+que par ce formulaire : le contrôle vit dans `lib/forms/resource.ts`, il ne protège que ce qui y
+passe.
+
+**T4.2 — L'exclusivité de deux paramètres d'ouverture se tient par une variable, pas par une
+discipline.** `?activite=` et `?ressource=` cohabitent depuis ce ticket, et `?resultat=` arrive en
+T4.4. La forme retenue tient en deux lignes en tête de la page : `conflict` si les deux clés sont
+présentes, puis `asked` — l'objet vide en cas de conflit, les paramètres sinon. **Tout le reste de la
+page lit `asked`, jamais les paramètres bruts**, si bien qu'aucun chemin ne peut ouvrir deux panneaux.
+Écrire à la place trois conditions qui s'excluent mutuellement aurait tenu aussi, et aurait cessé de
+tenir au quatrième paramètre — la garantie doit être dans une valeur, pas dans la relecture. Le
+comportement retenu, arbitré avec l'humain : **deux clés n'ouvrent rien**. Aucune préséance inventée
+entre deux gestes de même rang, et c'est déjà ce que la page fait de toute valeur d'`?activite=`
+qu'elle ne reconnaît pas. Conséquence à connaître : une URL portant les deux rend la page nue sans
+rien dire — inatteignable par l'interface, aucun lien ne la construit.
+
+**T4.2 — Le groupe « Annulé » est écarté des activités proposées, sans être refusé par l'action.**
+Une activité annulée n'a rien produit : la proposer au rattachement d'une ressource n'aurait aucun
+sens. Elle reste pourtant **acceptée** si une soumission forgée la désigne — « ce qu'on ne propose
+pas, on continue de l'accepter », la règle posée en T3.4 pour un type d'activité archivé. Ce n'est
+pas une négligence : une activité a pu produire un document avant d'être abandonnée, et la ressource
+qui le référence décrit un fait. Ce que l'action refuse, elle, est ce qui serait **faux** : une
+activité d'un autre projet, ou archivée. **Aucune requête neuve pour ces options** — elles se
+dérivent de `listProjectRoadmap`, déjà lue par l'écran, dont les archivées sont déjà absentes ;
+`lib/queries/activities.ts` n'est pas dans le périmètre de la fiche, et n'avait pas à y entrer.
+
+**T4.2 — Troisième copie de `PanelField`, et la dette est désormais chiffrée.** `project-form.tsx`
+(T2.5), `activity-panel.tsx` (T3.3) et maintenant `resource-panel.tsx` portent chacun un composant de
+champ de quinze lignes, quasi identiques — les deux panneaux le sont exactement, seul celui du
+formulaire de page diffère par la taille et le poids de l'intitulé. La copie n'a pas été évitable
+ici : `activity-panel.tsx` ne l'exporte pas et n'appartient pas au périmètre de T4.2. **L'extraction
+appartient au premier ticket qui pourra toucher les trois fichiers ensemble** — aucun de C4, C5 ou C6
+ne le fait, donc ce n'est pas une destination, c'est une dette. Le vrai coût n'est pas la
+duplication du balisage mais celle des **choix mesurés** qu'il porte : bordure de contrôle, bordure
+d'erreur, mention « (obligatoire) » écrite plutôt qu'étoilée. Un quatrième formulaire qui les
+recopierait de mémoire finirait par en inventer un septième.
+
+**T4.2 — `createResource` ne revalide que la page du projet, et c'est une décision.** `refresh()`
+revalide quatre chemins, dont la liste des produits et la page du produit, **parce qu'une écriture
+d'activité fait recalculer `last_activity_at` par la couche**. Relier une ressource n'est pas une
+activité : la fraîcheur ne bouge pas, et appeler `refresh()` aurait fait croire le contraire à qui
+lit le fichier. Un seul `revalidatePath(ROUTES.project(projectId))`, avec la raison en commentaire.
+C'est aussi ce que l'interdit de la fiche demande, lu à l'endroit : « aucun recalcul de
+`last_activity_at` ».
+
+**T4.2 — `openProject` reçoit son message de refus en paramètre.** Le texte disait « La saisie d'une
+activité est réservée… », ce qui aurait été faux sous le panneau de ressource. Le paramètre porte une
+valeur par défaut égale au texte existant : **aucun appel existant ne change**, et les deux gestes
+gardent le même droit — `docs/02` §5 range activités et ressources dans ce que le contributeur
+désigné écrit. Seul le mot change, jamais la règle.

@@ -2,12 +2,12 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 14/08/2026 — session d'entretien, hors ticket. Le récit détaillé des
-tickets est parti dans `HISTORIQUE-TICKETS.md` et les points ouverts sont regroupés : ce fichier
-passe de 855 à ~230 lignes, pour redevenir lisible en tête de session. **Un chantier a été ajouté
-au découpage** — C4bis, archivage et correction, qui s'exécute entre C4 et C5.
-**Chantier en cours :** C4 — ressources et résultats, 1 ticket sur 4 terminé
-**Ticket suivant :** T4.2 — relier une ressource
+**Dernière mise à jour :** 14/08/2026 — T4.2. Le fichier tient sous le seuil de 250 lignes posé par
+le protocole ; le mécanisme d'entretien du 14/08/2026 a envoyé le récit détaillé dans
+`HISTORIQUE-TICKETS.md`. **Un chantier a été ajouté au découpage** — C4bis, archivage et correction,
+qui s'exécute entre C4 et C5.
+**Chantier en cours :** C4 — ressources et résultats, 2 tickets sur 4 terminés
+**Ticket suivant :** T4.3 — le résultat sur l'entrée de roadmap, lecture
 
 ---
 
@@ -18,7 +18,7 @@ au découpage** — C4bis, archivage et correction, qui s'exécute entre C4 et C
 | C1 — Socle technique | T1.1 → T1.6 | **terminé** |
 | C2 — Produits et projets | T2.1 → T2.6 | **terminé** |
 | C3 — Activités et roadmap | T3.1 → T3.6 | **terminé** |
-| C4 — Ressources et résultats | T4.1 → T4.4 | **T4.1 terminé**, T4.2 → T4.4 à faire |
+| C4 — Ressources et résultats | T4.1 → T4.4 | **T4.1 et T4.2 terminés**, T4.3 → T4.4 à faire |
 | C4bis — Archivage et correction | à découper | à faire — décidé le 14/08/2026 |
 | C5 — Indicateurs et temps long | à découper | à faire |
 | C6 — Liens et journal | à découper | à faire |
@@ -37,15 +37,13 @@ s'appellent T4bis.1, T4bis.2… **Il se découpe à la clôture de C4**, en sess
 
 ## Journal des tickets
 
-*(une ligne par ticket terminé : identifiant, date, titre, écarts de périmètre. **Rien d'autre.**
-Le récit — critères lus dans le HTML servi, mises en défaut de tests, mesures de contraste — va
-dans `HISTORIQUE-TICKETS.md`, qui n'est pas lu au démarrage. Les pièges et dettes vont dans
-`JOURNAL-TECHNIQUE.md`.)*
+*(une ligne par ticket : identifiant, date, titre, écarts de périmètre. **Rien d'autre.** Le récit va
+dans `HISTORIQUE-TICKETS.md`, les pièges et dettes dans `JOURNAL-TECHNIQUE.md`.)*
 
 **Repliage dû à la clôture de C4.** C1, C2 et C3 sont clos et occupent encore 18 lignes. À la
 session de découpage de C4bis — geste 1 du protocole —, les quatre chantiers clos se replient en
-quatre lignes et leurs tickets partent dans `HISTORIQUE-TICKETS.md`. Reporté volontairement le
-14/08/2026 : le geste s'éprouve sur C4 fraîchement clos plutôt que sur trois chantiers anciens.
+quatre lignes et leurs tickets partent dans `HISTORIQUE-TICKETS.md`. Reporté le 14/08/2026 : le
+geste s'éprouve sur C4 fraîchement clos plutôt que sur trois chantiers anciens.
 
 - **T1.1 — 11/08/2026 — initialisation du projet.** Écarts : couleurs d'aires thérapeutiques
   Servier non traduites ; `next dev` bridé pour cesser d'écrire dans `CLAUDE.md`.
@@ -82,6 +80,8 @@ quatre lignes et leurs tickets partent dans `HISTORIQUE-TICKETS.md`. Reporté vo
 - **T3.6 — 13/08/2026 — participants d'une activité.** Clôt C3, et avec lui le POC minimal
   démontrable. Écarts : `app/(app)/projets/[id]/page.tsx` ; `components/projects/roadmap.tsx`.
 - **T4.1 — 13/08/2026 — bloc « Ressources » de la page projet, lecture.** Aucun écart de périmètre.
+- **T4.2 — 14/08/2026 — relier une ressource.** Ferme la boucle minimale de `docs/05` §2. Aucun
+  écart de périmètre.
 
 ---
 
@@ -127,18 +127,23 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   d'afficher son libellé, que la roadmap ne montre plus — non atteignable par l'interface tant que
   rien n'archive une activité, et à retrancher avec le même ticket.
   → **C4bis, à découper à la clôture de C4.**
-- **Trois panneaux latéraux et trois paramètres d'ouverture sur la page projet.** `?activite=`
-  depuis T3.2, puis `?ressource=` en T4.2 et `?resultat=` en T4.4. T4.2 doit rendre les paramètres
-  **mutuellement exclusifs** — deux `role="dialog"` ou deux `inert` concurrents ne se rattrapent pas
-  après coup. → **T4.2**, sa fiche le porte déjà ; **T4.4** reprend la règle.
+- **Trois paramètres d'ouverture sur la page projet, dont deux posés.** `?activite=` depuis T3.2,
+  `?ressource=` depuis T4.2, `?resultat=` en T4.4. **La règle d'exclusivité est écrite et éprouvée** :
+  deux clés présentes ensemble n'ouvrent **rien** — aucune préséance entre gestes de même rang, et
+  c'est déjà ce que la page fait d'une valeur d'`?activite=` qu'elle ne reconnaît pas. Elle tient par
+  une **valeur** et non par une discipline : `conflict` puis `asked` en tête de la page, que tout le
+  reste lit à la place des paramètres bruts. **T4.4 ajoute sa clé à `asked` et n'écrit aucune
+  condition neuve** — trois conditions qui s'excluent tiendraient encore, et cesseraient de tenir à la
+  quatrième. → **T4.4**.
 - **La coquille de navigation reste focalisable derrière le voile, sans JavaScript.** La page projet
   porte `inert` quand un panneau est ouvert, mais la barre latérale vit dans `app/(app)/layout.tsx`,
   et un layout Next ne reçoit pas les `searchParams`. Avec JavaScript, `FocusTrap` la met hors
   d'atteinte et `aria-modal` la retire de l'arbre d'accessibilité ; sans JavaScript, le cycle de
-  tabulation passe par elle. **Sa condition d'ouverture — « à reprendre si une seconde modale
-  arrive » — est atteinte par `?ressource=` de T4.2, et elle n'a pas suffi** : la fiche T4.2 ne
-  porte pas `layout.tsx`, et le défaut ne se voit que scripts coupés. Arbitrage du 14/08/2026 : noté,
-  pas traité en T4.2. À joindre au **rebranchement des deux blocs manquants de la barre latérale** —
+  tabulation passe par elle. **La seconde modale est arrivée avec T4.2, et n'a rien changé** : la
+  fiche ne portait pas `layout.tsx`, le défaut ne se voit que scripts coupés, et le panneau de
+  ressource reprend `FocusTrap` tel quel — donc exactement la même couverture partielle, ni aggravée
+  ni refermée. Arbitrage du 14/08/2026, tenu. À joindre au **rebranchement des deux blocs manquants
+  de la barre latérale** —
   carte de la personne courante et entrée Administration, dans les maquettes, écartés en T1.6 faute
   de droit de lire la session. L'obstacle a disparu : les écrans lisent la session depuis T2.1 et
   `can.manageDomain` depuis T2.5. Ce qui manque n'est plus un droit, c'est un ticket.
@@ -165,7 +170,9 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   un accompagnement de plus — « Refonte de l'espace documents » sur « Espace client web », créé en
   vérification de T2.6, avec un commanditaire renseigné et une personne `source = manual` (Nadia
   Berthier) ; cinq activités archivées depuis T3.3 ; quatre transitions non revenues en arrière
-  depuis T3.5 ; un « Test projet » et un produit « test » d'une session antérieure.
+  depuis T3.5 ; une ressource de plus depuis T4.2 — « Compte rendu d'atelier — T4.2 » sur
+  « Autonomie des opérations courantes », le critère du ticket, et **sans chemin d'archivage** jusqu'à
+  C4bis ; un « Test projet » et un produit « test » d'une session antérieure.
   **Règle posée le 14/08/2026 : la base de développement est jetable.** La règle 4 protège la donnée
   métier, pas une fixture locale. Conséquences à connaître : les critères de T2.1 à T2.4 se lisaient
   sur « 2 accompagnements » pour ce produit et s'y liraient sur 3 ; un critère de ticket passé ne
@@ -220,8 +227,9 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   l'identifiant de la saisie, mais Next le sérialise dans un champ `$ACTION_…` du balisage, **en
   clair en développement**, et une soumission peut le réécrire. **Règle : une action ne tire jamais
   une autorisation de la valeur qu'on lui a liée.** Elle interroge le droit sur la valeur **reçue**.
-  Éprouvée en T3.3 puis en T3.4, où deux valeurs sont liées dont l'une désigne la ligne écrite.
-  Vaut pour T4.2 et T4.4, tous deux des tickets d'écriture.
+  Éprouvée en T3.3 puis en T3.4, où deux valeurs sont liées dont l'une désigne la ligne écrite, et
+  **relue une troisième fois en T4.2** : le `projectId` lié à `createResource` s'est lu en clair dans
+  le champ `$ACTION_13:1` du balisage servi. Vaut pour T4.4, dernier ticket d'écriture du chantier.
 - **Le panneau de saisie est un composant client depuis T3.3.** `useActionState` est le seul moyen
   de faire revenir une saisie refusée avec ses valeurs. Ce qui n'a pas bougé : l'ouverture reste une
   URL, les trois sorties restent des liens, `inert` et `autofocus` restent des attributs HTML. C'est

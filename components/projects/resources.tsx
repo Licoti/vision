@@ -4,8 +4,14 @@
  * `docs/06` §5 le place en tête du tableau des blocs, après la roadmap et
  * jamais avant : le récit domine, les références l'entourent. Il porte
  * **la section entière**, son en-tête compris — la forme de `Roadmap` depuis
- * T3.1, pour que T4.2 n'ait qu'à y brancher son point d'entrée « Relier », en
- * tête et dans l'état vide, sans que la page ait à connaître ce détail.
+ * T3.1. T4.2 tient la promesse écrite ici par T4.1 : « Relier une ressource »
+ * est en tête du bloc *et* dans l'état vide, les deux emplacements vivent ici,
+ * et la page n'a pas à connaître ce détail. En **tête**, jamais en pied
+ * (`docs/06` §5).
+ *
+ * `addHref` à `null` retire les deux : l'action n'existe que pour qui peut
+ * écrire dans ce projet (D9). Le composant, lui, ne connaît aucun droit — c'est
+ * l'appelant qui les lit, la règle de `Roadmap` et de `PageHeader`.
  *
  * Chaque entrée dit trois choses et pas une de plus : son titre, son type en
  * toutes lettres, et l'activité qui l'a produite quand le rattachement est
@@ -27,15 +33,36 @@
  * `listProjectResources` a déjà lu, filtré et trié.
  */
 
+import Link from "next/link";
+
 import { ExternalLink } from "@/components/ui/external-link";
 import { Section, SectionHeader } from "@/components/ui/section";
 import { formatResourceType } from "@/lib/format";
 import type { ProjectResource } from "@/lib/queries/resources";
 
-export function Resources({ resources }: { resources: ProjectResource[] }) {
+export function Resources({
+  resources,
+  addHref,
+}: {
+  resources: ProjectResource[];
+  /** L'ouverture du panneau, ou `null` pour qui ne peut pas écrire (D9). */
+  addHref: string | null;
+}) {
   return (
     <Section>
-      <SectionHeader title="Ressources" />
+      <SectionHeader
+        title="Ressources"
+        {...(addHref
+          ? {
+              action: (
+                <LinkResource
+                  href={addHref}
+                  className="border border-content-neutral-normal bg-surface-neutral-pale text-content-primary-dark"
+                />
+              ),
+            }
+          : {})}
+      />
 
       {resources.length > 0 ? (
         <ul role="list" className="flex flex-col">
@@ -78,13 +105,50 @@ export function Resources({ resources }: { resources: ProjectResource[] }) {
           ))}
         </ul>
       ) : (
-        <p className="text-sm leading-175 text-content-neutral-base">
-          Les liens vers les documents de l&apos;accompagnement s&apos;afficheront
-          ici, avec leur type et l&apos;activité qui les a produits. Vision
-          n&apos;héberge aucun fichier : elle renvoie vers l&apos;outil qui le
-          porte.
-        </p>
+        <div className="flex flex-col items-start gap-4">
+          <p className="text-sm leading-175 text-content-neutral-base">
+            Les liens vers les documents de l&apos;accompagnement
+            s&apos;afficheront ici, avec leur type et l&apos;activité qui les a
+            produits. Vision n&apos;héberge aucun fichier : elle renvoie vers
+            l&apos;outil qui le porte.
+          </p>
+          {addHref ? (
+            <LinkResource
+              href={addHref}
+              className="bg-surface-primary-base text-content-neutral-pale"
+            />
+          ) : null}
+        </div>
       )}
     </Section>
+  );
+}
+
+/**
+ * L'action d'ouverture du panneau, aux deux emplacements — la forme
+ * d'`AddActivity` dans `roadmap.tsx`, et pour la même raison.
+ *
+ * C'est un lien et non un bouton, parce que c'en est un : il mène à une URL,
+ * celle de la page du projet portant `?ressource=nouvelle`. Il se copie, se
+ * partage, s'ouvre dans un onglet — ce qu'un bouton d'ouverture piloté par du
+ * JavaScript n'aurait fait dans aucun des trois cas.
+ *
+ * Le `+` est décoratif : « Relier une ressource » se lit seul.
+ */
+function LinkResource({
+  href,
+  className,
+}: {
+  href: string;
+  className: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold ${className}`}
+    >
+      <span aria-hidden="true">+</span>
+      Relier une ressource
+    </Link>
   );
 }

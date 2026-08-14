@@ -1,7 +1,8 @@
 "use server";
 
 /**
- * Les écritures d'activité — le geste critique du produit (`docs/06` §9).
+ * Les écritures de la page projet — le geste critique du produit (`docs/06` §9) :
+ * les activités depuis T3.3, et **relier une ressource** depuis T4.2.
  *
  * D9 : **saisir dans un projet est ouvert au contributeur désigné**, pas
  * seulement au responsable de domaine. C'est ce qui distingue ce fichier de
@@ -57,6 +58,15 @@
  * (`ETAT.md`) : `createActivity` écrit désormais deux tables, sans transaction
  * interactive pour les lier — la fenêtre résiduelle est acceptée, pas fermée.
  *
+ * **Relier une ressource (T4.2)** ne fait exception à rien de ce qui précède :
+ * même porte d'entrée `openProject` — au message près, `docs/05` §3 distinguant
+ * les deux gestes —, même vérification de la référence reçue avant l'écriture,
+ * même refus qui rend la saisie. Deux points la distinguent, et les deux sont
+ * des **retraits** : elle n'écrit qu'une table, donc la non-atomicité ne la
+ * concerne pas ; et elle ne revalide que la page du projet, **relier une
+ * ressource n'étant pas une activité** — la fraîcheur d'un produit ne bouge pas
+ * parce qu'un lien a été attaché.
+ *
  * Aucune suppression, aucun archivage, jamais.
  */
 
@@ -72,6 +82,7 @@ import {
   activityTypes,
   approaches,
   projects,
+  resources,
 } from "@/lib/db/schema";
 import { DomainScopeError, type Row } from "@/lib/db/scoped";
 import {
@@ -87,6 +98,13 @@ import {
   type ActivityRowInput,
   type ActivityState,
 } from "@/lib/forms/activity";
+import {
+  parseResourceForm,
+  readResourceForm,
+  type ResourceFormErrors,
+  type ResourceFormState,
+  type ResourceRowInput,
+} from "@/lib/forms/resource";
 import { ROUTES } from "@/lib/navigation";
 
 /**
@@ -122,19 +140,21 @@ function refusal(formData: FormData, message: string): ActivityFormState {
  * `writeProject` porte sur une **désignation**, pas sur une appartenance de
  * domaine : le projet est donc confronté au domaine ensuite, faute de quoi un
  * identifiant d'un autre domaine passerait par une désignation homonyme.
+ *
+ * `refused` dit **quel geste** est réservé — l'activité par défaut, la ressource
+ * depuis T4.2. Le droit, lui, est rigoureusement le même : `docs/02` §5 range
+ * les deux dans ce que le contributeur désigné écrit.
  */
 async function openProject(
   session: Session,
   projectId: string,
+  refused = "La saisie d'une activité est réservée au responsable de domaine et aux contributeurs désignés de cet accompagnement.",
 ): Promise<{ project: Row<typeof projects> } | { message: string }> {
   // D9 — responsable de domaine, ou contributeur désigné de **ce** projet. Le
   // droit est par projet : la même personne peut écrire sur l'un et pas sur
   // l'autre, ce que T3.2 a éprouvé sur quatre couples personne × projet.
   if (!session.can.writeProject(projectId)) {
-    return {
-      message:
-        "La saisie d'une activité est réservée au responsable de domaine et aux contributeurs désignés de cet accompagnement.",
-    };
+    return { message: refused };
   }
 
   const project = await session.db.find(projects, projectId);
@@ -520,4 +540,114 @@ export async function cancelActivity(
   });
 
   refresh(activity.projectId, project.productId);
+}
+
+/* ==========================================================================
+   Relier une ressource — T4.2
+
+   Le geste qui ferme la boucle minimale de `docs/05` §2. Une table, un
+   formulaire, la même porte d'entrée que le reste du fichier.
+   ========================================================================== */
+
+/** Le jumeau de `refusal` ci-dessus, pour l'autre formulaire de cette page. */
+function resourceRefusal(
+  formData: FormData,
+  message: string,
+): ResourceFormState {
+  return { values: readResourceForm(formData), errors: {}, message };
+}
+
+/**
+ * L'activité reçue, rapprochée de **ce** projet.
+ *
+ * Le rattachement est facultatif (`docs/02` §5) : rien à vérifier quand il est
+ * absent. Renseigné, il ne suffit pas qu'il désigne une activité du domaine —
+ * une ressource appartient à un projet, et son activité productrice aussi. Sans
+ * ce contrôle, une soumission forgée rattacherait la restitution d'un
+ * accompagnement à l'activité d'un autre, et le bloc de T4.1 afficherait
+ * fidèlement ce mensonge.
+ *
+ * Une activité **archivée** est refusée pour la même raison qu'en correction
+ * (T3.4) : le panneau ne la propose pas, et rien ne justifie de l'accepter par
+ * requête. Une activité **annulée**, en revanche, passe : elle n'est pas
+ * proposée non plus, mais elle a pu produire un document avant d'être
+ * abandonnée — ce qu'on ne propose pas, on continue de l'accepter.
+ *
+ * Un message de champ, jamais une exception : `assertPreconditions` reste le
+ * second filet, pas le premier.
+ */
+async function checkResourceActivity(
+  session: Session,
+  projectId: string,
+  input: ResourceRowInput,
+): Promise<ResourceFormErrors> {
+  if (!input.activityId) return {};
+
+  const activity = await session.db.find(activities, input.activityId);
+  if (!activity || activity.projectId !== projectId || activity.archivedAt !== null) {
+    return {
+      activityId: "Cette activité n'appartient pas à cet accompagnement.",
+    };
+  }
+
+  return {};
+}
+
+/**
+ * Relier une ressource à un projet, et facultativement à l'activité qui l'a
+ * produite.
+ *
+ * `projectId` est lié côté serveur ; `previous` est l'état que `useActionState`
+ * fait circuler, dont l'action n'a pas besoin — la saisie repart du `FormData`
+ * à chaque soumission.
+ *
+ * **Aucune requête sortante vers l'adresse saisie** : elle est enregistrée telle
+ * qu'elle a été tapée, une fois son schéma vérifié. Vision n'appelle pas les
+ * outils qu'elle référence (interdit de la fiche, D15).
+ */
+export async function createResource(
+  projectId: string,
+  _previous: ResourceFormState,
+  formData: FormData,
+): Promise<ResourceFormState> {
+  const session = await requireSession();
+
+  const gate = await openProject(
+    session,
+    projectId,
+    "Relier une ressource est réservé au responsable de domaine et aux contributeurs désignés de cet accompagnement.",
+  );
+  if ("message" in gate) return resourceRefusal(formData, gate.message);
+
+  const { values, errors, input } = parseResourceForm(formData);
+  if (!input) return { values, errors };
+
+  const misplaced = await checkResourceActivity(session, projectId, input);
+  if (Object.keys(misplaced).length > 0) return { values, errors: misplaced };
+
+  try {
+    await session.db.insert(resources, { projectId, ...input });
+  } catch (error) {
+    if (error instanceof DomainScopeError) {
+      return resourceRefusal(
+        formData,
+        "Une référence de ce formulaire n'appartient pas au domaine : la saisie n'a pas été enregistrée.",
+      );
+    }
+    throw error;
+  }
+
+  /* **Cette page-là, et elle seule.** `refresh` revalide en plus la liste des
+     produits et la page du produit, toutes deux porteuses de la fraîcheur que
+     la couche recalcule à chaque écriture d'activité. Relier une ressource
+     n'est pas une activité : rien n'y a bougé, et les revalider ferait croire
+     le contraire au lecteur de ce fichier. */
+  revalidatePath(ROUTES.project(projectId));
+
+  // La page nue, panneau refermé : « enregistrement sans confirmation
+  // intermédiaire » (`docs/06` §9). La ressource paraît en tête de son bloc —
+  // l'ordre tranché par T4.1 —, et c'est toute la confirmation. `redirect`
+  // lève : elle est appelée hors de tout `try`, faute de quoi le `catch`
+  // ci-dessus avalerait la navigation.
+  redirect(ROUTES.project(projectId));
 }

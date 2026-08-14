@@ -22,14 +22,23 @@
  * contributeur désigné écrit dans le projet — activités, ressources — mais ne
  * modifie pas son identité, qui reste au responsable.
  *
- * **Le panneau de saisie d'activité est cette page, plus un paramètre** (D30,
- * T3.2). `?activite=nouvelle` l'ouvre vide, `?activite=<identifiant>` l'ouvre
- * sur une activité à corriger (T3.4) — une seule clé, dont la valeur porte le
- * cas, et un seul formulaire pour les deux gestes. La page reste rendue
- * derrière lui, et
- * porte alors l'attribut HTML `inert` — sans JavaScript, c'est l'ordre du DOM
- * qui décide de la tabulation, et `inert` est ce qui empêche d'entrer au
- * clavier dans le contenu masqué par le voile.
+ * **Les panneaux de saisie sont cette page, plus un paramètre** (D30, T3.2).
+ * `?activite=nouvelle` ouvre le panneau d'activité vide, `?activite=<identifiant>`
+ * l'ouvre sur une activité à corriger (T3.4) — une seule clé, dont la valeur
+ * porte le cas, et un seul formulaire pour les deux gestes. `?ressource=nouvelle`
+ * ouvre celui de T4.2. La page reste rendue derrière eux, et porte alors
+ * l'attribut HTML `inert` — sans JavaScript, c'est l'ordre du DOM qui décide de
+ * la tabulation, et `inert` est ce qui empêche d'entrer au clavier dans le
+ * contenu masqué par le voile.
+ *
+ * **Les deux clés sont mutuellement exclusives, et le sont par une règle unique :
+ * présentes ensemble, elles n'ouvrent rien** (T4.2). Deux `role="dialog"` ou deux
+ * `inert` concurrents ne se rattrapent pas après coup, et aucune préséance n'est
+ * inventée entre deux gestes de même rang — c'est déjà ce que la page fait de
+ * toute valeur d'`?activite=` qu'elle ne reconnaît pas. T4.4 reprendra la règle
+ * telle quelle avec `?resultat=`. Un seul `panelOpen`, un seul `inert`, un seul
+ * panneau monté : la propriété se lit dans le code, elle ne se déduit pas de
+ * trois conditions éparses.
  *
  * **Le droit décide du rendu, pas seulement de l'affichage d'un bouton.** Un
  * membre non contributeur qui tape l'URL d'ouverture obtient la page nue — pas
@@ -46,10 +55,15 @@ import Link from "next/link";
 import {
   cancelActivity,
   createActivity,
+  createResource,
   transitionActivity,
   updateActivity,
 } from "./actions";
 import { ActivityPanel } from "@/components/projects/activity-panel";
+import {
+  ResourcePanel,
+  type ResourceActivityOption,
+} from "@/components/projects/resource-panel";
 import { Resources } from "@/components/projects/resources";
 import { Roadmap } from "@/components/projects/roadmap";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
@@ -62,8 +76,12 @@ import { Tag } from "@/components/ui/tag";
 import { requireSession } from "@/lib/auth/provider";
 import { activities } from "@/lib/db/schema";
 import { toActivityFormValues } from "@/lib/forms/activity";
-import { formatPeriod, formatRank } from "@/lib/format";
-import { ACTIVITY_PANEL_NEW, ROUTES } from "@/lib/navigation";
+import { formatActivityPeriod, formatPeriod, formatRank } from "@/lib/format";
+import {
+  ACTIVITY_PANEL_NEW,
+  RESOURCE_PANEL_NEW,
+  ROUTES,
+} from "@/lib/navigation";
 import {
   listActivityFormOptions,
   listActivityParticipantIds,
@@ -111,7 +129,7 @@ export default async function ProjectPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ activite?: string }>;
+  searchParams: Promise<{ activite?: string; ressource?: string }>;
 }) {
   const { id } = await params;
   if (!isUuid(id)) notFound();
@@ -125,7 +143,14 @@ export default async function ProjectPage({
      règle est déjà écrite dans le contexte de session : elle ne se rejoue pas
      ici. */
   const canWrite = session.can.writeProject(project.id);
-  const { activite } = await searchParams;
+  const { activite, ressource } = await searchParams;
+
+  /* L'exclusivité, en une ligne et avant tout le reste : deux clés d'ouverture
+     concurrentes n'en ouvrent aucune (T4.2). Tout ce qui suit lit `asked`, pas
+     les paramètres bruts, si bien qu'aucun chemin ne peut ouvrir deux panneaux
+     à la fois — la garantie est dans le code, pas dans la relecture. */
+  const conflict = activite !== undefined && ressource !== undefined;
+  const asked = conflict ? {} : { activite, ressource };
 
   /* Une seule clé, dont la **valeur** porte le cas (T3.2) : `nouvelle` crée,
      un identifiant corrige, tout le reste n'ouvre rien. L'activité est
@@ -133,8 +158,11 @@ export default async function ProjectPage({
      affiche aucune des deux dernières, donc aucun lien n'y mène, mais une URL
      se tape. Une activité annulée s'édite en T3.5, pas ici. */
   const edited =
-    canWrite && activite && activite !== ACTIVITY_PANEL_NEW && isUuid(activite)
-      ? await session.db.find(activities, activite)
+    canWrite &&
+    asked.activite &&
+    asked.activite !== ACTIVITY_PANEL_NEW &&
+    isUuid(asked.activite)
+      ? await session.db.find(activities, asked.activite)
       : undefined;
 
   const activity =
@@ -145,8 +173,15 @@ export default async function ProjectPage({
       ? edited
       : null;
 
-  const panelOpen =
-    canWrite && (activite === ACTIVITY_PANEL_NEW || activity !== null);
+  const activityPanelOpen =
+    canWrite && (asked.activite === ACTIVITY_PANEL_NEW || activity !== null);
+
+  /* C4 n'écrit aucune correction de ressource (arbitrage (a)) : une seule
+     valeur ouvre, toute autre n'ouvre rien. Aucune lecture en base n'est
+     nécessaire pour en décider — le panneau ne pré-remplit rien. */
+  const resourcePanelOpen = canWrite && asked.ressource === RESOURCE_PANEL_NEW;
+
+  const panelOpen = activityPanelOpen || resourcePanelOpen;
 
   /* Trois lectures indépendantes, un seul aller-retour : les ressources
      rejoignent le rang et la roadmap plutôt que d'attendre leur tour (T4.1). */
@@ -167,8 +202,12 @@ export default async function ProjectPage({
      T2.6, ici éprouvable pour la première fois.
 
      Les participants déjà liés (T3.6) ne se lisent qu'en correction — une
-     création n'en a encore aucun. */
-  const [panelOptions, activityParticipantIds] = panelOpen
+     création n'en a encore aucun.
+
+     La condition est `activityPanelOpen` et non `panelOpen` : le panneau de
+     ressource (T4.2) n'a que faire des types, des approches et des personnes,
+     et ne doit pas les faire lire. */
+  const [panelOptions, activityParticipantIds] = activityPanelOpen
     ? await Promise.all([
         listActivityFormOptions(
           session.db,
@@ -180,8 +219,52 @@ export default async function ProjectPage({
       ])
     : [null, []];
 
+  /* Les activités proposées au rattachement d'une ressource (T4.2).
+     **Aucune requête neuve** : elles se dérivent de la roadmap déjà lue pour
+     l'écran, dont les archivées sont déjà absentes.
+
+     Le groupe « Annulé » est écarté : une activité abandonnée n'a rien
+     produit. On décrit, on ne propose pas — la règle de T3.3, ici appliquée à
+     un choix plutôt qu'à un libellé. L'action, elle, continue d'accepter une
+     activité annulée reçue : ce qu'on ne propose pas, on ne le refuse pas
+     pour autant.
+
+     L'étiquette porte la période autant que le type : deux activités du même
+     type sur un même accompagnement sont la norme, pas l'exception. */
+  const resourceActivities: ResourceActivityOption[] = resourcePanelOpen
+    ? roadmap
+        .filter((group) => group.key !== "cancelled")
+        .flatMap((group) =>
+          group.activities.map((entry) => ({
+            id: entry.id,
+            label: `${entry.typeLabel} · ${formatActivityPeriod(
+              entry.periodStart,
+              entry.periodEnd,
+              entry.isUnscheduled,
+            )}`,
+          })),
+        )
+    : [];
+
   return (
     <>
+      {resourcePanelOpen ? (
+        /* L'action est liée **côté serveur** au projet courant, comme celle du
+           panneau d'activité : l'identifiant sort de la saisie, et le panneau
+           ne connaît pas l'accompagnement qu'il écrit. Ce n'est pas un verrou —
+           Next sérialise les arguments liés dans un champ `$ACTION_…`,
+           réécrivable. Le verrou est dans l'action, qui interroge `writeProject`
+           sur l'identifiant reçu et rapproche l'activité reçue de ce projet ;
+           un panneau absent du rendu n'a jamais protégé le point d'entrée HTTP
+           qui l'accompagne. */
+        <ResourcePanel
+          projectName={project.name}
+          closeHref={ROUTES.project(project.id)}
+          action={createResource.bind(null, project.id)}
+          activities={resourceActivities}
+        />
+      ) : null}
+
       {panelOptions ? (
         /* L'action est liée **côté serveur** — au projet courant en création,
            au projet et à l'activité en correction —, comme `updateProject`
@@ -349,7 +432,10 @@ export default async function ProjectPage({
 
           {/* Les blocs de référence, « Ressources » en tête (docs/06 §5). */}
           <div className="grid gap-5 md:grid-cols-2">
-            <Resources resources={resources} />
+            <Resources
+              resources={resources}
+              addHref={canWrite ? ROUTES.projectResourceNew(project.id) : null}
+            />
 
             {REFERENCE_BLOCKS.map((block) => (
               <Section key={block.title}>
