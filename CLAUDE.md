@@ -121,7 +121,14 @@ personne.
 2. **Plan mode.** Présenter le plan et la liste exacte des fichiers à créer ou modifier.
    N'écrire aucun fichier avant validation explicite.
 3. Implémenter, strictement dans le périmètre annoncé.
-4. Vérifier le critère de validation du ticket et le rapporter.
+4. Vérifier le critère de validation du ticket et le rapporter. Cinq disciplines, toutes exigées :
+   - **Le critère se lit dans le HTML servi**, jamais il ne s'affirme.
+   - **Les tests se mettent en défaut** avant d'être crus : neutraliser la règle, voir tomber
+     exactement les tests attendus, et rien d'autre.
+   - **Le contraste se mesure** avant d'être cru, sur tout couple de couleurs neuf par la position.
+   - **Le droit s'éprouve par l'action**, jamais par l'écran : un panneau absent du rendu n'a
+     jamais protégé le point d'entrée HTTP qui l'accompagne.
+   - **Le parcours se joue sans une ligne de JavaScript.**
 5. Mettre à jour `ETAT.md` : ticket terminé, écarts éventuels, ticket suivant.
 6. Ajouter à `JOURNAL-TECHNIQUE.md` tout piège rencontré, contournement, dette assumée,
    incohérence documentaire ou désaccord avec une décision.
@@ -135,4 +142,5 @@ personne.
 | `CLAUDE.md` | Règles stables du projet | L'humain uniquement |
 | `ETAT.md` | Avancement, ticket courant, points ouverts | Claude, étape 5 |
 | `JOURNAL-TECHNIQUE.md` | Pièges, contournements, dettes, désaccords | Claude, étape 6 |
+| `HISTORIQUE-TICKETS.md` | Récit détaillé des tickets terminés | Claude, étape 5 |
 | `docs/` | Fondations produit | Figé |

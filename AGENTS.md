@@ -50,9 +50,9 @@ Tu peux lancer des sous-agents à fenêtre isolée. Trois règles :
 La règle 7 de `CLAUDE.md` — ne jamais écrire dans `CLAUDE.md` — vaut aussi pour `AGENTS.md`,
 `.agents/` et `docs/`.
 
-Hors code applicatif, trois fichiers seulement te sont ouverts : `ETAT.md` (étape 5),
-`JOURNAL-TECHNIQUE.md` (étape 6), et `tickets-C3.md` — ce dernier en session de découpage
-uniquement.
+Hors code applicatif, quatre fichiers seulement te sont ouverts : `ETAT.md` (étape 5),
+`JOURNAL-TECHNIQUE.md` (étape 6), `HISTORIQUE-TICKETS.md` (étape 5, récit détaillé), et le
+`tickets-*.md` du chantier courant — ce dernier en session de découpage uniquement.
 
 Aucun outil, aucun processus lancé par toi ne doit écrire dans `CLAUDE.md`. Si tu constates qu'un
 outil de développement le modifie, tu t'arrêtes et tu le signales.

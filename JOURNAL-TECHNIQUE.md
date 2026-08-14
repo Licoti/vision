@@ -1564,3 +1564,98 @@ JavaScript, et ce qui restait à éprouver était le rendu serveur. L'ordre de t
 **47ᵉ et dernier** élément focalisable de la page, après les gestes de roadmap ; chez une membre non
 contributrice, le **10ᵉ et dernier**, la roadmap n'offrant alors aucun lien. Le bloc n'ajoute donc
 qu'un arrêt par ressource, et nulle part ailleurs.
+
+**14/08/2026, hors ticket — `ETAT.md` avait dérivé de sa propre convention.** Le fichier faisait
+855 lignes / 78 Ko, lu intégralement à chaque session (protocole étape 1, rendu obligatoire par
+`AGENTS.md`), soit ~22–25k tokens avant la moindre ligne de code. Deux causes. **La première est
+écrite dans le fichier lui-même** : le sous-titre du « Journal des tickets » dit « une ligne par
+ticket terminé », et les entrées faisaient 15 à 32 lignes — T4.1 seul en faisait 32. **La seconde
+est un mode de croissance** : un point ouvert recevait un addendum par ticket plutôt que d'être
+récrit, si bien que la dette du design system portait six alinéas dont trois disaient « T3.3
+n'ajoute rien », « T3.4 n'ajoute rien non plus », « T4.1 n'ajoute rien non plus » — trois phrases
+pour dire qu'une règle tient, ce qui est son état normal. Sept points refermés y occupaient encore
+la place, dont un de 35 lignes. **Effet plus grave que le poids** : un point ouvert qui compte ne se
+distinguait plus d'un point rangé.
+
+**14/08/2026, hors ticket — un quatrième fichier de suivi que `CLAUDE.md` ne connaît pas.**
+`HISTORIQUE-TICKETS.md` reçoit les 463 lignes de récit, à la ligne près, plus les points refermés.
+Il n'est pas lu au démarrage. **La table « Où écrire quoi » de `CLAUDE.md` n'en porte pas de ligne**,
+et la règle 7 m'interdit de l'y mettre : le texte à coller a été proposé à l'humain. Tant qu'elle
+n'y est pas, le protocole ignore ce fichier. Même remarque pour `AGENTS.md`, dont la section « Droits
+d'écriture » énumère trois fichiers ouverts et devrait en compter quatre.
+
+**14/08/2026, hors ticket — la règle 4 ne s'applique pas à la base de développement.** Quatre points
+ouverts distincts inventoriaient sa dérive (T2.6, T3.3, T3.5, plus des lignes orphelines d'une
+session antérieure), chacun justifiant par la règle 4 le fait de n'avoir rien défait. **Arbitrage
+rendu avec l'humain : la base de développement est jetable.** La règle 4 protège la donnée métier,
+pas une fixture locale. Conséquence assumée et désormais écrite une seule fois : un critère de
+ticket passé ne s'y relit pas nécessairement — ceux de T2.1 à T2.4 se lisaient sur « 2
+accompagnements » et s'y liraient sur 3. **Il n'existe pas de `db:reset`** : `db:seed` ignore ce
+qu'il n'a pas semé, si bien qu'aucune commande ne ramène la base à la fixture. Non traité — ce
+serait un ticket d'outillage, hors du périmètre de tout ticket C4.
+
+**14/08/2026, hors ticket — la condition d'ouverture d'un point ouvert peut être atteinte sans que
+personne le voie.** Le point sur la coquille de navigation focalisable derrière le voile se donnait
+pour condition d'être repris « si une seconde modale arrive ». `?ressource=` de T4.2 est cette
+seconde modale, et **la fiche T4.2 ne la mentionne pas** — elle demande l'exclusion mutuelle des
+paramètres, ce qui est un autre sujet, et ne porte pas `app/(app)/layout.tsx`. Arbitrage rendu avec
+l'humain : noté, pas traité en T4.2, et rattaché au ticket de la barre latérale. **À en tirer une
+discipline** : un point ouvert dont la destination est une condition (« si X arrive ») doit être
+relu au découpage de chaque chantier, sans quoi la condition s'atteint en silence.
+
+**14/08/2026, hors ticket — les cinq disciplines de vérification n'existaient que par répétition.**
+`ETAT.md` les désignait comme le vrai levier — « tant qu'elles ne sont pas écrites dans `CLAUDE.md`,
+un ticket peut être correct **et** non vérifié » — sans jamais les lister. Elles ont été extraites
+des dix-neuf récits, où elles reviennent à l'identique : le critère lu dans le HTML servi et jamais
+affirmé ; les tests mis en défaut avant d'être crus ; le contraste mesuré avant d'être cru ; le
+droit éprouvé par l'action et non par l'écran ; le parcours joué sans une ligne de JavaScript. Le
+texte a été proposé à l'humain pour l'étape 4 du protocole. **Je ne peux pas l'y écrire** (règle 7),
+et c'est précisément pourquoi la dette a tenu dix-neuf tickets.
+
+**14/08/2026, hors ticket — incohérence documentaire assumée : `docs/05` §5 écrit « Sept
+chantiers », il y en a huit.** Le chantier ajouté est l'archivage et la correction, décidé avec
+l'humain et placé entre C4 et C5. **Ce n'est pas un oubli de découpage, c'est une absence du
+cadrage** : `docs/05` §3 distribue « création et édition » pour le produit et le projet, « création,
+édition, changement d'état » pour l'activité, et pour la ressource et le résultat seulement « saisie
+déclarative » — le verbe *corriger* n'apparaît nulle part, et *ranger* pas davantage. Six manques
+s'étaient accumulés dans `ETAT.md` sans destination réelle avant d'être réunis. `docs/` étant figé,
+la divergence vit dans `ETAT.md` seul, et le document de cadrage n'est pas touché.
+
+**14/08/2026, hors ticket — le numéro d'un chantier n'est pas son rang, et c'est la règle 6 qui
+l'impose.** Placer le nouveau chantier « entre C4 et C5 » invitait à renuméroter : C5 archivage,
+C6 indicateurs, C7 liens, C8 finitions. **Impossible sans falsifier des décisions figées.** L'inventaire
+avant décision : « C7 » est écrit dans **`docs/07` D25** (écran des référentiels), **D28** (budget)
+et **D37** (SSO reporté en C7), que la règle 6 interdit de rouvrir ; deux fois dans `docs/05` §7 ;
+trois fois dans `tickets-C4.md`, dont la ligne d'interdits communs qui renvoie « budget (C7) » ; et
+onze fois dans ce journal. Une renumérotation aurait fait coexister deux sens du même identifiant,
+sans moyen de les distinguer à la lecture. **Le chantier prend donc le numéro libre C8 et s'exécute
+en cinquième position** ; ses tickets s'appellent T8.1, T8.2… sans collision avec les T5.x du
+chantier des indicateurs. Conséquence heureuse, vérifiée : aucune destination existante n'a eu à
+bouger — « `/a-propos`, C7 au plus tard », « barre latérale, C7 », « (D25, C7) » restent justes,
+C7 valant toujours Finitions. **À retenir pour tout chantier ajouté plus tard** : le numéro
+identifie, la table d'avancement classe.
+
+**14/08/2026, hors ticket — la règle 7 a été enfreinte sur instruction explicite de l'humain, et
+c'est consigné ici parce que c'en est l'endroit.** `CLAUDE.md` et `AGENTS.md` ont reçu trois
+modifications que j'avais d'abord refusé de faire, textes fournis et validés par l'humain avant
+écriture : (1) la ligne `HISTORIQUE-TICKETS.md` dans la table « Où écrire quoi » ; (2) les cinq
+disciplines de vérification à l'étape 4 du protocole de ticket ; (3) `AGENTS.md` passant de trois à
+quatre fichiers ouverts, et de `tickets-C3.md` — périmé, C3 étant clos — au `tickets-*.md` du
+chantier courant. **Le raisonnement, à connaître pour la prochaine fois** : la règle 7 a été posée
+en T1.1 après que `next dev` eut ajouté de lui-même un bloc `nextjs-agent-rules` en fin de
+`CLAUDE.md`. Elle vise l'écriture **silencieuse** par un outil, pas la main de l'humain passant par
+moi sur un texte qu'il a lu et approuvé. **L'exception ne vaut pas précédent** : hors instruction
+explicite portant sur un texte déjà validé, ces deux fichiers restent fermés, et la formulation
+absolue de la règle reste la bonne — c'est elle qui a fait que la question a été posée plutôt que
+tranchée toute seule. Le garde-fou technique reste en place : `agentRules: false` dans
+`next.config.ts`, et la vérification « aucun outil ne modifie `CLAUDE.md` » du §« Droits d'écriture »
+d'`AGENTS.md` est inchangée.
+
+**14/08/2026, hors ticket — les cinq disciplines n'étaient pas une invention, mais une extraction.**
+Elles ont été relevées dans les dix-neuf récits de tickets de T1.1 à T4.1, où elles reviennent aux
+mêmes mots : « le critère est tenu et lu dans le HTML servi, pas affirmé », « les tests ont été mis
+en défaut avant d'être crus », « le contraste a été mesuré avant d'être cru », « le droit a été
+éprouvé par l'action et pas par l'écran », « le parcours a été joué sans une ligne de JavaScript ».
+Aucune n'a été ajoutée ni reformulée au passage. **Ce qui change en les écrivant** : elles cessent
+d'être une habitude que chaque session redécouvre en lisant les récits — ce qui était précisément
+l'argument pour alléger `ETAT.md`, et qui l'aurait sinon vidé de sa substance.
