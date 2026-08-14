@@ -52,6 +52,13 @@ export default async function EditProductPage({
   const product = await session.db.find(products, id);
   if (!product) notFound();
 
+  /* Un produit archivé n'a plus de formulaire (T4bis.2). `find` rend les lignes
+     archivées — délibérément, une donnée archivée restant lisible —, et rien
+     n'en tirait les conséquences ici. **Ce n'est pas cette route qui protège** :
+     les champs récoltés avant l'archivage se repostent tels quels ensuite, et
+     c'est `updateProduct` qui les refuse, sur l'identifiant reçu. */
+  if (product.archivedAt) notFound();
+
   // L'entité que ce produit porte déjà reste proposée, fût-elle archivée
   // depuis (T4bis.1) : sans cette exception nominative, le `select` s'ouvrirait
   // amputé et la première correction du nom changerait aussi le rattachement.

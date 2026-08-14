@@ -461,6 +461,80 @@ describe("l'archivage", () => {
     ).rejects.toThrow(IntegrityError);
   });
 
+  /* Le rétablissement — T4bis.2. `archive` existait seul depuis T1.3, et un
+     geste qui ne se défait pas n'en est pas un : la fiche annonce « Rétablir »
+     sur la page d'un produit archivé, et aucune porte n'y menait. */
+
+  test("`restore` remet la ligne dans les listes vivantes", async () => {
+    const entity = await a.scope.insert(entities, {
+      label: "Entité à ressortir",
+    });
+    await a.scope.archive(entities, entity.id);
+    expect(
+      (await a.scope.list(entities)).map((row) => row.id),
+    ).not.toContain(entity.id);
+
+    const restored = await a.scope.restore(entities, entity.id);
+    expect(restored?.archivedAt).toBeNull();
+
+    const visible = await a.scope.list(entities);
+    expect(visible.map((row) => row.id)).toContain(entity.id);
+  });
+
+  test("`restore` ne rend rien sur une ligne vivante", async () => {
+    const entity = await a.scope.insert(entities, { label: "Entité vivante" });
+
+    // Le filtre `is not null` est ce qui distingue « rétabli » d'« inutile » :
+    // sans lui, l'appel toucherait la ligne et prétendrait avoir agi.
+    expect(await a.scope.restore(entities, entity.id)).toBeUndefined();
+
+    const row = await db
+      .select()
+      .from(entities)
+      .where(eq(entities.id, entity.id));
+    expect(row[0]?.archivedAt).toBeNull();
+  });
+
+  test("un rétablissement ne franchit pas la frontière", async () => {
+    await b.scope.archive(products, b.productId);
+
+    const restored = await a.scope.restore(products, b.productId);
+    expect(restored).toBeUndefined();
+
+    const row = await db
+      .select()
+      .from(products)
+      .where(eq(products.id, b.productId));
+    expect(row[0]?.archivedAt).not.toBeNull();
+
+    // La fixture est rendue à son état : les tests suivants la partagent.
+    await b.scope.restore(products, b.productId);
+  });
+
+  test("l'aller-retour d'une activité fait tomber puis revenir `last_activity_at`", async () => {
+    const project = await a.scope.insert(projects, {
+      name: "Projet rétabli",
+      productId: a.productId,
+      statusId: a.statusId,
+    });
+    const activity = await a.scope.insert(activities, {
+      projectId: project.id,
+      activityTypeId: a.activityTypeId,
+      state: "done",
+      periodStart: "2026-06-01",
+      periodEnd: "2026-06-30",
+    });
+
+    await a.scope.archive(activities, activity.id);
+    expect((await a.scope.find(projects, project.id))?.lastActivityAt).toBeNull();
+
+    // La promesse de couche vaut dans les deux sens : rétablir une activité est
+    // une écriture d'activité, elle recalcule.
+    await a.scope.restore(activities, activity.id);
+    const after = await a.scope.find(projects, project.id);
+    expect(after?.lastActivityAt?.toISOString().slice(0, 10)).toBe("2026-06-30");
+  });
+
   test("`unlink` défait une liaison, et n'existe que pour elles", async () => {
     const job = await a.scope.insert(jobs, { label: "Product Design" });
     const link = await a.scope.insert(projectJobs, {

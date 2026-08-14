@@ -30,6 +30,7 @@ import {
   findProductDetail,
   listProductFormOptions,
   listProductProjects,
+  listProductsWithCounts,
 } from "./products";
 
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
@@ -48,6 +49,8 @@ type Fixture = {
   productId: string;
   /** Un second produit du même domaine : il ne doit jamais déborder. */
   otherProductId: string;
+  /** Un produit archivé : lisible par son identifiant, absent de la liste. */
+  archivedProductId: string;
   recentProjectId: string;
   oldProjectId: string;
   /** L'entité vivante du domaine : proposée à tout le monde. */
@@ -105,6 +108,15 @@ async function seedDomain(label: string): Promise<Fixture> {
     name: `Autre produit ${label}`,
     entityId: entity.id,
   });
+
+  // Archivé dans la fixture plutôt qu'en cours de test : ce qui se lit d'un
+  // produit rangé — sa date, son absence des listes — ne dépend d'aucun ordre
+  // d'exécution.
+  const archivedProduct = await scope.insert(products, {
+    name: `Produit archivé ${label}`,
+    entityId: entity.id,
+  });
+  await scope.archive(products, archivedProduct.id);
 
   const old = await scope.insert(projects, {
     name: `Ancien ${label}`,
@@ -180,6 +192,7 @@ async function seedDomain(label: string): Promise<Fixture> {
     scope,
     productId: product.id,
     otherProductId: otherProduct.id,
+    archivedProductId: archivedProduct.id,
     recentProjectId: recent.id,
     oldProjectId: old.id,
     entityId: entity.id,
@@ -216,6 +229,27 @@ describe("findProductDetail", () => {
 
   test("ne trouve pas le produit d'un autre domaine", async () => {
     expect(await findProductDetail(a.scope, b.productId)).toBeUndefined();
+  });
+
+  /* T4bis.2 — la page d'un produit archivé reste servie (règle 4), et c'est
+     cette colonne qui lui permet de le dire. Sans elle, l'écran affichait une
+     page identique à celle d'un produit vivant. */
+
+  test("un produit vivant n'a pas de date d'archivage", async () => {
+    const detail = await findProductDetail(a.scope, a.productId);
+    expect(detail?.archivedAt).toBeNull();
+  });
+
+  test("un produit archivé reste lisible, et porte sa date", async () => {
+    const detail = await findProductDetail(a.scope, a.archivedProductId);
+    expect(detail?.name).toBe("Produit archivé a");
+    expect(detail?.archivedAt).toBeInstanceOf(Date);
+  });
+
+  test("un produit archivé ne figure plus dans la liste", async () => {
+    const rows = await listProductsWithCounts(a.scope);
+    expect(rows.map((row) => row.id)).not.toContain(a.archivedProductId);
+    expect(rows.map((row) => row.id)).toContain(a.productId);
   });
 });
 

@@ -18,11 +18,17 @@
  * Ce que cette couche n'expose pas : de suppression générique. Le mot
  * `delete` ne figure pas dans son API. Règle 4 — aucune donnée métier ne se
  * supprime, elle s'archive.
+ *
+ * `archive` et `restore` sont les **deux seuls chemins** vers `archived_at` :
+ * `update` refuse la colonne, et `UpdateValues` l'exclut du typage. Un
+ * archivage qui se déferait par une écriture ordinaire ne serait plus un
+ * geste, ce serait un champ.
  */
 
 import {
   and,
   eq,
+  isNotNull,
   isNull,
   sql,
   type InferInsertModel,
@@ -558,6 +564,49 @@ export function forDomain(scope: Scope) {
   }
 
   /**
+   * Rétablit une ligne archivée : `archived_at` repasse à nul.
+   *
+   * Miroir exact d'`archive`, jusqu'au filtre : la condition porte sur
+   * `is not null` là où l'archivage porte sur `is null`, si bien qu'un
+   * rétablissement d'une ligne vivante ne touche rien et rend `undefined`. Un
+   * geste qui prétendrait défaire ce qui n'a pas été fait mentirait à son
+   * appelant, qui ne saurait plus distinguer le succès de l'inutile.
+   *
+   * `updated_at` est repoussé, comme à l'archivage : ranger et sortir du
+   * rangement sont deux modifications métier, et non des rafraîchissements de
+   * champ dérivé.
+   *
+   * La branche `activities` reprend celle d'`archive` pour la même raison :
+   * l'en-tête de ce module promet que **toute écriture d'activité recalcule
+   * `last_activity_at`**, et une promesse de couche ne se tient pas seulement
+   * là où une interface y mène. Rien n'appelle encore ce chemin — arbitrage
+   * (b) de `tickets-C4bis.md`, l'activité se ressaisit plutôt qu'elle ne se
+   * rétablit — et il serait faux le jour où quelque chose l'appellerait.
+   */
+  async function restore<T extends ArchivableTable>(
+    table: T,
+    id: string,
+  ): Promise<Row<T> | undefined> {
+    const mutation = db
+      .update(anyTable(table))
+      .set({ archivedAt: null, updatedAt: new Date() } as never)
+      .where(and(eq(table.id, id), filter(table), isNotNull(table.archivedAt)))
+      .returning();
+
+    if (!isTable(table, activities)) {
+      return ((await mutation) as Row<T>[])[0];
+    }
+
+    // Une activité rétablie rentre dans le calcul : le projet est recalculé
+    // après, comme il l'est quand elle en sort.
+    const outcomes = (await db.batch([
+      mutation,
+      recalcByActivity(domainId, id),
+    ] as unknown as Batch)) as unknown as Row<T>[][];
+    return outcomes[0]?.[0];
+  }
+
+  /**
    * Rejoue le calcul de `last_activity_at` — sur les projets nommés, ou sur
    * tous ceux du domaine.
    *
@@ -619,6 +668,7 @@ export function forDomain(scope: Scope) {
     insertMany,
     update,
     archive,
+    restore,
     refreshLastActivity,
     unlink,
   };

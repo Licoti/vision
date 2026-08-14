@@ -134,6 +134,12 @@ export type ProductDetail = {
   name: string;
   description: string | null;
   entityLabel: string;
+  /**
+   * Nul tant que le produit est vivant (T4bis.2). La ligne était déjà rendue
+   * archivée ou non ; ce qui manquait était de **le dire** à l'écran, qui la
+   * servait à l'identique dans les deux cas.
+   */
+  archivedAt: Date | null;
 };
 
 /**
@@ -155,6 +161,7 @@ export function findProductDetail(
         name: products.name,
         description: products.description,
         entityLabel: entities.label,
+        archivedAt: products.archivedAt,
       })
       .from(products)
       .innerJoin(

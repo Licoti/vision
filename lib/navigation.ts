@@ -82,6 +82,24 @@ export const RESOURCE_PANEL_NEW = "nouvelle";
 export const RESULT_PANEL_PARAM = "resultat";
 
 /**
+ * Le panneau de **confirmation d'archivage** (T4bis.2), sur la page du produit.
+ * Même mécanique que les trois précédents — une URL, pas un état : la page reste
+ * rendue derrière, porte `inert`, et les trois sorties sont des liens.
+ *
+ * **Une seule valeur d'ouverture**, comme `ressource` : rien ici n'est
+ * polymorphe, l'objet à archiver étant celui de la page. La valeur ne désigne
+ * donc rien — elle ouvre, et c'est tout ; toute autre n'ouvre rien.
+ *
+ * Une clé distincte des trois autres, et pour la même raison qu'elles le sont
+ * entre elles : ce sont des gestes différents, pas deux formes du même. T4bis.3
+ * reprend cette paire telle quelle sur la page du projet.
+ */
+export const ARCHIVE_PANEL_PARAM = "archiver";
+
+/** La seule valeur qui ouvre le panneau de confirmation. */
+export const ARCHIVE_PANEL_CONFIRM = "confirmation";
+
+/**
  * Les adresses des six écrans, et des formulaires qui les alimentent. Les
  * pages de détail prennent un identifiant : le schéma en pose des UUID, et
  * rien ne promet encore de slug — ce choix revient à C2, avec l'écran qui
@@ -99,6 +117,13 @@ export const ROUTES = {
   product: (id: string) => `/produits/${id}`,
   productNew: "/produits/nouveau",
   productEdit: (id: string) => `/produits/${id}/modifier`,
+  /**
+   * La page du produit, panneau de confirmation d'archivage ouvert (T4bis.2).
+   * **Ce n'est pas un écran de plus** : c'est le même, avec un paramètre — et la
+   * fermeture est donc `product(id)`, qui n'a pas besoin d'entrée à elle.
+   */
+  productArchive: (id: string) =>
+    `/produits/${id}?${ARCHIVE_PANEL_PARAM}=${ARCHIVE_PANEL_CONFIRM}`,
   projects: "/projets",
   project: (id: string) => `/projets/${id}`,
   projectNew: "/projets/nouveau",

@@ -2092,3 +2092,74 @@ formulaire dépendent désormais des liaisons de la ligne éditée : l'exception
 peut pas se construire avant de savoir ce que le projet porte. Deux allers-retours séquentiels là où
 il y en avait deux en parallèle. Le coût est réel et assumé ; le supprimer demanderait de fusionner
 `findProjectLinks` et `listProjectFormOptions` en une fonction qui ferait deux choses.
+
+**T4bis.2 — aucune vérification n'a pu tourner, et c'est la dette la plus lourde de la session.**
+L'environnement de cette session a refusé toute commande qui exécute du code : `npx tsc --noEmit`,
+`npm run lint`, `npm test` et `next dev` ont tous rendu « requires approval », sept tentatives sous
+quatre formes différentes comprises. Le ticket est donc livré **relu, jamais éprouvé** — et le
+protocole exige l'inverse : « le critère se lit dans le HTML servi, jamais il ne s'affirme ». Ce
+qui a été fait à la place est une relecture ligne à ligne, qui ne remplace rien : elle ne peut ni
+compiler un `bind`, ni observer un `303`, ni compter des lignes en base. **La règle à en tirer,
+pour la session qui reprend :** un ticket dont l'étape 4 n'a pas tourné n'est pas terminé, quel que
+soit l'état du code — la ligne d'`ETAT.md` le dit, le point ouvert de la section « à trancher »
+l'énumère discipline par discipline, et le commit porte la mention. Il vaut mieux un ticket
+explicitement inachevé qu'un ticket dont on croit à tort qu'il a été éprouvé.
+
+**T4bis.2 — « Rétablir » n'avait aucun chemin, et l'écart était invisible dans la fiche.** Le
+périmètre annoncé listait six fichiers, tous côté application. Or `archive()` pose `archived_at`
+(`lib/db/scoped.ts`) et **rien ne le retirait** : `update()` lève `IntegrityError` dès que
+`archivedAt` figure dans les valeurs — un garde-fou de T1.3, délibéré —, `UpdateValues` l'exclut du
+typage, et `eslint.config.mjs` interdit d'importer `lib/db/client` hors de `scoped.ts`. Les trois
+verrous sont bons ; leur somme était une impasse. **Le motif est exactement celui de T4bis.1** — une
+fiche qui annonce un critère que son périmètre ne peut pas produire —, à ceci près qu'il ne s'agit
+plus d'une lecture oubliée mais d'un **verbe qui n'existe pas**. La leçon se généralise aux quatre
+tickets restants du chantier : **avant d'écrire, chercher le verbe, pas seulement le fichier.**
+T4bis.3 rétablit un accompagnement et trouvera `restore()` en place ; T4bis.4, T4bis.5 et T4bis.6
+n'ont rien à rétablir (arbitrage (b)) et ne rouvriront donc pas la couche.
+
+**T4bis.2 — `restore()` recalcule `last_activity_at` pour un chemin que rien n'appelle.** La branche
+`activities` du `batch` est reprise d'`archive()` alors que l'arbitrage (b) exclut le rétablissement
+d'une activité : aucune interface n'y mène, et aucune n'y mènera dans ce chantier. Elle est écrite
+quand même, parce que l'en-tête de `lib/db/scoped.ts` promet que **toute écriture d'activité
+recalcule le champ** — c'est l'une des trois règles que la base ne peut pas tenir seule, et une
+promesse de couche qui ne vaudrait que pour les chemins actuellement branchés n'est pas une
+promesse. Le test qui la couvre fait l'aller-retour complet : la date tombe à l'archivage, revient
+au rétablissement. **Contrepartie assumée** : c'est du code sans appelant applicatif, que seul son
+test exerce. La règle qui l'emporte est celle de `docs/04` §6 — une seule autorité sur un champ
+dérivé, et elle est complète ou elle n'est pas.
+
+**T4bis.2 — le refus d'un produit archivé ne pouvait pas passer par le `undefined` existant.** Le
+tronc commun `submit` de `produits/actions.ts` traduisait déjà un `undefined` rendu par `write` en
+« Ce produit n'existe plus dans ce domaine » — la ligne introuvable, inconnue ou d'un autre domaine,
+que la couche scopée ne distingue pas. Réutiliser ce chemin pour le produit archivé aurait été gratuit
+et **faux** : le produit existe, il est lisible, et sa page est servie deux clics plus loin. `write`
+rend donc `string | { refused: string } | undefined`, et le refus nommé porte son propre message.
+Trois caractères de plus qu'un `return undefined`, et un message qui ne ment pas.
+
+**T4bis.2 — le mot « Rétablir » n'est écrit nulle part dans `docs/`, et le choix est ici.**
+L'arbitrage (d) de `tickets-C4bis.md` pose « Archiver » — celui de `docs/04` §1 et de D42 — et
+constate qu'aucun document ne nomme le retour. « Restaurer » a été écarté : il appartient au
+vocabulaire de la sauvegarde, donc de la perte, et la règle 4 dit précisément qu'il n'y a pas de
+perte. « Désarchiver » a été écarté aussi, comme tout verbe en dés- qui se lit comme une annulation
+technique. **« Rétablir » dit qu'on remet une chose à sa place**, ce qui est exactement le geste. Le
+libellé complet est « Rétablir ce produit », par symétrie avec « Modifier ce produit ».
+
+**T4bis.2 — trou connu, non traité, règle 3 : `createProject` accepte un produit archivé.** Le
+formulaire de création d'un accompagnement ne propose plus le produit archivé (T4bis.1 y a posé
+l'exception nominative, qui ne joue qu'en édition), et la page produit n'affiche plus « Nouvel
+accompagnement ». Mais `createProject` ne relit pas l'archivage du produit **reçu** :
+`assertPreconditions` vérifie l'appartenance au domaine, jamais `archived_at`. Une soumission forgée
+rattacherait donc un accompagnement neuf à un produit rangé — accompagnement qui n'apparaîtrait sur
+aucune liste, les deux jointures écartant les projets d'un produit archivé. Le cas est **inatteignable
+par l'interface** et n'est pas au périmètre de la fiche, qui nomme `updateProduct` et pas
+`createProject`. → **à refermer par le ticket qui touchera `app/(app)/projets/actions.ts`**, T4bis.3
+étant le premier candidat : il y écrit déjà la lecture seule d'un accompagnement archivé, et la
+question « qu'accepte-t-on d'un parent rangé » y est exactement la même.
+
+**T4bis.2 — la mention datée se lit au mois, et le jour aurait été une seconde entorse.** `docs/04`
+§1 stocke `archived_at` en `timestamptz`, donc l'heure est là. D13 pose le mois comme unité de temps,
+et `lib/format.ts` ne connaît **qu'une** entorse, documentée et bornée : `formatDay`, pour la date de
+mesure d'un résultat, que D39 autorise nommément comme « valeur reportée d'un outil externe, avec sa
+date ». Une date de rangement n'est ni l'une ni l'autre : c'est un fait interne, et savoir qu'un
+produit a été rangé le 14 plutôt qu'en août n'ajoute rien à la lecture. `formatMonth` était déjà
+exporté et prend un `Date` — `lib/format.ts` n'est donc pas entré au périmètre.

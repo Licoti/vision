@@ -763,6 +763,66 @@ elles sont recopiées ici au fil de l'eau pour que le récit détaillé garde so
   `Promise.all` de la page de modification d'un accompagnement est perdu, l'exception nominative ne
   pouvant pas se construire avant de savoir ce que la ligne porte.
 
+- **T4bis.2 — 14/08/2026 — archiver un produit, et le rétablir.** **Le premier appelant
+  d'`archive()`** : la fonction existait dans `lib/db/scoped.ts` depuis T1.3, et `grep -rn '\.archive('`
+  sur `app/` ne rendait aucun appelant. Un produit qui n'est plus accompagné s'archive depuis sa
+  page, sa page reste lisible (règle 4), et le geste se défait.
+  **L'écart de périmètre, déclaré et tranché avant écriture — le second du chantier après T4bis.1.**
+  La fiche annonce « Rétablir » dans son objectif, l'arbitrage (b) le pose pour le produit et le
+  projet, le critère de validation l'exige — et **aucun chemin n'existait** : `archive()` pose
+  `archived_at`, il n'y avait pas de `restore()`, `update()` lève `IntegrityError` dès que
+  `archivedAt` figure dans les valeurs, `UpdateValues` l'exclut du typage, et `eslint.config.mjs`
+  interdit d'importer `lib/db/client` ailleurs que dans `scoped.ts`. Périmètre étendu à
+  `lib/db/scoped.ts` et `lib/db/scoped.test.ts`, **pour `restore()` et rien d'autre**. Neuf fichiers
+  au total.
+  **`restore()` est le miroir exact d'`archive()`**, au filtre près : `isNotNull(archivedAt)` là où
+  l'archivage porte `isNull`, si bien qu'un rétablissement de ligne vivante ne touche rien et rend
+  `undefined` — un geste qui prétendrait défaire ce qui n'a pas été fait mentirait à son appelant.
+  La branche `activities` du `batch` est reprise telle quelle : l'en-tête du module promet que toute
+  écriture d'activité recalcule `last_activity_at`, et **une promesse de couche ne se tient pas
+  seulement là où une interface y mène** — l'arbitrage (b) exclut le rétablissement d'activité, donc
+  rien n'appelle ce chemin, et il serait faux le jour où quelque chose l'appellerait. L'en-tête du
+  module dit désormais qu'`archive` et `restore` sont les **deux seuls** chemins vers `archived_at`.
+  **Trois règles vivent dans l'action, pas à l'écran.** (1) `updateProduct` relit le produit par
+  l'identifiant **reçu** et refuse s'il est archivé — `/produits/{id}/modifier` rend 404, mais une
+  route retirée n'a jamais protégé l'action qu'elle affichait, et les champs récoltés avant
+  l'archivage se repostent tels quels ensuite. (2) `archiveProduct` enchaîne `manageDomain` → produit
+  du domaine → **compte des accompagnements vivants** par `session.db.count`, qui écarte les archivés
+  d'elle-même → `archive()` → revalidations et `redirect` **hors de tout `try`**. (3) `restoreProduct`
+  refuse **muettement**, précédent `transitionActivity` de T3.5 : ce geste n'a aucune saisie à rendre.
+  Le tronc commun `submit` gagne un refus **nommé** (`{ refused }`) à côté de son `undefined`, sans
+  quoi un produit archivé aurait été annoncé « n'existe plus dans ce domaine », qui est faux.
+  **`components/ui/confirm-panel.tsx` est le jumeau de `resource-panel.tsx`, formulaire de saisie en
+  moins** : même `FocusTrap` réutilisé sans modification, même voile non focalisable, même filet
+  gauche `content-neutral-dark`, même croix `autoFocus`, mêmes jetons — **aucun couple de couleurs
+  neuf par la position**, donc aucune mesure à refaire et aucun septième substitut inventé. Il est
+  client pour une seule raison : `useActionState` est le seul moyen de faire revenir le refus de
+  l'arbitrage (e) **avec son compte**. Le texte, lui, arrive en `children` et reste serveur. Il ne
+  connaît aucun droit. T4bis.3 le reprend tel quel, comme T4.3 a repris `external-link.tsx`.
+  **Le panneau est une URL, pas un état** : `?archiver=confirmation`, une **seule** valeur
+  d'ouverture — l'objet visé est celui de la page, rien n'est polymorphe —, la page rendue derrière
+  avec `inert`, la fermeture sur `ROUTES.product(id)`. La mécanique de T3.2, sans qu'un caractère
+  bouge.
+  **Aucune cascade — arbitrage (f).** `listProductProjects` ne change pas d'une ligne : les
+  accompagnements gardent leur `archived_at` nul et cessent de s'afficher parce que leur parent ne
+  s'affiche plus. C'est ce qui rend le rétablissement écrivable — une cascade rendrait indistinguable
+  ce qui a été archivé de ce qui l'a été par ricochet.
+  **`ProductDetail` gagne `archivedAt`**, et c'est tout ce que la lecture change : les deux listes
+  filtraient déjà `isNull(products.archivedAt)`. Ce qui manquait n'était pas de rendre la ligne — elle
+  l'était — mais de **le dire** à l'écran, qui la servait à l'identique dans les deux cas. La mention
+  se lit **au mois** (`formatMonth`, D13) : c'est une date de rangement, pas un horodatage, et
+  `lib/format.ts` n'entre donc pas au périmètre.
+  **Ce qui n'a pas été fait, et pourquoi.** `createProject` n'interdit pas encore, sur soumission
+  forgée, de rattacher un accompagnement neuf à un produit archivé — le trou est connu, il n'est pas
+  au périmètre de la fiche (règle 3), et il part au journal technique. Aucune ligne dans `events`
+  (C6). Aucun archivage de projet, d'activité, de ressource ni de résultat.
+  **Ce qui n'a pas été vérifié, et c'est le manque central de ce ticket.** La session n'a obtenu le
+  droit de lancer **aucune commande** : ni `tsc --noEmit`, ni `lint`, ni `vitest`, ni `next dev`. Les
+  quatre disciplines de l'étape 4 sont donc **à jouer**, et le point ouvert d'`ETAT.md` les énumère
+  une à une. Rien de ce qui suit n'est affirmé ici : le critère n'a pas été lu dans le HTML servi, le
+  droit n'a pas été éprouvé par l'action, les tests n'ont pas été mis en défaut. Seule la mesure de
+  contraste est légitimement absente — aucun couple n'est neuf par la position.
+
 ---
 
 ## Points ouverts refermés
