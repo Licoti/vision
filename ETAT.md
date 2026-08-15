@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 15/08/2026 — T4bis.6 livré, quatre disciplines jouées. C4bis est terminé.
-**Chantier en cours :** aucun — C4bis clos, ses six tickets livrés
-**Ticket suivant :** session de découpage de C5 — indicateurs et temps long
+**Dernière mise à jour :** 15/08/2026 — session de découpage de C5. C4bis replié, `tickets-C5.md` écrit.
+**Chantier en cours :** C5 — indicateurs et lecture dans le temps, six tickets découpés
+**Ticket suivant :** T5.1 — le bloc « Indicateurs » de la page produit, en lecture
 
 ---
 
@@ -17,7 +17,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C3 — Activités et roadmap | T3.1 → T3.6 | **terminé** |
 | C4 — Ressources et résultats | T4.1 → T4.4 | **terminé** |
 | C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **terminé** |
-| C5 — Indicateurs et temps long | à découper | à faire |
+| C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **en cours** |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
@@ -27,6 +27,10 @@ boucle complète de `docs/05` §2 — saisir, attacher le lien, reporter le rés
 **Sur C4bis, désormais clos.** `docs/05` §5 n'avait prévu ni l'archivage ni la correction ; le
 chantier s'est intercalé **sans décaler les autres** — C5, C6 et C7 gardent le sens que `docs/05`
 leur donne, « C7 » étant écrit dans D25, D28 et D37 que la règle 6 interdit de rouvrir.
+
+**Sur C5, ouvert le 15/08/2026.** Six tickets, sept arbitrages rendus avant écriture, dans
+`tickets-C5.md`. Sa leçon reprise de C4bis : **chaque objet arrive avec ses trois gestes — créer,
+corriger, ranger — dans le ticket qui l'introduit.**
 
 ---
 
@@ -45,49 +49,16 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
 - **C4 — Ressources et résultats — T4.1 → T4.4, du 13 au 14/08/2026.** Le bloc « Ressources », le
   geste qui relie, le résultat sur l'entrée de roadmap, sa saisie déclarative. Ferme la boucle
   minimale de `docs/05` §2.
+- **C4bis — Archivage et correction — T4bis.1 → T4bis.6, du 14 au 15/08/2026.** Le chantier que
+  `docs/05` §5 n'avait pas prévu, intercalé sans décaler les autres. Six manques refermés sous six
+  arbitrages : la matrice « corriger / archiver » est pleine, quatre portes gouvernent les écritures
+  de la page projet, et un seul `canWrite` fait tomber sept gestes ensemble. Porte la seule migration
+  du chantier — l'unicité partielle du résultat, qui fait de « retirer puis ressaisir » un chemin
+  réel.
 
-**C4bis — en cours** *(une ligne par ticket jusqu'au repliage du chantier)*
+**C5 — en cours** *(une ligne par ticket jusqu'au repliage du chantier)*
 
-- **T4bis.1 — 14/08/2026 — ce qu'un formulaire fait d'une valeur archivée.** Écart déclaré et
-  tranché avec l'humain avant écriture : `app/(app)/projets/actions.ts`, sans quoi le critère de
-  re-soumission de la fiche ne pouvait pas se lire.
-- **T4bis.2 — 14/08/2026 — archiver un produit, et le rétablir.** Écart déclaré et tranché avant
-  écriture : `lib/db/scoped.ts` et ses tests, pour `restore()` et rien d'autre — sans lui,
-  « Rétablir » n'avait aucun chemin. Ses vérifications, non exécutées le jour même, ont été jouées
-  en tête de T4bis.3 pour ce qui est mécanisable.
-- **T4bis.3 — 15/08/2026 — archiver un accompagnement, et la lecture seule qui va avec.** Aucun
-  écart de périmètre. Trois arbitrages tranchés avant écriture : `updateProject` refuse le projet
-  archivé reçu ; aucun garde-fou au rétablissement sous un produit archivé ; le trou `createProject`
-  reste ouvert. Les quatre disciplines jouées, dont sept charges repostées refusées puis, les mêmes
-  non retouchées, acceptées après rétablissement.
-- **T4bis.4 — 15/08/2026 — archiver une activité saisie par erreur.** Aucun écart de périmètre, cinq
-  fichiers pour cinq annoncés. Trois arbitrages tranchés avant écriture : le geste **disparaît** de
-  l'entrée qui porte un résultat et l'action refuse en silence ; il traverse les **cinq** groupes,
-  « Annulé » compris ; il se lit « Archiver la saisie », pour ne pas se confondre avec « Annuler ».
-  `openActivity` a porté les quatre contrôles sans être modifiée. Les quatre disciplines jouées, dont
-  la fraîcheur du produit lue changer dans `/produits` — octobre puis août 2026 — et quatre refus
-  éprouvés séparément.
-- **T4bis.5 — 15/08/2026 — corriger et retirer une ressource.** Aucun écart de périmètre, neuf
-  fichiers pour les sept annoncés plus leurs deux tests. Deux arbitrages tranchés avant écriture :
-  l'écran dit « Modifier » et « Archiver », aucun verbe neuf ; l'exception nominative couvre
-  l'activité **annulée** autant que l'archivée, sans quoi une re-soumission détachait la ressource en
-  silence. Les quatre disciplines jouées, dont six charges repostées refusées base comptée avant et
-  après, et le tour complet à l'identique relu en base — `activity_id` inchangé. **La mise en défaut
-  a servi** : retirer `filter(activities)` de `findResourceActivity` ne faisait tomber aucun test, les
-  deux filtres de domaine se rattrapant ; un test isolant a été ajouté avant de croire la discipline.
-- **T4bis.6 — 15/08/2026 — corriger et retirer un résultat, et sa migration.** Aucun écart de
-  périmètre, dix fichiers pour les huit annoncés plus leurs deux tests. **Première migration depuis
-  T1.2** : `results_activity_unique` devient un index **partiel**, `where archived_at is null`, sans
-  changer de nom ; `drizzle-kit` a rendu le `DROP CONSTRAINT` avant le `CREATE UNIQUE INDEX`, l'ordre
-  qu'il fallait. Quatre arbitrages tranchés avant écriture : nom d'index conservé ; « Corriger le
-  résultat » et « Archiver le résultat » à l'écran ; les deux gestes suivent **le résultat**, non le
-  groupe « Terminé » qu'une période corrigée peut quitter ; « 62.0000 » se retape « 62 ». Le
-  `includeArchived` de `checkResultActivity` s'est relu avec la migration, comme la fiche l'exigeait.
-  Quatre disciplines jouées, dont **la ressaisie après retrait lue à l'écran** — le critère qui
-  n'existait pas avant ce ticket —, six charges forgées refusées base comptée, et deux charges
-  récoltées **avant** archivage du projet refusées après puis acceptées non retouchées après
-  rétablissement. **Mise en défaut portée trois fois** : contrainte totale rétablie, `keepToolId`
-  neutralisée, filtre de domaine de `tools` neutralisé — chacune fait tomber le seul test qui l'isole.
+- *(aucun ticket livré — le chantier vient d'être découpé.)*
 
 ---
 
@@ -102,15 +73,6 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   dans la conversation le 12/08/2026 — la base de développement, puis la branche de test. Elles ne
   sont que dans `.env.local`, hors dépôt, mais restent valides. → **action humaine.**
 
-- **Le parcours d'archivage d'un produit n'a jamais été joué à l'écran.** T4bis.3 a lancé les
-  commandes que T4bis.2 n'avait pas pu lancer — `tsc`, `lint`, `vitest` (379 verts), `next dev` — et
-  a mis en défaut le `select` de `findProjectDetail`. Ce qu'aucune commande ne joue reste dû, et ne
-  concerne que le **produit** : le parcours archiver / rétablir depuis sa page, `/produits/{id}/modifier`
-  en 404, `updateProduct` reposté après archivage, `archiveProduct` et `restoreProduct` sous le cookie
-  d'un membre, et surtout le **refus (e) dont le message doit dire combien** — le seul de C4bis qui
-  n'ait aucun équivalent côté projet. Le protocole de re-soumission de T4bis.3 s'y transpose tel quel
-  (`JOURNAL-TECHNIQUE.md`). → **à jouer à la première session qui ouvre `produits/`.**
-
 - **Rétablir un accompagnement sous un produit archivé le laisse invisible.** L'arbitrage (e)
   n'autorise l'archivage d'un produit que si tous ses accompagnements sont archivés : « produit rangé,
   accompagnements rangés » est donc l'état courant. En rétablir un depuis sa page donne un projet
@@ -118,19 +80,20 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   geste paraît ne rien faire. Arbitrage du 15/08/2026, tranché avant écriture : **aucun garde-fou**,
   l'arbitrage (f) posant qu'il n'y a pas de cascade et le chantier interdisant d'en ouvrir un
   septième en cours de ticket. Rien n'est perdu ; le geste est trompeur.
-  → **ticket propre, C7 au plus tard** — aucun ticket de C4bis, C5 ni C6 ne touche ce couple.
+  → **ticket propre, C7 au plus tard** — vérifié au découpage de C5 : aucune de ses six fiches
+  n'ouvre `archiveProject` ni `restoreProject`.
 
 ### b. Assignés à un ticket
 
-- **C4bis est livré en entier, et la matrice « corriger / archiver » est pleine.** Les six manques
-  sont refermés par six tickets, sous les six arbitrages rendus avant écriture. Quatre portes
-  gouvernent désormais les écritures de la page projet — `openProject`, `openActivity`,
-  `openResource`, `openResult` — et le même `canWrite` fait tomber sept gestes ensemble. T4bis.6 a
-  porté la seule migration du chantier : « retirer puis ressaisir » est un chemin réel, pour le
-  résultat comme pour l'activité qui le portait.
-  → **repliage dû à la session de découpage de C5** : les six lignes de ticket ci-dessus partent
-  alors dans `HISTORIQUE-TICKETS.md`, ce point sort d'ici, et **ETAT.md repasse sous 250 lignes** —
-  il les dépasse depuis ce ticket, et seul le repliage peut le corriger (règle du protocole).
+- **Le parcours d'archivage d'un produit n'a jamais été joué à l'écran.** T4bis.3 a lancé les
+  commandes que T4bis.2 n'avait pas pu lancer — `tsc`, `lint`, `vitest`, `next dev` — et a mis en
+  défaut le `select` de `findProjectDetail`. Ce qu'aucune commande ne joue reste dû, et ne concerne
+  que le **produit** : le parcours archiver / rétablir depuis sa page, `/produits/{id}/modifier` en
+  404, `updateProduct` reposté après archivage, `archiveProduct` et `restoreProduct` sous le cookie
+  d'un membre, et surtout le **refus (e) dont le message doit dire combien** — le seul de C4bis qui
+  n'ait aucun équivalent côté projet. Le protocole de re-soumission de T4bis.3 s'y transpose tel quel
+  (`JOURNAL-TECHNIQUE.md`). Destination posée le 15/08/2026, session de découpage de C5 : c'est le
+  premier ticket qui ouvre `produits/`. → **dû à T5.1**, hors de son périmètre de fichiers.
 - **`createProject` accepte encore un produit archivé.** Le formulaire ne le propose plus et la page
   produit n'y mène plus, mais l'action ne relit pas l'`archived_at` du produit **reçu** : une
   soumission forgée rattacherait un accompagnement neuf à un produit rangé, invisible partout. Relevé
@@ -142,8 +105,8 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   existe depuis T1.2, `docs/04` §2 le dit « habituellement associé », et la fixture le pose sur les
   deux types d'audit du brief. Le panneau de T4.4 ne l'a pas lu — la fiche ne le demandait pas,
   règle 3. Trois lignes suffiraient, et la colonne n'a **aucun lecteur**. → **ticket propre, C7 au
-  plus tard** (destination posée le 14/08/2026 : aucun ticket de C4bis, C5 ni C6 ne touche ce
-  panneau).
+  plus tard** (destination posée le 14/08/2026, confirmée au découpage de C5 : aucune de ses six
+  fiches n'ouvre `activity-panel.tsx`).
 - **La coquille de navigation reste focalisable derrière le voile, sans JavaScript.** La page projet
   porte `inert` quand un panneau est ouvert, mais la barre latérale vit dans `app/(app)/layout.tsx`,
   et un layout Next ne reçoit pas les `searchParams`. Avec JavaScript, `FocusTrap` la met hors
@@ -159,8 +122,8 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   (2) `persons.kind` : un intervenant côté entité est marqué sur la page projet depuis T2.4 et dans
   le formulaire depuis T2.6 — pastille grise **et** mention « côté entité » —, mais la page produit et
   la liste transverse affichent tous les membres à l'identique, leurs lectures ne remontant pas la
-  colonne. Aucun ticket de C4bis, C5 ni C6 ne touche ces listes. → **ticket propre, C7** (destination
-  posée le 14/08/2026).
+  colonne. → **ticket propre, C7** (destination posée le 14/08/2026, confirmée au découpage de C5 :
+  T5.1 et T5.5 ouvrent la page produit sans rouvrir `listProductProjects` ni la liste transverse).
 - **Le contenu rédigé d'`/a-propos` reste à écrire.** La page a son en-tête et son état vide. Son
   contenu — ce qu'est Vision, le vocabulaire, ce qu'elle ne fait pas, l'état daté — ne demande
   aucune lecture en base. → **ticket propre, C7 au plus tard.**

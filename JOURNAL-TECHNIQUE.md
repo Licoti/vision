@@ -2466,3 +2466,46 @@ est sa première étape. Les deux se contredisent ici, C4bis venant tout juste d
 **ne pas faire le travail du découpage**, resserrer les seuls paragraphes que ce ticket écrit ou rend
 historiques — ce qui a rendu cinq lignes — et **nommer le dépassement dans `ETAT.md` avec sa cause et
 son échéance**. Le repliage de C4bis rendra une quarantaine de lignes d'un coup.
+
+**Découpage de C5 — écart assumé à `docs/02` §5 : un seul lieu de création d'un indicateur.** Le
+document écrit qu'un projet « adopte un indicateur existant du produit, **ou en crée un nouveau** ».
+L'arbitrage (c) de `tickets-C5.md` ne retient que la première moitié : la création vit sur la page
+produit, et le panneau d'adoption de T5.4 renvoie vers elle quand le produit ne porte aucun
+indicateur. **Ce n'est pas une décision rouverte** — `docs/07` ne porte rien sur ce point, D11 disant
+seulement à qui l'indicateur appartient. La raison est chiffrée : trois copies de `PanelField`
+existent déjà (T2.5, T3.3, T4.2), chacune portant les choix mesurés que le design system ne nomme
+pas — bordure de contrôle, bordure d'erreur, mention « (obligatoire) » écrite. Un quatrième
+formulaire les recopierait de mémoire, et c'est ainsi qu'un septième substitut s'invente. **À
+rouvrir** le jour où l'usage montre qu'un contributeur crée ses indicateurs depuis le projet plutôt
+que depuis le produit : le signal 3 de `docs/05` §7 est fait pour cela.
+
+**Découpage de C5 — le droit d'écrire un indicateur n'existait dans aucun des deux droits posés.**
+D23 dit « les contributeurs du projet saisissent les indicateurs » ; D1 et D11 posent que
+l'indicateur appartient au **produit**. La page produit, elle, ne connaît que `manageDomain` depuis
+T2.5. Les deux lectures possibles étaient : réserver la saisie au responsable de domaine, contre la
+lettre de D23 ; ou dériver le droit des accompagnements du produit. Retenu, arbitrage (b) :
+`manageDomain` **ou** contributeur désigné d'au moins un accompagnement de ce produit. Le calcul ne
+coûte aucune requête — la page lit déjà ses accompagnements, et `session.can.writeProject` répond sur
+chacun. **Aucun droit neuf n'entre dans `SessionRights`** : ce serait un troisième niveau là où D9
+en pose deux, et le jour où Entra ID remplacera le stub, c'est `lib/auth/provider.ts` qui change,
+pas la règle. L'action redérive le droit sur l'identifiant reçu, jamais sur ce que le rendu a décidé.
+
+**Découpage de C5 — la deuxième migration du projet est décidée avant d'être écrite, et c'est
+volontaire.** `indicator_readings` n'a pas d'`archived_at` (T1.2). Retirer un relevé saisi en double
+n'avait donc que la suppression pour chemin, que la règle 4 interdit. Trois options étaient sur la
+table : ne pas offrir le retrait — une correction rattrape toute erreur de saisie, jamais un doublon ;
+ajouter la colonne ; ou traiter le relevé comme une liaison, ce qu'il n'est pas. Retenu : la colonne,
+dans T5.3, **avec le geste qu'elle autorise** — une migration qui n'a pas de lecteur le jour où elle
+est posée est une migration qu'on relira sans savoir pourquoi. La couche d'accès ne change pas d'une
+ligne : `hasArchivedAt` introspecte le schéma, donc `archive`, `restore` et le filtre des vivants
+couvrent la table du jour où la colonne existe. **C'est la première fois que cette propriété de T1.3
+est éprouvée** ; si elle ne tient pas, c'est `lib/db/scoped.ts` qui a un défaut, pas T5.3.
+
+**Découpage de C5 — le repliage de C4bis n'a coûté aucun geste, et c'est T4bis.1 qui l'avait payé
+d'avance.** La section « C4bis » de `HISTORIQUE-TICKETS.md` a été ouverte le 14/08/2026 avec la
+consigne de recopier chaque ligne de ticket **au fil de l'eau**, plutôt que d'attendre le repliage.
+Le geste 1 de la session de découpage s'est donc réduit à supprimer les six lignes d'`ETAT.md` et à
+poser la ligne de chantier : rien à déplacer, rien à récrire, rien à perdre. Les lignes d'`ETAT.md`
+portaient davantage — les vérifications jouées, les charges refusées —, et ce détail vit dans le
+récit détaillé, ticket par ticket. `ETAT.md` passe de **256 à 219 lignes**. **À garder pour C5** :
+la section « C5 » de `HISTORIQUE-TICKETS.md` s'ouvre au premier ticket livré, avec la même consigne.

@@ -75,8 +75,11 @@ Elles servent ici de sommaire au récit détaillé qui suit, qui porte chacun de
 
 **C4bis — Archivage et correction**
 
-*(section ouverte le 14/08/2026. Ces lignes vivent dans `ETAT.md` jusqu'au repliage du chantier ;
-elles sont recopiées ici au fil de l'eau pour que le récit détaillé garde son sommaire.)*
+*(section ouverte le 14/08/2026, **repliée le 15/08/2026** par la session de découpage de C5 :
+`ETAT.md` ne porte plus qu'une ligne de chantier, et ces six lignes sont désormais le seul sommaire
+du récit détaillé. Elles y avaient été recopiées au fil de l'eau, ce qui a rendu le repliage sans
+geste — rien n'a été récrit ni résumé au passage, et les vérifications que les lignes d'`ETAT.md`
+portaient en plus vivent dans le récit ci-dessous, ticket par ticket.)*
 
 - **T4bis.1 — 14/08/2026 — ce qu'un formulaire fait d'une valeur archivée.** Écart déclaré et
   tranché avec l'humain avant écriture : `app/(app)/projets/actions.ts`, un septième fichier.
@@ -1090,6 +1093,16 @@ test isolant a été écrit d'avance, et il tient.
 *(archivés depuis `ETAT.md` le 14/08/2026 — ils étaient barrés dans la section « Points ouverts »,
 où ils occupaient encore la place. Conservés tels quels : un point refermé documente comment il
 l%s été.)*
+
+- ~~**C4bis est livré en entier, et la matrice « corriger / archiver » est pleine.**~~ **Refermé le
+  15/08/2026 par la session de découpage de C5, geste 2.** Les six manques sont refermés par six
+  tickets, sous les six arbitrages rendus avant écriture. Quatre portes gouvernent désormais les
+  écritures de la page projet — `openProject`, `openActivity`, `openResource`, `openResult` — et le
+  même `canWrite` fait tomber sept gestes ensemble. T4bis.6 a porté la seule migration du chantier :
+  « retirer puis ressaisir » est un chemin réel, pour le résultat comme pour l'activité qui le
+  portait. **Ce que le point promettait est tenu** : les six lignes de ticket ont quitté `ETAT.md`
+  pour la ligne de chantier unique, et le fichier est repassé de 256 à 219 lignes, sous le seuil de
+  250 que le protocole lui fixe.
 
 - ~~**`CLAUDE.md` et `AGENTS.md` ont été modifiés par Claude le 14/08/2026, sur instruction
   explicite, en trois fois.**~~ **Refermé le 14/08/2026 par la session de découpage de C4bis, geste
