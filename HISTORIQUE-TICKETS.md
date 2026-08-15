@@ -87,6 +87,10 @@ elles sont recopiées ici au fil de l'eau pour que le récit détaillé garde so
   écart de périmètre. Trois arbitrages posés et tranchés avant écriture : `updateProject` refuse le
   projet archivé reçu ; aucun garde-fou au rétablissement sous un produit archivé ; le trou
   `createProject` × produit archivé reste ouvert.
+- **T4bis.4 — 15/08/2026 — archiver une activité saisie par erreur.** Aucun écart de périmètre, cinq
+  fichiers pour cinq annoncés. Trois arbitrages posés et tranchés avant écriture : geste retiré de
+  l'entrée qui porte un résultat et refus muet ; geste présent dans les cinq groupes, « Annulé »
+  compris ; libellé « Archiver la saisie ».
 
 ---
 
@@ -881,6 +885,60 @@ elles sont recopiées ici au fil de l'eau pour que le récit détaillé garde so
   produit et de l'en-tête projet.
   **Ce que les gardes d'actions ne portent pas :** aucun test unitaire, faute de banc d'essai pour
   les actions serveur dans ce dépôt. C'est la seconde discipline qui les couvre, et elle seule.
+
+- **T4bis.4 — 15/08/2026 — archiver une activité saisie par erreur.** Le manque (3), et la fin de la
+  colonne « Archiver » de la matrice pour les objets qui ont une page. Cinq fichiers annoncés, cinq
+  touchés : `archiveActivity` dans `app/(app)/projets/[id]/actions.ts`, le geste dans
+  `components/projects/roadmap.tsx`, son branchement dans `app/(app)/projets/[id]/page.tsx`, et le
+  filtre d'archivage du `leftJoin` de `lib/queries/resources.ts` avec ses tests.
+  **L'action tient en douze lignes, parce que `openActivity` en portait déjà quatre contrôles.**
+  Écrite en T3.5 pour la transition et l'annulation, étendue en T4bis.3 au projet archivé, elle
+  vérifie d'un coup : l'activité existe, elle n'est pas déjà archivée, `writeProject` est interrogé
+  sur le projet **de l'activité reçue**, et ce projet n'est pas archivé. La conséquence est que le
+  refus d'une activité **d'un autre accompagnement** n'a demandé aucun code : le droit se juge sur le
+  projet d'ailleurs, où l'on n'écrit pas. La porte n'a pas été modifiée d'une ligne, seul son en-tête
+  nomme son troisième appelant. Reste propre à ce ticket la garde du **résultat vivant** — `count`
+  sur `results`, qui écarte les archivés d'elle-même.
+  **Trois arbitrages, rendus avant écriture** (raisons au journal technique) : (1) le geste
+  **disparaît** de l'entrée qui porte un résultat, et l'action refuse en silence — la mécanique de
+  « Saisir un résultat » de T4.4, où la même donnée décide du lien et de l'action ; il réapparaîtra
+  de lui-même avec « Retirer le résultat » en T4bis.6 ; (2) il traverse les **cinq** groupes,
+  « Annulé » compris — l'archivage n'est pas une transition d'état, il ne fait pas sortir de
+  `cancelled`, il sort du récit ; (3) il se lit **« Archiver la saisie »** et non « Archiver », que
+  deux lettres sépareraient d'« Annuler » dans la même colonne.
+  **Aucun composant n'a eu à changer de nature, et la page pas davantage.** `archiveActivity` est le
+  sixième geste gouverné par le `canWrite` de T4bis.3 : il tombe avec les cinq autres sur un
+  accompagnement archivé, sans qu'aucune condition s'ajoute — la propriété que ce `&&` cherchait,
+  vérifiée pour la première fois.
+  **La conséquence de T4.1, retranchée dans le même geste.** `listProjectResources` joignait
+  l'activité sans filtrer son archivage : « on décrit, on ne propose pas ». Le raisonnement tenait
+  tant que rien n'archivait une activité ; ce ticket le rend faux et le récrit plutôt que de
+  l'amender. Le filtre vit dans le `on`, jamais dans le `where` : **la ressource reste**, seul son
+  libellé d'activité disparaît, et `activityLabel` retrouve la forme `null` qu'a déjà une ressource
+  sans rattachement — l'écran n'a pas eu à changer.
+  **Vérifications — les quatre disciplines.** `tsc`, `lint`, `vitest` (380 verts). Lu dans le HTML
+  servi, sur « Autonomie des opérations courantes » : l'activité quitte la roadmap, la page reste
+  entière ; les deux ressources qui citaient « Test utilisateur » restent avec leur titre, leur lien
+  et leur type, **sans la mention « · Activité : Test utilisateur »** ; le geste est absent de
+  l'entrée « Audit d'accessibilité », seule à porter un résultat, présent sur les quatre autres ;
+  présent sur les deux entrées **annulées** de « Test projet », qui n'offrent pas « Modifier ».
+  **La fraîcheur du produit a changé dans `/produits`** — « Espace client web » passe d'« octobre
+  2026 » à « août 2026 » quand l'activité d'octobre est archivée, et y revient au rétablissement :
+  la preuve du recalcul par la couche, lue et non affirmée, sans qu'une ligne du ticket n'écrive
+  `last_activity_at`. Tests mis en défaut : neutraliser `isNull(activities.archivedAt)` fait tomber
+  **exactement** le test inversé, et rien d'autre. Contraste : `content-primary-dark` sur
+  `surface-neutral-pale`, mesuré à **15,72:1**, et surtout **aucun couple neuf par la position** —
+  `ACTION_LINK` est repris tel quel des quatre autres gestes de l'entrée. Le droit éprouvé par
+  l'action, quatre refus séparément et base relue à chaque fois : activité portant un résultat ;
+  membre non contributeur ; activité d'un autre accompagnement ; accompagnement archivé. Puis le
+  constat positif qui ferme le raisonnement : la même charge sous le cookie d'une **contributrice
+  désignée non responsable de domaine** archive — le droit est bien `writeProject`, pas
+  `manageDomain`.
+  **Un faux départ, gardé parce qu'il instruit :** le premier essai du refus « membre non
+  contributeur » a **écrit**. Non que la garde ait cédé, mais parce que le cookie désignait une
+  personne dont `has_access` est faux : le repli du stub retombe alors sur le responsable de domaine.
+  L'essai refait sous une personne à session réelle a tenu. Le cookie du stub ne vaut que pour qui a
+  un accès.
 
 ---
 

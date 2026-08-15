@@ -2260,3 +2260,77 @@ sept re-soumissions acceptées de l'étape (6) ont ensuite écrit sept lignes «
 projet. Tout a été retiré en fin de session, et le projet remis sous son nom, son objectif et sa
 fraîcheur d'origine. La dérive inventoriée dans `ETAT.md` n'a donc pas augmenté ; elle n'a pas
 diminué non plus.
+
+**T4bis.4 — le refus d'un résultat vivant ne se dit pas, il se retire de l'écran.** La fiche exige
+que l'archivage d'une activité portant un résultat soit refusé ; elle ne dit pas comment ce refus se
+donne à voir, et le geste est un formulaire nu, sans état où loger un message. Deux options : rendre
+le geste toujours et faire remonter un refus lisible, au prix d'un `useActionState` par entrée de
+roadmap — donc un composant client là où il n'y en avait pas —, ou faire disparaître le geste dès
+qu'un résultat vivant est posé et laisser l'action refuser en silence. La seconde a été retenue : la
+mécanique existe déjà à l'identique pour « Saisir un résultat » depuis T4.4, où **la même donnée
+décide du lien et de l'action**, si bien que l'un ne peut pas survivre à l'autre ; et `activity.result`
+est déjà porté par `RoadmapActivity`, donc aucune requête ne s'ajoute à l'écran. Le refus muet est
+celui de `transitionActivity`, `cancelActivity` et `restoreProject`. **Contrepartie assumée, et
+bornée : jusqu'à T4bis.6, une activité portant un résultat n'offre aucun chemin d'archivage et
+l'écran n'en dit pas la raison.** T4bis.6 livre « Retirer le résultat », et le geste réapparaît de
+lui-même — c'est l'ordre du chantier qui referme cette dette, pas un ticket à ouvrir.
+
+**T4bis.4 — le geste traverse le groupe « Annulé », et ce n'est pas une entorse à T3.5.** `editHref`
+n'est pas transmis à ce groupe depuis T3.5 : aucun retour en arrière depuis `cancelled`. La fiche
+situe l'archivage « à côté de "Corriger" », ce qui pouvait se lire comme la même restriction.
+Arbitrage tranché avant écriture : **l'archivage n'est pas une transition d'état.** Il ne fait pas
+sortir de `cancelled`, il sort du récit — l'interdit de T3.5 porte sur le retour en arrière, pas sur
+le rangement. Une activité saisie par erreur *puis* annulée est un cas ordinaire, et l'exclure
+l'aurait laissée sans aucun chemin, soit exactement le manque (3) que le ticket referme. Lu dans le
+HTML servi de « Test projet » : les deux entrées annulées portent « Archiver la saisie » et aucune ne
+porte « Modifier ».
+
+**T4bis.4 — « Archiver la saisie », parce que « Archiver » seul se confondrait avec « Annuler ».**
+L'arbitrage (d) du chantier fixe le verbe — jamais « Ranger », jamais « Supprimer » — et la fiche
+ajoute que l'écran doit distinguer l'archivage de l'annulation **par ses libellés**. Empilés dans la
+même colonne d'actions, en même graisse et même taille, « Annuler » et « Archiver » ne se distinguent
+que par deux lettres. Le complément porte le sens du geste : c'est la *saisie* qu'on retire, pas
+l'activité qu'on annule. Le verbe de l'arbitrage (d) est conservé, l'`aria-label` porte l'activité
+comme celui de « Modifier ».
+
+**T4bis.4 — un cookie sans session ne prouve aucun refus, il en fabrique un faux — ou pire, une
+acceptation.** Le premier essai du refus « membre non contributeur » a été joué sous le cookie de
+Marc Tellier, choisi parce que `project_members.is_contributor` vaut `false` pour lui. La
+re-soumission a **écrit**. La garde n'était pas en cause : `persons.has_access` est `false` pour
+cette personne, `loadCurrentSession` rend donc `null`, et le repli du stub
+(`lib/auth/provider.ts`, « tolérance propre au stub ») retombe sur la personne par défaut — le
+responsable de domaine. Le cookie ne désignait personne, et la charge a été traitée avec tous les
+droits. L'essai a été refait sous Awa Diallo — membre, `has_access = true`, contributrice d'un autre
+projet —, et le refus a tenu : page servie sans aucun geste d'archivage, charge repostée refusée,
+base inchangée. **À retenir pour les tickets suivants : le cookie du stub ne vaut que pour une
+personne dont `has_access` est vrai ; sinon on éprouve le repli, pas le droit.** L'activité archivée
+par erreur pendant cet essai a été rétablie aussitôt.
+
+**T4bis.4 — `restore()` a servi pour la première fois sur une activité, hors interface et pour
+réparer le terrain.** L'arbitrage (b) du chantier interdit tout rétablissement d'activité par
+l'écran, et son en-tête dans `lib/db/scoped.ts` annonçait un chemin sans appelant. Les quatre
+activités archivées en vérification — dont celle de l'essai raté ci-dessus — ont été rétablies par un
+script jetable appelant `scope.restore(activities, id)`, hors du dépôt. Le rétablissement a recalculé
+`last_activity_at` comme l'archivage l'avait fait : la fraîcheur d'« Espace client web » est repassée
+d'août à octobre 2026 dans `/produits`. La branche `activities` de `restore`, écrite en T4bis.2 « pour
+qu'une promesse de couche se tienne partout », s'est donc éprouvée sans qu'aucune interface n'y mène.
+**La dérive inventoriée dans `ETAT.md` n'a pas augmenté.**
+
+**T4bis.4 — la preuve du recalcul est une date lue à l'écran, pas une ligne de code relue.** La fiche
+demande que la fraîcheur du produit ait changé dans `/produits` quand l'activité archivée était la
+plus récente à avoir eu lieu. Le terrain a demandé d'être choisi plutôt que trouvé : archiver
+n'importe quelle activité ne déplace rien à l'écran, la fraîcheur d'un produit étant le maximum sur
+ses accompagnements vivants. C'est « Audit UX » (octobre 2026) sur « Autonomie des opérations
+courantes » qui la portait pour « Espace client web » ; l'archiver a fait passer la ligne du produit
+de « Dernière activité : octobre 2026 » à « août 2026 », `last_activity_at` du projet suivant de
+2026-10-31 à 2026-08-31 — et **aucune ligne du ticket n'écrit ce champ.** C'est le `batch` d'`archive`
+dans `lib/db/scoped.ts`, vérifié et non réécrit.
+
+**T4bis.4 — la mise en défaut a porté sur ce qui est testable, et la dette de T4bis.3 tient toujours.**
+Neutraliser `isNull(activities.archivedAt)` dans le `leftJoin` de `listProjectResources` fait tomber
+**exactement un test** — le test inversé —, et rien d'autre : ni l'ordre, ni les deux liaisons
+forgées, ni l'étanchéité. Le test frère, lui, ne tombe pas, et c'est voulu : il constate que la
+ressource **reste** dans la lecture, propriété vraie des deux côtés du filtre, qui prouve que celui-ci
+vit dans le `on` de la jointure et non dans le `where`. `archiveActivity` et sa garde du résultat
+vivant, elles, ne sont couvertes par aucun test — `vitest` couvre `lib/`, jamais `app/`. La dette
+relevée par T4bis.3 est donc inchangée, et le ticket ne prétend pas l'avoir réduite.

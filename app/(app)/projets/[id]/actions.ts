@@ -30,19 +30,26 @@
  * reste.
  *
  * **Un accompagnement archivé est en lecture seule, strictement** (T4bis.3,
- * arbitrage (a) de `tickets-C4bis.md`). Deux portes couvrent les cinq écritures
+ * arbitrage (a) de `tickets-C4bis.md`). Deux portes couvrent les six écritures
  * de ce fichier : `openProject` pour la création et la correction d'activité, la
- * ressource et le résultat ; `openActivity` pour la transition et l'annulation.
- * Toutes deux exigent désormais un projet non archivé, et **c'est le seul
- * endroit où la règle s'écrit** — une règle posée à cinq exemplaires diverge un
- * jour, et ces deux fonctions existent précisément pour qu'elle n'ait qu'une
- * adresse. Les trois panneaux disparaissent aussi du rendu, et les gestes de
- * roadmap avec eux ; ce n'est pas ce rendu qui protège.
+ * ressource et le résultat ; `openActivity` pour la transition, l'annulation et
+ * **l'archivage d'une activité** (T4bis.4). Toutes deux exigent un projet non
+ * archivé, et **c'est le seul endroit où la règle s'écrit** — une règle posée à
+ * six exemplaires diverge un jour, et ces deux fonctions existent précisément
+ * pour qu'elle n'ait qu'une adresse. Les trois panneaux disparaissent aussi du
+ * rendu, et les gestes de roadmap avec eux ; ce n'est pas ce rendu qui protège.
+ *
+ * **Cinq écritures ajoutent ou corrigent ; la sixième retire** (T4bis.4).
+ * `archiveActivity` est le seul geste de ce fichier qui sorte une ligne du
+ * récit, et le seul appelant d'`archive()` ici. Il ne supprime rien (règle 4) et
+ * ne cascade sur rien (arbitrage (f)) : les ressources rattachées gardent leur
+ * `activity_id` et leur `archived_at` nul.
  *
  * **`last_activity_at` n'est pas recalculé ici.** `lib/db/scoped.ts` le fait
- * pour toute écriture d'activité, dans le même `batch` que l'insertion ou la
+ * pour toute écriture d'activité — **l'archivage compris**, dans le même `batch`
+ * que la pose d'`archived_at` —, comme il le fait pour l'insertion et la
  * modification. Le refaire ici poserait une seconde autorité sur un champ
- * dérivé.
+ * dérivé, ce que `docs/04` §6 interdit.
  *
  * Aucune écriture directe : tout passe par `session.db`, déjà scopé sur le
  * domaine courant et sur la personne courante — `domain_id` et `created_by`
@@ -490,19 +497,26 @@ export async function updateActivity(
 
 /**
  * L'activité et son projet, retrouvés à partir de l'activité **reçue** — ces
- * deux gestes n'ont pas de `projectId` lié, contrairement à `createActivity`
+ * trois gestes n'ont pas de `projectId` lié, contrairement à `createActivity`
  * et `updateActivity`. `writeProject` se vérifie sur le projet ainsi trouvé,
- * jamais sur un identifiant qu'on nous soumettrait à côté.
+ * jamais sur un identifiant qu'on nous soumettrait à côté. **C'est aussi ce qui
+ * refuse l'activité d'un autre accompagnement sans qu'un contrôle s'ajoute** :
+ * le droit est interrogé sur le projet de l'activité reçue, si bien qu'une
+ * activité d'ailleurs se juge sur le projet d'ailleurs, où l'on n'écrit pas.
  *
- * Un refus ici est **muet** : ni redirection, ni message. Ces deux actions ne
+ * Un refus ici est **muet** : ni redirection, ni message. Ces trois actions ne
  * s'atteignent en usage normal que par un bouton que l'écran n'affiche que
  * lorsque le geste est légal — le contrôle protège la requête forgée, pas un
  * parcours que l'interface est censée emprunter.
  *
- * **Seconde adresse de la lecture seule** (T4bis.3) : un projet archivé ferme
- * la transition et l'annulation comme il ferme le formulaire complet. Le refus
- * y est muet, comme les deux autres refus de cette porte — la roadmap d'un
- * accompagnement archivé n'affiche plus aucun de ces deux gestes.
+ * **Seconde adresse de la lecture seule** (T4bis.3) : un projet archivé ferme la
+ * transition, l'annulation et l'archivage d'une activité comme il ferme le
+ * formulaire complet. Le refus y est muet, comme les autres refus de cette porte
+ * — la roadmap d'un accompagnement archivé n'affiche plus aucun de ces gestes.
+ *
+ * **Une activité déjà archivée est refusée d'entrée**, et T4bis.4 s'en repose :
+ * l'archivage n'a donc aucun contrôle d'idempotence à écrire, et `archive()`
+ * ne toucherait de toute façon rien (son filtre porte `is null`).
  */
 async function openActivity(
   session: Session,
@@ -587,6 +601,63 @@ export async function cancelActivity(
     state: "cancelled",
     cancellationReason: reason,
   });
+
+  refresh(activity.projectId, project.productId);
+}
+
+/* ==========================================================================
+   Archiver une saisie — T4bis.4
+
+   **Deux gestes, deux sens, et ils ne se remplacent pas.** L'annulation de
+   T3.5 dit « cette activité ne se fera pas » et la garde au récit, dans le
+   cinquième groupe de la roadmap ; l'archivage dit « elle n'aurait pas dû être
+   saisie » et l'en sort. `docs/03` §4 ne connaît que le premier — une activité
+   saisie par erreur n'avait, jusqu'ici, aucun chemin.
+
+   Le droit est `writeProject` (D9), comme la saisie : ce qu'on a le droit
+   d'écrire, on a le droit de le retirer. Ni confirmation (arbitrage (c)) ni
+   motif — l'annulation en demande un parce qu'elle raconte quelque chose, une
+   saisie erronée n'a rien à dire.
+   ========================================================================== */
+
+/**
+ * Archiver une activité saisie par erreur : elle quitte la roadmap, rien n'est
+ * supprimé (règle 4).
+ *
+ * **Aucun rétablissement** — arbitrage (b) : une activité se **ressaisit** en
+ * moins d'une minute plutôt qu'elle ne se rétablit, et lui inventer un écran des
+ * éléments archivés serait un septième écran pour un geste rare.
+ *
+ * **Un résultat vivant s'oppose au rangement.** Il resterait accroché à une
+ * activité sortie du récit — et `results_activity_unique` portant sur
+ * `activity_id` seul, sans regarder `archived_at`, il continuerait d'y bloquer
+ * toute ressaisie. Le résultat se retire d'abord (T4bis.5 et T4bis.6 le
+ * livrent) ; d'ici là, l'entrée de roadmap n'offre pas le geste, la même donnée
+ * décidant du lien et de l'action. `count` écarte les archivés d'elle-même :
+ * c'est bien un résultat **vivant** qui refuse, pas un déjà rangé.
+ *
+ * **Le refus est muet**, comme `transitionActivity` et `cancelActivity` : ce
+ * geste n'a aucune saisie à rendre, et rien ne justifie de lui inventer un
+ * message que l'écran n'atteint jamais en usage normal.
+ *
+ * **`last_activity_at` n'est pas recalculé ici** : `archive()` le fait dans le
+ * même `batch` que la pose d'`archived_at`, une activité archivée sortant du
+ * calcul. `refresh` revalide donc les quatre écrans, dont la liste des produits
+ * et la page du produit, toutes deux porteuses de cette fraîcheur.
+ */
+export async function archiveActivity(activityId: string): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openActivity(session, activityId);
+  if (!gate) return;
+  const { activity, project } = gate;
+
+  const attached = await session.db.count(results, {
+    where: eq(results.activityId, activityId),
+  });
+  if (attached > 0) return;
+
+  await session.db.archive(activities, activityId);
 
   refresh(activity.projectId, project.productId);
 }

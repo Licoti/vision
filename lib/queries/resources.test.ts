@@ -253,13 +253,30 @@ describe("listProjectResources — les champs", () => {
     expect(grille?.activityLabel).toBeNull();
   });
 
-  test("le libellé d'une activité archivée s'affiche quand même", async () => {
-    // On décrit, on ne propose pas — la règle que `listProjectRoadmap`
-    // applique déjà au libellé d'un type d'activité archivé.
+  test("le libellé d'une activité archivée ne s'affiche plus", async () => {
+    /* L'inverse de ce que T4.1 tenait pour juste, et le renversement est daté :
+       tant que rien n'archivait une activité, « on décrit, on ne propose pas »
+       suffisait. T4bis.4 rend le geste atteignable, et la ressource citerait
+       alors le libellé d'une activité que la roadmap ne montre plus. */
     const rows = await listProjectResources(a.scope, a.fullId);
     const notes = rows.find((row) => row.title === a.onArchivedActivityTitle);
 
-    expect(notes?.activityLabel).toBe("Atelier de cadrage a");
+    expect(notes?.activityLabel).toBeNull();
+  });
+
+  test("la ressource d'une activité archivée reste dans la lecture", async () => {
+    /* Le filtre vit dans le `on` de la jointure, pas dans le `where` : c'est ce
+       qui distingue « la ressource perd son libellé » de « la ressource
+       disparaît ». Le test précédent seul ne le prouverait pas — un `undefined`
+       y passerait la comparaison à `null` sans qu'on le voie. */
+    const rows = await listProjectResources(a.scope, a.fullId);
+    const notes = rows.find((row) => row.title === a.onArchivedActivityTitle);
+
+    expect(notes).toBeDefined();
+    expect(notes).toMatchObject({
+      title: a.onArchivedActivityTitle,
+      resourceType: "powerpoint",
+    });
   });
 });
 

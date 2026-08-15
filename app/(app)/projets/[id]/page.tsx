@@ -66,6 +66,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import {
+  archiveActivity,
   cancelActivity,
   createActivity,
   createResource,
@@ -176,10 +177,11 @@ export default async function ProjectPage({
 
      **La lecture seule d'un accompagnement archivé tient à ce `&&`** (T4bis.3,
      arbitrage (a)) : un seul point de bascule fait tomber ensemble les trois
-     panneaux, les cinq gestes de roadmap et l'ajout de ressource — tous déjà
-     gouvernés par un `| null` que cette page fournit, si bien qu'aucun composant
-     n'a eu à changer. Le rendu n'est pas le verrou pour autant : les deux portes
-     de `./actions` refusent le projet archivé reçu. */
+     panneaux, les six gestes de roadmap et l'ajout de ressource — tous déjà
+     gouvernés par un `| null` que cette page fournit. **T4bis.4 en a ajouté un
+     sixième sans qu'une condition s'ajoute ici** : c'est exactement la propriété
+     que ce `&&` cherchait. Le rendu n'est pas le verrou pour autant : les deux
+     portes de `./actions` refusent le projet archivé reçu. */
   const canWrite = session.can.writeProject(project.id) && !archived;
   const { activite, ressource, resultat, archiver } = await searchParams;
 
@@ -625,6 +627,7 @@ export default async function ProjectPage({
             }
             transitionActivity={canWrite ? transitionActivity : null}
             cancelActivity={canWrite ? cancelActivity : null}
+            archiveActivity={canWrite ? archiveActivity : null}
           />
 
           {/* Les blocs de référence, « Ressources » en tête (docs/06 §5). */}

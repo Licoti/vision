@@ -59,11 +59,18 @@ export type ProjectResource = {
  * on la retrouve en tête. `id` départage : un ordre qui varierait d'un
  * affichage à l'autre serait un défaut.
  *
- * **L'activité jointe n'est pas filtrée sur son archivage**, contrairement à ce
- * que fait `listProjectRoadmap` pour ses propres entrées : on décrit, on ne
- * propose pas — la règle qui fait déjà afficher le libellé d'un type archivé.
- * Le libellé est du texte, il ne mène nulle part, et l'effacer rendrait la
- * ressource moins lisible qu'elle ne l'est en base.
+ * **L'activité jointe est filtrée sur son archivage** (T4bis.4), et le
+ * raisonnement inverse de T4.1 est retranché plutôt qu'amendé. Il tenait tant
+ * que **rien n'archivait une activité** : « on décrit, on ne propose pas », la
+ * règle qui fait afficher le libellé d'un type archivé. Le geste de T4bis.4
+ * rend ce cas atteignable, et le change de nature — une ressource citerait le
+ * libellé d'une activité que la roadmap ne montre plus, donc un rattachement
+ * que l'écran ne sait plus expliquer. Un type archivé, lui, reste le type de
+ * l'activité : ce sont deux situations différentes, pas une règle qui plie.
+ *
+ * **La ressource, elle, reste** : le filtre vit dans le `on` de la jointure, pas
+ * dans le `where`. Le `leftJoin` rend alors `activityLabel` à `null`, la forme
+ * qu'a déjà une ressource sans rattachement — l'écran n'a pas eu à changer.
  *
  * Les ressources archivées sont écartées, comme partout ailleurs. Un projet
  * sans ressource rend un tableau vide : l'état vide appartient à l'écran.
@@ -83,10 +90,18 @@ export function listProjectResources(
       })
       .from(resources)
       /* `activity_id` est nullable — d'où les deux `leftJoin` : une ressource
-         sans rattachement doit sortir de la lecture, pas en disparaître. */
+         sans rattachement doit sortir de la lecture, pas en disparaître. Une
+         activité **archivée** coupe la jointure de la même façon (T4bis.4) : la
+         ressource sort, son libellé non. Le second `leftJoin` n'a pas de filtre
+         d'archivage à porter — un type archivé reste le type de l'activité, et
+         la jointure coupée l'emporte de toute façon avec elle. */
       .leftJoin(
         activities,
-        and(eq(activities.id, resources.activityId), filter(activities)),
+        and(
+          eq(activities.id, resources.activityId),
+          filter(activities),
+          isNull(activities.archivedAt),
+        ),
       )
       .leftJoin(
         activityTypes,

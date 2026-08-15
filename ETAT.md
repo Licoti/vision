@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 15/08/2026 — T4bis.3 livré, quatre disciplines jouées.
-**Chantier en cours :** C4bis — archivage et correction, six tickets, trois livrés
-**Ticket suivant :** T4bis.4 — archiver une activité saisie par erreur
+**Dernière mise à jour :** 15/08/2026 — T4bis.4 livré, quatre disciplines jouées.
+**Chantier en cours :** C4bis — archivage et correction, six tickets, quatre livrés
+**Ticket suivant :** T4bis.5 — corriger et retirer une ressource
 
 ---
 
@@ -16,7 +16,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C2 — Produits et projets | T2.1 → T2.6 | **terminé** |
 | C3 — Activités et roadmap | T3.1 → T3.6 | **terminé** |
 | C4 — Ressources et résultats | T4.1 → T4.4 | **terminé** |
-| C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **en cours**, T4bis.1 à T4bis.3 livrés |
+| C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **en cours**, T4bis.1 à T4bis.4 livrés |
 | C5 — Indicateurs et temps long | à découper | à faire |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
@@ -61,6 +61,13 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   archivé reçu ; aucun garde-fou au rétablissement sous un produit archivé ; le trou `createProject`
   reste ouvert. Les quatre disciplines jouées, dont sept charges repostées refusées puis, les mêmes
   non retouchées, acceptées après rétablissement.
+- **T4bis.4 — 15/08/2026 — archiver une activité saisie par erreur.** Aucun écart de périmètre, cinq
+  fichiers pour cinq annoncés. Trois arbitrages tranchés avant écriture : le geste **disparaît** de
+  l'entrée qui porte un résultat et l'action refuse en silence ; il traverse les **cinq** groupes,
+  « Annulé » compris ; il se lit « Archiver la saisie », pour ne pas se confondre avec « Annuler ».
+  `openActivity` a porté les quatre contrôles sans être modifiée. Les quatre disciplines jouées, dont
+  la fraîcheur du produit lue changer dans `/produits` — octobre puis août 2026 — et quatre refus
+  éprouvés séparément.
 
 ---
 
@@ -95,17 +102,18 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
 
 ### b. Assignés à un ticket
 
-- **C4bis est découpé, et ses trois premiers tickets sont livrés.** Les six manques — archivage du
+- **C4bis est découpé, et ses quatre premiers tickets sont livrés.** Les six manques — archivage du
   produit, du projet, de l'activité, correction de la ressource et du résultat, lecture seule d'un
   projet archivé, valeur archivée dans un formulaire — sont distribués en six tickets, avec les six
   arbitrages rendus avant écriture (lecture seule stricte, rétablissement limité au produit et au
   projet, confirmation pour ces deux-là seulement, vocabulaire « Archiver / Rétablir », refus
   d'archiver un produit portant un accompagnement vivant, aucune cascade). **T4bis.1 a refermé le
   manque (6)**, **T4bis.2 le manque (1)** — premier appelant d'`archive()`, unique auteur de
-  `restore()` —, et **T4bis.3 les manques (2) et (5)**, la lecture seule tenant en deux lignes,
-  `openProject` et `openActivity` étant les deux seules portes des cinq écritures de la page projet.
-  `components/ui/confirm-panel.tsx` a servi deux fois sans être modifié.
-  → **`tickets-C4bis.md`, reprendre à T4bis.4.**
+  `restore()` —, **T4bis.3 les manques (2) et (5)**, la lecture seule tenant en deux lignes, et
+  **T4bis.4 le manque (3)**, `openActivity` devenant la porte de trois gestes sans changer d'une
+  ligne. `components/ui/confirm-panel.tsx` a servi deux fois sans être modifié. Reste le manque (4),
+  scindé en deux tickets — la ressource, puis le résultat et sa migration.
+  → **`tickets-C4bis.md`, reprendre à T4bis.5.**
 - **`createProject` accepte encore un produit archivé.** Le formulaire ne le propose plus et la page
   produit n'y mène plus, mais l'action ne relit pas l'`archived_at` du produit **reçu** : une
   soumission forgée rattacherait un accompagnement neuf à un produit rangé, invisible partout. Relevé

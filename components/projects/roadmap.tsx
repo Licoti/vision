@@ -79,6 +79,12 @@ type TransitionAction =
   ((activityId: string, target: "in_progress" | "done") => Promise<void>) | null;
 type CancelAction = ((activityId: string, formData: FormData) => Promise<void>) | null;
 
+/**
+ * L'archivage d'une saisie erronée (T4bis.4), gaté à `null` comme les deux
+ * précédentes. Un seul argument : ce geste n'a ni cible d'état ni motif.
+ */
+type ArchiveAction = ((activityId: string) => Promise<void>) | null;
+
 export function Roadmap({
   groups,
   addHref,
@@ -86,6 +92,7 @@ export function Roadmap({
   resultHref,
   transitionActivity,
   cancelActivity,
+  archiveActivity,
 }: {
   groups: RoadmapGroup[];
   /** L'ouverture du panneau de saisie, ou `null` pour qui ne peut pas écrire. */
@@ -110,6 +117,13 @@ export function Roadmap({
   transitionActivity: TransitionAction;
   /** Annuler, motif à l'appui (T3.5). Même règle. */
   cancelActivity: CancelAction;
+  /**
+   * Archiver une saisie erronée (T4bis.4). Même règle de droit que les deux
+   * précédentes ; la **cinquième** condition — aucun résultat vivant sur
+   * l'entrée — se lit dans la donnée, et l'entrée la tient elle-même, comme
+   * elle tient déjà celles de `resultHref`.
+   */
+  archiveActivity: ArchiveAction;
 }) {
   return (
     <section className="flex flex-col gap-4">
@@ -138,6 +152,7 @@ export function Roadmap({
               resultHref={resultHref}
               transitionActivity={transitionActivity}
               cancelActivity={cancelActivity}
+              archiveActivity={archiveActivity}
             />
           ))}
         </div>
@@ -202,6 +217,12 @@ function AddActivity({
  * toujours ouverts, dans un simple `<div>`. « Modifier » n'est pas transmis à
  * ce groupe : aucun retour en arrière depuis annulée (interdit de T3.5), donc
  * aucun lien qui y mènerait.
+ *
+ * **L'archivage, lui, traverse les cinq groupes** (T4bis.4, arbitrage du
+ * 15/08/2026) : il n'est pas une transition d'état — il ne fait pas sortir de
+ * `cancelled`, il sort du récit. L'interdit de T3.5 porte sur le retour en
+ * arrière, pas sur le rangement, et une activité saisie par erreur puis annulée
+ * n'aurait sinon aucun chemin.
  */
 function RoadmapSection({
   group,
@@ -209,12 +230,14 @@ function RoadmapSection({
   resultHref,
   transitionActivity,
   cancelActivity,
+  archiveActivity,
 }: {
   group: RoadmapGroup;
   editHref: ((activityId: string) => string) | null;
   resultHref: ((activityId: string) => string) | null;
   transitionActivity: TransitionAction;
   cancelActivity: CancelAction;
+  archiveActivity: ArchiveAction;
 }) {
   const tone = GROUP_TONE[group.key];
   const cancelled = group.key === "cancelled";
@@ -256,6 +279,7 @@ function RoadmapSection({
           groupKey={group.key}
           transitionActivity={transitionActivity}
           cancelActivity={cancelActivity}
+          archiveActivity={archiveActivity}
           {...(editHref && !cancelled ? { editHref: editHref(activity.id) } : {})}
           {...(resultHref &&
           group.key === "done" &&
@@ -380,6 +404,19 @@ const ACTION_LINK = "text-xs font-semibold text-content-primary-dark underline";
  * est `required`, ce qui suffit à empêcher une soumission vide sans aller-retour
  * serveur. Une activité `cancelled` n'offre plus aucun de ces gestes — le
  * schéma d'états ne lui en laisse aucun — et affiche son motif à leur place.
+ *
+ * **« Archiver la saisie » (T4bis.4) est le seul geste qui retire.** Son
+ * libellé ne se réduit pas à « Archiver » : empilé sous « Annuler » dans la
+ * même colonne, le verbe seul se confondrait avec lui, et la fiche demande que
+ * l'écran distingue les deux gestes **par ses libellés**. C'est la saisie qu'on
+ * retire, pas l'activité qu'on annule.
+ *
+ * **Il disparaît de lui-même quand un résultat est posé** : le résultat se
+ * retire d'abord (T4bis.6), sans quoi il resterait accroché à une activité
+ * sortie du récit. La même donnée décide du geste et de l'action, comme elle le
+ * fait déjà pour « Saisir un résultat » — l'un ne peut pas survivre à l'autre.
+ * Ce n'est pas ce rendu qui protège : `archiveActivity` refuse l'activité reçue
+ * qui porte un résultat.
  */
 function RoadmapEntry({
   activity,
@@ -389,6 +426,7 @@ function RoadmapEntry({
   resultHref,
   transitionActivity,
   cancelActivity,
+  archiveActivity,
 }: {
   activity: RoadmapActivity;
   edge: string;
@@ -397,6 +435,7 @@ function RoadmapEntry({
   resultHref?: string;
   transitionActivity: TransitionAction;
   cancelActivity: CancelAction;
+  archiveActivity: ArchiveAction;
 }) {
   const period = formatActivityPeriod(
     activity.periodStart,
@@ -502,6 +541,24 @@ function RoadmapEntry({
           <form action={transitionActivity.bind(null, activity.id, "done")}>
             <button type="submit" className={ACTION_LINK}>
               Marquer terminée
+            </button>
+          </form>
+        ) : null}
+        {/* Le geste de T4bis.4, après ce qui fait avancer et avant ce qui
+            annule : l'ordre de la colonne va du plus courant au plus rare.
+            Un formulaire nu, sans confirmation ni motif (arbitrage (c)) — et
+            `ACTION_LINK` repris tel quel, donc aucun couple de couleurs neuf
+            par la position. Le nom accessible porte l'activité, comme celui de
+            « Modifier » : « Archiver la saisie » répété quinze fois dans une
+            liste de gestes ne dit pas laquelle. */}
+        {archiveActivity && activity.result === null ? (
+          <form action={archiveActivity.bind(null, activity.id)}>
+            <button
+              type="submit"
+              aria-label={`Archiver l'activité ${activity.typeLabel} — ${period}`}
+              className={ACTION_LINK}
+            >
+              Archiver la saisie
             </button>
           </form>
         ) : null}
