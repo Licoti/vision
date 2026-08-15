@@ -77,6 +77,32 @@ export const EMPTY_RESOURCE_VALUES: ResourceFormValues = {
   activityId: "",
 };
 
+/**
+ * La ligne déjà enregistrée, ramenée aux quatre chaînes du formulaire — le
+ * pré-remplissage du panneau en correction (T4bis.5).
+ *
+ * Jumeau de `toActivityFormValues` (`lib/forms/activity.ts`, T3.4), et pour la
+ * même raison : le panneau reçoit des **valeurs de formulaire**, jamais une
+ * ligne de base. C'est ce qui laisse un refus les remplacer sans que rien ne
+ * change de forme entre les deux chemins.
+ *
+ * `activityId` nul devient `""` : le rattachement est facultatif (`docs/02` §5),
+ * et c'est la valeur de l'option « Aucune » du `select`.
+ */
+export function toResourceFormValues(row: {
+  title: string;
+  url: string;
+  resourceType: ResourceTypeValue;
+  activityId: string | null;
+}): ResourceFormValues {
+  return {
+    title: row.title,
+    url: row.url,
+    resourceType: row.resourceType,
+    activityId: row.activityId ?? "",
+  };
+}
+
 /** Le champ, lu et rogné. Absent ou d'un type inattendu, il vaut « vide ». */
 function field(formData: FormData, name: string): string {
   const value = formData.get(name);

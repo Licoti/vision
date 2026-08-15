@@ -2334,3 +2334,69 @@ ressource **reste** dans la lecture, propriété vraie des deux côtés du filtr
 vit dans le `on` de la jointure et non dans le `where`. `archiveActivity` et sa garde du résultat
 vivant, elles, ne sont couvertes par aucun test — `vitest` couvre `lib/`, jamais `app/`. La dette
 relevée par T4bis.3 est donc inchangée, et le ticket ne prétend pas l'avoir réduite.
+
+**T4bis.5 — l'écran garde ses deux verbes, la fiche garde sa prose.** La fiche dit « corriger » et
+« retirer » ; l'écran dit déjà « Modifier » (le lien de correction d'une activité, `roadmap.tsx`) et
+« Archiver » (l'arbitrage (d) du chantier, tenu par T4bis.2, .3 et .4). Arbitrage tranché avant
+écriture : **aucun verbe neuf n'entre à l'écran.** Retenir « Corriger / Retirer » aurait fait quatre
+verbes pour deux gestes, sur des objets voisins d'une même page. Le « à côté de "Corriger" » de la
+fiche de T4bis.4 désignait déjà un lien libellé « Modifier » : c'est le même écart entre la prose
+d'une fiche et le mot de l'interface, et il se tranche du même côté. Titre du panneau en correction :
+« Modifier la ressource », bouton « Enregistrer les modifications ».
+
+**T4bis.5 — l'exception nominative devait couvrir l'activité annulée, que la fiche ne nommait pas.**
+La fiche demande que « le rattachement à une activité **archivée depuis** reste sélectionné sans être
+proposé ». Or les options du panneau se dérivent de la roadmap **moins le groupe « Annulé »** : une
+ressource rattachée à une activité annulée est exactement dans le même cas, et il est atteignable
+aujourd'hui — le `select` retomberait sur « Aucune » et la première re-soumission détacherait la
+ressource **en silence**, le défaut même que T4bis.1 a refermé. Arbitrage tranché avant écriture :
+**une règle, un chemin de code**, `findResourceActivity` ne filtrant ni sur `archived_at` ni sur
+`state`, et `checkResourceActivity` acceptant l'activité archivée **si et seulement si** c'est celle
+que la ressource porte déjà (quatrième paramètre `keptActivityId`, `null` par défaut, `createResource`
+inchangé). Vérifié en base et non à l'écran, car l'écran ne peut pas en témoigner depuis T4bis.4 : le
+bloc n'affiche plus le libellé d'une activité archivée. Ouvrir la correction, ne rien changer,
+enregistrer — `activity_id` identique avant et après, pour l'archivée comme pour l'annulée. Et le
+panneau de **création** ne propose ni l'une ni l'autre : une option ajoutée, jamais deux.
+
+**T4bis.5 — le test « autre domaine » ne prouvait pas ce qu'il semblait prouver.** La mise en défaut
+de `filter(activities)` dans `findResourceActivity` n'a fait tomber **aucun** test. Le test qui
+interroge une activité d'un autre domaine était en réalité porté par `filter(activityTypes)` : les
+deux filtres se rattrapent l'un l'autre — la propriété relevée de T2.2 à T3.1 — et un test qui passe
+par les deux ne pince ni l'un ni l'autre. Un test isolant a donc été **ajouté avant de croire la
+discipline** : il forge par `db.insert` direct une activité du domaine A dont le type appartient au
+domaine B, situation qu'aucune écriture de l'application ne produit, et que seul `filter(activities)`
+peut refuser. La sabotage refait tombe alors exactement sur ce test. **À retenir : « le test tombe »
+ne se vérifie qu'en retirant la règle une par une ; un test vert au retrait d'une règle est un test
+qui ne la couvre pas, même s'il porte son nom.**
+
+**T4bis.5 — un `<form>` ne tient pas dans un `<p>`, et le rendu servi s'en charge tout seul.** La
+rangée de gestes de chaque entrée du bloc a d'abord été écrite dans un `<p>`, par symétrie avec la
+ligne « Type · Activité » juste au-dessus. Un `<form>` est du contenu de flux : le navigateur ferme le
+paragraphe avant lui et rouvre après, si bien que l'arbre rendu ne correspond plus au balisage servi —
+et l'hydratation de React tombe dessus. Corrigé en `<div>`, avec la raison écrite sur place pour que
+la symétrie ne soit pas rétablie par mégarde. **Le balisage servi et l'arbre du navigateur sont deux
+choses ; seul le second décide.**
+
+**T4bis.5 — `ACTION_LINK` est redit dans `resources.tsx`, dette assumée et bornée.** La constante
+(`text-xs font-semibold text-content-primary-dark underline`) vit dans `roadmap.tsx` depuis T3.5, qui
+ne l'exporte pas et n'est pas au périmètre du ticket (règle 3). Elle est donc recopiée, commentée
+comme redite. Le couple `content-primary-dark` sur `surface-neutral-pale` est déjà celui de « Relier
+une ressource » dans ce même bloc — **aucun couple neuf par la position** — et il a tout de même été
+mesuré : **15,72:1**, AA et AAA atteints. Le jour où un troisième bloc porte la même rangée, la
+constante mérite `components/ui/`.
+
+**T4bis.5 — la variable `resources` de la page a dû céder son nom à la table.** `page.tsx` déstructure
+la liste sous le nom `resources` depuis T4.1 ; le pré-remplissage du panneau demande d'importer la
+**table** `resources` du schéma pour le `find`. La liste est renommée `projectResources`, la table
+garde son nom — c'est elle qui vient du schéma, et un alias d'import aurait déplacé la surprise
+ailleurs.
+
+**T4bis.5 — la base de développement a été remise en état, et le serveur écoutait ailleurs.** Les
+vérifications ont demandé deux ressources factices — l'une sur une activité archivée, l'autre sur une
+annulée —, un projet archivé puis rétabli, et une ressource d'un **autre** accompagnement corrigée par
+une charge dont les deux arguments liés étaient réécrits (écriture légitime : la responsable de domaine
+a bien ce droit sur cette ligne). Toutes les lignes touchées ont été remises dans leur état de départ,
+`archived_at` compris ; la dérive inventoriée dans `ETAT.md` augmente de deux ressources factices sur
+« Test projet ». Le serveur de développement, lui, tournait déjà sur le port **3000** pour ce dépôt :
+`next dev` refuse d'en lancer un second et le signale. Les relevés de T4bis.5 sont donc pris sur 3000,
+là où ceux de la session précédente citaient 3001.

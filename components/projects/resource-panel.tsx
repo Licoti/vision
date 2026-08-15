@@ -30,9 +30,12 @@
  * l'adresse tapée — ni pour la vérifier, ni pour en deviner le titre ou le type
  * (D21).
  *
- * **Aucune correction ici** : C4 n'écrit que la création (arbitrage (a) de
- * `tickets-C4.md`). Ce panneau n'a donc qu'un point d'entrée, là où celui de
- * l'activité en porte deux.
+ * **Deux points d'entrée depuis T4bis.5**, comme celui de l'activité depuis
+ * T3.4 : `?ressource=nouvelle` relie, `?ressource=<identifiant>` corrige. Un
+ * seul formulaire pour les deux gestes — mêmes champs, mêmes règles, mêmes
+ * refus. Ce qui change tient en trois propriétés — le titre, le libellé du
+ * bouton, les valeurs initiales — et le panneau ne sait pas lequel des deux
+ * gestes il sert : c'est l'action liée qui le décide, côté serveur.
  */
 
 import Link from "next/link";
@@ -44,6 +47,7 @@ import {
   EMPTY_RESOURCE_VALUES,
   RESOURCE_TYPE_VALUES,
   type ResourceFormState,
+  type ResourceFormValues,
 } from "@/lib/forms/resource";
 
 /**
@@ -75,6 +79,9 @@ export function ResourcePanel({
   closeHref,
   action,
   activities,
+  title = "Relier une ressource",
+  submitLabel = "Relier la ressource",
+  initial = EMPTY_RESOURCE_VALUES,
 }: {
   projectName: string;
   /** La page du projet, sans son paramètre. Les trois sorties y mènent. */
@@ -92,9 +99,18 @@ export function ResourcePanel({
    * §5). Vide est un cas normal : un projet peut n'avoir aucune activité.
    */
   activities: readonly ResourceActivityOption[];
+  /** « Relier une ressource » en création, « Modifier la ressource » sinon. */
+  title?: string;
+  submitLabel?: string;
+  /**
+   * Les valeurs de la ressource corrigée (T4bis.5). C'est l'**état initial** de
+   * `useActionState` : un refus le remplace par ce qui a été tapé, si bien que
+   * les deux chemins ont rigoureusement la même forme.
+   */
+  initial?: ResourceFormValues;
 }) {
   const [state, submit, pending] = useActionState(action, {
-    values: EMPTY_RESOURCE_VALUES,
+    values: initial,
     errors: {},
   });
 
@@ -136,7 +152,7 @@ export function ResourcePanel({
               id={titleId}
               className="text-md font-semibold text-content-neutral-darkest"
             >
-              Relier une ressource
+              {title}
             </h2>
             {/* Le nom du projet : le panneau ne quitte pas son contexte, il le
                 rappelle. */}
@@ -303,7 +319,7 @@ export function ResourcePanel({
               disabled={pending}
               className="rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale disabled:opacity-60"
             >
-              {pending ? "Enregistrement…" : "Relier la ressource"}
+              {pending ? "Enregistrement…" : submitLabel}
             </button>
             <Link
               href={closeHref}

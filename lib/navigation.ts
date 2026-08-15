@@ -54,13 +54,15 @@ export const ACTIVITY_PANEL_NEW = "nouvelle";
  * et aucune préséance n'est inventée entre deux gestes de même rang. T4.4
  * reprendra la règle telle quelle avec `resultat`.
  *
- * Une **seule** valeur d'ouverture, là où `activite` en porte deux : C4 n'écrit
- * aucune correction de ressource (arbitrage (a) de `tickets-C4.md`), donc aucun
- * identifiant ne se glisse ici. Toute autre valeur n'ouvre rien.
+ * **Deux valeurs d'ouverture depuis T4bis.5**, comme `activite` en porte deux
+ * depuis T3.4 : `nouvelle` relie, l'identifiant d'une **ressource** corrige. C4
+ * n'écrivait aucune correction (arbitrage (a) de `tickets-C4.md`), qui renvoyait
+ * explicitement à C4bis ; la forme, elle, n'a pas eu à changer d'un caractère —
+ * un UUID ne peut pas valoir `nouvelle`, et toute autre valeur n'ouvre rien.
  */
 export const RESOURCE_PANEL_PARAM = "ressource";
 
-/** La seule valeur qui ouvre le panneau de ressource. */
+/** La valeur d'ouverture en création. Toute autre valeur est un identifiant. */
 export const RESOURCE_PANEL_NEW = "nouvelle";
 
 /**
@@ -170,6 +172,15 @@ export const ROUTES = {
    */
   projectResourceNew: (id: string) =>
     `/projets/${id}?${RESOURCE_PANEL_PARAM}=${RESOURCE_PANEL_NEW}`,
+  /**
+   * Le même panneau, sur une ressource existante (T4bis.5) : un seul
+   * formulaire, deux points d'entrée — la forme de `projectActivityEdit`
+   * jusqu'au nom de la clé. La fermeture reste `project(id)` : corriger une
+   * ressource ne fait pas davantage quitter la page du projet que d'en relier
+   * une.
+   */
+  projectResourceEdit: (id: string, resourceId: string) =>
+    `/projets/${id}?${RESOURCE_PANEL_PARAM}=${resourceId}`,
   /**
    * La page du projet, panneau de résultat ouvert sur une activité donnée
    * (T4.4). Le geste part de l'entrée de roadmap de l'activité terminée qui a

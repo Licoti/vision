@@ -122,3 +122,86 @@ export function listProjectResources(
     return rows;
   });
 }
+
+/* ==========================================================================
+   L'exception nominative du panneau — T4bis.5
+   ========================================================================== */
+
+/**
+ * L'activité qu'une ressource porte déjà, de quoi la nommer dans le `select`.
+ *
+ * Le format est **brut** : `formatActivityPeriod` vit dans `lib/format` et la
+ * page compose le libellé, comme elle le fait déjà pour les options tirées de la
+ * roadmap. Une lecture ne met pas en forme.
+ */
+export type KeptResourceActivity = {
+  id: string;
+  /** Le libellé du type — « Test utilisateur ». */
+  typeLabel: string;
+  /** Colonnes `date` : chaînes `YYYY-MM-DD`, formatées par `lib/format`. */
+  periodStart: string | null;
+  periodEnd: string | null;
+  isUnscheduled: boolean;
+};
+
+/**
+ * L'activité **déjà portée** par une ressource que l'on corrige, quel que soit
+ * son état — l'exception nominative de T4bis.1, transposée au panneau de
+ * ressource.
+ *
+ * **Aucun filtre sur `archived_at` ni sur `state`, et c'est toute sa raison
+ * d'être.** Les options du panneau se dérivent de la roadmap, dont les activités
+ * archivées sont absentes et dont le groupe « Annulé » est écarté — « on décrit,
+ * on ne propose pas ». Une ressource rattachée à l'une ou à l'autre verrait donc
+ * son `select` retomber sur « Aucune », et **la première re-soumission la
+ * détacherait en silence** : exactement la perte que T4bis.1 a refermée pour les
+ * formulaires de produit et de projet. Cette lecture nomme la valeur portée, et
+ * elle seule ; elle n'ouvre la liste à personne d'autre.
+ *
+ * **`projectId` fait partie de la question, pas de l'habillage** : sans lui,
+ * l'exception nommerait l'activité d'un autre accompagnement dès qu'une
+ * soumission forgée en glisserait l'identifiant. L'appelant tient déjà le projet
+ * de la ressource — le rapprochement se fait donc ici, en SQL, plutôt qu'après
+ * coup.
+ *
+ * Rend `null` quand rien ne correspond : une activité d'un autre projet, d'un
+ * autre domaine, ou dont le type appartient à un autre domaine — le `innerJoin`
+ * filtré emportant le tout.
+ */
+export function findResourceActivity(
+  scope: ScopedDb,
+  projectId: string,
+  activityId: string,
+): Promise<KeptResourceActivity | null> {
+  return scope.joinedRead(async (database, { filter }) => {
+    const rows = await database
+      .select({
+        id: activities.id,
+        typeLabel: activityTypes.label,
+        periodStart: activities.periodStart,
+        periodEnd: activities.periodEnd,
+        isUnscheduled: activities.isUnscheduled,
+      })
+      .from(activities)
+      /* `innerJoin` et non `leftJoin` : `activity_type_id` est `not null`, et
+         une activité dont le type ne se lit pas dans ce domaine ne se nomme
+         pas — la règle de `listProjectResources`, où la jointure coupée retire
+         le libellé. Sans nom, pas d'option. */
+      .innerJoin(
+        activityTypes,
+        and(
+          eq(activityTypes.id, activities.activityTypeId),
+          filter(activityTypes),
+        ),
+      )
+      .where(
+        and(
+          filter(activities),
+          eq(activities.id, activityId),
+          eq(activities.projectId, projectId),
+        ),
+      );
+
+    return rows[0] ?? null;
+  });
+}

@@ -25,8 +25,9 @@
  * **Les panneaux sont cette page, plus un paramètre** (D30, T3.2).
  * `?activite=nouvelle` ouvre le panneau d'activité vide, `?activite=<identifiant>`
  * l'ouvre sur une activité à corriger (T3.4) — une seule clé, dont la valeur
- * porte le cas, et un seul formulaire pour les deux gestes. `?ressource=nouvelle`
- * ouvre celui de T4.2, `?resultat=<identifiant d'activité>` celui de T4.4, et
+ * porte le cas, et un seul formulaire pour les deux gestes. `?ressource=` a pris
+ * la même forme en T4bis.5 : `nouvelle` relie, `<identifiant>` corrige.
+ * `?resultat=<identifiant d'activité>` ouvre celui de T4.4, et
  * `?archiver=confirmation` le panneau de confirmation de T4bis.2, repris tel
  * quel. La page reste rendue derrière eux, et porte alors l'attribut HTML
  * `inert` — c'est l'ordre du DOM qui décide de la tabulation, et `inert` est ce
@@ -67,12 +68,14 @@ import Link from "next/link";
 
 import {
   archiveActivity,
+  archiveResource,
   cancelActivity,
   createActivity,
   createResource,
   createResult,
   transitionActivity,
   updateActivity,
+  updateResource,
 } from "./actions";
 import { archiveProject, restoreProject } from "../actions";
 import { ActivityPanel } from "@/components/projects/activity-panel";
@@ -92,8 +95,9 @@ import { Section, SectionHeader } from "@/components/ui/section";
 import { StatusDot } from "@/components/ui/status-dot";
 import { Tag } from "@/components/ui/tag";
 import { requireSession } from "@/lib/auth/provider";
-import { activities } from "@/lib/db/schema";
+import { activities, resources } from "@/lib/db/schema";
 import { toActivityFormValues } from "@/lib/forms/activity";
+import { toResourceFormValues } from "@/lib/forms/resource";
 import {
   formatActivityPeriod,
   formatMonth,
@@ -113,7 +117,10 @@ import {
   listResultToolOptions,
 } from "@/lib/queries/activities";
 import { findAccompanimentRank, findProjectDetail } from "@/lib/queries/projects";
-import { listProjectResources } from "@/lib/queries/resources";
+import {
+  findResourceActivity,
+  listProjectResources,
+} from "@/lib/queries/resources";
 import { isUuid } from "@/lib/uuid";
 
 export const metadata = {
@@ -223,14 +230,32 @@ export default async function ProjectPage({
   const activityPanelOpen =
     canWrite && (asked.activite === ACTIVITY_PANEL_NEW || activity !== null);
 
-  /* C4 n'écrit aucune correction de ressource (arbitrage (a)) : une seule
-     valeur ouvre, toute autre n'ouvre rien. Aucune lecture en base n'est
-     nécessaire pour en décider — le panneau ne pré-remplit rien. */
-  const resourcePanelOpen = canWrite && asked.ressource === RESOURCE_PANEL_NEW;
+  /* La ressource corrigée (T4bis.5), sur la forme exacte du bloc ci-dessus :
+     une seule clé, dont la **valeur** porte le cas — `nouvelle` relie, un
+     identifiant corrige, tout le reste n'ouvre rien. La ressource est
+     confrontée au projet et à l'archivage, comme l'activité l'est : le bloc
+     n'affiche aucun lien vers une ressource archivée, mais une URL se tape. */
+  const editedResource =
+    canWrite &&
+    asked.ressource &&
+    asked.ressource !== RESOURCE_PANEL_NEW &&
+    isUuid(asked.ressource)
+      ? await session.db.find(resources, asked.ressource)
+      : undefined;
+
+  const resource =
+    editedResource &&
+    editedResource.projectId === project.id &&
+    editedResource.archivedAt === null
+      ? editedResource
+      : null;
+
+  const resourcePanelOpen =
+    canWrite && (asked.ressource === RESOURCE_PANEL_NEW || resource !== null);
 
   /* Trois lectures indépendantes, un seul aller-retour : les ressources
      rejoignent le rang et la roadmap plutôt que d'attendre leur tour (T4.1). */
-  const [rank, roadmap, resources] = await Promise.all([
+  const [rank, roadmap, projectResources] = await Promise.all([
     findAccompanimentRank(session.db, project),
     listProjectRoadmap(session.db, project.id),
     listProjectResources(session.db, project.id),
@@ -344,6 +369,44 @@ export default async function ProjectPage({
         )
     : [];
 
+  /* **L'exception nominative du panneau** (T4bis.5), l'exception de T4bis.1
+     transposée ici : la valeur déjà portée par la ligne éditée reste dans la
+     liste, donc sélectionnée, et n'apparaît nulle part ailleurs — ni en
+     création, ni sur une autre ressource.
+
+     Elle couvre d'un seul chemin les deux activités que les options ci-dessus
+     n'ont pas : l'**archivée**, absente de la roadmap depuis T4bis.4, et
+     l'**annulée**, que le filtre du groupe écarte. Sans elle, le `select`
+     retomberait sur « Aucune » et la première re-soumission détacherait la
+     ressource **en silence** — une case absente ne revient pas dans le
+     `FormData`, et c'est exactement la perte que T4bis.1 a refermée ailleurs.
+
+     La lecture n'a lieu que dans ce cas : panneau ouvert, en correction, sur une
+     activité que les options ne portent pas déjà. Un panneau fermé, une création
+     ou une activité vivante n'en paient rien — la discipline de `panelOptions`,
+     posée en T3.3. L'option est ajoutée **en fin de liste** : elle est
+     sélectionnée d'office, et sa place n'a pas à déplacer les autres. */
+  const keptActivity =
+    resource?.activityId &&
+    !resourceActivities.some((option) => option.id === resource.activityId)
+      ? await findResourceActivity(
+          session.db,
+          project.id,
+          resource.activityId,
+        )
+      : null;
+
+  if (keptActivity) {
+    resourceActivities.push({
+      id: keptActivity.id,
+      label: `${keptActivity.typeLabel} · ${formatActivityPeriod(
+        keptActivity.periodStart,
+        keptActivity.periodEnd,
+        keptActivity.isUnscheduled,
+      )}`,
+    });
+  }
+
   return (
     <>
       {archivePanelOpen ? (
@@ -406,19 +469,35 @@ export default async function ProjectPage({
       ) : null}
 
       {resourcePanelOpen ? (
-        /* L'action est liée **côté serveur** au projet courant, comme celle du
-           panneau d'activité : l'identifiant sort de la saisie, et le panneau
-           ne connaît pas l'accompagnement qu'il écrit. Ce n'est pas un verrou —
-           Next sérialise les arguments liés dans un champ `$ACTION_…`,
-           réécrivable. Le verrou est dans l'action, qui interroge `writeProject`
-           sur l'identifiant reçu et rapproche l'activité reçue de ce projet ;
-           un panneau absent du rendu n'a jamais protégé le point d'entrée HTTP
-           qui l'accompagne. */
+        /* L'action est liée **côté serveur** — au projet courant en création, au
+           projet et à la ressource en correction (T4bis.5) —, comme celle du
+           panneau d'activité : les identifiants sortent de la saisie, et le
+           panneau ne connaît ni l'accompagnement ni la ressource qu'il écrit. Ce
+           n'est pas un verrou — Next sérialise les arguments liés dans un champ
+           `$ACTION_…`, réécrivable. Le verrou est dans l'action, qui interroge
+           `writeProject` sur l'identifiant reçu, rapproche la ressource reçue de
+           ce projet et l'activité reçue de ce même projet ; un panneau absent du
+           rendu n'a jamais protégé le point d'entrée HTTP qui l'accompagne. */
         <ResourcePanel
+          /* La `key` change avec ce que le panneau édite, pour la raison écrite
+             sur celle du panneau d'activité : `useActionState` ne relit son état
+             initial qu'au montage. */
+          key={resource ? resource.id : RESOURCE_PANEL_NEW}
           projectName={project.name}
           closeHref={ROUTES.project(project.id)}
-          action={createResource.bind(null, project.id)}
+          action={
+            resource
+              ? updateResource.bind(null, project.id, resource.id)
+              : createResource.bind(null, project.id)
+          }
           activities={resourceActivities}
+          {...(resource
+            ? {
+                title: "Modifier la ressource",
+                submitLabel: "Enregistrer les modifications",
+                initial: toResourceFormValues(resource),
+              }
+            : {})}
         />
       ) : null}
 
@@ -632,9 +711,24 @@ export default async function ProjectPage({
 
           {/* Les blocs de référence, « Ressources » en tête (docs/06 §5). */}
           <div className="grid gap-5 md:grid-cols-2">
+            {/* Les trois points d'entrée du bloc tombent avec le même
+                `canWrite` : le droit d'écrire dans ce projet (D9), et la
+                lecture seule d'un accompagnement archivé (T4bis.3). Aucune
+                condition ne s'ajoute ici — c'est la propriété que ce `&&`
+                cherchait. `archiveResource` est liée au projet **côté
+                serveur** ; le bloc y ajoutera la ressource au rendu. */}
             <Resources
-              resources={resources}
+              resources={projectResources}
               addHref={canWrite ? ROUTES.projectResourceNew(project.id) : null}
+              editHref={
+                canWrite
+                  ? (resourceId) =>
+                      ROUTES.projectResourceEdit(project.id, resourceId)
+                  : null
+              }
+              archiveResource={
+                canWrite ? archiveResource.bind(null, project.id) : null
+              }
             />
 
             {REFERENCE_BLOCKS.map((block) => (

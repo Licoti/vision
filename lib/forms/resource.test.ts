@@ -25,6 +25,7 @@ import {
   isResourceType,
   parseResourceForm,
   readResourceForm,
+  toResourceFormValues,
   validateResourceForm,
   type ResourceFormValues,
 } from "./resource";
@@ -278,6 +279,27 @@ describe("parseResourceForm", () => {
     expect(returned.title).toBe("Restitution des tests — vague 2");
   });
 
+  test("le tour complet d'une correction à l'identique rend la ligne de départ", () => {
+    /* **Le critère du ticket, énoncé sans base** : une ressource ouverte en
+       correction et re-soumise sans qu'on y touche doit rendre exactement ce
+       qui était enregistré — rattachement compris. C'est la perte silencieuse
+       que T4bis.1 a refermée pour les formulaires de produit et de projet, ici
+       éprouvée sur le chemin `ligne → panneau → action`. */
+    const row = {
+      title: "Rapport d'audit d'accessibilité",
+      url: "https://exemple.invalid/audit-a11y.pdf",
+      resourceType: "pdf" as const,
+      activityId: ACTIVITY,
+    };
+
+    const data = new FormData();
+    for (const [key, value] of Object.entries(toResourceFormValues(row))) {
+      data.set(key, value);
+    }
+
+    expect(parseResourceForm(data).input).toEqual(row);
+  });
+
   test("`input` non nul si et seulement si `errors` est vide", () => {
     const cases = [
       formOf(),
@@ -292,5 +314,40 @@ describe("parseResourceForm", () => {
       const { errors, input } = parseResourceForm(data);
       expect(input === null).toBe(Object.keys(errors).length > 0);
     }
+  });
+});
+
+/* ==========================================================================
+   De la ligne au panneau — T4bis.5
+   ========================================================================== */
+
+describe("toResourceFormValues", () => {
+  test("une ligne complète rend ses quatre valeurs", () => {
+    expect(
+      toResourceFormValues({
+        title: "Maquettes v3",
+        url: "https://exemple.invalid/maquettes-v3",
+        resourceType: "figma",
+        activityId: ACTIVITY,
+      }),
+    ).toEqual({
+      title: "Maquettes v3",
+      url: "https://exemple.invalid/maquettes-v3",
+      resourceType: "figma",
+      activityId: ACTIVITY,
+    });
+  });
+
+  test("un rattachement absent rend la valeur de l'option « Aucune »", () => {
+    // `activity_id` est nullable — le rattachement est facultatif (`docs/02`
+    // §5). `null` n'est pas une valeur de `select` : c'est `""` qui l'est.
+    const returned = toResourceFormValues({
+      title: "Grille d'entretien",
+      url: "https://exemple.invalid/grille",
+      resourceType: "word",
+      activityId: null,
+    });
+
+    expect(returned.activityId).toBe("");
   });
 });

@@ -39,11 +39,18 @@
  * pour qu'elle n'ait qu'une adresse. Les trois panneaux disparaissent aussi du
  * rendu, et les gestes de roadmap avec eux ; ce n'est pas ce rendu qui protège.
  *
- * **Cinq écritures ajoutent ou corrigent ; la sixième retire** (T4bis.4).
- * `archiveActivity` est le seul geste de ce fichier qui sorte une ligne du
- * récit, et le seul appelant d'`archive()` ici. Il ne supprime rien (règle 4) et
- * ne cascade sur rien (arbitrage (f)) : les ressources rattachées gardent leur
+ * **Six écritures ajoutent ou corrigent ; deux retirent** (T4bis.4, T4bis.5).
+ * `archiveActivity` et `archiveResource` sont les deux seuls gestes de ce
+ * fichier qui sortent une ligne du récit, et les deux seuls appelants
+ * d'`archive()` ici. Ils ne suppriment rien (règle 4) et ne cascadent sur rien
+ * (arbitrage (f)) : archiver une activité laisse ses ressources avec leur
  * `activity_id` et leur `archived_at` nul.
+ *
+ * **Corriger et retirer une ressource (T4bis.5)** ferme la moitié du manque (4)
+ * du chantier. `openResource` en est la troisième porte : elle enchaîne
+ * `openProject` sur le projet **reçu** et le rapprochement de la ressource
+ * **reçue** à ce projet — sans ce second contrôle, une soumission forgée
+ * corrigerait la ressource d'un autre accompagnement.
  *
  * **`last_activity_at` n'est pas recalculé ici.** `lib/db/scoped.ts` le fait
  * pour toute écriture d'activité — **l'archivage compris**, dans le même `batch`
@@ -95,7 +102,8 @@
  * se rattache qu'à une activité terminée », qui traverse deux tables. Elle la
  * laisse refuser et se contente de rendre son refus lisible.
  *
- * Aucune suppression, aucun archivage, jamais.
+ * **Aucune suppression, jamais** (règle 4) : la couche n'expose pas de `delete`,
+ * et ce fichier ne lui en demande pas. Ce qui se retire s'archive.
  */
 
 import { eq } from "drizzle-orm";
@@ -182,7 +190,7 @@ function refusal(formData: FormData, message: string): ActivityFormState {
  *
  * Le refus d'archivage, lui, n'est **pas** paramétrable, et c'est voulu : ce
  * n'est pas le geste qui est réservé, c'est l'accompagnement qui est fermé.
- * Quatre gestes, un seul message.
+ * Six gestes, un seul message.
  */
 async function openProject(
   session: Session,
@@ -204,8 +212,9 @@ async function openProject(
   /* La lecture seule d'un accompagnement archivé, première des deux adresses
      (T4bis.3). `find` rend les lignes archivées — délibérément, une donnée
      archivée restant lisible —, et rien n'en tirait les conséquences ici.
-     Quatre écritures passent par cette ligne : la création et la correction
-     d'activité, la ressource, le résultat. */
+     Six écritures passent par cette ligne : la création et la correction
+     d'activité, la création, la correction et le retrait d'une ressource, le
+     résultat. */
   if (project.archivedAt !== null) {
     return {
       message:
@@ -678,6 +687,51 @@ function resourceRefusal(
 }
 
 /**
+ * La ressource reçue, rapprochée de **ce** projet — la troisième porte du
+ * fichier (T4bis.5), sur le modèle d'`openProject` et d'`openActivity`.
+ *
+ * Deux contrôles, et chacun ferme une porte :
+ *
+ * 1. `openProject` sur le `projectId` **reçu** — le droit `writeProject` (D9),
+ *    l'appartenance au domaine, et la lecture seule d'un accompagnement archivé,
+ *    d'un seul appel ;
+ * 2. la ressource reçue **appartient à ce projet** et n'est pas déjà archivée.
+ *    Sans ce second contrôle, une soumission forgée corrigerait ou retirerait la
+ *    ressource d'un autre accompagnement — les identifiants liés sont sérialisés
+ *    en clair dans un champ `$ACTION_…`, et une soumission peut les réécrire.
+ *
+ * Les deux refus se ressemblent volontairement : l'écran ne distingue pas la
+ * ressource inconnue de celle d'un autre domaine, pour la même raison que la
+ * page projet rend 404 dans les deux cas.
+ *
+ * Le message n'est utilisé que par `updateResource` : `archiveResource` refuse
+ * en silence, n'ayant aucune saisie à rendre.
+ */
+async function openResource(
+  session: Session,
+  projectId: string,
+  resourceId: string,
+  refused: string,
+): Promise<
+  | { project: Row<typeof projects>; resource: Row<typeof resources> }
+  | { message: string }
+> {
+  const gate = await openProject(session, projectId, refused);
+  if ("message" in gate) return gate;
+
+  const resource = await session.db.find(resources, resourceId);
+  if (
+    !resource ||
+    resource.projectId !== projectId ||
+    resource.archivedAt !== null
+  ) {
+    return { message: "Cette ressource n'existe plus dans cet accompagnement." };
+  }
+
+  return { project: gate.project, resource };
+}
+
+/**
  * L'activité reçue, rapprochée de **ce** projet.
  *
  * Le rattachement est facultatif (`docs/02` §5) : rien à vérifier quand il est
@@ -693,6 +747,15 @@ function resourceRefusal(
  * proposée non plus, mais elle a pu produire un document avant d'être
  * abandonnée — ce qu'on ne propose pas, on continue de l'accepter.
  *
+ * **`keptActivityId` est l'exception nominative de T4bis.1, transposée ici**
+ * (T4bis.5). Une ressource dont l'activité a été archivée **depuis** la garde
+ * sélectionnée dans le panneau : la refuser à la re-soumission rendrait toute
+ * correction impossible sans changer le rattachement, ce qui est précisément la
+ * perte que ce ticket vient éviter. L'exception est **nominative** — elle
+ * n'accepte que la valeur déjà portée par la ligne éditée, et n'ouvre la porte à
+ * aucune autre archivée. `createResource` ne passe rien : une création n'a
+ * aucune valeur antérieure à préserver.
+ *
  * Un message de champ, jamais une exception : `assertPreconditions` reste le
  * second filet, pas le premier.
  */
@@ -700,11 +763,16 @@ async function checkResourceActivity(
   session: Session,
   projectId: string,
   input: ResourceRowInput,
+  keptActivityId: string | null = null,
 ): Promise<ResourceFormErrors> {
   if (!input.activityId) return {};
 
   const activity = await session.db.find(activities, input.activityId);
-  if (!activity || activity.projectId !== projectId || activity.archivedAt !== null) {
+  if (
+    !activity ||
+    activity.projectId !== projectId ||
+    (activity.archivedAt !== null && activity.id !== keptActivityId)
+  ) {
     return {
       activityId: "Cette activité n'appartient pas à cet accompagnement.",
     };
@@ -770,6 +838,138 @@ export async function createResource(
   // lève : elle est appelée hors de tout `try`, faute de quoi le `catch`
   // ci-dessus avalerait la navigation.
   redirect(ROUTES.project(projectId));
+}
+
+/* ==========================================================================
+   Corriger et retirer une ressource — T4bis.5
+
+   La ressource était, avec le résultat, **le premier objet de Vision sans
+   chemin de correction** : C4 n'écrivait que la création (arbitrage (a) de
+   `tickets-C4.md`, qui renvoyait explicitement ici). Un lien mal collé — mauvais
+   titre, mauvaise adresse, mauvais rattachement — n'avait aucun geste.
+
+   Les deux actions partagent `openResource` et ne se distinguent que par ce
+   qu'elles font d'un refus : la correction le **rend**, le retrait se tait.
+   ========================================================================== */
+
+/**
+ * Corriger une ressource déjà reliée : **le même formulaire, la même
+ * validation, les mêmes refus** qu'à la création — la propriété qui fait qu'un
+ * seul panneau sert les deux gestes.
+ *
+ * `projectId` et `resourceId` sont liés côté serveur, comme `updateActivity`
+ * depuis T3.4. **Ce ne sont pas des secrets** : Next les sérialise en clair dans
+ * un champ `$ACTION_…`, et une soumission peut les réécrire. Ce qui protège est
+ * `openResource`, qui interroge le droit sur le projet **reçu** puis rapproche
+ * la ressource **reçue** de ce projet.
+ *
+ * **Aucun contrôle d'idempotence** à la `activityRowUnchanged` de T3.4 : il
+ * existe là-bas pour ne pas repousser une fraîcheur ni écrire au journal de C6
+ * une modification qui n'en est pas une. Ici `last_activity_at` n'est pas en
+ * jeu — corriger une ressource n'est pas une activité — et l'inventer sortirait
+ * du périmètre du ticket (règle 3).
+ *
+ * **Aucune requête sortante vers l'adresse saisie**, pas plus qu'à la création :
+ * elle est enregistrée telle qu'elle a été tapée, une fois son schéma vérifié.
+ */
+export async function updateResource(
+  projectId: string,
+  resourceId: string,
+  _previous: ResourceFormState,
+  formData: FormData,
+): Promise<ResourceFormState> {
+  const session = await requireSession();
+
+  const gate = await openResource(
+    session,
+    projectId,
+    resourceId,
+    "La modification d'une ressource est réservée au responsable de domaine et aux contributeurs désignés de cet accompagnement.",
+  );
+  if ("message" in gate) return resourceRefusal(formData, gate.message);
+
+  const { values, errors, input } = parseResourceForm(formData);
+  if (!input) return { values, errors };
+
+  /* L'exception nominative : l'activité que la ressource porte **déjà** est
+     acceptée même archivée, et elle seule. Le panneau la garde sélectionnée
+     sans la proposer ; sans cette ligne, une re-soumission à l'identique serait
+     refusée. */
+  const misplaced = await checkResourceActivity(
+    session,
+    projectId,
+    input,
+    gate.resource.activityId,
+  );
+  if (Object.keys(misplaced).length > 0) return { values, errors: misplaced };
+
+  try {
+    const updated = await session.db.update(resources, resourceId, input);
+    if (!updated) {
+      return resourceRefusal(
+        formData,
+        "Cette ressource n'existe plus dans cet accompagnement.",
+      );
+    }
+  } catch (error) {
+    if (error instanceof DomainScopeError) {
+      return resourceRefusal(
+        formData,
+        "Une référence de ce formulaire n'appartient pas au domaine : la saisie n'a pas été enregistrée.",
+      );
+    }
+    throw error;
+  }
+
+  // Cette page-là, et elle seule — la raison de `createResource` : corriger une
+  // ressource n'est pas écrire une activité, et `last_activity_at` n'a pas bougé.
+  revalidatePath(ROUTES.project(projectId));
+
+  // La page nue, panneau refermé : le titre corrigé paraît dans son bloc, et
+  // c'est toute la confirmation (`docs/06` §9). `redirect` lève, donc hors du
+  // `try`.
+  redirect(ROUTES.project(projectId));
+}
+
+/**
+ * Retirer une ressource du bloc : elle s'archive, rien n'est supprimé (règle 4).
+ *
+ * **Sans confirmation** — arbitrage (c) de `tickets-C4bis.md` : la confirmation
+ * se justifie là où le geste retire de la lecture tout un ensemble, un produit
+ * et ses accompagnements, un accompagnement et sa roadmap. Retirer un lien mal
+ * collé est au contraire le geste qu'on veut rapide, et `docs/06` §9 proscrit la
+ * confirmation partout où elle ne protège rien.
+ *
+ * **Aucun rétablissement** — arbitrage (b) : une ressource se **ressaisit** en
+ * moins d'une minute, un titre et une adresse.
+ *
+ * **Le refus est muet**, comme `archiveActivity` : ce geste n'a aucune saisie à
+ * rendre, et rien ne justifie de lui inventer un message que l'écran n'atteint
+ * jamais en usage normal.
+ *
+ * **Aucun recalcul de `last_activity_at`** : `resources` n'est pas `activities`,
+ * `archive()` ne déclenche donc aucun `batch` de recalcul, et la revalidation
+ * s'en tient à cette page — retirer un lien n'a rien changé à la fraîcheur du
+ * produit.
+ */
+export async function archiveResource(
+  projectId: string,
+  resourceId: string,
+): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openResource(
+    session,
+    projectId,
+    resourceId,
+    // Jamais rendu : ce geste n'affiche aucun refus.
+    "Le retrait d'une ressource est réservé au responsable de domaine et aux contributeurs désignés de cet accompagnement.",
+  );
+  if ("message" in gate) return;
+
+  await session.db.archive(resources, resourceId);
+
+  revalidatePath(ROUTES.project(projectId));
 }
 
 /* ==========================================================================

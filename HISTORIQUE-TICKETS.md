@@ -91,6 +91,10 @@ elles sont recopiées ici au fil de l'eau pour que le récit détaillé garde so
   fichiers pour cinq annoncés. Trois arbitrages posés et tranchés avant écriture : geste retiré de
   l'entrée qui porte un résultat et refus muet ; geste présent dans les cinq groupes, « Annulé »
   compris ; libellé « Archiver la saisie ».
+- **T4bis.5 — 15/08/2026 — corriger et retirer une ressource.** Aucun écart de périmètre, neuf
+  fichiers pour les sept annoncés plus leurs deux tests. Deux arbitrages posés et tranchés avant
+  écriture : les libellés « Modifier » et « Archiver », aucun verbe neuf à l'écran ; l'exception
+  nominative étendue à l'activité **annulée**, que la fiche ne nommait pas.
 
 ---
 
@@ -939,6 +943,60 @@ elles sont recopiées ici au fil de l'eau pour que le récit détaillé garde so
   personne dont `has_access` est faux : le repli du stub retombe alors sur le responsable de domaine.
   L'essai refait sous une personne à session réelle a tenu. Le cookie du stub ne vaut que pour qui a
   un accès.
+
+### T4bis.5 — corriger et retirer une ressource — 15/08/2026
+
+**Le manque (4), pour sa moitié « ressource ».** La ressource était, avec le résultat, le dernier
+objet de Vision sans chemin de correction : T4.2 n'avait écrit que la création, et son arbitrage (a)
+renvoyait explicitement ici. Une ressource mal collée ne se réparait par aucun geste et ne se retirait
+pas davantage — `resources` n'avait aucun appelant d'`archive()`. Le panneau de T4.2 devient un
+panneau à deux gestes, ouvert par `?ressource=<identifiant>` — la forme d'`?activite=` depuis T3.4,
+que `lib/navigation.ts` annonçait déjà en toutes lettres —, et chaque entrée du bloc « Ressources »
+gagne ses deux points d'entrée. L'autre moitié du manque, le résultat et la migration de
+`results_activity_unique`, reste à T4bis.6.
+
+**Neuf fichiers, aucun hors périmètre.** `lib/navigation.ts` (une route, un commentaire récrit),
+`lib/forms/resource.ts` (`toResourceFormValues`, jumelle de celle de l'activité),
+`lib/queries/resources.ts` (`findResourceActivity`, une lecture et une seule),
+`components/projects/resource-panel.tsx` (trois propriétés optionnelles),
+`components/projects/resources.tsx` (deux propriétés, une rangée de gestes),
+`app/(app)/projets/[id]/actions.ts` (`openResource`, `updateResource`, `archiveResource`),
+`app/(app)/projets/[id]/page.tsx`, plus les deux fichiers de tests. `listProjectResources` n'a pas
+bougé d'un caractère, et le panneau n'a pas été redit : **quatrième copie de `PanelField` évitée.**
+
+**Une porte, deux gestes — le dessin d'`openActivity` transposé.** `openResource` enchaîne
+`openProject` — droit `writeProject` sur le projet **reçu**, appartenance au domaine, lecture seule
+d'un accompagnement archivé — puis le second contrôle que la fiche exige : la ressource existe,
+relève de **ce** projet, n'est pas archivée. Sans lui, une soumission forgée corrigerait la ressource
+d'un autre accompagnement. Les deux actions passent par cette seule ligne ; `updateResource` rend la
+saisie refusée, `archiveResource` refuse en silence — il n'a aucune saisie à rendre.
+
+**L'exception nominative, étendue là où la fiche s'arrêtait.** La fiche ne nommait que l'activité
+archivée ; l'activité **annulée** est dans le même cas et il est atteignable, les options du panneau
+se dérivant de la roadmap moins le groupe « Annulé ». Une règle, un chemin de code :
+`findResourceActivity` ne filtre ni sur `archived_at` ni sur `state`, et rapproche du `projectId` en
+SQL ; `checkResourceActivity` accepte l'archivée si et seulement si c'est celle déjà portée.
+`createResource` n'a pas changé d'un caractère. Lu dans le HTML servi : l'option est ajoutée et
+`selected` dans les deux cas, **une seule** option de plus que le panneau de création, qui n'en
+propose aucune des deux.
+
+**Les quatre disciplines.** Le critère lu dans le balisage servi : les deux gestes nommés par leur
+ressource, les quatre champs pré-remplis et les deux `selected`, la correction visible aussitôt dans
+le bloc, l'entrée qui disparaît à l'archivage, l'état vide qui revient sur la dernière, et la page nue
+— aucun `role="dialog"` — pour une ressource d'un autre projet, un identifiant inconnu, une valeur qui
+n'est pas un UUID, et l'exclusivité éprouvée à quatre clés. Les tests mis en défaut un par un, chacun
+faisant tomber **exactement un** test : le rapprochement au projet, le filtre de domaine, le `?? ""`.
+Le contraste mesuré — 15,72:1 — sur le seul couple concerné, qui n'était pas neuf par la position. Le
+droit éprouvé par l'action, six charges séparées, base comptée avant et après : trois ressources
+vivantes sur trois avant, trois sur trois après, la ligne visée portant le même `updated_at` qu'avant
+la première charge.
+
+**Ce que la mise en défaut a réellement trouvé.** Retirer `filter(activities)` de
+`findResourceActivity` n'a fait tomber **aucun** test : le test « autre domaine » était porté par
+`filter(activityTypes)`, les deux filtres se rattrapant l'un l'autre. Plutôt que de déclarer la
+discipline passée, un test isolant a été ajouté — une activité du domaine A dont le type appartient au
+domaine B, forgée par `db.insert` direct — et la sabotage refaite tombe exactement dessus. **Un test
+vert au retrait d'une règle est un test qui ne la couvre pas, même s'il porte son nom.**
 
 ---
 

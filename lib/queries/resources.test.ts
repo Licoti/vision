@@ -28,7 +28,11 @@ import {
   resources,
 } from "@/lib/db/schema";
 
-import { listProjectResources, type ProjectResource } from "./resources";
+import {
+  findResourceActivity,
+  listProjectResources,
+  type ProjectResource,
+} from "./resources";
 
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
 const teardownOrder = [
@@ -58,6 +62,10 @@ type Fixture = {
   testActivityId: string;
   /** Son type — la seconde cible des liaisons forgées. */
   userTestTypeId: string;
+  /** L'activité archivée — l'exception nominative de T4bis.5. */
+  archivedActivityId: string;
+  /** L'activité annulée — le second cas de cette même exception. */
+  cancelledActivityId: string;
 };
 
 const suffix = Math.random().toString(36).slice(2, 10);
@@ -65,8 +73,9 @@ let a: Fixture;
 let b: Fixture;
 
 /**
- * Trois projets, deux types d'activité, deux activités dont une archivée, et
- * cinq ressources couvrant les quatre formes de la lecture plus le débordement.
+ * Trois projets, deux types d'activité, trois activités — une vivante, une
+ * archivée, une annulée (T4bis.5) — et cinq ressources couvrant les quatre
+ * formes de la lecture plus le débordement.
  *
  * Les ressources sont écrites **dans le désordre** par rapport à l'ordre
  * attendu, et leur `created_at` est posé explicitement : c'est la requête qui
@@ -128,6 +137,16 @@ async function seedDomain(label: string): Promise<Fixture> {
   });
   await scope.archive(activities, archivedActivity.id);
 
+  /* Une activité annulée : la roadmap la porte, mais le panneau ne la propose
+     pas — l'autre cas que l'exception nominative de T4bis.5 doit nommer. */
+  const cancelledActivity = await scope.insert(activities, {
+    projectId: full.id,
+    activityTypeId: workshop.id,
+    state: "cancelled",
+    cancellationReason: "Reportée à l'exercice suivant",
+    periodStart: "2026-02-01",
+  });
+
   const resource = async (values: {
     projectId: string;
     activityId?: string;
@@ -187,6 +206,8 @@ async function seedDomain(label: string): Promise<Fixture> {
     onArchivedActivityTitle: onArchived.title,
     testActivityId: testActivity.id,
     userTestTypeId: userTest.id,
+    archivedActivityId: archivedActivity.id,
+    cancelledActivityId: cancelledActivity.id,
   };
 }
 
@@ -405,5 +426,100 @@ describe("listProjectResources — étanchéité du domaine", () => {
     // et lui seul qui empêche le libellé de `a` de s'afficher ici.
     expect(row).toBeDefined();
     expect(row?.activityLabel).toBeNull();
+  });
+});
+
+/* ==========================================================================
+   L'exception nominative du panneau — T4bis.5
+
+   Ce que cette lecture doit rendre est exactement ce que les options du panneau
+   n'ont pas : une activité archivée, une activité annulée. Ce qu'elle doit
+   refuser est ce qu'une soumission forgée y glisserait — l'activité d'un autre
+   accompagnement, celle d'un autre domaine.
+   ========================================================================== */
+
+describe("findResourceActivity", () => {
+  test("une activité vivante est nommée, avec sa période", async () => {
+    const kept = await findResourceActivity(
+      a.scope,
+      a.fullId,
+      a.testActivityId,
+    );
+
+    expect(kept).toEqual({
+      id: a.testActivityId,
+      typeLabel: "Test utilisateur a",
+      periodStart: "2026-03-01",
+      periodEnd: "2026-03-31",
+      isUnscheduled: false,
+    });
+  });
+
+  test("une activité **archivée** est nommée : c'est la raison d'être de la lecture", async () => {
+    // La roadmap ne la porte plus (T4bis.4), donc les options du panneau non
+    // plus. Sans cette lecture, le `select` retomberait sur « Aucune » et la
+    // première re-soumission détacherait la ressource en silence.
+    const kept = await findResourceActivity(
+      a.scope,
+      a.fullId,
+      a.archivedActivityId,
+    );
+
+    expect(kept?.typeLabel).toBe("Atelier de cadrage a");
+  });
+
+  test("une activité **annulée** est nommée elle aussi", async () => {
+    // Le panneau écarte le groupe « Annulé » de ses options : le cas est le
+    // même que l'archivée, et il n'a pas deux règles.
+    const kept = await findResourceActivity(
+      a.scope,
+      a.fullId,
+      a.cancelledActivityId,
+    );
+
+    expect(kept?.typeLabel).toBe("Atelier de cadrage a");
+  });
+
+  test("une activité d'un autre accompagnement n'est pas nommée", async () => {
+    // Sans le rapprochement au projet, l'exception nominative nommerait
+    // l'activité d'ailleurs dès qu'une soumission en glisserait l'identifiant.
+    expect(
+      await findResourceActivity(a.scope, a.otherId, a.testActivityId),
+    ).toBeNull();
+  });
+
+  test("une activité d'un autre domaine n'est pas nommée", async () => {
+    // Règle 1 : le domaine ferme la question avant le projet.
+    expect(
+      await findResourceActivity(b.scope, b.fullId, a.testActivityId),
+    ).toBeNull();
+  });
+
+  test("le filtre de domaine de l'activité refuse seul, type du domaine courant", async () => {
+    /* **Le test qui épingle `filter(activities)`, et lui seul.** Le précédent
+       ne le fait pas : l'activité de `a` porte un type de `a`, si bien que
+       `filter(activityTypes)` coupe déjà le `innerJoin` — les deux filtres de
+       domaine se rattrapent l'un l'autre, la propriété relevée de T2.2 à T3.1,
+       qui « ne dispense d'aucun d'eux ». Le retrait de `filter(activities)` ne
+       ferait donc tomber aucun test, et la règle ne serait pas tenue par les
+       tests mais par un hasard de fixture.
+
+       La liaison forgée l'isole : une activité du domaine `a` dont le type est
+       du domaine `b`. Interrogée sous `b`, `filter(activityTypes)` passe et
+       `eq(projectId)` aussi — seul `filter(activities)` la refuse. */
+    const [forged] = await db
+      .insert(activities)
+      .values({
+        domainId: a.domainId,
+        projectId: a.fullId,
+        activityTypeId: b.userTestTypeId,
+        state: "in_progress",
+        periodStart: "2026-09-01",
+      })
+      .returning();
+
+    expect(
+      await findResourceActivity(b.scope, a.fullId, forged?.id ?? ""),
+    ).toBeNull();
   });
 });

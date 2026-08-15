@@ -11,7 +11,10 @@
  *
  * `addHref` à `null` retire les deux : l'action n'existe que pour qui peut
  * écrire dans ce projet (D9). Le composant, lui, ne connaît aucun droit — c'est
- * l'appelant qui les lit, la règle de `Roadmap` et de `PageHeader`.
+ * l'appelant qui les lit, la règle de `Roadmap` et de `PageHeader`. `editHref`
+ * et `archiveResource` (T4bis.5) suivent la même règle pour les deux gestes de
+ * chaque entrée : chez qui ne peut pas écrire — et sur un accompagnement
+ * archivé —, le bloc se lit et ne se corrige nulle part.
  *
  * Chaque entrée dit trois choses et pas une de plus : son titre, son type en
  * toutes lettres, et l'activité qui l'a produite quand le rattachement est
@@ -40,13 +43,40 @@ import { Section, SectionHeader } from "@/components/ui/section";
 import { formatResourceType } from "@/lib/format";
 import type { ProjectResource } from "@/lib/queries/resources";
 
+/**
+ * Les classes d'un geste texte — la constante `ACTION_LINK` de `roadmap.tsx`,
+ * **redite** plutôt qu'importée : ce module ne l'exporte pas, et il n'appartient
+ * pas au périmètre de ce ticket. Deux fois trois jetons valent mieux qu'un
+ * couplage entre deux composants pour si peu ; la dette est consignée au
+ * journal, et l'extraction appartient au ticket qui pourra toucher les deux.
+ *
+ * `content-primary-dark` sur `surface-neutral-pale` n'est **pas un couple neuf
+ * par la position** : c'est déjà celui de « Relier une ressource » en tête de ce
+ * même bloc.
+ */
+const ACTION_LINK = "text-xs font-semibold text-content-primary-dark underline";
+
 export function Resources({
   resources,
   addHref,
+  editHref,
+  archiveResource,
 }: {
   resources: ProjectResource[];
   /** L'ouverture du panneau, ou `null` pour qui ne peut pas écrire (D9). */
   addHref: string | null;
+  /**
+   * L'ouverture du panneau sur une ressource donnée (T4bis.5), ou `null` pour
+   * qui ne peut pas écrire — la même règle que `addHref`, et le composant ne lit
+   * toujours aucun droit.
+   */
+  editHref: ((resourceId: string) => string) | null;
+  /**
+   * Le retrait d'une ressource (T4bis.5) — l'action serveur **déjà liée au
+   * projet** côté serveur, à lier à la ressource au moment du rendu. Même règle
+   * de droit que les deux précédentes.
+   */
+  archiveResource: ((resourceId: string) => Promise<void>) | null;
 }) {
   return (
     <Section>
@@ -101,6 +131,49 @@ export function Resources({
                   </>
                 ) : null}
               </p>
+
+              {/* Les deux gestes de T4bis.5, sous la ligne de description et
+                  jamais à droite : le bloc occupe une demi-largeur de la
+                  grille, et une colonne d'actions y écraserait le titre.
+
+                  Le nom accessible porte le titre de la ressource, comme celui
+                  de « Modifier » dans la roadmap : « Modifier » répété dix fois
+                  dans une liste de liens ne dit pas laquelle. Le mot reste
+                  écrit à l'écran — l'`aria-label` complète, il ne remplace pas.
+
+                  « Archiver » est un formulaire nu : ni confirmation
+                  (arbitrage (c) de `tickets-C4bis.md` — elle ne protégerait
+                  rien ici, et `docs/06` §9 la proscrit là où elle ne protège
+                  pas), ni motif. Le mot est celui de l'arbitrage (d), jamais
+                  « Supprimer » : rien n'est supprimé (règle 4). */}
+              {/* Un `div` et non un `p` : `<form>` est du contenu de flux, et
+                  un paragraphe n'accepte que du phrasé — le balisage servi
+                  serait réécrit par le navigateur, et l'hydratation
+                  divergerait. */}
+              {editHref || archiveResource ? (
+                <div className="mt-1.5 flex flex-wrap items-center gap-4">
+                  {editHref ? (
+                    <Link
+                      href={editHref(resource.id)}
+                      aria-label={`Modifier la ressource ${resource.title}`}
+                      className={ACTION_LINK}
+                    >
+                      Modifier
+                    </Link>
+                  ) : null}
+                  {archiveResource ? (
+                    <form action={archiveResource.bind(null, resource.id)}>
+                      <button
+                        type="submit"
+                        aria-label={`Archiver la ressource ${resource.title}`}
+                        className={ACTION_LINK}
+                      >
+                        Archiver
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>

@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 15/08/2026 — T4bis.4 livré, quatre disciplines jouées.
-**Chantier en cours :** C4bis — archivage et correction, six tickets, quatre livrés
-**Ticket suivant :** T4bis.5 — corriger et retirer une ressource
+**Dernière mise à jour :** 15/08/2026 — T4bis.5 livré, quatre disciplines jouées.
+**Chantier en cours :** C4bis — archivage et correction, six tickets, cinq livrés
+**Ticket suivant :** T4bis.6 — corriger et retirer un résultat, et sa migration
 
 ---
 
@@ -16,7 +16,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C2 — Produits et projets | T2.1 → T2.6 | **terminé** |
 | C3 — Activités et roadmap | T3.1 → T3.6 | **terminé** |
 | C4 — Ressources et résultats | T4.1 → T4.4 | **terminé** |
-| C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **en cours**, T4bis.1 à T4bis.4 livrés |
+| C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **en cours**, T4bis.1 à T4bis.5 livrés |
 | C5 — Indicateurs et temps long | à découper | à faire |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
@@ -68,6 +68,14 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   `openActivity` a porté les quatre contrôles sans être modifiée. Les quatre disciplines jouées, dont
   la fraîcheur du produit lue changer dans `/produits` — octobre puis août 2026 — et quatre refus
   éprouvés séparément.
+- **T4bis.5 — 15/08/2026 — corriger et retirer une ressource.** Aucun écart de périmètre, neuf
+  fichiers pour les sept annoncés plus leurs deux tests. Deux arbitrages tranchés avant écriture :
+  l'écran dit « Modifier » et « Archiver », aucun verbe neuf ; l'exception nominative couvre
+  l'activité **annulée** autant que l'archivée, sans quoi une re-soumission détachait la ressource en
+  silence. Les quatre disciplines jouées, dont six charges repostées refusées base comptée avant et
+  après, et le tour complet à l'identique relu en base — `activity_id` inchangé. **La mise en défaut
+  a servi** : retirer `filter(activities)` de `findResourceActivity` ne faisait tomber aucun test, les
+  deux filtres de domaine se rattrapant ; un test isolant a été ajouté avant de croire la discipline.
 
 ---
 
@@ -102,18 +110,20 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
 
 ### b. Assignés à un ticket
 
-- **C4bis est découpé, et ses quatre premiers tickets sont livrés.** Les six manques — archivage du
+- **C4bis est découpé, et ses cinq premiers tickets sont livrés.** Les six manques — archivage du
   produit, du projet, de l'activité, correction de la ressource et du résultat, lecture seule d'un
   projet archivé, valeur archivée dans un formulaire — sont distribués en six tickets, avec les six
   arbitrages rendus avant écriture (lecture seule stricte, rétablissement limité au produit et au
   projet, confirmation pour ces deux-là seulement, vocabulaire « Archiver / Rétablir », refus
   d'archiver un produit portant un accompagnement vivant, aucune cascade). **T4bis.1 a refermé le
   manque (6)**, **T4bis.2 le manque (1)** — premier appelant d'`archive()`, unique auteur de
-  `restore()` —, **T4bis.3 les manques (2) et (5)**, la lecture seule tenant en deux lignes, et
+  `restore()` —, **T4bis.3 les manques (2) et (5)**, la lecture seule tenant en deux lignes,
   **T4bis.4 le manque (3)**, `openActivity` devenant la porte de trois gestes sans changer d'une
-  ligne. `components/ui/confirm-panel.tsx` a servi deux fois sans être modifié. Reste le manque (4),
-  scindé en deux tickets — la ressource, puis le résultat et sa migration.
-  → **`tickets-C4bis.md`, reprendre à T4bis.5.**
+  ligne, et **T4bis.5 la moitié du manque (4)**, `openResource` reprenant le même dessin.
+  `components/ui/confirm-panel.tsx` a servi deux fois sans être modifié ; `ResourcePanel` sert
+  désormais deux gestes sans être redit. Reste l'autre moitié du manque (4) : le résultat et la
+  migration de `results_activity_unique`.
+  → **`tickets-C4bis.md`, reprendre à T4bis.6.**
 - **`createProject` accepte encore un produit archivé.** Le formulaire ne le propose plus et la page
   produit n'y mène plus, mais l'action ne relit pas l'`archived_at` du produit **reçu** : une
   soumission forgée rattacherait un accompagnement neuf à un produit rangé, invisible partout. Relevé
