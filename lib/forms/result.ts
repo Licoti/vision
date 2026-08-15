@@ -76,6 +76,62 @@ export const EMPTY_RESULT_VALUES: ResultFormValues = {
   externalUrl: "",
 };
 
+/* ==========================================================================
+   De la ligne à la saisie — T4bis.6
+
+   Le chemin inverse de `parseResultForm`, et le jumeau de
+   `toResourceFormValues` : un seul panneau sert la saisie et la correction, et
+   la correction a besoin de la ligne existante sous forme de six chaînes.
+   ========================================================================== */
+
+/**
+ * La valeur telle qu'elle se **retape**, et non telle que la colonne la rend.
+ *
+ * `numeric(18, 4)` rend « 62.0000 » au pilote, jamais « 62 » : posé tel quel
+ * dans le champ, ce serait une invitation à retaper une valeur que personne n'a
+ * écrite ainsi. Les zéros décimaux non significatifs sont donc rognés, et le
+ * point décimal disparaît avec eux quand il ne sépare plus rien.
+ *
+ * **Le point est conservé, jamais changé en virgule** : ce module ne connaît
+ * aucune locale — c'est `lib/format.ts` qui la porte, et l'importer ici pour un
+ * champ de formulaire mettrait une règle d'affichage dans un module qui n'en a
+ * pas. La virgule reste acceptée en saisie, elle n'est pas produite.
+ *
+ * **Le tour est exact** : ce qui est réaffiché passe `validateResultForm` sans
+ * modification et réécrit la même valeur — la propriété qui fait qu'une
+ * re-soumission à l'identique ne change rien, et qu'un test éprouve.
+ */
+function decimalAsTyped(value: string): string {
+  if (!value.includes(".")) return value;
+  return value.replace(/\.?0+$/, "") || "0";
+}
+
+/**
+ * La ligne lue, rendue au panneau. `null` devient `""` : le formulaire ne
+ * connaît que des chaînes, et l'absence s'y écrit vide.
+ *
+ * La forme du paramètre est celle d'`ActivityResult` (`lib/queries/activities.ts`),
+ * ce que la roadmap a déjà lu pour l'écran : la correction n'ajoute **aucune
+ * lecture en base**.
+ */
+export function toResultFormValues(row: {
+  label: string;
+  value: string | null;
+  unit: string | null;
+  measuredOn: string;
+  toolId: string | null;
+  externalUrl: string | null;
+}): ResultFormValues {
+  return {
+    label: row.label,
+    value: row.value === null ? "" : decimalAsTyped(row.value),
+    unit: row.unit ?? "",
+    measuredOn: row.measuredOn,
+    toolId: row.toolId ?? "",
+    externalUrl: row.externalUrl ?? "",
+  };
+}
+
 /** Le champ, lu et rogné. Absent ou d'un type inattendu, il vaut « vide ». */
 function field(formData: FormData, name: string): string {
   const value = formData.get(name);

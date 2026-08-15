@@ -32,15 +32,28 @@
  * code couleur de bon ou mauvais score** : Vision reporte une valeur, elle ne
  * la juge pas (D39).
  *
- * **Aucune correction ici** : C4 n'écrit que la création (arbitrage (a) de
- * `tickets-C4.md`). Ce panneau n'a donc qu'un point d'entrée.
+ * **Deux points d'entrée depuis T4bis.6**, comme le panneau de ressource depuis
+ * T4bis.5 et celui d'activité depuis T3.4 — et **sans que la clé d'URL change
+ * d'un caractère** : `?resultat=<identifiant d'activité>` ouvre la saisie quand
+ * l'activité n'a pas de résultat, la correction quand elle en porte un. La
+ * valeur désigne la cible du geste, pas le geste ; c'est la donnée qui le
+ * décide, et l'écran comme le panneau en héritent.
+ *
+ * Un seul formulaire pour les deux — mêmes champs, mêmes règles, mêmes refus.
+ * Ce qui change tient en trois propriétés — le titre, le libellé du bouton, les
+ * valeurs initiales — et le panneau ne sait pas lequel des deux gestes il
+ * sert : c'est l'action liée qui le décide, côté serveur.
  */
 
 import Link from "next/link";
 import { useActionState, type ReactNode } from "react";
 
 import { FocusTrap } from "@/components/ui/focus-trap";
-import { EMPTY_RESULT_VALUES, type ResultFormState } from "@/lib/forms/result";
+import {
+  EMPTY_RESULT_VALUES,
+  type ResultFormState,
+  type ResultFormValues,
+} from "@/lib/forms/result";
 import type { ResultToolOption } from "@/lib/queries/activities";
 
 /**
@@ -66,6 +79,9 @@ export function ResultPanel({
   closeHref,
   action,
   tools,
+  title = "Saisir un résultat",
+  submitLabel = "Enregistrer le résultat",
+  initial = EMPTY_RESULT_VALUES,
 }: {
   projectName: string;
   /**
@@ -89,9 +105,18 @@ export function ResultPanel({
    * référentiel ne porte pas encore.
    */
   tools: readonly ResultToolOption[];
+  /** « Saisir un résultat » à la saisie, « Corriger le résultat » sinon. */
+  title?: string;
+  submitLabel?: string;
+  /**
+   * Les valeurs du résultat corrigé (T4bis.6). C'est l'**état initial** de
+   * `useActionState` : un refus le remplace par ce qui a été tapé, si bien que
+   * les deux chemins ont rigoureusement la même forme.
+   */
+  initial?: ResultFormValues;
 }) {
   const [state, submit, pending] = useActionState(action, {
-    values: EMPTY_RESULT_VALUES,
+    values: initial,
     errors: {},
   });
 
@@ -132,7 +157,7 @@ export function ResultPanel({
               id={titleId}
               className="text-md font-semibold text-content-neutral-darkest"
             >
-              Saisir un résultat
+              {title}
             </h2>
             {/* L'activité **et** le projet : le panneau ne quitte pas son
                 contexte, il le rappelle — et il écrit sur une activité, pas sur
@@ -347,7 +372,7 @@ export function ResultPanel({
               disabled={pending}
               className="rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale disabled:opacity-60"
             >
-              {pending ? "Enregistrement…" : "Enregistrer le résultat"}
+              {pending ? "Enregistrement…" : submitLabel}
             </button>
             <Link
               href={closeHref}

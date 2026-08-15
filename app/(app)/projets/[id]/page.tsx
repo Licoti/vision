@@ -27,9 +27,11 @@
  * l'ouvre sur une activité à corriger (T3.4) — une seule clé, dont la valeur
  * porte le cas, et un seul formulaire pour les deux gestes. `?ressource=` a pris
  * la même forme en T4bis.5 : `nouvelle` relie, `<identifiant>` corrige.
- * `?resultat=<identifiant d'activité>` ouvre celui de T4.4, et
- * `?archiver=confirmation` le panneau de confirmation de T4bis.2, repris tel
- * quel. La page reste rendue derrière eux, et porte alors l'attribut HTML
+ * `?resultat=<identifiant d'activité>` ouvre celui de T4.4 — **et sert les deux
+ * gestes depuis T4bis.6 sans changer d'un caractère** : la valeur y désigne la
+ * cible, jamais le geste, si bien que la même adresse saisit quand l'activité
+ * n'a pas de résultat et corrige quand elle en porte un. `?archiver=confirmation`
+ * ouvre le panneau de confirmation de T4bis.2, repris tel quel. La page reste rendue derrière eux, et porte alors l'attribut HTML
  * `inert` — c'est l'ordre du DOM qui décide de la tabulation, et `inert` est ce
  * qui empêche d'entrer au clavier dans le contenu masqué par le voile.
  *
@@ -69,6 +71,7 @@ import Link from "next/link";
 import {
   archiveActivity,
   archiveResource,
+  archiveResult,
   cancelActivity,
   createActivity,
   createResource,
@@ -76,6 +79,7 @@ import {
   transitionActivity,
   updateActivity,
   updateResource,
+  updateResult,
 } from "./actions";
 import { archiveProject, restoreProject } from "../actions";
 import { ActivityPanel } from "@/components/projects/activity-panel";
@@ -98,6 +102,7 @@ import { requireSession } from "@/lib/auth/provider";
 import { activities, resources } from "@/lib/db/schema";
 import { toActivityFormValues } from "@/lib/forms/activity";
 import { toResourceFormValues } from "@/lib/forms/resource";
+import { toResultFormValues } from "@/lib/forms/result";
 import {
   formatActivityPeriod,
   formatMonth,
@@ -261,31 +266,42 @@ export default async function ProjectPage({
     listProjectResources(session.db, project.id),
   ]);
 
-  /* L'activité sur laquelle un résultat se saisit (T4.4). **Aucune lecture en
-     base ne s'ajoute pour en décider** : elle se cherche dans la roadmap déjà
-     lue pour l'écran, et les quatre conditions de la fiche s'y lisent d'un
-     coup — la roadmap est scopée à ce projet et exclut déjà les archivées, le
-     groupe `done` donne l'état (« le seul état qui autorise le rattachement
-     d'un résultat », `docs/03` §4), `producesResult` donne le drapeau du type
-     (`docs/04` §2), et `result` donne ce qui est déjà posé.
+  /* L'activité sur laquelle un résultat se saisit ou se corrige (T4.4,
+     T4bis.6). **Aucune lecture en base ne s'ajoute pour en décider** : elle se
+     cherche dans la roadmap déjà lue pour l'écran, et toutes les conditions de
+     la fiche s'y lisent d'un coup — la roadmap est scopée à ce projet et exclut
+     déjà les archivées, le groupe `done` donne l'état (« le seul état qui
+     autorise le rattachement d'un résultat », `docs/03` §4), `producesResult`
+     donne le drapeau du type (`docs/04` §2), et `result` donne ce qui est déjà
+     posé.
 
-     **C'est ce qui fait disparaître le point d'entrée une fois le résultat
-     saisi** : la même donnée décide du lien dans la roadmap et de l'ouverture
-     du panneau, si bien que l'un ne peut pas survivre à l'autre. Une URL tapée
-     à la main n'ouvre donc rien de plus que ce que l'écran propose.
+     **Le point d'entrée ne disparaît plus une fois le résultat saisi : il
+     change de geste.** La même donnée décide du lien dans la roadmap et de
+     l'ouverture du panneau, si bien qu'une URL tapée à la main n'ouvre jamais
+     rien de plus que ce que l'écran propose — c'est la propriété de T4.4, tenue
+     à l'identique, et elle vaut maintenant pour deux gestes.
+
+     **La correction ne demande que l'existence du résultat**, là où la saisie
+     garde les quatre conditions (arbitrage du 15/08/2026) : une période
+     corrigée redérive l'état d'une activité terminée sans toucher à son
+     résultat, et exiger `done` ici laisserait ce résultat orphelin. Le geste se
+     lit donc dans **toute** la roadmap, la saisie dans le seul groupe
+     « Terminé ».
 
      La forme est vérifiée avant la base, comme pour `?activite=` : une colonne
      `uuid` interrogée avec n'importe quoi rend une erreur PostgreSQL. */
   const resultTarget =
     canWrite && asked.resultat && isUuid(asked.resultat)
       ? (roadmap
-          .find((group) => group.key === "done")
-          ?.activities.find(
-            (entry) =>
+          .flatMap((group) =>
+            group.activities.map((entry) => ({ key: group.key, entry })),
+          )
+          .find(
+            ({ key, entry }) =>
               entry.id === asked.resultat &&
-              entry.producesResult &&
-              entry.result === null,
-          ) ?? null)
+              (entry.result !== null ||
+                (key === "done" && entry.producesResult)),
+          )?.entry ?? null)
       : null;
 
   const resultPanelOpen = resultTarget !== null;
@@ -309,9 +325,23 @@ export default async function ProjectPage({
   /* Le référentiel des outils n'est lu **que** si le panneau de résultat
      s'ouvre — la discipline de `panelOptions` ci-dessous, posée en T3.3 : la
      page la plus consultée du produit ne paie pas cette requête pour un
-     panneau fermé. */
+     panneau fermé.
+
+     **L'exception nominative de T4bis.6**, l'exception de T4bis.1 transposée au
+     troisième panneau : l'outil déjà porté par le résultat corrigé reste dans la
+     liste — donc sélectionné — et n'apparaît nulle part ailleurs, ni en saisie
+     ni sur un autre résultat. Sans elle, un outil archivé depuis retomberait sur
+     « Aucun », et la première re-soumission détacherait le résultat de son outil
+     **en silence** : c'est exactement la perte que T4bis.1 a refermée ailleurs.
+     Le `select` du panneau n'a rien à savoir de tout cela — il rend ce qu'on lui
+     donne. */
   const resultTools = resultPanelOpen
-    ? await listResultToolOptions(session.db)
+    ? await listResultToolOptions(
+        session.db,
+        resultTarget?.result?.toolId
+          ? { keepToolId: resultTarget.result.toolId }
+          : {},
+      )
     : [];
 
   /* Les référentiels — dont les personnes, depuis T3.6 — ne sont lus **que**
@@ -448,14 +478,20 @@ export default async function ProjectPage({
       ) : null}
 
       {resultTarget ? (
-        /* Deux identifiants liés **côté serveur** — le projet et l'activité —,
-           comme `updateActivity` depuis T3.4 : ils sortent de la saisie, et le
-           panneau n'écrit pas ce qu'il ne connaît pas. Ce n'est pas un verrou,
-           Next les sérialisant dans un champ `$ACTION_…` réécrivable ; le
-           verrou est dans l'action, qui interroge `writeProject` sur le projet
-           reçu et rapproche l'activité reçue de ce projet, de son type
-           producteur et de l'absence d'un résultat déjà posé. */
+        /* Les identifiants sont liés **côté serveur** — le projet et l'activité
+           en saisie, le résultat en plus en correction (T4bis.6) —, comme
+           `updateActivity` depuis T3.4 : ils sortent de la saisie, et le panneau
+           n'écrit pas ce qu'il ne connaît pas. Ce n'est pas un verrou, Next les
+           sérialisant dans un champ `$ACTION_…` réécrivable ; le verrou est dans
+           l'action, qui interroge `writeProject` sur le projet reçu, rapproche
+           l'activité reçue de ce projet — puis, selon le geste, l'absence d'un
+           résultat déjà posé et le type producteur, ou le résultat reçu de
+           l'activité reçue. */
         <ResultPanel
+          /* La `key` change avec ce que le panneau édite, pour la raison écrite
+             sur celle du panneau d'activité : `useActionState` ne relit son état
+             initial qu'au montage. */
+          key={resultTarget.result?.id ?? resultTarget.id}
           projectName={project.name}
           activityLabel={`${resultTarget.typeLabel} · ${formatActivityPeriod(
             resultTarget.periodStart,
@@ -463,8 +499,24 @@ export default async function ProjectPage({
             resultTarget.isUnscheduled,
           )}`}
           closeHref={ROUTES.project(project.id)}
-          action={createResult.bind(null, project.id, resultTarget.id)}
+          action={
+            resultTarget.result
+              ? updateResult.bind(
+                  null,
+                  project.id,
+                  resultTarget.id,
+                  resultTarget.result.id,
+                )
+              : createResult.bind(null, project.id, resultTarget.id)
+          }
           tools={resultTools}
+          {...(resultTarget.result
+            ? {
+                title: "Corriger le résultat",
+                submitLabel: "Enregistrer les modifications",
+                initial: toResultFormValues(resultTarget.result),
+              }
+            : {})}
         />
       ) : null}
 
@@ -707,6 +759,14 @@ export default async function ProjectPage({
             transitionActivity={canWrite ? transitionActivity : null}
             cancelActivity={canWrite ? cancelActivity : null}
             archiveActivity={canWrite ? archiveActivity : null}
+            /* `archiveResult` est liée au projet **côté serveur** ; l'entrée y
+               ajoute l'activité et le résultat au rendu. Le même `canWrite` que
+               les six autres gestes, **et aucune condition ne s'ajoute ici** —
+               c'est la propriété que le `&&` de T4bis.3 cherchait, tenue pour un
+               septième geste. */
+            archiveResult={
+              canWrite ? archiveResult.bind(null, project.id) : null
+            }
           />
 
           {/* Les blocs de référence, « Ressources » en tête (docs/06 §5). */}

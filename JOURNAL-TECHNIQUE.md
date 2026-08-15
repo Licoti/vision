@@ -2400,3 +2400,69 @@ a bien ce droit sur cette ligne). Toutes les lignes touchées ont été remises 
 « Test projet ». Le serveur de développement, lui, tournait déjà sur le port **3000** pour ce dépôt :
 `next dev` refuse d'en lancer un second et le signale. Les relevés de T4bis.5 sont donc pris sur 3000,
 là où ceux de la session précédente citaient 3001.
+
+**T4bis.6 — `drizzle-kit` rend le `DROP CONSTRAINT` avant le `CREATE UNIQUE INDEX`, et c'est ce qu'il
+fallait.** L'arbitrage gardait le nom `results_activity_unique` en passant d'une contrainte unique à un
+index partiel : PostgreSQL l'accepte, à condition que la contrainte — qui possède son index — soit
+retirée avant que le nouvel index ne prenne le nom. L'ordre n'était pas garanti par la documentation,
+il a donc été **relu dans le fichier généré** avant d'être appliqué, et il était juste, sans retouche à
+la main. La vérification vaut d'être refaite au prochain renommage d'index : rien ne promet cet ordre.
+
+**T4bis.6 — `toolId` vient de la colonne, `toolName` de la jointure filtrée, et la différence est
+volontaire.** `listProjectRoadmap` joint `tools` avec `filter(tools)` : sélectionner `tools.id` aurait
+rendu `null` dès que le `tool_id` pointe l'outil d'un autre domaine — et le panneau de correction, qui
+resélectionne l'outil, aurait alors silencieusement détaché un résultat parfaitement légitime dès qu'un
+`tool_id` forgé traînait. `results.toolId` dit ce que la ligne **porte** ; la jointure dit ce qu'on a le
+droit d'en **nommer**. Un test l'éprouve sur la ligne forgée du domaine `b` (`toolName` nul, `toolId`
+intact), et c'est le seul endroit où la distinction se voit.
+
+**T4bis.6 — la valeur d'un `numeric(18,4)` ne se réaffiche pas telle que la colonne la rend.** Le
+pilote rend « 62.0000 » ; le poser dans le champ « Valeur » invitait à retaper. `toResultFormValues`
+rogne les zéros décimaux non significatifs et **garde le point** — `lib/forms/` ne connaît aucune
+locale, c'est `lib/format.ts` qui la porte, et l'importer là aurait mis une règle d'affichage dans un
+module qui n'en a pas. Ce qui compte est le **tour complet**, et deux tests l'éprouvent : réaffiché,
+resoumis sans être touché, le résultat réécrit la même valeur. La virgule reste acceptée en saisie ;
+elle n'est simplement pas produite.
+
+**T4bis.6 — la correction d'un résultat ne peut pas exiger `done`, et c'est un cas atteignable.** Un
+résultat ne s'écrit que sur une activité terminée — `assertPreconditions` en reste la seule autorité —
+mais `resolveActivityPeriod` (T3.4) redérive l'état quand la période bouge : corriger les dates d'une
+activité terminée qui porte un résultat la fait passer en « prévu » ou « en cours », le résultat
+restant accroché. Confiner « Corriger » et « Archiver le résultat » au groupe « Terminé » l'aurait
+rendu **visible, incorrigible et irretirable**. Les deux gestes suivent donc le résultat, la saisie
+seule garde les quatre conditions de T4.4. Ni la roadmap ni la page n'ont eu besoin d'une condition de
+plus pour cela : c'est la même expression, à un `||` près.
+
+**T4bis.6 — la mise en défaut a porté trois fois, et la leçon de T4bis.5 a été appliquée d'avance.**
+(1) La contrainte totale rétablie à la main sur la branche de test fait tomber **le seul** test de
+ressaisie, et rien d'autre — les deux autres tests du bloc éprouvent la règle qui survit à la
+migration, ils devaient donc rester verts. (2) `keepToolId` neutralisée (`where` retiré,
+`includeArchived` gardé) fait tomber le seul test qui isole l'exception — « l'exception ne retient que
+celui-là » —, les autres passant faute d'être sensibles à une liste trop permissive. (3) Le filtre de
+domaine de `tools` neutralisé dans la couche fait tomber ce même test isolant. C'est exactement le trou
+que T4bis.5 avait découvert après coup sur `findResourceActivity` ; ici le test isolant a été écrit
+avant, et il tient.
+
+**T4bis.6 — « aucune alerte » pour le membre non contributeur n'est pas un défaut, et la preuve se fait
+par différence.** `updateResult` refusé rend un message, mais le panneau qui l'afficherait n'est pas
+monté pour qui ne peut pas écrire : la page revient nue. Constater l'absence d'alerte ne prouve donc
+rien — ni que l'action a refusé, ni qu'elle a seulement été ignorée. La preuve retenue est la
+**différence** : la même charge, non retouchée, n'écrit rien sous le cookie du membre et écrit sous
+celui de la responsable. Même protocole pour la lecture seule : deux charges récoltées **avant**
+l'archivage du projet, refusées après, puis acceptées telles quelles après rétablissement.
+
+**T4bis.6 — la base de développement a été remise en état, sauf ce que le ticket devait y laisser.**
+Les vérifications ont corrigé, retiré, ressaisi un résultat sur « Test projet », archivé puis rétabli
+son accompagnement, archivé puis rétabli l'outil « Ergonome », et archivé une activité annulée par une
+soumission de trop — celle-ci a été rétablie, l'autre activité archivée du même projet datant d'avant
+la session. Ce qui **reste volontairement** : l'audit de « Test projet » porte deux résultats, un rangé
+et un vivant, soit l'état que seule l'unicité partielle autorise et qu'aucune fixture ne produit.
+`ETAT.md` en porte l'inventaire à jour.
+
+**T4bis.6 — `ETAT.md` dépasse 250 lignes, et seul le repliage peut le corriger.** Le fichier finit à
+**256** lignes. L'étape 5 du protocole demande de le balayer au-delà du seuil ; la session de découpage
+se dit « le seul moment où `ETAT.md` se balaie », et le **repliage d'un chantier clos en une ligne**
+est sa première étape. Les deux se contredisent ici, C4bis venant tout juste de se clore. Choix retenu :
+**ne pas faire le travail du découpage**, resserrer les seuls paragraphes que ce ticket écrit ou rend
+historiques — ce qui a rendu cinq lignes — et **nommer le dépassement dans `ETAT.md` avec sa cause et
+son échéance**. Le repliage de C4bis rendra une quarantaine de lignes d'un coup.

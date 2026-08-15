@@ -1,0 +1,2 @@
+ALTER TABLE "results" DROP CONSTRAINT "results_activity_unique";--> statement-breakpoint
+CREATE UNIQUE INDEX "results_activity_unique" ON "results" USING btree ("activity_id") WHERE "results"."archived_at" is null;

@@ -30,7 +30,7 @@
  * reste.
  *
  * **Un accompagnement archivé est en lecture seule, strictement** (T4bis.3,
- * arbitrage (a) de `tickets-C4bis.md`). Deux portes couvrent les six écritures
+ * arbitrage (a) de `tickets-C4bis.md`). Deux portes couvrent les écritures
  * de ce fichier : `openProject` pour la création et la correction d'activité, la
  * ressource et le résultat ; `openActivity` pour la transition, l'annulation et
  * **l'archivage d'une activité** (T4bis.4). Toutes deux exigent un projet non
@@ -39,18 +39,27 @@
  * pour qu'elle n'ait qu'une adresse. Les trois panneaux disparaissent aussi du
  * rendu, et les gestes de roadmap avec eux ; ce n'est pas ce rendu qui protège.
  *
- * **Six écritures ajoutent ou corrigent ; deux retirent** (T4bis.4, T4bis.5).
- * `archiveActivity` et `archiveResource` sont les deux seuls gestes de ce
- * fichier qui sortent une ligne du récit, et les deux seuls appelants
- * d'`archive()` ici. Ils ne suppriment rien (règle 4) et ne cascadent sur rien
- * (arbitrage (f)) : archiver une activité laisse ses ressources avec leur
- * `activity_id` et leur `archived_at` nul.
+ * **Sept écritures ajoutent ou corrigent ; trois retirent** (T4bis.4, T4bis.5,
+ * T4bis.6). `archiveActivity`, `archiveResource` et `archiveResult` sont les
+ * seuls gestes de ce fichier qui sortent une ligne du récit, et les seuls
+ * appelants d'`archive()` ici. Ils ne suppriment rien (règle 4) et ne cascadent
+ * sur rien (arbitrage (f)) : archiver une activité laisse ses ressources avec
+ * leur `activity_id` et leur `archived_at` nul.
  *
  * **Corriger et retirer une ressource (T4bis.5)** ferme la moitié du manque (4)
  * du chantier. `openResource` en est la troisième porte : elle enchaîne
  * `openProject` sur le projet **reçu** et le rapprochement de la ressource
  * **reçue** à ce projet — sans ce second contrôle, une soumission forgée
  * corrigerait la ressource d'un autre accompagnement.
+ *
+ * **Corriger et retirer un résultat (T4bis.6)** ferme l'autre moitié, et
+ * `openResult` est la quatrième porte — un maillon de plus que les autres, le
+ * résultat pendant à une activité qui pend elle-même au projet, `results`
+ * n'ayant pas de `project_id`. Le ticket porte aussi **la première migration
+ * depuis T1.2** : `results_activity_unique` est devenu un index **partiel**, et
+ * le contrôle d'unicité de `checkResultActivity` s'est relu avec elle — T4.4
+ * l'avait écrit pour épouser l'ancienne contrainte, et le laisser interdirait
+ * la ressaisie que la migration vient d'autoriser.
  *
  * **`last_activity_at` n'est pas recalculé ici.** `lib/db/scoped.ts` le fait
  * pour toute écriture d'activité — **l'archivage compris**, dans le même `batch`
@@ -638,12 +647,13 @@ export async function cancelActivity(
  * éléments archivés serait un septième écran pour un geste rare.
  *
  * **Un résultat vivant s'oppose au rangement.** Il resterait accroché à une
- * activité sortie du récit — et `results_activity_unique` portant sur
- * `activity_id` seul, sans regarder `archived_at`, il continuerait d'y bloquer
- * toute ressaisie. Le résultat se retire d'abord (T4bis.5 et T4bis.6 le
- * livrent) ; d'ici là, l'entrée de roadmap n'offre pas le geste, la même donnée
- * décidant du lien et de l'action. `count` écarte les archivés d'elle-même :
- * c'est bien un résultat **vivant** qui refuse, pas un déjà rangé.
+ * activité sortie du récit. Le résultat se retire d'abord — **et depuis T4bis.6
+ * il y a un geste pour cela** : « Archiver le résultat » sur la même entrée de
+ * roadmap, après quoi « Archiver la saisie » reparaît. L'entrée n'offre jamais
+ * les deux à la fois, la même donnée décidant du lien et de l'action. `count`
+ * écarte les archivés d'elle-même : c'est bien un résultat **vivant** qui
+ * refuse, pas un déjà rangé — et c'est ce qui rend ce chemin praticable, là où
+ * l'ancienne unicité totale laissait le résultat rangé bloquer la ressaisie.
  *
  * **Le refus est muet**, comme `transitionActivity` et `cancelActivity` : ce
  * geste n'a aucune saisie à rendre, et rien ne justifie de lui inventer un
@@ -999,10 +1009,11 @@ function resultRefusal(formData: FormData, message: string): ResultFormState {
  *    d'entrée que là ; un panneau absent du rendu n'a jamais protégé le point
  *    d'entrée HTTP qui l'accompagne, et ce refus-ci n'est donc pas une règle
  *    de plus mais la même règle, éprouvée là où elle tient ;
- * 3. **aucun résultat n'y est déjà posé** — `results_activity_unique` n'en
- *    autorise qu'un. Sans ce contrôle, la seconde saisie ne serait pas refusée
- *    mais **plantée** : une violation d'unicité est une exception PostgreSQL,
- *    donc un 500, là où l'on attend un message.
+ * 3. **aucun résultat vivant n'y est déjà posé** — `results_activity_unique`
+ *    n'en autorise qu'un, et depuis T4bis.6 il ne compte que les vivants. Sans
+ *    ce contrôle, la seconde saisie ne serait pas refusée mais **plantée** :
+ *    une violation d'unicité est une exception PostgreSQL, donc un 500, là où
+ *    l'on attend un message.
  *
  * Le quatrième — l'activité est **terminée** — n'est pas réécrit ici :
  * `assertPreconditions` le porte depuis T1.3, à travers deux tables, et le
@@ -1031,14 +1042,16 @@ async function checkResultActivity(
     return "Ce type d'activité ne produit pas de résultat chiffré.";
   }
 
-  /* `includeArchived` **et ce n'est pas une précaution de style** :
-     `results_activity_unique` porte sur `activity_id` seul et ignore
-     `archived_at` (piège relevé par T4.3). Une ligne archivée bloquerait donc
-     l'insertion sans que la lecture par défaut la voie. Le chemin n'est pas
-     atteignable — rien n'archive un résultat avant C4bis — et c'est exactement
-     pourquoi le contrôle doit épouser la contrainte plutôt que le cas courant. */
+  /* **`includeArchived` a disparu ici, et c'est la migration de T4bis.6 qui
+     l'exige.** T4.4 l'avait écrit pour épouser `results_activity_unique`, qui
+     portait sur `activity_id` seul et ignorait `archived_at` : une ligne
+     archivée bloquait l'insertion sans que la lecture par défaut la voie, et le
+     contrôle devait donc voir ce que la contrainte voyait. L'index est
+     désormais **partiel** — `where archived_at is null` —, si bien que le
+     défaut de `list` dit exactement ce qu'il interdit. Le laisser interdirait
+     la ressaisie que la migration vient d'autoriser : les deux se relisent
+     ensemble, jamais l'un sans l'autre. */
   const existing = await session.db.list(results, {
-    includeArchived: true,
     where: eq(results.activityId, activityId),
   });
   if (existing.length > 0) {
@@ -1125,7 +1138,238 @@ export async function createResult(
 
   // La page nue, panneau refermé : « enregistrement sans confirmation
   // intermédiaire » (`docs/06` §9). Le résultat paraît sur l'entrée de roadmap
-  // de son activité — la lecture de T4.3 —, et le point d'entrée en disparaît :
-  // c'est toute la confirmation. `redirect` lève, donc hors de tout `try`.
+  // de son activité — la lecture de T4.3 —, et le point d'entrée y devient
+  // « Corriger le résultat » (T4bis.6) : c'est toute la confirmation.
+  // `redirect` lève, donc hors de tout `try`.
   redirect(ROUTES.project(projectId));
+}
+
+/* ==========================================================================
+   Corriger et retirer un résultat — T4bis.6
+
+   L'autre moitié du manque (4), et le dernier objet de Vision sans chemin de
+   correction. Le ticket porte aussi **la première migration depuis T1.2** :
+   `results_activity_unique` est devenu un index **partiel**, sans quoi retirer
+   un résultat ne libérait pas son activité et la ressaisie levait une exception
+   PostgreSQL. Le contrôle d'unicité de `checkResultActivity` s'est relu avec
+   elle, ci-dessus.
+
+   Les deux actions partagent `openResult` et ne se distinguent que par ce
+   qu'elles font d'un refus : la correction le **rend**, le retrait se tait —
+   la forme exacte de T4bis.5.
+   ========================================================================== */
+
+/**
+ * Le résultat reçu, rapproché de l'activité reçue, elle-même rapprochée de ce
+ * projet — la **quatrième porte** du fichier, sur le modèle d'`openResource`.
+ *
+ * Trois contrôles, et chacun ferme une porte :
+ *
+ * 1. `openProject` sur le `projectId` **reçu** — le droit `writeProject` (D9),
+ *    l'appartenance au domaine, et la lecture seule d'un accompagnement
+ *    archivé, d'un seul appel ;
+ * 2. l'activité reçue **appartient à ce projet** et n'est pas archivée ;
+ * 3. le résultat reçu **appartient à cette activité** et n'est pas déjà
+ *    archivé.
+ *
+ * **Les trois sont nécessaires, et le troisième n'est pas redondant.**
+ * `results` n'a pas de `project_id` : sans le second contrôle, l'activité ne
+ * dirait rien du projet ; sans le troisième, une soumission forgée corrigerait
+ * ou retirerait le résultat d'une autre activité du même accompagnement. Les
+ * identifiants liés sont sérialisés en clair dans un champ `$ACTION_…`, et une
+ * soumission peut les réécrire.
+ *
+ * Les deux derniers refus se ressemblent volontairement : l'écran ne distingue
+ * pas le résultat inconnu de celui d'ailleurs, pour la même raison que la page
+ * projet rend 404 dans les deux cas.
+ *
+ * **Aucun contrôle sur l'état de l'activité ici.** Un résultat ne s'écrit que
+ * sur une activité terminée — `assertPreconditions` en reste la seule autorité
+ * (T4.4) —, mais une période corrigée peut redériver l'état d'une activité qui
+ * porte déjà le sien (`resolveActivityPeriod`, T3.4). Exiger `done` pour
+ * corriger rendrait alors ce résultat intouchable : on ne peut pas retirer ce
+ * qu'on n'a plus le droit d'atteindre.
+ *
+ * Le message n'est utilisé que par `updateResult` : `archiveResult` refuse en
+ * silence, n'ayant aucune saisie à rendre.
+ */
+async function openResult(
+  session: Session,
+  projectId: string,
+  activityId: string,
+  resultId: string,
+  refused: string,
+): Promise<
+  | {
+      project: Row<typeof projects>;
+      activity: Row<typeof activities>;
+      result: Row<typeof results>;
+    }
+  | { message: string }
+> {
+  const gate = await openProject(session, projectId, refused);
+  if ("message" in gate) return gate;
+
+  const activity = await session.db.find(activities, activityId);
+  if (
+    !activity ||
+    activity.projectId !== projectId ||
+    activity.archivedAt !== null
+  ) {
+    return { message: "Cette activité n'existe plus dans cet accompagnement." };
+  }
+
+  const result = await session.db.find(results, resultId);
+  if (
+    !result ||
+    result.activityId !== activityId ||
+    result.archivedAt !== null
+  ) {
+    return { message: "Ce résultat n'existe plus sur cette activité." };
+  }
+
+  return { project: gate.project, activity, result };
+}
+
+/**
+ * Corriger un résultat déjà reporté : **le même formulaire, la même validation,
+ * les mêmes refus** qu'à la saisie — la propriété qui fait qu'un seul panneau
+ * sert les deux gestes.
+ *
+ * `projectId`, `activityId` et `resultId` sont liés côté serveur. **Ce ne sont
+ * pas des secrets** : Next les sérialise en clair dans un champ `$ACTION_…`, et
+ * une soumission peut les réécrire. Ce qui protège est `openResult`.
+ *
+ * **L'activité ne se corrige pas ici** : `results.activity_id` n'est pas un
+ * champ du formulaire et ne le devient pas. Déplacer un résultat d'une activité
+ * à l'autre serait un geste que la fiche ne demande pas — et un résultat mal
+ * placé se retire et se ressaisit, ce que ce ticket rend possible pour la
+ * première fois.
+ *
+ * **Aucun contrôle d'idempotence** à la `activityRowUnchanged` de T3.4, pour la
+ * raison d'`updateResource` : `last_activity_at` n'est pas en jeu — corriger un
+ * résultat n'est pas écrire une activité.
+ *
+ * **Aucune requête sortante**, ni vers l'adresse saisie ni vers l'outil : le POC
+ * s'en tient au niveau 1 déclaratif (D15).
+ */
+export async function updateResult(
+  projectId: string,
+  activityId: string,
+  resultId: string,
+  _previous: ResultFormState,
+  formData: FormData,
+): Promise<ResultFormState> {
+  const session = await requireSession();
+
+  const gate = await openResult(
+    session,
+    projectId,
+    activityId,
+    resultId,
+    "La correction d'un résultat est réservée au responsable de domaine et aux contributeurs désignés de cet accompagnement.",
+  );
+  if ("message" in gate) return resultRefusal(formData, gate.message);
+
+  const { values, errors, input } = parseResultForm(formData);
+  if (!input) return { values, errors };
+
+  /* L'outil reçu, rapproché du domaine — le contrôle de `createResult`, repris
+     tel quel. `find` rend aussi les lignes archivées, et c'est ce qui fait
+     passer l'**exception nominative** sans une ligne de plus : l'outil qu'un
+     résultat porte déjà reste sélectionné dans le panneau, et une re-soumission
+     à l'identique doit continuer de l'accepter. Ce qu'on ne propose plus, on
+     continue de l'accepter. */
+  if (input.toolId) {
+    const tool = await session.db.find(tools, input.toolId);
+    if (!tool) {
+      return {
+        values,
+        errors: { toolId: "Cet outil n'existe pas dans ce domaine." },
+      };
+    }
+  }
+
+  try {
+    const updated = await session.db.update(results, resultId, input);
+    if (!updated) {
+      return resultRefusal(
+        formData,
+        "Ce résultat n'existe plus sur cette activité.",
+      );
+    }
+  } catch (error) {
+    if (error instanceof IntegrityError) {
+      return resultRefusal(
+        formData,
+        "Un résultat ne se rattache qu'à une activité terminée.",
+      );
+    }
+    if (error instanceof DomainScopeError) {
+      return resultRefusal(
+        formData,
+        "Une référence de ce formulaire n'appartient pas au domaine : la saisie n'a pas été enregistrée.",
+      );
+    }
+    throw error;
+  }
+
+  // Cette page-là, et elle seule — la raison de `createResult` : corriger un
+  // résultat n'est pas écrire une activité, et `last_activity_at` n'a pas bougé.
+  revalidatePath(ROUTES.project(projectId));
+
+  // La page nue, panneau refermé : la valeur corrigée paraît sur l'entrée de
+  // roadmap, et c'est toute la confirmation (`docs/06` §9). `redirect` lève,
+  // donc hors du `try`.
+  redirect(ROUTES.project(projectId));
+}
+
+/**
+ * Retirer un résultat de son entrée de roadmap : il s'archive, rien n'est
+ * supprimé (règle 4).
+ *
+ * **C'est le geste que la migration de ce ticket rend enfin réversible.** Avant
+ * elle, un résultat archivé occupait toujours la place de son activité et
+ * aucune ressaisie n'était possible ; l'index partiel libère l'activité au
+ * moment où le résultat est rangé. C'est pourquoi ce geste-ci n'a pas besoin de
+ * rétablissement — arbitrage (b) : un résultat se **ressaisit**, un libellé,
+ * une valeur et une date.
+ *
+ * **Sans confirmation** — arbitrage (c) : elle se justifie là où le geste retire
+ * de la lecture tout un ensemble, et `docs/06` §9 la proscrit partout où elle ne
+ * protège rien.
+ *
+ * **Le refus est muet**, comme `archiveResource` : ce geste n'a aucune saisie à
+ * rendre.
+ *
+ * **Aucun recalcul de `last_activity_at`** : `results` n'est pas `activities`,
+ * `archive()` ne déclenche donc aucun `batch` de recalcul, et la revalidation
+ * s'en tient à cette page — retirer un résultat n'a rien changé à la fraîcheur
+ * du produit.
+ *
+ * **Conséquence à connaître** : l'entrée de roadmap retrouve « Archiver la
+ * saisie », qu'`archiveActivity` refusait tant qu'un résultat vivant y pendait.
+ * Le chemin « retirer le résultat, puis archiver l'activité » que T4bis.4
+ * annonçait est ouvert par ce geste, sans qu'une ligne y soit écrite pour lui.
+ */
+export async function archiveResult(
+  projectId: string,
+  activityId: string,
+  resultId: string,
+): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openResult(
+    session,
+    projectId,
+    activityId,
+    resultId,
+    // Jamais rendu : ce geste n'affiche aucun refus.
+    "Le retrait d'un résultat est réservé au responsable de domaine et aux contributeurs désignés de cet accompagnement.",
+  );
+  if ("message" in gate) return;
+
+  await session.db.archive(results, resultId);
+
+  revalidatePath(ROUTES.project(projectId));
 }

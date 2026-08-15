@@ -25,6 +25,7 @@ import {
   normalizeDecimal,
   parseResultForm,
   readResultForm,
+  toResultFormValues,
   validateResultForm,
   type ResultFormValues,
 } from "./result";
@@ -397,5 +398,128 @@ describe("parseResultForm", () => {
       "unit",
       "value",
     ]);
+  });
+});
+
+/* ==========================================================================
+   De la ligne à la saisie — T4bis.6
+
+   Le chemin inverse, celui que la correction emprunte. Ce qui s'y joue n'est
+   pas la validation mais **le tour complet** : une ligne réaffichée, resoumise
+   sans être touchée, doit réécrire exactement la même valeur. Une colonne
+   `numeric(18,4)` rend « 62.0000 », et la propriété ne va pas de soi.
+   ========================================================================== */
+
+/** Une ligne de `results` telle que la roadmap la rend (`ActivityResult`). */
+function row(overrides: Partial<Parameters<typeof toResultFormValues>[0]> = {}) {
+  return {
+    label: "Score d'audit UX",
+    value: "62.0000" as string | null,
+    unit: "/100" as string | null,
+    measuredOn: "2024-05-31",
+    toolId: TOOL as string | null,
+    externalUrl: "https://exemple.invalid/rapport" as string | null,
+    ...overrides,
+  };
+}
+
+describe("toResultFormValues", () => {
+  test("la ligne complète devient six chaînes", () => {
+    expect(toResultFormValues(row())).toEqual({
+      label: "Score d'audit UX",
+      value: "62",
+      unit: "/100",
+      measuredOn: "2024-05-31",
+      toolId: TOOL,
+      externalUrl: "https://exemple.invalid/rapport",
+    });
+  });
+
+  test("les quatre colonnes nulles deviennent vides, jamais « null »", () => {
+    // Un constat sans chiffre, sans unité, sans outil et sans lien profond est
+    // un résultat normal (T4.3) : le panneau doit l'ouvrir sans afficher le mot
+    // `null` dans quatre champs.
+    expect(
+      toResultFormValues(
+        row({ value: null, unit: null, toolId: null, externalUrl: null }),
+      ),
+    ).toEqual({
+      label: "Score d'audit UX",
+      value: "",
+      unit: "",
+      measuredOn: "2024-05-31",
+      toolId: "",
+      externalUrl: "",
+    });
+  });
+
+  /* `numeric(18, 4)` rend toujours ses quatre décimales : « 62.0000 » là où
+     personne n'a tapé autre chose que « 62 ». Ce qui est réaffiché est ce qui
+     se retape, pas ce que la colonne stocke. */
+  test.each([
+    ["62.0000", "62"],
+    ["68.5000", "68.5"],
+    ["68.5400", "68.54"],
+    ["0.0000", "0"],
+    ["-12.3400", "-12.34"],
+    ["1000.0000", "1000"],
+    ["0.0500", "0.05"],
+    // Quatorze chiffres avant la virgule : la limite de la colonne, intacte.
+    ["99999999999999.0000", "99999999999999"],
+  ])("« %s » se réaffiche « %s »", (stored, shown) => {
+    expect(toResultFormValues(row({ value: stored })).value).toBe(shown);
+  });
+
+  test("le point n'est jamais changé en virgule", () => {
+    // `lib/forms` ne connaît aucune locale — c'est `lib/format.ts` qui la
+    // porte. La virgule reste acceptée en saisie ; elle n'est pas produite.
+    expect(toResultFormValues(row({ value: "68.5000" })).value).not.toContain(
+      ",",
+    );
+  });
+
+  /* **La propriété qui compte** : le tour complet. Sans elle, corriger un
+     libellé sans toucher à la valeur pourrait la refuser, ou pire l'écrire
+     autrement — la perte silencieuse que T4bis.1 a refermée ailleurs. */
+  test("le tour complet ne perd rien : réaffiché, resoumis, réécrit à l'identique", () => {
+    const original = row();
+    const shown = toResultFormValues(original);
+
+    expect(validateResultForm(shown)).toEqual({});
+
+    const data = new FormData();
+    for (const [key, value] of Object.entries(shown)) data.set(key, value);
+    const { input } = parseResultForm(data);
+
+    expect(input).toEqual({
+      label: original.label,
+      // « 62 » et « 62.0000 » sont la même valeur pour la colonne : ce qui
+      // compte est qu'aucun chiffre n'ait bougé.
+      value: "62",
+      unit: original.unit,
+      measuredOn: original.measuredOn,
+      toolId: original.toolId,
+      externalUrl: original.externalUrl,
+    });
+  });
+
+  test("le tour complet d'un constat sans chiffre ne perd rien non plus", () => {
+    const shown = toResultFormValues(
+      row({ value: null, unit: null, toolId: null, externalUrl: null }),
+    );
+
+    expect(validateResultForm(shown)).toEqual({});
+
+    const data = new FormData();
+    for (const [key, value] of Object.entries(shown)) data.set(key, value);
+
+    expect(parseResultForm(data).input).toEqual({
+      label: "Score d'audit UX",
+      value: null,
+      unit: null,
+      measuredOn: "2024-05-31",
+      toolId: null,
+      externalUrl: null,
+    });
   });
 });

@@ -29,6 +29,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
@@ -608,7 +609,7 @@ export const results = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     domainId: domainRef(),
-    /** Un résultat pour une activité au plus. */
+    /** Un résultat **vivant** pour une activité au plus — voir l'index. */
     activityId: uuid("activity_id")
       .notNull()
       .references(() => activities.id, { onDelete: "cascade" }),
@@ -632,7 +633,20 @@ export const results = pgTable(
   (t) => [
     index("results_domain_id_idx").on(t.domainId),
     index("results_tool_id_idx").on(t.toolId),
-    unique("results_activity_unique").on(t.activityId),
+    /* **Partiel depuis T4bis.6, et le nom ne change pas** — la règle de
+       `docs/04` §4 n'est pas changée d'un mot, elle en sort exacte : un
+       résultat **vivant** pour une activité au plus.
+
+       Une unicité totale sur `activity_id` faisait qu'un résultat archivé
+       occupait toujours la place : le retrait ne libérait pas son activité, et
+       la ressaisie levait une violation d'unicité — une exception PostgreSQL,
+       donc un 500, là où l'on attend un écran. Piège relevé par T4.3, épousé
+       par T4.4, refermé ici. Le nom est conservé parce que le code, le journal
+       et les fiches le nomment : PostgreSQL accepte de le réutiliser, la
+       contrainte étant retirée avant que l'index ne soit créé. */
+    uniqueIndex("results_activity_unique")
+      .on(t.activityId)
+      .where(sql`${t.archivedAt} is null`),
   ],
 );
 

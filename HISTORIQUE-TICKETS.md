@@ -95,6 +95,12 @@ elles sont recopiées ici au fil de l'eau pour que le récit détaillé garde so
   fichiers pour les sept annoncés plus leurs deux tests. Deux arbitrages posés et tranchés avant
   écriture : les libellés « Modifier » et « Archiver », aucun verbe neuf à l'écran ; l'exception
   nominative étendue à l'activité **annulée**, que la fiche ne nommait pas.
+- **T4bis.6 — 15/08/2026 — corriger et retirer un résultat, et sa migration.** Aucun écart de
+  périmètre, dix fichiers pour les huit annoncés plus leurs deux tests. **Première migration depuis
+  T1.2.** Quatre arbitrages posés et tranchés avant écriture : le nom `results_activity_unique`
+  conservé malgré le changement de nature ; les libellés « Corriger le résultat » et « Archiver le
+  résultat » ; les deux gestes suivent le **résultat** et non le groupe « Terminé » ; la valeur se
+  réaffiche rognée de ses zéros décimaux. Clôt C4bis.
 
 ---
 
@@ -997,6 +1003,85 @@ la première charge.
 discipline passée, un test isolant a été ajouté — une activité du domaine A dont le type appartient au
 domaine B, forgée par `db.insert` direct — et la sabotage refaite tombe exactement dessus. **Un test
 vert au retrait d'une règle est un test qui ne la couvre pas, même s'il porte son nom.**
+
+### T4bis.6 — corriger et retirer un résultat, et sa migration — 15/08/2026
+
+**L'autre moitié du manque (4), et le seul ticket du chantier qui touche le schéma.** Le résultat
+était le dernier objet de Vision sans chemin de correction. Mais là où la ressource ne demandait
+qu'un panneau à deux gestes, le résultat exigeait d'abord une **migration** :
+`results_activity_unique` portait sur `activity_id` seul et ignorait `archived_at`, si bien qu'un
+résultat archivé occupait toujours la place de son activité. Retirer ne libérait rien, et la
+ressaisie levait une violation d'unicité — une exception PostgreSQL, donc un 500, là où l'on attend
+un écran. T4.3 avait relevé le piège, T4.4 l'avait **épousé** plutôt que contourné.
+
+**Dix fichiers, aucun hors périmètre.** `lib/db/schema.ts` et `drizzle/0001_easy_prowler.sql`,
+`lib/forms/result.ts` (`toResultFormValues`), `lib/queries/activities.ts` (`ActivityResult` gagne
+`id` et `toolId` ; `listResultToolOptions` gagne `keepToolId`),
+`components/projects/result-panel.tsx` (trois propriétés optionnelles),
+`components/projects/roadmap.tsx`, `app/(app)/projets/[id]/actions.ts` (`openResult`,
+`updateResult`, `archiveResult`), `app/(app)/projets/[id]/page.tsx`, plus les deux fichiers de
+tests. **`lib/navigation.ts` n'a pas été touché**, et c'est la propriété du ticket :
+`?resultat=<identifiant d'activité>` désigne la **cible**, jamais le geste, si bien que la même
+adresse saisit quand l'activité n'a pas de résultat et corrige quand elle en porte un. T4bis.5 avait
+dû ajouter une route ; ici la forme posée par T4.4 suffisait déjà, sans en avoir eu l'intention.
+
+**La migration d'abord, et le `includeArchived` avec elle.** L'index devient partiel,
+`where archived_at is null`, **sans changer de nom** — quatre commentaires de code, le journal et
+deux fiches le nomment. `drizzle-kit` a rendu le `DROP CONSTRAINT` avant le `CREATE UNIQUE INDEX`,
+l'ordre qu'il fallait pour réutiliser le nom ; l'ordre a été relu dans le fichier généré avant
+d'être appliqué, sur la base de développement **et** sur la branche de test. Dans le même geste, le
+`includeArchived: true` de `checkResultActivity` est tombé : écrit par T4.4 pour épouser l'ancienne
+contrainte, il aurait interdit la ressaisie que la migration venait d'autoriser. Sa fiche exigeait
+qu'ils se relisent ensemble ; c'est le seul endroit du chantier où un ticket défait une ligne écrite
+par un ticket antérieur.
+
+**Quatrième porte, un maillon de plus que les trois autres.** `openResult` enchaîne `openProject`
+sur le projet **reçu**, rapproche l'activité **reçue** de ce projet, puis le résultat **reçu** de
+cette activité. Le troisième contrôle n'est pas redondant : `results` n'a pas de `project_id`, et
+sans lui une soumission forgée corrigerait le résultat d'une autre activité du même accompagnement.
+Ce qu'`openResult` ne contrôle **pas**, et volontairement : l'état de l'activité. Un résultat ne
+s'écrit que sur une activité terminée — `assertPreconditions` en reste la seule autorité — mais
+`resolveActivityPeriod` redérive l'état quand la période bouge, et exiger `done` pour corriger
+aurait rendu intouchable un résultat que l'écran continue d'afficher.
+
+**Les deux gestes suivent le résultat ; la saisie garde ses quatre conditions.** C'est l'arbitrage le
+moins visible du ticket et le plus conséquent. Dans la roadmap comme dans la page, l'expression est
+la même à un `||` près : `result !== null || (groupe « done » && producesResult)`. « Archiver le
+résultat » et « Archiver la saisie » ne peuvent jamais se trouver côte à côte — l'un ne paraît que si
+l'entrée porte un résultat, l'autre que si elle n'en porte pas —, ce qui a évité d'inventer le verbe
+que T4bis.4 redoutait.
+
+**Le critère qui n'existait pas avant ce ticket, lu à l'écran.** Sur « Test projet » : la valeur
+corrigée de 34 à « 41,5 » — virgule acceptée, normalisée en base — paraît aussitôt sur l'entrée
+(« 41,5/100 ») ; retirée, la ligne de résultat disparaît et « Saisir un résultat » **et** « Archiver
+la saisie » reparaissent ensemble ; **une seconde saisie sur la même activité est acceptée**, et la
+base porte alors deux lignes sur le même `activity_id`, une rangée et une vivante. Le chemin complet
+que T4bis.4 annonçait — retirer le résultat, puis archiver la saisie — a été joué jusqu'au bout et
+remis en état.
+
+**L'exception nominative, éprouvée des deux côtés.** L'outil « Ergonome » archivé le temps de la
+vérification : il reste **sélectionné** dans le panneau du résultat qui le porte, et il est **absent**
+du panneau d'un autre résultat — la nominativité se lit dans deux balisages servis, pas dans un
+raisonnement. La re-soumission à l'identique du premier panneau est acceptée et laisse `tool_id`
+intact : c'est exactement la perte silencieuse que T4bis.1 a refermée ailleurs, et elle n'a pas lieu.
+
+**Le droit éprouvé par l'action, et la preuve faite par différence.** Six charges forgées refusées,
+base comptée avant et après, rigoureusement identique : `archiveResult` et `updateResult` sous le
+cookie d'un membre non contributeur, `resultId` réécrit vers le résultat d'un autre accompagnement,
+`activityId` vers l'activité d'un autre, `projectId` vers un autre projet. Les refus qui **rendent**
+un message l'ont affiché — « Ce résultat n'existe plus sur cette activité. » —, et les cinq refus de
+T4.4 tiennent en correction, éprouvés séparément, la saisie revenant avec ses valeurs. Le refus du
+membre, lui, n'affiche rien : le panneau n'est pas monté pour qui ne peut pas écrire, et une absence
+d'alerte ne prouve rien. La preuve retenue est la **différence** — la même charge n'écrit pas sous un
+cookie et écrit sous l'autre. Même protocole pour la lecture seule : deux charges récoltées **avant**
+l'archivage du projet, refusées après, puis acceptées non retouchées après rétablissement.
+
+**La mise en défaut a porté trois fois.** La contrainte totale rétablie à la main sur la branche de
+test fait tomber **le seul** test de ressaisie et rien d'autre — les deux autres tests du bloc
+éprouvent la règle qui survit à la migration, ils devaient rester verts. `keepToolId` neutralisée,
+puis le filtre de domaine de `tools` neutralisé dans la couche, font tomber le seul test qui les
+isole. C'est le trou que T4bis.5 avait découvert **après coup** sur `findResourceActivity` ; ici le
+test isolant a été écrit d'avance, et il tient.
 
 ---
 

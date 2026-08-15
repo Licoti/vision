@@ -8,6 +8,13 @@
       "when": 1786521184575,
       "tag": "0000_sticky_fantastic_four",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786799830321,
+      "tag": "0001_easy_prowler",
+      "breakpoints": true
     }
   ]
 }

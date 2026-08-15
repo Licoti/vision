@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 15/08/2026 — T4bis.5 livré, quatre disciplines jouées.
-**Chantier en cours :** C4bis — archivage et correction, six tickets, cinq livrés
-**Ticket suivant :** T4bis.6 — corriger et retirer un résultat, et sa migration
+**Dernière mise à jour :** 15/08/2026 — T4bis.6 livré, quatre disciplines jouées. C4bis est terminé.
+**Chantier en cours :** aucun — C4bis clos, ses six tickets livrés
+**Ticket suivant :** session de découpage de C5 — indicateurs et temps long
 
 ---
 
@@ -16,7 +16,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C2 — Produits et projets | T2.1 → T2.6 | **terminé** |
 | C3 — Activités et roadmap | T3.1 → T3.6 | **terminé** |
 | C4 — Ressources et résultats | T4.1 → T4.4 | **terminé** |
-| C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **en cours**, T4bis.1 à T4bis.5 livrés |
+| C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **terminé** |
 | C5 — Indicateurs et temps long | à découper | à faire |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
@@ -24,10 +24,9 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 **Point de bascule atteint :** C1 à C3 constituent le POC minimal démontrable ; C4 y ajoute la
 boucle complète de `docs/05` §2 — saisir, attacher le lien, reporter le résultat.
 
-**Sur C4bis.** `docs/05` §5 pose sept chantiers et n'a jamais prévu l'archivage ni la correction :
-le cadrage distribue la création et l'édition, jamais le rangement. Le chantier s'intercale **sans
-décaler les autres** — « C7 » est écrit dans D25, D28 et D37, que la règle 6 interdit de rouvrir.
-C5, C6 et C7 gardent le sens que `docs/05` leur donne.
+**Sur C4bis, désormais clos.** `docs/05` §5 n'avait prévu ni l'archivage ni la correction ; le
+chantier s'est intercalé **sans décaler les autres** — C5, C6 et C7 gardent le sens que `docs/05`
+leur donne, « C7 » étant écrit dans D25, D28 et D37 que la règle 6 interdit de rouvrir.
 
 ---
 
@@ -76,6 +75,19 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   après, et le tour complet à l'identique relu en base — `activity_id` inchangé. **La mise en défaut
   a servi** : retirer `filter(activities)` de `findResourceActivity` ne faisait tomber aucun test, les
   deux filtres de domaine se rattrapant ; un test isolant a été ajouté avant de croire la discipline.
+- **T4bis.6 — 15/08/2026 — corriger et retirer un résultat, et sa migration.** Aucun écart de
+  périmètre, dix fichiers pour les huit annoncés plus leurs deux tests. **Première migration depuis
+  T1.2** : `results_activity_unique` devient un index **partiel**, `where archived_at is null`, sans
+  changer de nom ; `drizzle-kit` a rendu le `DROP CONSTRAINT` avant le `CREATE UNIQUE INDEX`, l'ordre
+  qu'il fallait. Quatre arbitrages tranchés avant écriture : nom d'index conservé ; « Corriger le
+  résultat » et « Archiver le résultat » à l'écran ; les deux gestes suivent **le résultat**, non le
+  groupe « Terminé » qu'une période corrigée peut quitter ; « 62.0000 » se retape « 62 ». Le
+  `includeArchived` de `checkResultActivity` s'est relu avec la migration, comme la fiche l'exigeait.
+  Quatre disciplines jouées, dont **la ressaisie après retrait lue à l'écran** — le critère qui
+  n'existait pas avant ce ticket —, six charges forgées refusées base comptée, et deux charges
+  récoltées **avant** archivage du projet refusées après puis acceptées non retouchées après
+  rétablissement. **Mise en défaut portée trois fois** : contrainte totale rétablie, `keepToolId`
+  neutralisée, filtre de domaine de `tools` neutralisé — chacune fait tomber le seul test qui l'isole.
 
 ---
 
@@ -110,20 +122,15 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
 
 ### b. Assignés à un ticket
 
-- **C4bis est découpé, et ses cinq premiers tickets sont livrés.** Les six manques — archivage du
-  produit, du projet, de l'activité, correction de la ressource et du résultat, lecture seule d'un
-  projet archivé, valeur archivée dans un formulaire — sont distribués en six tickets, avec les six
-  arbitrages rendus avant écriture (lecture seule stricte, rétablissement limité au produit et au
-  projet, confirmation pour ces deux-là seulement, vocabulaire « Archiver / Rétablir », refus
-  d'archiver un produit portant un accompagnement vivant, aucune cascade). **T4bis.1 a refermé le
-  manque (6)**, **T4bis.2 le manque (1)** — premier appelant d'`archive()`, unique auteur de
-  `restore()` —, **T4bis.3 les manques (2) et (5)**, la lecture seule tenant en deux lignes,
-  **T4bis.4 le manque (3)**, `openActivity` devenant la porte de trois gestes sans changer d'une
-  ligne, et **T4bis.5 la moitié du manque (4)**, `openResource` reprenant le même dessin.
-  `components/ui/confirm-panel.tsx` a servi deux fois sans être modifié ; `ResourcePanel` sert
-  désormais deux gestes sans être redit. Reste l'autre moitié du manque (4) : le résultat et la
-  migration de `results_activity_unique`.
-  → **`tickets-C4bis.md`, reprendre à T4bis.6.**
+- **C4bis est livré en entier, et la matrice « corriger / archiver » est pleine.** Les six manques
+  sont refermés par six tickets, sous les six arbitrages rendus avant écriture. Quatre portes
+  gouvernent désormais les écritures de la page projet — `openProject`, `openActivity`,
+  `openResource`, `openResult` — et le même `canWrite` fait tomber sept gestes ensemble. T4bis.6 a
+  porté la seule migration du chantier : « retirer puis ressaisir » est un chemin réel, pour le
+  résultat comme pour l'activité qui le portait.
+  → **repliage dû à la session de découpage de C5** : les six lignes de ticket ci-dessus partent
+  alors dans `HISTORIQUE-TICKETS.md`, ce point sort d'ici, et **ETAT.md repasse sous 250 lignes** —
+  il les dépasse depuis ce ticket, et seul le repliage peut le corriger (règle du protocole).
 - **`createProject` accepte encore un produit archivé.** Le formulaire ne le propose plus et la page
   produit n'y mène plus, mais l'action ne relit pas l'`archived_at` du produit **reçu** : une
   soumission forgée rattacherait un accompagnement neuf à un produit rangé, invisible partout. Relevé
@@ -164,13 +171,14 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
 
 ### c. Dettes assumées, sans échéance
 
-- **La base de développement a dérivé de la fixture, et c'est acté.** Inventaire au 14/08/2026 :
+- **La base de développement a dérivé de la fixture, et c'est acté.** Inventaire au 15/08/2026 :
   un accompagnement de plus — « Refonte de l'espace documents » sur « Espace client web », créé en
   vérification de T2.6, avec un commanditaire renseigné et une personne `source = manual` (Nadia
-  Berthier) ; cinq activités archivées depuis T3.3 ; quatre transitions non revenues en arrière depuis
-  T3.5 ; une ressource de plus depuis T4.2 et un résultat de plus depuis T4.4 ; un « Test projet » et
-  un produit « test » d'une session antérieure. La dérive a servi T4.4 : elle avait déjà mis un
-  Audit UX en « terminée » sans résultat, soit le cas exact que la fixture ne porte pas.
+  Berthier) ; six activités archivées depuis T3.3 ; quatre transitions non revenues en arrière depuis
+  T3.5 ; deux ressources de plus depuis T4.2 ; un « Test projet » et un produit « test » d'une session
+  antérieure, dont l'audit porte depuis T4bis.6 **deux résultats, un rangé et un vivant** — l'état que
+  seule l'unicité partielle autorise. La dérive a servi T4.4 : elle avait déjà mis un Audit UX en
+  « terminée » sans résultat, soit le cas exact que la fixture ne porte pas.
   **Règle posée le 14/08/2026 : la base de développement est jetable.** La règle 4 protège la donnée
   métier, pas une fixture locale. Conséquence : un critère de ticket passé ne s'y relit pas
   nécessairement — T2.1 à T2.4 se lisaient sur « 2 accompagnements », il y en a 3 — et ce n'est pas un

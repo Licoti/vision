@@ -150,11 +150,16 @@ export type ResultToolOption = { id: string; name: string };
  * elle qui rend le nom d'un résultat déjà posé. Décrire et proposer n'appellent
  * pas le même filtre, la règle de T2.6.
  *
- * **Aucune exception nominative** comme le `keepActivityTypeId` de T3.4 : C4
- * n'écrit aucune correction de résultat (arbitrage (a) de `tickets-C4.md`),
- * donc aucun panneau ne s'ouvre sur une ligne existante dont l'outil aurait pu
- * être archivé depuis. La question se posera avec le ticket de correction, en
- * C4bis.
+ * **Une exception, et une seule : `keepToolId`** (T4bis.6). L'en-tête renvoyait
+ * la question à C4bis en toutes lettres — C4 n'écrivait aucune correction
+ * (arbitrage (a) de `tickets-C4.md`), donc aucun panneau ne s'ouvrait sur une
+ * ligne existante dont l'outil aurait pu être archivé depuis. La correction
+ * existe désormais, et le motif est **rigoureusement celui de
+ * `keepActivityTypeId`** : l'outil déjà porté par le résultat édité reste dans
+ * la liste — donc sélectionné — et n'apparaît nulle part ailleurs. L'exception
+ * est **nominative** : elle n'ouvre la porte à aucun autre archivé, et la
+ * saisie n'en passe aucun, une création n'ayant pas de valeur antérieure à
+ * préserver.
  *
  * Tri par nom : `tools` ne porte pas de `position`, à la différence des types
  * et des approches — l'alphabet est alors le seul ordre qui ne varie pas d'un
@@ -162,8 +167,22 @@ export type ResultToolOption = { id: string; name: string };
  */
 export async function listResultToolOptions(
   scope: ScopedDb,
+  options: { keepToolId?: string } = {},
 ): Promise<ResultToolOption[]> {
-  const rows = await scope.list(tools, { orderBy: [asc(tools.name)] });
+  const keep = options.keepToolId;
+
+  const rows = await scope.list(tools, {
+    /* Sans exception, c'est la couche qui écarte les archivés. Avec, le filtre
+       passe dans le `where` — `includeArchived` ne lève rien de plus que ce que
+       la condition ci-dessous rétablit nommément. */
+    ...(keep
+      ? {
+          includeArchived: true,
+          where: or(isNull(tools.archivedAt), eq(tools.id, keep)),
+        }
+      : {}),
+    orderBy: [asc(tools.name)],
+  });
   return rows.map((row) => ({ id: row.id, name: row.name }));
 }
 
@@ -205,6 +224,13 @@ export type RoadmapGroupKey =
  * C'est une valeur **reportée**, jamais un indice calculé par Vision (D39).
  */
 export type ActivityResult = {
+  /**
+   * L'identifiant de la ligne — **ce que T4bis.6 ajoute**. Sans lui, les deux
+   * gestes de correction n'auraient rien à lier côté serveur : ils ne peuvent
+   * pas se contenter de l'activité, `results` n'ayant pas de `project_id` et le
+   * résultat reçu devant être rapproché de l'activité reçue.
+   */
+  id: string;
   label: string;
   /**
    * `numeric(18,4)` : le pilote rend la chaîne brute — « 62.0000 » et non 62.
@@ -216,6 +242,13 @@ export type ActivityResult = {
   measuredOn: string;
   /** `tool_id` est nullable (`on delete set null`). */
   toolName: string | null;
+  /**
+   * L'identifiant de l'outil — **ce que T4bis.6 ajoute**, à côté du nom que la
+   * lecture rendait déjà. Le nom sert l'écran, l'identifiant sert le panneau :
+   * c'est lui qui resélectionne l'outil en correction, et qui porte l'exception
+   * nominative de `listResultToolOptions` quand il a été archivé depuis.
+   */
+  toolId: string | null;
   /** Le lien profond. Nul pour les deux résultats de la fixture — cas normal. */
   externalUrl: string | null;
 };
@@ -247,9 +280,12 @@ export type RoadmapActivity = {
   /** Facultatif (`docs/03` §4), triés par nom. Vide la plupart du temps — T3.6. */
   participants: ActivityFormPerson[];
   /**
-   * Le résultat, s'il y en a un — T4.3. Un au plus
-   * (`results_activity_unique`), et seulement sur une activité terminée, seul
-   * état qui l'autorise (`docs/03` §4).
+   * Le résultat, s'il y en a un — T4.3. Un **vivant** au plus
+   * (`results_activity_unique`, partiel depuis T4bis.6), et rattaché à une
+   * activité terminée, seul état qui l'autorise (`docs/03` §4). La lecture
+   * n'impose pas ce dernier point, elle en hérite : `assertPreconditions` le
+   * refuse à l'écriture, et une période corrigée peut redériver l'état d'une
+   * activité qui porte déjà son résultat.
    */
   result: ActivityResult | null;
 };
@@ -418,11 +454,18 @@ export function listProjectRoadmap(
     const resultRows = await database
       .select({
         activityId: results.activityId,
+        id: results.id,
         label: results.label,
         value: results.value,
         unit: results.unit,
         measuredOn: results.measuredOn,
         toolName: tools.name,
+        /* `results.toolId`, et non `tools.id` : la jointure est filtrée sur le
+           domaine, et un `tool_id` pointant l'outil d'un autre domaine rendrait
+           `null` des deux côtés — le panneau perdrait alors la valeur qu'il
+           doit resélectionner. La colonne dit ce que la ligne porte ; la
+           jointure dit ce qu'on a le droit d'en nommer. */
+        toolId: results.toolId,
         externalUrl: results.externalUrl,
       })
       .from(results)
@@ -440,16 +483,20 @@ export function listProjectRoadmap(
         ),
       );
 
-    /* Un résultat par activité au plus — `results_activity_unique` —, donc une
-       valeur et non une liste, contrairement aux participants. */
+    /* Un résultat **vivant** par activité au plus — `results_activity_unique`,
+       partiel depuis T4bis.6 —, donc une valeur et non une liste,
+       contrairement aux participants. Le `where` ci-dessus écarte les archivés,
+       si bien que la contrainte et la lecture disent exactement la même chose. */
     const resultByActivity = new Map<string, ActivityResult>();
     for (const row of resultRows) {
       resultByActivity.set(row.activityId, {
+        id: row.id,
         label: row.label,
         value: row.value,
         unit: row.unit,
         measuredOn: row.measuredOn,
         toolName: row.toolName,
+        toolId: row.toolId,
         externalUrl: row.externalUrl,
       });
     }

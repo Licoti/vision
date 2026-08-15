@@ -36,6 +36,7 @@ import {
   listActivityFormOptions,
   listActivityParticipantIds,
   listProjectRoadmap,
+  listResultToolOptions,
   type RoadmapActivity,
   type RoadmapGroup,
 } from "./activities";
@@ -88,6 +89,8 @@ type Fixture = {
   doneOnlyActivityId: string;
   /** L'outil du domaine — la cible de la liaison forgée sur `tools`. */
   toolId: string;
+  /** L'outil archivé : proposé à personne, sauf au résultat qui le porte. */
+  retiredToolId: string;
   /** Côté centre de compétence — kind `center`. */
   centerPersonId: string;
   /** Côté entité accompagnée — kind `stakeholder` (T3.6, « côté entité »). */
@@ -299,6 +302,14 @@ async function seedDomain(label: string): Promise<Fixture> {
     kind: "audit",
   });
 
+  /* Un outil archivé (T4bis.6), sur le modèle du type archivé plus haut :
+     proposé à personne, sauf au résultat qui le porte déjà. */
+  const retiredTool = await scope.insert(tools, {
+    name: `Outil retiré ${label}`,
+    kind: "audit",
+  });
+  await scope.archive(tools, retiredTool.id);
+
   await scope.insert(results, {
     activityId: accessibilityActivity.id,
     label: `Score d'audit UX ${label}`,
@@ -338,6 +349,7 @@ async function seedDomain(label: string): Promise<Fixture> {
     userTestActivityId: userTestActivity.id,
     doneOnlyActivityId: doneOnlyActivity.id,
     toolId: tool.id,
+    retiredToolId: retiredTool.id,
     centerPersonId: center.id,
     stakeholderPersonId: stakeholder.id,
   };
@@ -677,6 +689,78 @@ describe("listActivityFormOptions — le type archivé", () => {
 });
 
 /* ==========================================================================
+   L'outil archivé — T4bis.6
+
+   L'exception nominative de T3.4, transposée au troisième panneau. Le bloc est
+   celui du type archivé, mot pour mot : ce sont les mêmes cinq questions, et
+   qu'elles se posent à l'identique est la propriété qu'on cherchait.
+   ========================================================================== */
+
+describe("listResultToolOptions — l'outil archivé", () => {
+  async function optionIds(
+    scope: ScopedDb,
+    options: { keepToolId?: string } = {},
+  ): Promise<string[]> {
+    const proposed = await listResultToolOptions(scope, options);
+    return proposed.map((tool) => tool.id);
+  }
+
+  test("sans exception, un outil archivé n'est proposé à personne", async () => {
+    const ids = await optionIds(a.scope);
+    expect(ids).not.toContain(a.retiredToolId);
+    expect(ids).toContain(a.toolId);
+  });
+
+  test("l'outil du résultat corrigé reste proposé, archivé compris", async () => {
+    const ids = await optionIds(a.scope, { keepToolId: a.retiredToolId });
+    expect(ids).toContain(a.retiredToolId);
+  });
+
+  test("l'exception ne retient que celui-là", async () => {
+    // Un second outil est archivé le temps du test : conserver l'un ne doit pas
+    // rouvrir la porte à l'autre.
+    await a.scope.archive(tools, a.toolId);
+    try {
+      const ids = await optionIds(a.scope, { keepToolId: a.retiredToolId });
+      expect(ids).toContain(a.retiredToolId);
+      expect(ids).not.toContain(a.toolId);
+    } finally {
+      await db
+        .update(tools)
+        .set({ archivedAt: null })
+        .where(eq(tools.id, a.toolId));
+    }
+  });
+
+  test("un outil vivant conservé ne se dédouble pas", async () => {
+    const ids = await optionIds(a.scope, { keepToolId: a.toolId });
+    expect(ids.filter((id) => id === a.toolId)).toHaveLength(1);
+  });
+
+  test("l'exception ne traverse pas la frontière de domaine", async () => {
+    /* **Le test qui isole le filtre de domaine** — la leçon de T4bis.5, où deux
+       filtres se rattrapaient l'un l'autre et où retirer le bon ne faisait
+       tomber aucun test. Ici la condition nominative porte sur `tools.id` seul,
+       sans domaine : c'est `filter(tools)` de la couche, et lui seul, qui empêche
+       l'outil archivé du domaine `a` d'être proposé dans le domaine `b`. */
+    const ids = await optionIds(b.scope, { keepToolId: a.retiredToolId });
+    expect(ids).not.toContain(a.retiredToolId);
+    expect(ids.length).toBeGreaterThan(0);
+  });
+
+  test("le tri par nom tient, l'outil conservé compris", async () => {
+    // `tools` ne porte pas de `position` : l'alphabet est le seul ordre qui ne
+    // varie pas d'un affichage à l'autre. « Ergonome a » avant « Outil retiré a ».
+    const proposed = await listResultToolOptions(a.scope, {
+      keepToolId: a.retiredToolId,
+    });
+    const names = proposed.map((tool) => tool.name);
+
+    expect(names).toEqual([...names].sort((x, y) => x.localeCompare(y)));
+  });
+});
+
+/* ==========================================================================
    Les participants — T3.6
    ========================================================================== */
 
@@ -789,6 +873,10 @@ describe("listProjectRoadmap — les résultats", () => {
     const groups = await listProjectRoadmap(a.scope, a.fullId);
 
     expect(entryOf(groups, a.accessibilityActivityId)?.result).toEqual({
+      // Les deux champs que T4bis.6 ajoute : l'identifiant, sans quoi les gestes
+      // de correction n'ont rien à lier, et l'identifiant de l'outil, sans quoi
+      // le panneau ne peut pas le resélectionner.
+      id: expect.any(String),
       label: "Score d'audit UX a",
       // `numeric(18,4)` : le pilote rend la chaîne brute, et c'est bien ce que
       // la lecture doit remonter — le formatage est le travail de
@@ -797,6 +885,7 @@ describe("listProjectRoadmap — les résultats", () => {
       unit: "/100",
       measuredOn: "2024-05-31",
       toolName: "Ergonome a",
+      toolId: a.toolId,
       externalUrl: "https://exemple.invalid/rapport-a",
     });
   });
@@ -808,11 +897,13 @@ describe("listProjectRoadmap — les résultats", () => {
     // outil et **sans lien profond** est un cas normal — c'est celui des deux
     // résultats de la fixture d'amorçage.
     expect(entryOf(groups, a.userTestActivityId)?.result).toEqual({
+      id: expect.any(String),
       label: "Synthèse de campagne a",
       value: null,
       unit: null,
       measuredOn: "2026-03-31",
       toolName: null,
+      toolId: null,
       externalUrl: null,
     });
   });
@@ -842,6 +933,84 @@ describe("listProjectRoadmap — les résultats", () => {
     // rien : c'est le résultat seul qui est rangé.
     expect(entryOf(groups, a.doneOnlyActivityId)).toBeDefined();
     expect(entryOf(groups, a.doneOnlyActivityId)?.result).toBeNull();
+  });
+});
+
+/* ==========================================================================
+   L'unicité partielle — T4bis.6
+
+   **Le seul bloc de ce fichier qui éprouve le schéma plutôt qu'une lecture**,
+   et il le fait par la lecture : `results_activity_unique` est devenu un index
+   partiel (`where archived_at is null`), et la propriété se constate là où
+   l'écran la constate — l'entrée de roadmap porte le résultat ressaisi.
+
+   Avant la migration, ces deux tests ne pouvaient pas exister : le premier
+   levait une violation d'unicité — une exception PostgreSQL, donc un 500 —
+   parce qu'un résultat archivé occupait toujours la place de son activité.
+   C'est la mise en défaut du ticket : rétablir la contrainte totale les fait
+   tomber, et eux seuls.
+
+   `doneOnlyActivityId` porte déjà le résultat **archivé** de la fixture : c'est
+   exactement l'état d'une activité dont on vient de retirer le résultat.
+   ========================================================================== */
+
+describe("results_activity_unique — l'index partiel", () => {
+  test("un résultat retiré libère son activité : le suivant s'écrit et se lit", async () => {
+    const replacement = await a.scope.insert(results, {
+      activityId: a.doneOnlyActivityId,
+      label: "Résultat ressaisi a",
+      value: "80",
+      measuredOn: "2025-03-31",
+    });
+
+    try {
+      const groups = await listProjectRoadmap(a.scope, a.doneOnlyId);
+      const entry = entryOf(groups, a.doneOnlyActivityId);
+
+      // Le ressaisi se lit, l'archivé reste invisible : un seul résultat sur
+      // l'entrée, et c'est le vivant.
+      expect(entry?.result?.label).toBe("Résultat ressaisi a");
+      expect(entry?.result?.id).toBe(replacement.id);
+    } finally {
+      // Les tests partagent une base réelle : la ligne repart, sans quoi les
+      // tests de roadmap qui suivent liraient un résultat de plus.
+      await db.delete(results).where(eq(results.id, replacement.id));
+    }
+  });
+
+  test("deux résultats **vivants** sur une même activité restent refusés", async () => {
+    /* La règle de `docs/04` §4 survit à la migration, elle en sort seulement
+       exacte : un résultat **vivant** pour une activité au plus.
+       `accessibilityActivityId` porte le sien, non archivé. */
+    await expect(
+      a.scope.insert(results, {
+        activityId: a.accessibilityActivityId,
+        label: "Second résultat vivant a",
+        measuredOn: "2024-06-30",
+      }),
+    ).rejects.toThrow();
+
+    // Et la lecture n'a pas bougé : l'entrée porte toujours le premier.
+    const groups = await listProjectRoadmap(a.scope, a.fullId);
+    expect(entryOf(groups, a.accessibilityActivityId)?.result?.label).toBe(
+      "Score d'audit UX a",
+    );
+  });
+
+  test("l'unicité ne connaît pas le domaine, et l'archivage la borne quand même", async () => {
+    /* `results_activity_unique` porte sur `activity_id` seul — aucun
+       `domain_id`, avant comme après la migration. Une ligne forgée depuis le
+       domaine `b` sur une activité du domaine `a` qui porte déjà un résultat
+       vivant se heurte donc à l'index, et non à un filtre de domaine. C'est ce
+       que le commentaire de `listProjectRoadmap` supposait sans l'éprouver. */
+    await expect(
+      db.insert(results).values({
+        domainId: b.domainId,
+        activityId: a.accessibilityActivityId,
+        label: "Résultat forgé sur activité occupée b",
+        measuredOn: "2027-03-31",
+      }),
+    ).rejects.toThrow();
   });
 });
 
@@ -904,6 +1073,16 @@ describe("listProjectRoadmap — étanchéité des résultats", () => {
     // franchit pas la frontière.
     expect(forged?.result?.label).toBe("Résultat à l'outil forgé b");
     expect(forged?.result?.toolName).toBeNull();
+
+    /* **`toolId` vient de la colonne, `toolName` de la jointure filtrée**, et
+       ce test est le seul endroit où la différence se voit (T4bis.6). La ligne
+       dit ce qu'elle porte ; la jointure dit ce qu'on a le droit d'en nommer.
+       Prendre `tools.id` aurait rendu `null` des deux côtés, et le panneau de
+       correction aurait perdu la valeur qu'il doit resélectionner. Rien ne
+       fuit pour autant : le nom de l'outil voisin ne franchit pas la
+       frontière, et `listResultToolOptions` ne proposera jamais cet
+       identifiant dans le domaine `b`. */
+    expect(forged?.result?.toolId).toBe(a.toolId);
   });
 
   test("un résultat forgé sur l'activité d'un autre domaine ne se lit pas", async () => {

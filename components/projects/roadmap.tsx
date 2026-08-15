@@ -85,6 +85,16 @@ type CancelAction = ((activityId: string, formData: FormData) => Promise<void>) 
  */
 type ArchiveAction = ((activityId: string) => Promise<void>) | null;
 
+/**
+ * Le retrait d'un résultat (T4bis.6), gaté de la même façon. **Deux arguments**,
+ * là où l'archivage d'activité n'en a qu'un : `results` n'a pas de
+ * `project_id`, et l'action rapproche le résultat reçu de l'activité reçue,
+ * elle-même rapprochée du projet lié côté serveur.
+ */
+type ArchiveResultAction =
+  | ((activityId: string, resultId: string) => Promise<void>)
+  | null;
+
 export function Roadmap({
   groups,
   addHref,
@@ -93,6 +103,7 @@ export function Roadmap({
   transitionActivity,
   cancelActivity,
   archiveActivity,
+  archiveResult,
 }: {
   groups: RoadmapGroup[];
   /** L'ouverture du panneau de saisie, ou `null` pour qui ne peut pas écrire. */
@@ -105,8 +116,13 @@ export function Roadmap({
   editHref: ((activityId: string) => string) | null;
   /**
    * L'ouverture du panneau de résultat sur une activité donnée (T4.4). Même
-   * règle que `editHref` pour le droit ; **les trois autres conditions se
-   * lisent dans la donnée**, et l'entrée les tient elle-même.
+   * règle que `editHref` pour le droit ; **les autres conditions se lisent dans
+   * la donnée**, et l'entrée les tient elle-même.
+   *
+   * **Une seule adresse pour deux gestes depuis T4bis.6** : la même URL saisit
+   * quand l'entrée n'a pas de résultat et corrige quand elle en porte un. C'est
+   * `lib/navigation.ts` qui l'avait rendu possible sans le savoir — la valeur y
+   * désigne l'activité, donc la cible, jamais le geste.
    */
   resultHref: ((activityId: string) => string) | null;
   /**
@@ -124,6 +140,12 @@ export function Roadmap({
    * elle tient déjà celles de `resultHref`.
    */
   archiveActivity: ArchiveAction;
+  /**
+   * Retirer le résultat d'une entrée (T4bis.6). Même règle de droit que les
+   * trois précédentes ; la condition qui reste — l'entrée porte un résultat
+   * vivant — se lit dans la donnée, et l'entrée la tient elle-même.
+   */
+  archiveResult: ArchiveResultAction;
 }) {
   return (
     <section className="flex flex-col gap-4">
@@ -153,6 +175,7 @@ export function Roadmap({
               transitionActivity={transitionActivity}
               cancelActivity={cancelActivity}
               archiveActivity={archiveActivity}
+              archiveResult={archiveResult}
             />
           ))}
         </div>
@@ -231,6 +254,7 @@ function RoadmapSection({
   transitionActivity,
   cancelActivity,
   archiveActivity,
+  archiveResult,
 }: {
   group: RoadmapGroup;
   editHref: ((activityId: string) => string) | null;
@@ -238,6 +262,7 @@ function RoadmapSection({
   transitionActivity: TransitionAction;
   cancelActivity: CancelAction;
   archiveActivity: ArchiveAction;
+  archiveResult: ArchiveResultAction;
 }) {
   const tone = GROUP_TONE[group.key];
   const cancelled = group.key === "cancelled";
@@ -280,11 +305,19 @@ function RoadmapSection({
           transitionActivity={transitionActivity}
           cancelActivity={cancelActivity}
           archiveActivity={archiveActivity}
+          archiveResult={archiveResult}
           {...(editHref && !cancelled ? { editHref: editHref(activity.id) } : {})}
+          /* **Les deux gestes du résultat suivent le résultat, pas le groupe**
+             (T4bis.6, arbitrage du 15/08/2026). La **saisie** garde les quatre
+             conditions de T4.4 — le droit, l'état terminé, un type qui produit,
+             aucun résultat déjà posé. La **correction**, elle, ne demande que
+             l'existence du résultat : éditer la période d'une activité terminée
+             la redérive en « prévu » ou « en cours » (`resolveActivityPeriod`)
+             sans toucher au résultat, et l'enfermer dans le groupe « Terminé »
+             le laisserait orphelin — visible, incorrigible, irretirable. */
           {...(resultHref &&
-          group.key === "done" &&
-          activity.producesResult &&
-          activity.result === null
+          (activity.result !== null ||
+            (group.key === "done" && activity.producesResult))
             ? { resultHref: resultHref(activity.id) }
             : {})}
         />
@@ -412,11 +445,13 @@ const ACTION_LINK = "text-xs font-semibold text-content-primary-dark underline";
  * retire, pas l'activité qu'on annule.
  *
  * **Il disparaît de lui-même quand un résultat est posé** : le résultat se
- * retire d'abord (T4bis.6), sans quoi il resterait accroché à une activité
- * sortie du récit. La même donnée décide du geste et de l'action, comme elle le
- * fait déjà pour « Saisir un résultat » — l'un ne peut pas survivre à l'autre.
- * Ce n'est pas ce rendu qui protège : `archiveActivity` refuse l'activité reçue
- * qui porte un résultat.
+ * retire d'abord, sans quoi il resterait accroché à une activité sortie du
+ * récit. **T4bis.6 donne enfin ce geste** — « Archiver le résultat » occupe
+ * exactement la place que « Archiver la saisie » laisse vide, et les deux ne se
+ * rencontrent jamais. La même donnée décide du geste et de l'action, comme elle
+ * le fait déjà pour « Saisir un résultat » — l'un ne peut pas survivre à
+ * l'autre. Ce n'est pas ce rendu qui protège : `archiveActivity` refuse
+ * l'activité reçue qui porte un résultat.
  */
 function RoadmapEntry({
   activity,
@@ -427,6 +462,7 @@ function RoadmapEntry({
   transitionActivity,
   cancelActivity,
   archiveActivity,
+  archiveResult,
 }: {
   activity: RoadmapActivity;
   edge: string;
@@ -436,6 +472,7 @@ function RoadmapEntry({
   transitionActivity: TransitionAction;
   cancelActivity: CancelAction;
   archiveActivity: ArchiveAction;
+  archiveResult: ArchiveResultAction;
 }) {
   const period = formatActivityPeriod(
     activity.periodStart,
@@ -514,21 +551,49 @@ function RoadmapEntry({
             Modifier
           </Link>
         ) : null}
-        {/* Le point d'entrée de T4.4, et ses quatre conditions réunies par
-            l'appelant et par l'entrée : le droit d'écrire, l'état terminé —
-            « le seul état qui autorise le rattachement d'un résultat »
-            (`docs/03` §4) —, un type qui en produit (`docs/04` §2), et aucun
-            résultat déjà posé, `results_activity_unique` n'en autorisant qu'un.
-            **Il disparaît donc de lui-même une fois le résultat saisi** : c'est
-            la même donnée qui l'affiche et qui le retire. */}
+        {/* Le point d'entrée de T4.4, **et sa correction depuis T4bis.6** : une
+            seule adresse, un seul panneau, deux gestes. Ce n'est pas le lien
+            qui change, c'est son libellé — la même donnée qui décidait de
+            l'afficher décide désormais de ce qu'il dit. Les conditions vivent
+            dans `RoadmapSection` ; ici ne reste que le mot.
+
+            « Corriger le résultat » et non « Modifier » : la fiche le nomme
+            ainsi, et le verbe dit que la valeur reportée était fausse — non que
+            la mesure a bougé, ce qui serait un second relevé et appartient aux
+            indicateurs (C5). */}
         {resultHref ? (
           <Link
             href={resultHref}
-            aria-label={`Saisir un résultat pour l'activité ${activity.typeLabel} — ${period}`}
+            aria-label={`${
+              activity.result ? "Corriger le résultat" : "Saisir un résultat"
+            } de l'activité ${activity.typeLabel} — ${period}`}
             className={ACTION_LINK}
           >
-            Saisir un résultat
+            {activity.result ? "Corriger le résultat" : "Saisir un résultat"}
           </Link>
+        ) : null}
+        {/* Le retrait de T4bis.6, juste sous le geste qui corrige : l'ordre va
+            du plus courant au plus rare, comme le reste de la colonne. Un
+            formulaire nu, sans confirmation (arbitrage (c)) ni motif, et
+            `ACTION_LINK` repris tel quel — aucun couple de couleurs neuf par la
+            position.
+
+            « Archiver le résultat » : le mot de l'arbitrage (d), jamais
+            « Supprimer » — rien n'est supprimé (règle 4). Il ne se confond pas
+            avec « Archiver la saisie » plus bas, et **ne peut pas s'y trouver
+            côte à côte** : celui-là ne paraît que si l'entrée n'a pas de
+            résultat, celui-ci que si elle en a un. La même donnée les exclut
+            l'un l'autre. */}
+        {archiveResult && activity.result ? (
+          <form action={archiveResult.bind(null, activity.id, activity.result.id)}>
+            <button
+              type="submit"
+              aria-label={`Archiver le résultat de l'activité ${activity.typeLabel} — ${period}`}
+              className={ACTION_LINK}
+            >
+              Archiver le résultat
+            </button>
+          </form>
         ) : null}
         {canMarkInProgress ? (
           <form action={transitionActivity.bind(null, activity.id, "in_progress")}>
