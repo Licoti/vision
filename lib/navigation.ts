@@ -269,6 +269,28 @@ export const ROUTES = {
    */
   projectResultNew: (id: string, activityId: string) =>
     `/projets/${id}?${RESULT_PANEL_PARAM}=${activityId}`,
+  /**
+   * La page du projet, panneau d'adoption ouvert (T5.4). **La même clé que la
+   * page produit**, comme la note d'`INDICATOR_PANEL_PARAM` l'annonçait : ce
+   * sont deux pages, jamais la même URL, et rien n'a eu à changer là-haut. La
+   * fermeture reste `project(id)`.
+   */
+  projectIndicatorNew: (id: string) =>
+    `/projets/${id}?${INDICATOR_PANEL_PARAM}=${INDICATOR_PANEL_NEW}`,
+  /**
+   * Le même panneau, sur une adoption existante (T5.4) : un seul formulaire,
+   * deux points d'entrée — la forme de `projectResourceEdit` jusqu'au nom de la
+   * clé.
+   *
+   * **La valeur porte l'identifiant de l'adoption, et non celui de
+   * l'indicateur.** C'est la règle tenue partout depuis T3.4 : la valeur désigne
+   * l'objet que le panneau corrige, et ici c'est la ligne de
+   * `project_indicators` — celle qui porte la référence, la cible et la valeur
+   * finale. La même clé change donc de **table** d'un écran à l'autre, comme
+   * `releve` en change entre ses deux cas.
+   */
+  projectIndicatorEdit: (id: string, adoptionId: string) =>
+    `/projets/${id}?${INDICATOR_PANEL_PARAM}=${adoptionId}`,
   about: "/a-propos",
 } as const;
 

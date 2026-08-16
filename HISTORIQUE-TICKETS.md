@@ -121,6 +121,13 @@ portaient en plus vivent dans le récit ci-dessous, ticket par ticket.)*
   Deux arbitrages tranchés avant écriture : la date de chaque ligne de série au **mois**, une seule
   règle de date dans tout le bloc ; la série **toujours dépliée**, sans geste d'ouverture. Aucun
   écart de périmètre — huit fichiers, ceux de la fiche.
+- **T5.4 — 16/08/2026 — adopter un indicateur depuis l'accompagnement.** Douze fichiers, dont
+  **trois hors fiche**, tous déclarés et tranchés avant écriture : `components/products/indicators.tsx`
+  et `app/(app)/produits/actions.ts` par arbitrage, `components/projects/adoption-panel.tsx` par
+  nécessité — la fiche demande un panneau sans nommer de fichier pour lui. Trois arbitrages : le
+  « combien » du refus (e) passe par l'écran et non par un message d'action ; le pluriel du refus (e)
+  d'`archiveProduct` se corrige avant d'être recopié ; `project_indicators.note` reste sans écrivain.
+  Premier retrait par `unlink` d'un objet que l'écran offre, et premier verbe neuf depuis T3.5.
 
 ---
 
@@ -1346,6 +1353,84 @@ colonne `numeric(18,4)` étant la même des deux côtés. La base de développem
 d'avant : trois relevés, aucun archivé, trois indicateurs dont deux archivés depuis T5.2. L'inventaire
 de dérive d'`ETAT.md` n'a pas grossi.
 
+### T5.4 — adopter un indicateur depuis l'accompagnement — 16/08/2026
+
+**Ce que le ticket livre.** Le deuxième bloc de référence de la page projet (`docs/06` §5), qui
+portait depuis T4.1 un état vide **annoncé** dans `REFERENCE_BLOCKS` : « les indicateurs du produit
+que cet accompagnement reprend à son compte s'afficheront ici ». La promesse est tenue. Chaque ligne
+dit quatre valeurs **reportées** côte à côte — référence, cible, dernière valeur datée, valeur
+finale — et pas un cinquième chiffre : aucun écart, aucune progression, aucun badge « cible
+atteinte » (arbitrage (g), D39). `project_indicators`, dormante depuis T1.2 et semée par la fixture,
+a enfin ses trois gestes.
+
+**Trois arbitrages rendus avant écriture, et posés à l'humain.**
+
+1. **Le « combien » du refus (e) atteint l'écran par le bloc, pas par l'action.** `archiveIndicator`
+   est un geste nu — `Promise<void>`, un formulaire sans champ — et n'a **nulle part où afficher un
+   message** : une valeur de retour ne serait même pas assignable au type de la prop qui la reçoit
+   (`((indicatorId: string) => Promise<void>) | null`). Retenu : `listProductIndicators` rend un
+   `adoptionCount`, et le bloc de la page produit remplace « Archiver » par une mention qui dit
+   combien. **L'action refuse quand même, en silence** — le droit s'éprouve par l'action, l'écran ne
+   fait qu'expliquer. Coût : un fichier hors fiche, `components/products/indicators.tsx`.
+2. **Le pluriel du refus (e) d'`archiveProduct` se corrige ici.** `ETAT.md` lui donnait T5.4 pour
+   destination — « un défaut se corrige avant d'être recopié » —, mais la fiche n'ouvre pas
+   `app/(app)/produits/actions.ts`. Le fichier y entre **pour cette seule phrase**.
+3. **`project_indicators.note` reste sans écrivain.** Quatre champs au panneau, pas un cinquième.
+
+**Un écart de périmètre de plus, et il était forcé.** La fiche écrit « le panneau reprend la clé
+`?indicateur=` » sans nommer de fichier pour ce panneau. `useActionState` impose un composant client,
+et le faire porter par `adopted-indicators.tsx` aurait fait entrer tout le bloc dans le paquet
+client, contre la forme de `Resources` et d'`Indicators`. **`components/projects/adoption-panel.tsx`
+est donc créé**, comme `indicator-panel.tsx` l'a été en T5.2.
+
+**Le décompte d'adoptions est une sous-requête corrélée, et c'est ce qui protège T5.1 et T5.3.** Un
+`leftJoin` sur `project_indicators` aurait multiplié les lignes par le nombre d'adoptions :
+`count(readings)` aurait compté chaque relevé autant de fois, et les deux agrégats ordonnés auraient
+changé de sens sans changer de résultat sur une fixture à une seule adoption. La sous-requête laisse
+la jointure de T5.1 et le filtre de T5.3 **exactement où ils sont**. Un test l'épingle en écrivant une
+**seconde** adoption : sans lui, le défaut serait resté invisible.
+
+**Le décompte d'exclusivité passe de quatre clés à cinq sans changer d'énoncé** — la deuxième fois
+qu'une généralisation écrite d'avance est payée par un ticket ultérieur, après `archiver` en T4bis.3.
+Éprouvé à l'écran : chaque clé seule ouvre son panneau, `indicateur` + `ressource` et `indicateur` +
+`archiver` n'ouvrent **rien**.
+
+**Le premier retrait par `unlink` d'un objet que l'écran offre, et un verbe neuf.** `syncParticipants`
+utilisait déjà `unlink` depuis T3.6, mais sans point d'entrée nommé. Ici le geste s'écrit à l'écran, et
+il ne pouvait pas s'appeler « Archiver » : rien n'est archivé, la ligne est supprimée, et
+`project_indicators` n'a pas d'`archived_at` — `LinkTable` l'impose à la compilation. **« Retirer »**
+est donc le premier verbe neuf depuis T3.5, et il l'est parce que le geste est neuf. Rien de la
+mémoire du centre ne s'y perd : les relevés vivent sur l'indicateur.
+
+**L'exception nominative couvre deux exclusions d'un seul chemin.** L'indicateur porté par l'adoption
+éditée est **déjà adopté** — donc écarté de la liste — et il a pu être **archivé** avant que
+l'arbitrage (e) ne l'interdise. `keepIndicatorId` le rétablit dans la requête, comme
+`listResultToolOptions` le fait pour l'outil depuis T4bis.6. Lu à l'écran : en correction, l'option
+est présente **et** `selected`, et la cible se réaffiche « 85 » et non « 85.0000 ».
+
+**Comment le droit a été éprouvé.** Le protocole de T4bis.3, et le harnais de T5.2/T5.3 repris tel
+quel — découpage du balisage **par `<form>`**, `$ACTION_REF_<n>` récolté **sans son `value`**, refus
+lus dans le **flux RSC**. Sept refus lus littéralement, base comptée avant et après, inchangée :
+membre non contributeur, indicateur archivé, indicateur d'un autre produit, seconde adoption du même
+indicateur, identifiant fantaisiste, indicateur absent, valeur qui n'est pas un nombre. Puis
+l'expérience contrôlée en six temps sur le projet archivé — récolte, témoin accepté, archivage, les
+**mêmes charges** refusées et base intacte, rétablissement, les mêmes charges acceptées. Et enfin le
+refus (e) par la même méthode : la charge d'archivage qui **écrit** quand l'indicateur est libre est
+**refusée** dès qu'il est adopté, l'indicateur restant `archivé=non`.
+
+**Le pluriel refermé, et lu dans ses deux états.** « Ce produit porte encore 1 accompagnement non
+archivé. Archivez-**le** d'abord : ranger le produit **le** ferait disparaître des listes sans **le**
+ranger. » et sa forme plurielle, toutes deux relues dans le flux. Deux phrases entières plutôt qu'un
+suffixe : une phrase à trous ne se relit pas dans ses deux états, et c'est ainsi que le défaut avait
+vécu de T4bis.2 à T5.1.
+
+**Ce que le ticket laisse derrière lui.** Une **sixième copie de `PanelField`** et une quatrième
+d'`ACTION_LINK` — à six copies, la dette cesse d'être bornée par la phrase qui la reportait. Un
+séparateur d'abord posé à `content-neutral-light` (2,22:1) puis ramené à la couleur du texte, ses deux
+côtés ayant la même graisse : la règle de T4bis.5, retrouvée à la mesure et non à la relecture. La base
+de développement garde une adoption au **même contenu mais à l'identifiant neuf**, `unlink` ne rendant
+pas sa ligne.
+
 ---
 
 ## Points ouverts refermés
@@ -1353,6 +1438,18 @@ de dérive d'`ETAT.md` n'a pas grossi.
 *(archivés depuis `ETAT.md` le 14/08/2026 — ils étaient barrés dans la section « Points ouverts »,
 où ils occupaient encore la place. Conservés tels quels : un point refermé documente comment il
 l%s été.)*
+
+- ~~**Le refus (e) d'`archiveProduct` reste au pluriel dans sa dernière phrase.**~~ **Refermé le
+  16/08/2026 par T5.4**, à qui `ETAT.md` l'avait assigné. Le point posait une tension que le ticket a
+  dû trancher : la fiche T5.4 n'ouvre **pas** `app/(app)/produits/actions.ts` — elle le cite comme
+  modèle à recopier —, si bien que la règle 3 et la destination écrite se contredisaient. Arbitrage
+  posé à l'humain avant écriture, tranché : le fichier entre au périmètre **pour cette seule phrase**,
+  parce qu'un défaut se corrige avant d'être recopié. La correction n'est pas un rapiéçage : le
+  `plural` disparaît au profit de **deux phrases entières** choisies par le décompte, et le refus (e)
+  d'`archiveIndicator` naît directement sous cette forme. Les deux états relus dans le flux, sur un
+  produit à un accompagnement et sur un produit à trois. **La leçon vaut au-delà de la phrase** :
+  une chaîne à trous ne se relit pas dans ses deux états, et c'est ce qui a laissé le défaut vivre de
+  T4bis.2 à T5.1 sans que quatre sessions le voient.
 
 - ~~**Le parcours d'archivage d'un produit n'a jamais été joué à l'écran.**~~ **Refermé le
   16/08/2026 par T5.1**, à qui la session de découpage de C5 l'avait assigné comme dû hors périmètre

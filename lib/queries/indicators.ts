@@ -22,13 +22,14 @@
  * courant. Règle 1.
  */
 
-import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, or, sql } from "drizzle-orm";
 
 import type { ScopedDb } from "@/lib/db/scoped";
 import {
   indicatorDirection,
   indicatorReadings,
   indicators,
+  projectIndicators,
 } from "@/lib/db/schema";
 
 /**
@@ -64,6 +65,16 @@ export type ProductIndicator = {
   lastReadOn: string | null;
   /** Le nombre de relevés. Zéro est une réponse, pas un manque. */
   readingCount: number;
+  /**
+   * Le nombre d'accompagnements qui **adoptent** cet indicateur (T5.4).
+   *
+   * Il ne décrit pas l'indicateur, il gouverne un geste : au-dessus de zéro,
+   * l'arbitrage (e) refuse l'archivage, et le bloc dit combien plutôt que
+   * d'offrir un « Archiver » qui paraîtrait ne rien faire. Ce n'est ni un
+   * score ni un indice (D39) — c'est un décompte de lignes, comme celui des
+   * accompagnements d'un produit depuis T2.2.
+   */
+  adoptionCount: number;
 };
 
 /**
@@ -94,6 +105,15 @@ export type ProductIndicator = {
  * relevés. Les trois agrégats l'écartent donc ensemble — un relevé retiré ne
  * compte plus, et ne fournit plus le dernier relevé, du même geste.
  *
+ * **Le décompte des adoptions est une sous-requête corrélée, et non une seconde
+ * jointure** (T5.4). Un `leftJoin` sur `project_indicators` multiplierait les
+ * lignes par le nombre d'adoptions : `count(readings)` compterait chaque relevé
+ * autant de fois, et les deux agrégats ordonnés changeraient de sens sans
+ * changer de résultat. La sous-requête laisse la jointure de T5.1 et le filtre
+ * de T5.3 **exactement où ils sont**, et leurs tests avec eux. Elle porte sa
+ * propre condition de domaine : `filter` ne s'applique qu'aux tables de la
+ * lecture, et un oubli serait une fuite.
+ *
  * Les indicateurs archivés sont écartés. Un produit sans indicateur rend un
  * tableau vide : l'état vide appartient à l'écran (règle 5).
  */
@@ -101,7 +121,7 @@ export function listProductIndicators(
   scope: ScopedDb,
   productId: string,
 ): Promise<ProductIndicator[]> {
-  return scope.joinedRead(async (database, { filter }) => {
+  return scope.joinedRead(async (database, { filter, domainId }) => {
     return database
       .select({
         id: indicators.id,
@@ -112,6 +132,7 @@ export function listProductIndicators(
         readingCount: sql<number>`count(${indicatorReadings.id})::int`,
         lastValue: sql<string | null>`(array_agg(${indicatorReadings.value} order by ${indicatorReadings.readOn} desc, ${indicatorReadings.id} desc))[1]`,
         lastReadOn: sql<string | null>`(array_agg(${indicatorReadings.readOn} order by ${indicatorReadings.readOn} desc, ${indicatorReadings.id} desc))[1]`,
+        adoptionCount: sql<number>`(select count(*) from ${projectIndicators} where ${projectIndicators.indicatorId} = ${indicators.id} and ${projectIndicators.domainId} = ${domainId})::int`,
       })
       .from(indicators)
       .leftJoin(
@@ -213,5 +234,168 @@ export function listProductReadings(
         ),
       )
       .orderBy(desc(indicatorReadings.readOn), desc(indicatorReadings.id));
+  });
+}
+
+/* ==========================================================================
+   L'adoption — T5.4
+
+   `project_indicators` relie l'accompagnement à son effet supposé (`docs/04`
+   §3). **Elle ne calcule rien** : ce module rend quatre valeurs reportées côte
+   à côte — référence, cible, valeur finale, et le dernier relevé daté — et
+   jamais leur écart, leur progression ou leur atteinte (arbitrage (g), D39).
+   ========================================================================== */
+
+/** Une entrée du bloc « Indicateurs adoptés » de la page projet. */
+export type ProjectAdoption = {
+  /**
+   * L'identifiant de l'**adoption**, pas de l'indicateur : c'est elle que la
+   * page corrige et retire, et c'est elle que porte la valeur de `?indicateur=`
+   * sur cet écran.
+   */
+  id: string;
+  /** L'indicateur adopté — ce que le panneau garde sélectionné en correction. */
+  indicatorId: string;
+  label: string;
+  /** L'unité de l'**indicateur** : les quatre chiffres la partagent. */
+  unit: string | null;
+  /** Brutes — « 85.0000 ». La mise en forme appartient à l'écran. */
+  baselineValue: string | null;
+  targetValue: string | null;
+  finalValue: string | null;
+  /** La valeur du dernier relevé vivant, ou `null` : l'écran le dit. */
+  lastValue: string | null;
+  /** « YYYY-MM-DD », et jamais posée à aujourd'hui (`docs/03` §7). */
+  lastReadOn: string | null;
+};
+
+/**
+ * Les indicateurs qu'un accompagnement a adoptés, par libellé.
+ *
+ * **Le patron de `listProductIndicators`, à la table de départ près** : une
+ * seule lecture jointe, le dernier relevé par l'agrégat ordonné
+ * `(array_agg(… order by read_on desc, id desc))[1]`, et le filtre des relevés
+ * retirés **dans le `on`** — l'emplacement que T5.3 a justifié, et pour la même
+ * raison ici : posé dans le `where`, il emporterait l'adoption avec ses relevés
+ * retirés au lieu de n'écarter que ceux-ci.
+ *
+ * `innerJoin` sur `indicators` : la jointure **est** la question. Elle porte le
+ * libellé, l'unité, et l'archivage de l'indicateur — une adoption dont
+ * l'indicateur est rangé sort du bloc en même temps que l'indicateur sort de la
+ * page produit. Le cas ne se crée plus depuis que l'arbitrage (e) refuse
+ * d'archiver un indicateur adopté ; il reste atteignable sur des lignes
+ * antérieures, et la cohérence entre les deux écrans prime.
+ *
+ * Le groupement se fait sur les deux clés primaires : celle de l'adoption pour
+ * ses trois valeurs, celle de l'indicateur pour son libellé et son unité — la
+ * dépendance fonctionnelle ne traverse pas une jointure.
+ *
+ * Un accompagnement sans adoption rend un tableau vide : l'état vide appartient
+ * à l'écran (règle 5).
+ */
+export function listProjectAdoptions(
+  scope: ScopedDb,
+  projectId: string,
+): Promise<ProjectAdoption[]> {
+  return scope.joinedRead(async (database, { filter }) => {
+    return database
+      .select({
+        id: projectIndicators.id,
+        indicatorId: projectIndicators.indicatorId,
+        label: indicators.label,
+        unit: indicators.unit,
+        baselineValue: projectIndicators.baselineValue,
+        targetValue: projectIndicators.targetValue,
+        finalValue: projectIndicators.finalValue,
+        lastValue: sql<string | null>`(array_agg(${indicatorReadings.value} order by ${indicatorReadings.readOn} desc, ${indicatorReadings.id} desc))[1]`,
+        lastReadOn: sql<string | null>`(array_agg(${indicatorReadings.readOn} order by ${indicatorReadings.readOn} desc, ${indicatorReadings.id} desc))[1]`,
+      })
+      .from(projectIndicators)
+      .innerJoin(
+        indicators,
+        and(
+          eq(indicators.id, projectIndicators.indicatorId),
+          filter(indicators),
+          isNull(indicators.archivedAt),
+        ),
+      )
+      .leftJoin(
+        indicatorReadings,
+        and(
+          eq(indicatorReadings.indicatorId, indicators.id),
+          filter(indicatorReadings),
+          isNull(indicatorReadings.archivedAt),
+        ),
+      )
+      .where(
+        and(
+          filter(projectIndicators),
+          eq(projectIndicators.projectId, projectId),
+        ),
+      )
+      .groupBy(projectIndicators.id, indicators.id)
+      .orderBy(asc(indicators.label), asc(projectIndicators.id));
+  });
+}
+
+/** Une option du panneau d'adoption : ce qu'il faut pour la nommer, rien de plus. */
+export type AdoptableIndicator = {
+  id: string;
+  label: string;
+  unit: string | null;
+};
+
+/**
+ * Les indicateurs qu'un accompagnement **peut encore adopter** : les vivants de
+ * son produit, moins ceux qu'il adopte déjà.
+ *
+ * L'exclusion des déjà-adoptés n'est pas un confort d'affichage : l'unicité
+ * `(projet, indicateur)` est **totale** en base, et proposer une seconde fois
+ * le même indicateur mènerait à une violation d'unicité — un 500 là où l'on
+ * attend un message. L'action la devance de toute façon ; la liste ne la
+ * propose pas.
+ *
+ * **`keepIndicatorId` est l'exception nominative** (T4bis.1, T4bis.5, T4bis.6),
+ * et elle en couvre deux d'un seul chemin : l'indicateur porté par l'adoption
+ * éditée est **déjà adopté** — donc exclu par la condition ci-dessus — et il a
+ * pu être **archivé** avant que l'arbitrage (e) ne l'interdise. Sans elle, le
+ * `select` du panneau s'ouvrirait sans option sélectionnée, et la première
+ * re-soumission changerait l'indicateur de l'adoption ou la refuserait — la
+ * perte exacte que T4bis.1 a refermée ailleurs. Elle est **nominative** : elle
+ * ne rétablit que la valeur déjà portée par la ligne éditée, et jamais une
+ * autre. La création ne passe rien.
+ *
+ * La condition de domaine de la sous-requête est écrite en propre : `filter` ne
+ * s'applique qu'aux tables de la lecture.
+ */
+export function listAdoptableIndicators(
+  scope: ScopedDb,
+  projectId: string,
+  productId: string,
+  options: { keepIndicatorId?: string } = {},
+): Promise<AdoptableIndicator[]> {
+  const keep = options.keepIndicatorId;
+
+  return scope.joinedRead(async (database, { filter, domainId }) => {
+    const free = sql`not exists (select 1 from ${projectIndicators} where ${projectIndicators.indicatorId} = ${indicators.id} and ${projectIndicators.projectId} = ${projectId} and ${projectIndicators.domainId} = ${domainId})`;
+    const alive = isNull(indicators.archivedAt);
+    const kept = keep ? eq(indicators.id, keep) : null;
+
+    return database
+      .select({
+        id: indicators.id,
+        label: indicators.label,
+        unit: indicators.unit,
+      })
+      .from(indicators)
+      .where(
+        and(
+          filter(indicators),
+          eq(indicators.productId, productId),
+          kept ? or(alive, kept) : alive,
+          kept ? or(free, kept) : free,
+        ),
+      )
+      .orderBy(asc(indicators.label), asc(indicators.id));
   });
 }

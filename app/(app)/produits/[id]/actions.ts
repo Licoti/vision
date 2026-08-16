@@ -80,6 +80,7 @@ import {
   indicatorReadings,
   indicators,
   products,
+  projectIndicators,
   projects,
 } from "@/lib/db/schema";
 import { DomainScopeError, type Row } from "@/lib/db/scoped";
@@ -434,15 +435,26 @@ export async function updateIndicator(
  * rétablissement existe pour les deux objets qui ont une page, et un indicateur
  * n'en a pas.
  *
- * **Aucun refus d'adoption ici** — arbitrage (e) de `tickets-C5.md` : un
- * indicateur encore adopté par un accompagnement ne s'archivera pas, et le refus
- * dira combien, mais il appartient à **T5.4**, qui crée les adoptions. T5.2 n'a
- * rien à refuser : aucune adoption n'existe encore par l'interface.
+ * **Le refus d'adoption, arrivé en T5.4** (arbitrage (e) de `tickets-C5.md`) :
+ * un indicateur encore adopté par un accompagnement ne s'archive pas. C'est la
+ * transposition exacte de l'arbitrage (e) de C4bis — ranger un objet dont les
+ * liaisons vivent n'est pas ranger, c'est faire disparaître. `listProjectAdoptions`
+ * écarte les adoptions dont l'indicateur est archivé : autoriser ce rangement
+ * ferait donc sortir l'adoption du bloc de la page projet **sans que personne ne
+ * l'ait retirée**, et sans qu'aucun écran ne puisse plus la défaire.
  *
- * **Le refus est muet**, comme `archiveResource` et `archiveResult` : ce geste
- * n'a aucune saisie à rendre, et rien ne justifie de lui inventer un message que
- * l'écran n'atteint jamais en usage normal — le point d'entrée n'est rendu qu'à
- * qui peut écrire, sur un indicateur vivant de ce produit.
+ * **Aucune cascade** — arbitrage (f) : les adoptions ne sont pas retirées à la
+ * place de qui range. Elles se retirent depuis la page de leur accompagnement,
+ * une par une, et l'archivage redevient possible ensuite.
+ *
+ * **Le refus est muet, et l'écran dit combien avant le clic.** Ce geste n'a
+ * aucune saisie à rendre, et son formulaire nu n'a nulle part où afficher un
+ * message : c'est le bloc de la page produit qui remplace « Archiver » par une
+ * mention nommant le nombre d'accompagnements — `adoptionCount`, lu par
+ * `listProductIndicators`. Le point d'entrée disparaît donc **avant** que le
+ * refus ne serve ; ce refus n'en est pas moins nécessaire, un point d'entrée
+ * absent du rendu n'ayant jamais protégé le point d'entrée HTTP qui
+ * l'accompagne.
  */
 export async function archiveIndicator(
   productId: string,
@@ -458,6 +470,14 @@ export async function archiveIndicator(
     "Le rangement d'un indicateur est réservé au responsable de domaine et aux contributeurs désignés d'un accompagnement de ce produit.",
   );
   if ("message" in gate) return;
+
+  /* Le refus de l'arbitrage (e). `count` sur la table de liaison : elle n'a pas
+     d'`archived_at`, donc toutes ses lignes sont vivantes — il n'y a pas
+     d'adoption rangée qui cesserait de s'opposer au rangement. */
+  const adopted = await session.db.count(projectIndicators, {
+    where: eq(projectIndicators.indicatorId, indicatorId),
+  });
+  if (adopted > 0) return;
 
   await session.db.archive(indicators, indicatorId);
 

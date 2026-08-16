@@ -74,15 +74,20 @@ import {
   archiveResult,
   cancelActivity,
   createActivity,
+  createAdoption,
   createResource,
   createResult,
+  removeAdoption,
   transitionActivity,
   updateActivity,
+  updateAdoption,
   updateResource,
   updateResult,
 } from "./actions";
 import { archiveProject, restoreProject } from "../actions";
 import { ActivityPanel } from "@/components/projects/activity-panel";
+import { AdoptedIndicators } from "@/components/projects/adopted-indicators";
+import { AdoptionPanel } from "@/components/projects/adoption-panel";
 import {
   ResourcePanel,
   type ResourceActivityOption,
@@ -99,8 +104,9 @@ import { Section, SectionHeader } from "@/components/ui/section";
 import { StatusDot } from "@/components/ui/status-dot";
 import { Tag } from "@/components/ui/tag";
 import { requireSession } from "@/lib/auth/provider";
-import { activities, resources } from "@/lib/db/schema";
+import { activities, projectIndicators, resources } from "@/lib/db/schema";
 import { toActivityFormValues } from "@/lib/forms/activity";
+import { toAdoptionFormValues } from "@/lib/forms/adoption";
 import { toResourceFormValues } from "@/lib/forms/resource";
 import { toResultFormValues } from "@/lib/forms/result";
 import {
@@ -112,6 +118,7 @@ import {
 import {
   ACTIVITY_PANEL_NEW,
   ARCHIVE_PANEL_CONFIRM,
+  INDICATOR_PANEL_NEW,
   RESOURCE_PANEL_NEW,
   ROUTES,
 } from "@/lib/navigation";
@@ -121,6 +128,10 @@ import {
   listProjectRoadmap,
   listResultToolOptions,
 } from "@/lib/queries/activities";
+import {
+  listAdoptableIndicators,
+  listProjectAdoptions,
+} from "@/lib/queries/indicators";
 import { findAccompanimentRank, findProjectDetail } from "@/lib/queries/projects";
 import {
   findResourceActivity,
@@ -136,14 +147,11 @@ export const metadata = {
  * Les blocs de référence **restants**, dans l'ordre de `docs/06` §5 — fréquence
  * d'usage. « Ressources » les précédait ici jusqu'à T4.1 ; il porte désormais
  * son contenu réel et vit dans `components/projects/resources.tsx`, en première
- * case de la grille.
+ * case de la grille. « Indicateurs adoptés » l'a suivi en T5.4, en deuxième
+ * case : leur état vide **annoncé** est devenu leur état vide réel, écrit dans
+ * leur composant.
  */
 const REFERENCE_BLOCKS: { title: string; description: string }[] = [
-  {
-    title: "Indicateurs adoptés",
-    description:
-      "Les indicateurs du produit que cet accompagnement reprend à son compte s'afficheront ici, avec leur valeur de référence, la cible fixée et le dernier relevé.",
-  },
   {
     title: "Projets liés",
     description:
@@ -171,6 +179,7 @@ export default async function ProjectPage({
     ressource?: string;
     resultat?: string;
     archiver?: string;
+    indicateur?: string;
   }>;
 }) {
   const { id } = await params;
@@ -195,7 +204,8 @@ export default async function ProjectPage({
      que ce `&&` cherchait. Le rendu n'est pas le verrou pour autant : les deux
      portes de `./actions` refusent le projet archivé reçu. */
   const canWrite = session.can.writeProject(project.id) && !archived;
-  const { activite, ressource, resultat, archiver } = await searchParams;
+  const { activite, ressource, resultat, archiver, indicateur } =
+    await searchParams;
 
   /* L'exclusivité, avant tout le reste : plusieurs clés d'ouverture
      concurrentes n'en ouvrent aucune (T4.2). Tout ce qui suit lit `asked`, pas
@@ -205,8 +215,10 @@ export default async function ProjectPage({
      **La règle n'a pas changé, son écriture si** : T4.2 la posait en une
      comparaison binaire, qui ne se généralise pas à trois clés. Un décompte dit
      la même chose pour trois — et T4bis.3 y a ajouté `archiver` sans toucher à
-     l'énoncé, ce qui était précisément la propriété cherchée. */
-  const keys = { activite, ressource, resultat, archiver };
+     l'énoncé, ce qui était précisément la propriété cherchée. **T5.4 y ajoute
+     `indicateur` de la même façon** : cinq clés, le même énoncé, et c'est la
+     seconde fois que la généralisation est payée par un ticket ultérieur. */
+  const keys = { activite, ressource, resultat, archiver, indicateur };
   const conflict =
     Object.values(keys).filter((value) => value !== undefined).length > 1;
   const asked: Partial<typeof keys> = conflict ? {} : keys;
@@ -258,12 +270,14 @@ export default async function ProjectPage({
   const resourcePanelOpen =
     canWrite && (asked.ressource === RESOURCE_PANEL_NEW || resource !== null);
 
-  /* Trois lectures indépendantes, un seul aller-retour : les ressources
-     rejoignent le rang et la roadmap plutôt que d'attendre leur tour (T4.1). */
-  const [rank, roadmap, projectResources] = await Promise.all([
+  /* Quatre lectures indépendantes, un seul aller-retour : les ressources
+     rejoignent le rang et la roadmap plutôt que d'attendre leur tour (T4.1), et
+     les adoptions les rejoignent à leur tour (T5.4). */
+  const [rank, roadmap, projectResources, adoptions] = await Promise.all([
     findAccompanimentRank(session.db, project),
     listProjectRoadmap(session.db, project.id),
     listProjectResources(session.db, project.id),
+    listProjectAdoptions(session.db, project.id),
   ]);
 
   /* L'activité sur laquelle un résultat se saisit ou se corrige (T4.4,
@@ -316,11 +330,40 @@ export default async function ProjectPage({
     !archived &&
     asked.archiver === ARCHIVE_PANEL_CONFIRM;
 
+  /* L'adoption corrigée (T5.4), sur la forme exacte de la ressource : une seule
+     clé, dont la **valeur** porte le cas — `nouvel` adopte, un identifiant
+     corrige, tout le reste n'ouvre rien. La valeur désigne l'**adoption**, pas
+     l'indicateur : c'est la ligne de `project_indicators` qu'on corrige, celle
+     qui porte la référence, la cible et la valeur finale.
+
+     La forme est vérifiée avant la base, comme partout : une colonne `uuid`
+     interrogée avec n'importe quoi rend une erreur PostgreSQL, donc un 500.
+
+     Aucune condition d'archivage ici, à la différence de la ressource :
+     `project_indicators` n'a pas de colonne `archived_at` — une liaison ne
+     s'archive pas, elle se défait (arbitrage (f)). */
+  const editedAdoption =
+    canWrite &&
+    asked.indicateur &&
+    asked.indicateur !== INDICATOR_PANEL_NEW &&
+    isUuid(asked.indicateur)
+      ? await session.db.find(projectIndicators, asked.indicateur)
+      : undefined;
+
+  const adoption =
+    editedAdoption && editedAdoption.projectId === project.id
+      ? editedAdoption
+      : null;
+
+  const adoptionPanelOpen =
+    canWrite && (asked.indicateur === INDICATOR_PANEL_NEW || adoption !== null);
+
   const panelOpen =
     activityPanelOpen ||
     resourcePanelOpen ||
     resultPanelOpen ||
-    archivePanelOpen;
+    archivePanelOpen ||
+    adoptionPanelOpen;
 
   /* Le référentiel des outils n'est lu **que** si le panneau de résultat
      s'ouvre — la discipline de `panelOptions` ci-dessous, posée en T3.3 : la
@@ -426,6 +469,27 @@ export default async function ProjectPage({
         )
       : null;
 
+  /* Les indicateurs proposés à l'adoption (T5.4). Lus **seulement si le panneau
+     s'ouvre** — la discipline de `panelOptions`, posée en T3.3 : la page la plus
+     consultée du produit ne paie pas cette requête pour un panneau fermé.
+
+     **L'exception nominative vit dans la requête**, comme celle de
+     `listResultToolOptions` et à la différence de celle des activités : la liste
+     ne se dérive d'aucune lecture déjà faite, donc rien n'oblige à la corriger
+     après coup. `keepIndicatorId` couvre les deux exclusions d'un seul chemin —
+     l'indicateur de l'adoption éditée est **déjà adopté**, et il a pu être
+     **archivé** avant que l'arbitrage (e) ne l'interdise. Sans elle, le `select`
+     s'ouvrirait sans option sélectionnée, et la première re-soumission changerait
+     l'indicateur de l'adoption ou la refuserait. */
+  const adoptableIndicators = adoptionPanelOpen
+    ? await listAdoptableIndicators(
+        session.db,
+        project.id,
+        project.productId,
+        adoption ? { keepIndicatorId: adoption.indicatorId } : {},
+      )
+    : [];
+
   if (keptActivity) {
     resourceActivities.push({
       id: keptActivity.id,
@@ -515,6 +579,39 @@ export default async function ProjectPage({
                 title: "Corriger le résultat",
                 submitLabel: "Enregistrer les modifications",
                 initial: toResultFormValues(resultTarget.result),
+              }
+            : {})}
+        />
+      ) : null}
+
+      {adoptionPanelOpen ? (
+        /* L'action est liée **côté serveur** — au projet courant en adoption, au
+           projet et à l'adoption en correction —, comme les cinq panneaux qui
+           précèdent : les identifiants sortent de la saisie, et le panneau ne
+           connaît ni l'accompagnement ni l'adoption qu'il écrit. Ce n'est pas un
+           verrou — Next sérialise les arguments liés dans un champ `$ACTION_…`,
+           réécrivable. Le verrou est dans l'action, qui interroge `writeProject`
+           sur l'identifiant reçu, rapproche l'adoption reçue de ce projet et
+           l'indicateur reçu du **produit** de ce projet (D11). */
+        <AdoptionPanel
+          /* La `key` change avec ce que le panneau édite, pour la raison écrite
+             sur celle du panneau d'activité : `useActionState` ne relit son état
+             initial qu'au montage. */
+          key={adoption ? adoption.id : INDICATOR_PANEL_NEW}
+          projectName={project.name}
+          closeHref={ROUTES.project(project.id)}
+          productHref={ROUTES.product(project.productId)}
+          action={
+            adoption
+              ? updateAdoption.bind(null, project.id, adoption.id)
+              : createAdoption.bind(null, project.id)
+          }
+          indicators={adoptableIndicators}
+          {...(adoption
+            ? {
+                title: "Modifier l'adoption",
+                submitLabel: "Enregistrer les modifications",
+                initial: toAdoptionFormValues(adoption),
               }
             : {})}
         />
@@ -789,6 +886,32 @@ export default async function ProjectPage({
               archiveResource={
                 canWrite ? archiveResource.bind(null, project.id) : null
               }
+            />
+
+            {/* Deuxième case de la grille, à la place que `docs/06` §5 lui donne
+                et sans en changer l'ordre. Les trois points d'entrée tombent
+                avec le **même** `canWrite` que ceux de « Ressources » — le droit
+                d'écrire dans ce projet (D9) et la lecture seule d'un
+                accompagnement archivé (T4bis.3) —, et **aucune condition ne
+                s'ajoute ici**. `removeAdoption` est liée au projet côté serveur ;
+                le bloc y ajoutera l'adoption au rendu.
+
+                `productHref` n'est pas un droit : c'est le renvoi de
+                l'arbitrage (c), et il vaut pour qui lit comme pour qui écrit —
+                un indicateur se crée sur la page du produit, jamais ici. */}
+            <AdoptedIndicators
+              adoptions={adoptions}
+              addHref={canWrite ? ROUTES.projectIndicatorNew(project.id) : null}
+              editHref={
+                canWrite
+                  ? (adoptionId) =>
+                      ROUTES.projectIndicatorEdit(project.id, adoptionId)
+                  : null
+              }
+              removeAdoption={
+                canWrite ? removeAdoption.bind(null, project.id) : null
+              }
+              productHref={ROUTES.product(project.productId)}
             />
 
             {REFERENCE_BLOCKS.map((block) => (

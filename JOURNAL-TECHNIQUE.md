@@ -2663,3 +2663,80 @@ récrite en T5.2, s'alourdit d'un cran : `project-form.tsx`, `activity-panel.tsx
 composant de champ ; `roadmap.tsx`, `resources.tsx` et `indicators.tsx` la même constante de geste
 texte. Aucun des fichiers ne l'exporte, aucun n'appartenait au périmètre. **À cinq copies, le ticket
 d'extraction ne se repousse plus par la même phrase** : il se pose, ou la dette cesse d'être bornée.
+
+**T5.4 — un geste nu n'a nulle part où afficher un refus, et le typage le dit avant le raisonnement.**
+L'arbitrage (e) de `tickets-C5.md` demande que le refus d'`archiveIndicator` « dise combien ».
+Or ce geste est un `<form>` sans champ, lié à une action `Promise<void>` : il n'y a pas de
+`useActionState` pour faire revenir un état, et lui en faire rendre un ne compile même pas —
+`Promise<{ message }>` n'est pas assignable au type de la prop qui le reçoit
+(`((indicatorId: string) => Promise<void>) | null`), la règle d'assignabilité de `void` ne
+traversant pas `Promise`. Trois issues se présentaient : refuser en silence et reporter le
+« combien » ; élargir le périmètre pour que l'écran le dise ; ou inventer un canal de message pour
+les gestes nus. La troisième est un mécanisme neuf que la fiche ne demande pas. Retenu, **posé à
+l'humain et tranché** : `listProductIndicators` rend un `adoptionCount`, le bloc remplace « Archiver »
+par la mention, et l'action refuse quand même — **le point d'entrée disparaît avant que le refus ne
+serve, et le refus existe quand même**, un point d'entrée absent du rendu n'ayant jamais protégé le
+point d'entrée HTTP qui l'accompagne. Coût : un fichier hors fiche.
+**À retenir : un arbitrage qui demande un message suppose un endroit où le lire ; à défaut, c'est
+l'écran qui parle avant le geste, pas l'action après lui.**
+
+**T5.4 — le décompte d'adoptions ne pouvait pas être une jointure, et un test à une seule adoption
+ne l'aurait jamais montré.** `adoptionCount` est une **sous-requête corrélée** dans le `select` de
+`listProductIndicators`. Un `leftJoin` sur `project_indicators` aurait multiplié les lignes par le
+nombre d'adoptions : `count(indicator_readings.id)` aurait compté chaque relevé autant de fois, et
+les deux `array_agg` ordonnés auraient gardé la bonne réponse — l'ordre étant stable — tout en
+changeant de sens. Sur la fixture, qui porte **une** adoption, rien n'aurait paru. Le test qui
+l'épingle écrit donc une **seconde** adoption le temps de la mesure, puis la défait. La sous-requête
+a un second mérite : elle laisse la jointure de T5.1 et le filtre de T5.3 exactement où ils sont, et
+leurs tests avec eux. **À retenir : une lecture qui gagne un agrégat sur une table à cardinalité
+variable se vérifie à deux lignes, jamais à une.**
+
+**T5.4 — un test peut porter le nom d'une règle sans la couvrir, et la mise en défaut l'a dit.**
+Le test « une adoption d'un autre domaine n'exclut rien » forgeait d'abord une ligne de domaine `a`
+sur un **projet de `a`**, puis lisait les options d'un projet de `b`. Retirer la condition de domaine
+de la sous-requête d'exclusion n'a fait tomber **aucun test** : la condition `project_id` écartait
+déjà la ligne forgée, et le test passait par elle. Récrit pour que la ligne forgée porte **le projet
+visé par la lecture** et ne se distingue que par son `domain_id`, il tombe. C'est mot pour mot la
+leçon de T4bis.5, retrouvée sur une autre règle : **un test vert au retrait d'une règle est un test
+qui ne la couvre pas, même s'il porte son nom.** Six sabotages joués en tout sur ce ticket ; c'est le
+seul qui a d'abord échoué à faire tomber quoi que ce soit.
+
+**T5.4 — l'écart de périmètre du panneau était forcé, pas choisi.** La fiche écrit « le panneau
+reprend la clé `?indicateur=` » et ne nomme aucun fichier pour lui — elle liste
+`components/projects/adopted-indicators.tsx` et rien d'autre côté composants. Faire porter le panneau
+par le bloc aurait fait basculer **tout le bloc** dans le paquet client, `useActionState` étant un
+crochet : c'est la forme que `Resources` et `Indicators` refusent depuis T4.1. `adoption-panel.tsx`
+est donc créé, sixième jumeau d'`activity-panel.tsx`. **À retenir pour les découpages : une fiche qui
+demande un panneau doit lister son fichier ; T5.2 le faisait, T5.4 l'a oublié.**
+
+**T5.4 — « Retirer » est un verbe neuf, et c'est le geste qui l'impose.** T4bis.5 avait posé
+qu'« aucun verbe neuf n'entre à l'écran », et l'écran n'en portait que deux — « Modifier » et
+« Archiver ». Le retrait d'une adoption n'est ni l'un ni l'autre : `project_indicators` n'a pas
+d'`archived_at`, `LinkTable` refuse `archive` à la compilation, et la ligne est **supprimée**.
+Écrire « Archiver » aurait nommé faux un geste irréversible. La règle de T4bis.5 vaut pour deux
+formes d'un même geste, pas pour deux gestes de nature différente. **Rien n'est perdu pour autant** :
+les relevés vivent sur l'indicateur, l'indicateur sur le produit, et la règle 4 protège la donnée
+métier — pas une liaison, arbitrage de fait de T1.2.
+
+**T5.4 — le séparateur a été posé à 2,22:1, et c'est la mesure qui l'a rattrapé.** Le `·` entre la
+dernière valeur et son mois avait reçu `content-neutral-light` par recopie d'un autre écran. Ses deux
+côtés ont exactement la même graisse et la même taille : à 2,22:1 sur `surface-neutral-pale`,
+« 71 % juin 2026 » se lit d'une traite. Ramené à la couleur du texte — `content-neutral-dark`,
+8,12:1 —, ce que `resources.tsx` fait depuis T4bis.5 et `indicators.tsx` depuis T5.1, les deux sans
+classe de couleur sur le séparateur. **Aucun couple neuf par la position dans tout le ticket**, les
+sept mesurés : 4,98 / 8,12 / 17,87 / 15,72 / 6,41 / 3,88:1. **À retenir : un jeton recopié d'un
+écran voisin n'est pas un jeton mesuré ; c'est la position qui décide, pas la provenance.**
+
+**T5.4 — la sixième copie de `PanelField` et la quatrième d'`ACTION_LINK`.** T5.3 écrivait qu'« à
+cinq copies, le ticket d'extraction ne se repousse plus par la même phrase : il se pose, ou la dette
+cesse d'être bornée ». Il ne s'est pas posé, et la sixième est là — `project-form.tsx`,
+`activity-panel.tsx`, `resource-panel.tsx`, `indicator-panel.tsx`, `reading-panel.tsx`,
+`adoption-panel.tsx`. Aucun ne l'exporte, aucun n'appartenait au périmètre de ce ticket. **La dette
+n'est plus bornée par une phrase, et il faut le dire ainsi** : le prochain ticket qui ouvre deux de
+ces fichiers ensemble doit extraire, ou C5 se termine à sept copies avec T5.5 et T5.6.
+
+**T5.4 — `ETAT.md` finit à 249 lignes, à une du seuil.** Le fichier passe de 238 à 249 : une ligne de
+ticket, un point ouvert neuf, un point refermé parti dans `HISTORIQUE-TICKETS.md`, et l'inventaire de
+dérive augmenté d'une phrase. Le protocole fixe 250. **T5.5 le franchira**, et son étape 5 devra
+balayer avant d'écrire — ou la session de découpage de C6 le fera, mais elle vient après deux tickets.
+À traiter au plus tard à l'ouverture de T5.6.

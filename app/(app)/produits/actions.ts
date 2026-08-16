@@ -211,6 +211,29 @@ async function openProduct(
 }
 
 /**
+ * Le refus de l'arbitrage (e) : le produit porte encore des accompagnements
+ * vivants, et le message dit combien.
+ *
+ * **Deux phrases entières, choisies par le décompte**, et non une phrase à
+ * suffixes — c'est ce que T5.4 corrige. Le `plural` d'origine gouvernait le nom
+ * et le premier pronom ; les deux derniers étaient écrits en dur au pluriel, si
+ * bien que le message se lisait « ranger le produit **les** ferait disparaître »
+ * pour **un** accompagnement. Le défaut a vécu de T4bis.2 à T5.1, où le refus a
+ * été lu au singulier pour la première fois : personne ne l'avait vu, parce
+ * qu'une phrase à trous ne se relit pas dans ses deux états.
+ *
+ * Deux phrases coûtent une ligne de plus et ne peuvent pas se désaccorder. La
+ * même forme est reprise par la mention d'adoption du bloc « Indicateurs »
+ * (T5.4) : c'est désormais la règle du dépôt pour un message qui compte.
+ */
+function refusalOfLivingProjects(alive: number): string {
+  if (alive > 1) {
+    return `Ce produit porte encore ${formatAccompaniments(alive)} non archivés. Archivez-les d'abord : ranger le produit les ferait disparaître des listes sans les ranger.`;
+  }
+  return `Ce produit porte encore ${formatAccompaniments(alive)} non archivé. Archivez-le d'abord : ranger le produit le ferait disparaître des listes sans le ranger.`;
+}
+
+/**
  * Archiver un produit : il quitte les listes, sa page reste lisible (règle 4).
  *
  * **Le refus qui compte est celui de l'arbitrage (e)** : un produit portant
@@ -243,10 +266,7 @@ export async function archiveProduct(
     where: eq(projects.productId, productId),
   });
   if (alive > 0) {
-    const plural = alive > 1 ? "s" : "";
-    return {
-      message: `Ce produit porte encore ${formatAccompaniments(alive)} non archivé${plural}. Archivez-le${plural} d'abord : ranger le produit les ferait disparaître des listes sans les ranger.`,
-    };
+    return { message: refusalOfLivingProjects(alive) };
   }
 
   await session.db.archive(products, productId);

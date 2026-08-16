@@ -75,6 +75,23 @@ import type {
 const ACTION_LINK = "text-xs font-semibold text-content-primary-dark underline";
 
 /**
+ * Ce qui remplace « Archiver » quand l'indicateur est adopté — le refus (e) de
+ * `tickets-C5.md`, dit **avant** le clic.
+ *
+ * **Deux phrases entières, choisies par le décompte**, et non une phrase à
+ * suffixes. C'est la leçon du refus (e) d'`archiveProduct`, relevée en T5.1 :
+ * un `plural` gouverne le nom et le premier pronom, jamais les suivants, et la
+ * phrase se lit faux au singulier sans que personne ne s'en aperçoive pendant
+ * trois chantiers. Deux phrases coûtent une ligne et ne peuvent pas se
+ * désaccorder.
+ */
+function adoptionNotice(count: number): string {
+  return count > 1
+    ? `Adopté par ${count} accompagnements — retirez ces adoptions pour pouvoir le ranger.`
+    : "Adopté par 1 accompagnement — retirez cette adoption pour pouvoir le ranger.";
+}
+
+/**
  * La série de chaque indicateur, en une passe.
  *
  * `readings` arrive **plat et déjà ordonné** — une lecture par écran, jamais une
@@ -355,16 +372,40 @@ export function Indicators({
                       Modifier
                     </Link>
                   ) : null}
+                  {/* **Le refus (e) de T5.4, dit avant le clic.** Un indicateur
+                      encore adopté ne s'archive pas : l'action le refuse, et
+                      comme son formulaire est nu, elle refuserait **en
+                      silence** — le geste paraîtrait ne rien faire. Le point
+                      d'entrée cède donc la place à la mention qui dit combien,
+                      et ce qu'il faut faire d'abord.
+
+                      Ce n'est pas le verrou : `archiveIndicator` recompte les
+                      adoptions sur l'identifiant **reçu**. Un point d'entrée
+                      absent du rendu n'a jamais protégé le point d'entrée HTTP
+                      qui l'accompagne.
+
+                      La mention n'est **pas un jugement** : c'est un décompte de
+                      lignes, comme « 2 accompagnements » sur la liste des
+                      produits depuis T2.2. Aucun couple neuf par la position —
+                      `content-neutral-base` sur `surface-neutral-pale`, à
+                      4,98:1, est déjà celui de la ligne de description
+                      au-dessus. */}
                   {archiveIndicator ? (
-                    <form action={archiveIndicator.bind(null, indicator.id)}>
-                      <button
-                        type="submit"
-                        aria-label={`Archiver l'indicateur ${indicator.label}`}
-                        className={ACTION_LINK}
-                      >
-                        Archiver
-                      </button>
-                    </form>
+                    indicator.adoptionCount > 0 ? (
+                      <span className="text-xs text-content-neutral-base">
+                        {adoptionNotice(indicator.adoptionCount)}
+                      </span>
+                    ) : (
+                      <form action={archiveIndicator.bind(null, indicator.id)}>
+                        <button
+                          type="submit"
+                          aria-label={`Archiver l'indicateur ${indicator.label}`}
+                          className={ACTION_LINK}
+                        >
+                          Archiver
+                        </button>
+                      </form>
+                    )
                   ) : null}
                 </div>
               ) : null}

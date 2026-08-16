@@ -1,6 +1,7 @@
 /**
- * Les tests des deux lectures du bloc « Indicateurs » : les indicateurs d'un
- * produit avec leur dernier relevé (T5.1), et leur série datée (T5.3).
+ * Les tests des lectures d'indicateurs : les indicateurs d'un produit avec leur
+ * dernier relevé (T5.1), leur série datée (T5.3), et l'adoption par un
+ * accompagnement (T5.4).
  *
  * Ils tournent sur la branche Neon dédiée — `vitest.config.mts` remappe
  * `DATABASE_URL` sur `TEST_DATABASE_URL` — et écrivent réellement : un
@@ -24,16 +25,29 @@ import {
   indicatorReadings,
   indicators,
   products,
+  projectIndicators,
+  projectStatuses,
+  projects,
 } from "@/lib/db/schema";
 
 import {
+  listAdoptableIndicators,
   listProductIndicators,
   listProductReadings,
+  listProjectAdoptions,
   type ProductIndicator,
 } from "./indicators";
 
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
-const teardownOrder = [indicatorReadings, indicators, products, entities];
+const teardownOrder = [
+  projectIndicators,
+  indicatorReadings,
+  indicators,
+  projects,
+  projectStatuses,
+  products,
+  entities,
+];
 
 type Fixture = {
   domainId: string;
@@ -54,6 +68,19 @@ type Fixture = {
   archivedReadingId: string;
   /** L'indicateur du produit voisin — la cible des relevés forgés. */
   otherIndicatorId: string;
+
+  /* --- T5.4 : l'adoption --------------------------------------------------- */
+
+  /** L'accompagnement qui adopte deux indicateurs du produit complet. */
+  adopterId: string;
+  /** Un accompagnement du même produit, sans aucune adoption. */
+  looseId: string;
+  /** L'accompagnement du produit **voisin** : son produit borne ses options. */
+  otherProjectId: string;
+  /** L'adoption d'« Autonomie » — celle qui porte les trois valeurs. */
+  autonomyAdoptionId: string;
+  /** L'adoption de l'indicateur **archivé** : elle ne doit pas se lire. */
+  archivedAdoptionId: string;
 };
 
 const suffix = Math.random().toString(36).slice(2, 10);
@@ -178,6 +205,58 @@ async function seedDomain(label: string): Promise<Fixture> {
     unit: "%",
   });
 
+  /* --- L'adoption — T5.4 -------------------------------------------------- */
+
+  const active = await scope.insert(projectStatuses, {
+    label: `En cours ${label}`,
+    nature: "active",
+  });
+
+  const project = async (name: string, productId: string) =>
+    scope.insert(projects, {
+      name: `${name} ${label}`,
+      productId,
+      statusId: active.id,
+    });
+
+  const adopter = await project("Adoptant", full.id);
+  const loose = await project("Sans adoption", full.id);
+  const otherProject = await project("Voisin", other.id);
+
+  /* « Autonomie » porte les trois valeurs, « Doublon » n'en porte aucune : les
+     colonnes sont toutes nullables (`docs/04` §3), et l'écran doit rendre les
+     deux cas. Elles sont écrites **dans le désordre alphabétique**, comme les
+     indicateurs : c'est la requête qui trie. */
+  await scope.insert(projectIndicators, {
+    projectId: adopter.id,
+    indicatorId: tie.id,
+  });
+
+  const autonomyAdoption = await scope.insert(projectIndicators, {
+    projectId: adopter.id,
+    indicatorId: autonomy.id,
+    baselineValue: "54",
+    targetValue: "85",
+    finalValue: "71",
+  });
+
+  /* L'adoption d'un indicateur **archivé**. Elle n'est plus atteignable par
+     l'interface depuis que l'arbitrage (e) refuse d'archiver un indicateur
+     adopté, mais des lignes antérieures la portent — et c'est l'`innerJoin` qui
+     doit l'écarter, pas un filtre posé sur l'adoption. */
+  const archivedAdoption = await scope.insert(projectIndicators, {
+    projectId: adopter.id,
+    indicatorId: archived.id,
+    targetValue: "100",
+  });
+
+  /* L'adoption du **voisin**, sur son propre indicateur : elle ne doit déborder
+     ni sur l'accompagnement adoptant, ni sur ses options. */
+  await scope.insert(projectIndicators, {
+    projectId: otherProject.id,
+    indicatorId: otherIndicator.id,
+  });
+
   return {
     domainId: domain.id,
     scope,
@@ -189,6 +268,11 @@ async function seedDomain(label: string): Promise<Fixture> {
     tieId: tie.id,
     archivedReadingId: archivedReading.id,
     otherIndicatorId: otherIndicator.id,
+    adopterId: adopter.id,
+    looseId: loose.id,
+    otherProjectId: otherProject.id,
+    autonomyAdoptionId: autonomyAdoption.id,
+    archivedAdoptionId: archivedAdoption.id,
   };
 }
 
@@ -545,5 +629,276 @@ describe("listProductReadings — étanchéité du domaine", () => {
     });
 
     expect(await listProductReadings(b.scope, b.otherId)).toEqual([]);
+  });
+});
+
+/* ==========================================================================
+   Le décompte des adoptions — T5.4
+
+   Il ne décrit pas l'indicateur, il gouverne un geste : c'est lui qui fait dire
+   au bloc combien d'accompagnements adoptent, là où « Archiver » paraîtrait ne
+   rien faire. Ce que ces tests épinglent est la **sous-requête corrélée** —
+   qu'une seconde jointure aurait remplacée au prix des trois agrégats voisins.
+   ========================================================================== */
+
+describe("listProductIndicators — le décompte des adoptions", () => {
+  test("un indicateur adopté dit combien, un indicateur libre dit zéro", async () => {
+    const rows = await listProductIndicators(a.scope, a.fullId);
+
+    expect(rows.find((row) => row.id === a.autonomyId)?.adoptionCount).toBe(1);
+    expect(rows.find((row) => row.id === a.tieId)?.adoptionCount).toBe(1);
+    // « Zèle » n'est adopté par personne, et « Baisse » non plus.
+    expect(rows.find((row) => row.label === "Zèle a")?.adoptionCount).toBe(0);
+    expect(rows.find((row) => row.label === "Baisse a")?.adoptionCount).toBe(0);
+  });
+
+  test("le décompte ne fausse ni les relevés ni le dernier relevé", async () => {
+    /* **Le test qui isole la sous-requête corrélée.** Une seconde jointure
+       aurait multiplié les lignes par le nombre d'adoptions : « Autonomie » est
+       adopté une fois, donc le défaut ne se verrait pas ici — c'est pourquoi le
+       constat porte sur les trois agrégats *ensemble*, et pourquoi le test
+       ci-dessous ajoute une seconde adoption pour le rendre visible. */
+    const rows = await listProductIndicators(a.scope, a.fullId);
+    const autonomy = rows.find((row) => row.id === a.autonomyId);
+
+    expect(autonomy).toMatchObject({
+      readingCount: 3,
+      lastValue: "71.0000",
+      lastReadOn: "2026-06-01",
+      adoptionCount: 1,
+    });
+  });
+
+  test("deux adoptions ne dédoublent pas les relevés", async () => {
+    /* Le cas qu'une jointure ferait tomber : avec deux adoptions,
+       `count(readings)` passerait de 3 à 6. La sous-requête, elle, ne touche pas
+       la cardinalité de la lecture. Le second accompagnement est écrit ici et
+       non dans la fixture, pour que les autres tests gardent leur décompte. */
+    const second = await a.scope.insert(projectIndicators, {
+      projectId: a.looseId,
+      indicatorId: a.autonomyId,
+    });
+
+    try {
+      const rows = await listProductIndicators(a.scope, a.fullId);
+      const autonomy = rows.find((row) => row.id === a.autonomyId);
+
+      expect(autonomy).toMatchObject({
+        readingCount: 3,
+        lastValue: "71.0000",
+        adoptionCount: 2,
+      });
+    } finally {
+      await a.scope.unlink(projectIndicators, second.id);
+    }
+  });
+
+  test("une adoption d'un autre domaine ne compte pas", async () => {
+    /* La condition de domaine de la sous-requête est écrite en propre :
+       `filter` ne s'applique qu'aux tables de la lecture, et elle ne pouvait
+       donc pas la porter. Sans elle, l'adoption forgée ci-dessous ferait passer
+       le décompte du voisin de 0 à 1. */
+    await db.insert(projectIndicators).values({
+      // La liaison interdite : une adoption du domaine `a` sur un indicateur `b`.
+      domainId: a.domainId,
+      projectId: a.adopterId,
+      indicatorId: b.otherIndicatorId,
+    });
+
+    const rows = await listProductIndicators(b.scope, b.otherId);
+    expect(
+      rows.find((row) => row.id === b.otherIndicatorId)?.adoptionCount,
+    ).toBe(1);
+  });
+});
+
+/* ==========================================================================
+   Les indicateurs adoptés par un accompagnement — T5.4
+
+   Quatre valeurs reportées côte à côte, et pas un cinquième chiffre : la
+   lecture rend ce que les lignes portent, jamais leur écart (arbitrage (g),
+   D39).
+   ========================================================================== */
+
+describe("listProjectAdoptions", () => {
+  test("le tri est alphabétique, pas celui des insertions", async () => {
+    const rows = await listProjectAdoptions(a.scope, a.adopterId);
+
+    // « Doublon » a été adopté en premier, « Autonomie » en second.
+    expect(rows.map((row) => row.label)).toEqual(["Autonomie a", "Doublon a"]);
+  });
+
+  test("une adoption rend ses trois valeurs, le libellé et le dernier relevé", async () => {
+    const rows = await listProjectAdoptions(a.scope, a.adopterId);
+    const autonomy = rows.find((row) => row.id === a.autonomyAdoptionId);
+
+    expect(autonomy).toMatchObject({
+      indicatorId: a.autonomyId,
+      label: "Autonomie a",
+      // L'unité vient de l'indicateur : les quatre chiffres la partagent.
+      unit: "%",
+      baselineValue: "54.0000",
+      targetValue: "85.0000",
+      finalValue: "71.0000",
+      lastValue: "71.0000",
+      lastReadOn: "2026-06-01",
+    });
+  });
+
+  test("les trois valeurs sont nulles quand rien n'est saisi", async () => {
+    /* Les colonnes sont nullables (`docs/04` §3) : une adoption qui ne fixe
+       aucune cible est une adoption normale, et l'écran le dit plutôt que de
+       poser un zéro. */
+    const rows = await listProjectAdoptions(a.scope, a.adopterId);
+    const tie = rows.find((row) => row.indicatorId === a.tieId);
+
+    expect(tie).toMatchObject({
+      baselineValue: null,
+      targetValue: null,
+      finalValue: null,
+    });
+  });
+
+  test("le dernier relevé est celui des relevés vivants", async () => {
+    /* Le filtre est dans le `on` de la jointure, l'emplacement de T5.3 : le
+       relevé retiré du 2026-08-01 porte 88 et serait *le* plus récent. */
+    const rows = await listProjectAdoptions(a.scope, a.adopterId);
+    const autonomy = rows.find((row) => row.id === a.autonomyAdoptionId);
+
+    expect(autonomy?.lastValue).toBe("71.0000");
+    expect(autonomy?.lastReadOn).toBe("2026-06-01");
+  });
+
+  test("l'adoption d'un indicateur archivé sort avec lui", async () => {
+    const rows = await listProjectAdoptions(a.scope, a.adopterId);
+
+    expect(rows.map((row) => row.id)).not.toContain(a.archivedAdoptionId);
+    expect(rows.map((row) => row.label)).not.toContain("Ancien a");
+  });
+
+  test("les adoptions d'un autre accompagnement n'apparaissent pas", async () => {
+    const rows = await listProjectAdoptions(a.scope, a.adopterId);
+
+    expect(rows.map((row) => row.indicatorId)).not.toContain(
+      a.otherIndicatorId,
+    );
+  });
+
+  test("un accompagnement sans adoption rend un tableau vide", async () => {
+    expect(await listProjectAdoptions(a.scope, a.looseId)).toEqual([]);
+  });
+
+  test("les adoptions d'un accompagnement d'un autre domaine ne se lisent pas", async () => {
+    expect(await listProjectAdoptions(b.scope, a.adopterId)).toEqual([]);
+  });
+});
+
+/* ==========================================================================
+   Les indicateurs adoptables — T5.4
+
+   Ce que le panneau propose : les vivants du produit que cet accompagnement
+   n'adopte pas encore, plus l'exception nominative en correction.
+   ========================================================================== */
+
+describe("listAdoptableIndicators", () => {
+  test("les indicateurs déjà adoptés ne sont pas proposés", async () => {
+    const rows = await listAdoptableIndicators(a.scope, a.adopterId, a.fullId);
+
+    // « Autonomie » et « Doublon » sont adoptés ; restent « Baisse » et « Zèle ».
+    expect(rows.map((row) => row.label)).toEqual(["Baisse a", "Zèle a"]);
+  });
+
+  test("un indicateur archivé n'est pas proposé", async () => {
+    const rows = await listAdoptableIndicators(a.scope, a.looseId, a.fullId);
+
+    // Rien n'est adopté par cet accompagnement : les quatre vivants sortent,
+    // et « Ancien » — alphabétiquement premier — reste dehors.
+    expect(rows.map((row) => row.label)).toEqual([
+      "Autonomie a",
+      "Baisse a",
+      "Doublon a",
+      "Zèle a",
+    ]);
+  });
+
+  test("l'exception nominative rétablit l'indicateur de l'adoption éditée", async () => {
+    /* **Le test qui isole l'exception**, et le seul : sans elle, « Autonomie »
+       — déjà adopté par cet accompagnement — serait absent de la liste, le
+       `select` s'ouvrirait sans option sélectionnée, et la première
+       re-soumission changerait l'indicateur de l'adoption ou la refuserait. */
+    const rows = await listAdoptableIndicators(a.scope, a.adopterId, a.fullId, {
+      keepIndicatorId: a.autonomyId,
+    });
+
+    expect(rows.map((row) => row.label)).toEqual([
+      "Autonomie a",
+      "Baisse a",
+      "Zèle a",
+    ]);
+  });
+
+  test("l'exception nominative rétablit aussi un indicateur archivé, et lui seul", async () => {
+    /* Elle couvre les deux exclusions d'un seul chemin. Et elle est
+       **nominative** : « Doublon », adopté et non conservé, reste dehors ;
+       aucun autre archivé n'entre. */
+    const rows = await listAdoptableIndicators(a.scope, a.adopterId, a.fullId, {
+      keepIndicatorId: a.archivedIndicatorId,
+    });
+
+    expect(rows.map((row) => row.label)).toEqual([
+      "Ancien a",
+      "Baisse a",
+      "Zèle a",
+    ]);
+  });
+
+  test("les indicateurs d'un autre produit ne sont pas proposés", async () => {
+    const rows = await listAdoptableIndicators(
+      a.scope,
+      a.otherProjectId,
+      a.otherId,
+    );
+
+    // Le voisin adopte déjà son unique indicateur : il ne reste rien.
+    expect(rows).toEqual([]);
+    expect(
+      (await listAdoptableIndicators(a.scope, a.adopterId, a.fullId)).map(
+        (row) => row.label,
+      ),
+    ).not.toContain("Indicateur du voisin a");
+  });
+
+  test("un produit sans indicateur ne propose rien", async () => {
+    expect(
+      await listAdoptableIndicators(a.scope, a.looseId, a.emptyId),
+    ).toEqual([]);
+  });
+
+  test("les indicateurs d'un produit d'un autre domaine ne se proposent pas", async () => {
+    expect(
+      await listAdoptableIndicators(b.scope, a.adopterId, a.fullId),
+    ).toEqual([]);
+  });
+
+  test("une adoption d'un autre domaine n'exclut rien", async () => {
+    /* **Le test qui isole la condition de domaine de l'exclusion**, et il a dû
+       être récrit : le premier jet forgeait une adoption sur un projet du
+       domaine `a`, que la condition `project_id` écartait déjà — retirer la
+       condition de domaine ne le faisait pas tomber. La leçon de T4bis.5 :
+       « un test vert au retrait d'une règle est un test qui ne la couvre pas,
+       même s'il porte son nom. »
+
+       La ligne forgée porte donc le **projet visé par la lecture**, et ne se
+       distingue que par son `domain_id` — la seule chose qui puisse encore
+       l'écarter. Aucune écriture de l'application ne la produit : la couche
+       scopée la refuserait. */
+    await db.insert(projectIndicators).values({
+      domainId: a.domainId,
+      projectId: b.looseId,
+      indicatorId: b.tieId,
+    });
+
+    const rows = await listAdoptableIndicators(b.scope, b.looseId, b.fullId);
+    expect(rows.map((row) => row.id)).toContain(b.tieId);
   });
 });

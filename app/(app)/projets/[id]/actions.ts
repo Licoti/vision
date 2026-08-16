@@ -115,7 +115,7 @@
  * et ce fichier ne lui en demande pas. Ce qui se retire s'archive.
  */
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -126,12 +126,21 @@ import {
   activityParticipants,
   activityTypes,
   approaches,
+  indicators,
+  projectIndicators,
   projects,
   resources,
   results,
   tools,
 } from "@/lib/db/schema";
 import { DomainScopeError, IntegrityError, type Row } from "@/lib/db/scoped";
+import {
+  parseAdoptionForm,
+  readAdoptionForm,
+  type AdoptionFormErrors,
+  type AdoptionFormState,
+  type AdoptionRowInput,
+} from "@/lib/forms/adoption";
 import {
   activityRowUnchanged,
   canTransitionActivity,
@@ -1372,4 +1381,352 @@ export async function archiveResult(
   await session.db.archive(results, resultId);
 
   revalidatePath(ROUTES.project(projectId));
+}
+
+/* ==========================================================================
+   Adopter, corriger et retirer une adoption — T5.4
+
+   `project_indicators` relie l'accompagnement à son effet supposé (`docs/04`
+   §3). Trois gestes, une seule porte de plus — `openAdoption` —, et **aucune
+   condition de droit qui s'ajoute** : le `canWrite` de la page et l'`openProject`
+   des actions gouvernent ces trois écritures comme les sept précédentes.
+
+   Le retrait passe par `unlink` et non par `archive` (arbitrage (f)) : une
+   adoption est une **liaison**, `project_indicators` ne porte pas
+   `archived_at`, et `LinkTable` l'impose à la compilation. Rien de la mémoire du
+   centre ne s'y perd — les relevés vivent sur l'indicateur, pas sur l'adoption.
+   ========================================================================== */
+
+/**
+ * Un refus qui n'appartient à aucun champ — jumeau de `resourceRefusal`.
+ *
+ * La saisie revient telle quelle : Vision ne jette jamais en silence ce qui a
+ * été tapé, y compris quand ce qu'elle refuse n'est pas la saisie.
+ */
+function adoptionRefusal(
+  formData: FormData,
+  message: string,
+): AdoptionFormState {
+  return { values: readAdoptionForm(formData), errors: {}, message };
+}
+
+/**
+ * L'adoption reçue, rapprochée de **ce** projet — la quatrième porte du fichier,
+ * sur le modèle exact d'`openResource`.
+ *
+ * Deux contrôles, et chacun ferme une porte :
+ *
+ * 1. `openProject` sur le `projectId` **reçu** — le droit `writeProject` (D9),
+ *    l'appartenance au domaine, et la lecture seule d'un accompagnement archivé,
+ *    d'un seul appel ;
+ * 2. l'adoption reçue **appartient à ce projet**. Sans ce second contrôle, une
+ *    soumission forgée corrigerait ou retirerait l'adoption d'un autre
+ *    accompagnement — les identifiants liés sont sérialisés en clair dans un
+ *    champ `$ACTION_…`, et une soumission peut les réécrire.
+ *
+ * **Aucun contrôle d'archivage sur l'adoption** : `project_indicators` n'a pas
+ * de colonne `archived_at`, et c'est le fond de l'arbitrage (f) — une liaison ne
+ * s'archive pas, elle se défait.
+ *
+ * Le message n'est utilisé que par `updateAdoption` : `removeAdoption` refuse en
+ * silence, n'ayant aucune saisie à rendre.
+ */
+async function openAdoption(
+  session: Session,
+  projectId: string,
+  adoptionId: string,
+  refused: string,
+): Promise<
+  | { project: Row<typeof projects>; adoption: Row<typeof projectIndicators> }
+  | { message: string }
+> {
+  const gate = await openProject(session, projectId, refused);
+  if ("message" in gate) return gate;
+
+  const adoption = await session.db.find(projectIndicators, adoptionId);
+  if (!adoption || adoption.projectId !== projectId) {
+    return {
+      message: "Cette adoption n'existe plus dans cet accompagnement.",
+    };
+  }
+
+  return { project: gate.project, adoption };
+}
+
+/**
+ * L'indicateur reçu, rapproché du **produit de ce projet**.
+ *
+ * D11 pose qu'un indicateur appartient à un seul produit : un indicateur d'un
+ * autre produit n'est pas adoptable, et le vérifier ici est la seule façon de
+ * l'empêcher — `assertPreconditions` ne connaît que le domaine, et le domaine
+ * est le même. Sans ce contrôle, une soumission forgée ferait apparaître dans ce
+ * bloc un indicateur que la page du produit n'affiche pas, et le bloc
+ * afficherait fidèlement ce mensonge.
+ *
+ * Un indicateur **archivé** est refusé pour la raison de `checkResourceActivity`
+ * : le panneau ne le propose pas, et rien ne justifie de l'accepter par requête.
+ *
+ * **`keptIndicatorId` est l'exception nominative** (T4bis.1, T4bis.5, T4bis.6).
+ * Elle n'a rien à voir avec l'unicité, qui se traite plus bas : elle ne concerne
+ * que l'archivage. Une adoption dont l'indicateur a été archivé **avant** que
+ * l'arbitrage (e) ne l'interdise garde son indicateur sélectionné dans le
+ * panneau ; le refuser à la re-soumission rendrait toute correction impossible
+ * sans changer d'indicateur. L'exception est **nominative** — elle n'accepte que
+ * la valeur déjà portée par la ligne éditée, et n'ouvre la porte à aucun autre
+ * archivé. `createAdoption` ne passe rien : une création n'a aucune valeur
+ * antérieure à préserver.
+ *
+ * Un message de champ, jamais une exception.
+ */
+async function checkAdoptionIndicator(
+  session: Session,
+  productId: string,
+  input: AdoptionRowInput,
+  keptIndicatorId: string | null = null,
+): Promise<AdoptionFormErrors> {
+  const indicator = await session.db.find(indicators, input.indicatorId);
+  if (
+    !indicator ||
+    indicator.productId !== productId ||
+    (indicator.archivedAt !== null && indicator.id !== keptIndicatorId)
+  ) {
+    return { indicatorId: "Cet indicateur n'existe pas sur ce produit." };
+  }
+
+  return {};
+}
+
+/**
+ * L'unicité `(projet, indicateur)`, **devancée plutôt que subie**.
+ *
+ * `project_indicators_project_indicator_unique` est une contrainte **totale** —
+ * la table n'a pas d'`archived_at`, donc rien à rendre partiel (T4bis.6). Une
+ * seconde adoption du même indicateur lèverait une violation d'unicité
+ * PostgreSQL, donc un 500, là où l'on attend un message : ce qui se refuse doit
+ * se lire, pas se planter.
+ *
+ * `exceptAdoptionId` est la correction : une adoption qui garde son propre
+ * indicateur ne se heurte pas à elle-même.
+ */
+async function checkAdoptionUnique(
+  session: Session,
+  projectId: string,
+  indicatorId: string,
+  exceptAdoptionId: string | null = null,
+): Promise<AdoptionFormErrors> {
+  const held = await session.db.list(projectIndicators, {
+    where: and(
+      eq(projectIndicators.projectId, projectId),
+      eq(projectIndicators.indicatorId, indicatorId),
+    ),
+  });
+
+  const clash = held.some((row) => row.id !== exceptAdoptionId);
+  if (clash) {
+    return {
+      indicatorId: "Cet accompagnement adopte déjà cet indicateur.",
+    };
+  }
+
+  return {};
+}
+
+/**
+ * Les deux écrans que cette écriture change.
+ *
+ * La page du **produit** en fait partie depuis T5.4 : son bloc « Indicateurs »
+ * dit combien d'accompagnements adoptent chaque indicateur, et c'est ce
+ * décompte qui gouverne le geste « Archiver ». Adopter ou retirer le déplace.
+ *
+ * Ce n'est **pas** `refresh` : `last_activity_at` n'a pas bougé — une adoption
+ * n'est pas un fait d'accompagnement —, et revalider la liste des projets ferait
+ * croire le contraire au lecteur de ce fichier (la leçon de T4.2).
+ */
+function refreshAdoption(projectId: string, productId: string): void {
+  revalidatePath(ROUTES.project(projectId));
+  revalidatePath(ROUTES.product(productId));
+}
+
+/**
+ * Adopter un indicateur du produit pour cet accompagnement.
+ *
+ * `projectId` est lié côté serveur ; `previous` est l'état que `useActionState`
+ * fait circuler, dont l'action n'a pas besoin — la saisie repart du `FormData`
+ * à chaque soumission.
+ *
+ * **Aucune adoption automatique**, aucune suggestion, aucune reprise de
+ * l'adoption d'un accompagnement précédent : le geste est déclaratif, et ce
+ * qu'il déclare est un choix.
+ */
+export async function createAdoption(
+  projectId: string,
+  _previous: AdoptionFormState,
+  formData: FormData,
+): Promise<AdoptionFormState> {
+  const session = await requireSession();
+
+  const gate = await openProject(
+    session,
+    projectId,
+    "L'adoption d'un indicateur est réservée au responsable de domaine et aux contributeurs désignés de cet accompagnement.",
+  );
+  if ("message" in gate) return adoptionRefusal(formData, gate.message);
+
+  const { values, errors, input } = parseAdoptionForm(formData);
+  if (!input) return { values, errors };
+
+  const misplaced = await checkAdoptionIndicator(
+    session,
+    gate.project.productId,
+    input,
+  );
+  if (Object.keys(misplaced).length > 0) return { values, errors: misplaced };
+
+  const held = await checkAdoptionUnique(session, projectId, input.indicatorId);
+  if (Object.keys(held).length > 0) return { values, errors: held };
+
+  try {
+    await session.db.insert(projectIndicators, { projectId, ...input });
+  } catch (error) {
+    if (error instanceof DomainScopeError) {
+      return adoptionRefusal(
+        formData,
+        "Une référence de ce formulaire n'appartient pas au domaine : la saisie n'a pas été enregistrée.",
+      );
+    }
+    throw error;
+  }
+
+  refreshAdoption(projectId, gate.project.productId);
+
+  // La page nue, panneau refermé : « enregistrement sans confirmation
+  // intermédiaire » (`docs/06` §9). L'adoption paraît dans son bloc, et c'est
+  // toute la confirmation. `redirect` lève : elle est appelée hors de tout
+  // `try`, faute de quoi le `catch` ci-dessus avalerait la navigation.
+  redirect(ROUTES.project(projectId));
+}
+
+/**
+ * Corriger une adoption : **le même formulaire, la même validation, les mêmes
+ * refus** qu'à l'adoption — la propriété qui fait qu'un seul panneau sert les
+ * deux gestes.
+ *
+ * `projectId` et `adoptionId` sont liés côté serveur. **Ce ne sont pas des
+ * secrets** : Next les sérialise en clair dans un champ `$ACTION_…`, et une
+ * soumission peut les réécrire. Ce qui protège est `openAdoption`, qui interroge
+ * le droit sur le projet **reçu** puis rapproche l'adoption **reçue** de ce
+ * projet.
+ *
+ * **L'indicateur peut changer** : corriger une adoption, c'est aussi s'être
+ * trompé d'indicateur. Les trois contrôles valent alors comme à la création —
+ * appartenance au produit, archivage, unicité —, l'adoption éditée exceptée
+ * d'elle-même.
+ */
+export async function updateAdoption(
+  projectId: string,
+  adoptionId: string,
+  _previous: AdoptionFormState,
+  formData: FormData,
+): Promise<AdoptionFormState> {
+  const session = await requireSession();
+
+  const gate = await openAdoption(
+    session,
+    projectId,
+    adoptionId,
+    "La modification d'une adoption est réservée au responsable de domaine et aux contributeurs désignés de cet accompagnement.",
+  );
+  if ("message" in gate) return adoptionRefusal(formData, gate.message);
+
+  const { values, errors, input } = parseAdoptionForm(formData);
+  if (!input) return { values, errors };
+
+  /* L'exception nominative : l'indicateur que l'adoption porte **déjà** est
+     accepté même archivé, et lui seul. Le panneau le garde sélectionné sans le
+     proposer ; sans cette ligne, une re-soumission à l'identique serait
+     refusée. */
+  const misplaced = await checkAdoptionIndicator(
+    session,
+    gate.project.productId,
+    input,
+    gate.adoption.indicatorId,
+  );
+  if (Object.keys(misplaced).length > 0) return { values, errors: misplaced };
+
+  const held = await checkAdoptionUnique(
+    session,
+    projectId,
+    input.indicatorId,
+    adoptionId,
+  );
+  if (Object.keys(held).length > 0) return { values, errors: held };
+
+  try {
+    const updated = await session.db.update(
+      projectIndicators,
+      adoptionId,
+      input,
+    );
+    if (!updated) {
+      return adoptionRefusal(
+        formData,
+        "Cette adoption n'existe plus dans cet accompagnement.",
+      );
+    }
+  } catch (error) {
+    if (error instanceof DomainScopeError) {
+      return adoptionRefusal(
+        formData,
+        "Une référence de ce formulaire n'appartient pas au domaine : la saisie n'a pas été enregistrée.",
+      );
+    }
+    throw error;
+  }
+
+  refreshAdoption(projectId, gate.project.productId);
+
+  // La page nue, panneau refermé : les valeurs corrigées paraissent dans le
+  // bloc, et c'est toute la confirmation. `redirect` lève, donc hors du `try`.
+  redirect(ROUTES.project(projectId));
+}
+
+/**
+ * Retirer l'adoption : la liaison se **défait**, elle ne s'archive pas
+ * (arbitrage (f)).
+ *
+ * **Ce n'est pas une entorse à la règle 4.** La règle protège la donnée métier ;
+ * une adoption est un lien, et c'est l'arbitrage de fait de T1.2 — celui des
+ * membres de projet et des participants d'activité, que `syncParticipants`
+ * applique depuis T3.6. `LinkTable` le dit à la compilation : `archive` ne
+ * compilerait pas sur cette table, `unlink` seul le peut. Rien de la mémoire du
+ * centre ne s'y perd — les relevés vivent sur l'indicateur, et l'indicateur sur
+ * le produit.
+ *
+ * **Sans confirmation** — arbitrage (c) de `tickets-C4bis.md` : elle se justifie
+ * là où le geste retire de la lecture tout un ensemble, et `docs/06` §9 la
+ * proscrit partout où elle ne protège rien. Retirer une adoption posée par
+ * erreur est le geste qu'on veut rapide, et il se refait.
+ *
+ * **Le refus est muet**, comme `archiveResource` : ce geste n'a aucune saisie à
+ * rendre, et rien ne justifie de lui inventer un message que l'écran n'atteint
+ * jamais en usage normal.
+ */
+export async function removeAdoption(
+  projectId: string,
+  adoptionId: string,
+): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openAdoption(
+    session,
+    projectId,
+    adoptionId,
+    // Jamais rendu : ce geste n'affiche aucun refus.
+    "Le retrait d'une adoption est réservé au responsable de domaine et aux contributeurs désignés de cet accompagnement.",
+  );
+  if ("message" in gate) return;
+
+  await session.db.unlink(projectIndicators, adoptionId);
+
+  refreshAdoption(projectId, gate.project.productId);
 }

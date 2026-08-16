@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 16/08/2026 — T5.3 livré : saisir, corriger et retirer un relevé.
-**Chantier en cours :** C5 — indicateurs et lecture dans le temps, trois tickets sur six livrés
-**Ticket suivant :** T5.4 — adopter un indicateur depuis l'accompagnement
+**Dernière mise à jour :** 16/08/2026 — T5.4 livré : adopter un indicateur depuis l'accompagnement.
+**Chantier en cours :** C5 — indicateurs et lecture dans le temps, quatre tickets sur six livrés
+**Ticket suivant :** T5.5 — la frise du temps long : l'axe, les accompagnements, les repères
 
 ---
 
@@ -17,7 +17,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C3 — Activités et roadmap | T3.1 → T3.6 | **terminé** |
 | C4 — Ressources et résultats | T4.1 → T4.4 | **terminé** |
 | C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **terminé** |
-| C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **en cours** — T5.1 → T5.3 livrés |
+| C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **en cours** — T5.1 → T5.4 livrés |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
@@ -77,6 +77,16 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   relevés retirés se pose **dans le `on`** de la jointure, à l'emplacement que T5.1 avait écrit
   d'avance. Le décompte d'exclusivité de T5.2 a absorbé une troisième clé sans changer d'énoncé,
   et les six points d'entrée du bloc tombent avec le même `canWriteIndicators`.
+- **T5.4 — adopter un indicateur depuis l'accompagnement, le 16/08/2026.** Le deuxième bloc de
+  référence de la page projet, et le **premier retrait par `unlink`** d'un objet que l'écran offre :
+  une adoption est une liaison, `LinkTable` l'impose à la compilation, et le verbe à l'écran est
+  « Retirer », jamais « Archiver ». Le décompte d'exclusivité passe de quatre clés à cinq sans
+  changer d'énoncé — la deuxième fois qu'une généralisation écrite d'avance est payée. **Trois
+  arbitrages tranchés avant écriture** : le « combien » du refus (e) atteint l'écran par le bloc
+  produit (`adoptionCount`) et non par un message d'action, un geste nu n'ayant nulle part où en
+  afficher un ; le pluriel du refus (e) d'`archiveProduct`, dû depuis T5.1, est corrigé avant d'être
+  recopié ; `project_indicators.note` reste sans écrivain. Un fichier hors fiche, `adoption-panel.tsx`,
+  la fiche demandant un panneau sans nommer où le mettre.
 
 ---
 
@@ -103,15 +113,14 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
 
 ### b. Assignés à un ticket
 
-- **Le refus (e) d'`archiveProduct` reste au pluriel dans sa dernière phrase.** Relevé le
-  16/08/2026 par le parcours d'archivage produit de T5.1, qui l'a lu au singulier pour la première
-  fois : « Ce produit porte encore **1 accompagnement** non archivé. Archivez-**le** d'abord :
-  ranger le produit **les** ferait disparaître des listes sans les ranger. » Le `plural` de
-  `app/(app)/produits/actions.ts:246` gouverne le nom et le premier pronom, jamais les deux
-  derniers — ils sont écrits en dur. Défaut de langue seul : le refus refuse, et la base ne bouge
-  pas. Hors du périmètre de fichiers de T5.1, règle 3. → **T5.4**, seul ticket de C5 dont la fiche
-  ouvre `app/(app)/produits/actions.ts`, et qui doit y reprendre « la forme exacte du refus (e)
-  d'`archiveProduct` » : à corriger avant de la recopier. C7 au plus tard.
+- **`project_indicators.note` n'a ni écrivain ni lecteur.** La colonne existe depuis T1.2, `docs/04`
+  §3 la décrit « texte court », et le panneau d'adoption de T5.4 ne la saisit pas : sa fiche énumère
+  ce qu'une ligne du bloc dit — libellé, référence, cible, dernière valeur, valeur finale — et n'en
+  parle nulle part. Arbitrage tranché avant écriture le 16/08/2026 : **quatre champs, pas un
+  cinquième**, règle 3 et leçon de T5.2 — une colonne écrite sans lecteur est une colonne qu'on relit
+  un jour sans savoir pourquoi. Le geste manquant est donc **une phrase sur le pourquoi d'une
+  cible**, et il se juge à l'usage, pas au schéma. → **ticket propre, C7 au plus tard ; ou jamais, si
+  personne ne la réclame.**
 - **`createProject` accepte encore un produit archivé.** Le formulaire ne le propose plus et la page
   produit n'y mène plus, mais l'action ne relit pas l'`archived_at` du produit **reçu** : une
   soumission forgée rattacherait un accompagnement neuf à un produit rangé, invisible partout. Relevé
@@ -159,7 +168,9 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   T3.5 ; deux ressources de plus depuis T4.2 ; un « Test projet » et un produit « test » d'une session
   antérieure, dont l'audit porte depuis T4bis.6 **deux résultats, un rangé et un vivant** — l'état que
   seule l'unicité partielle autorise ; deux indicateurs archivés depuis T5.2, dont un saisi sous le
-  cookie d'une contributrice. La dérive a servi T4.4 : elle avait déjà mis un Audit UX en
+  cookie d'une contributrice ; l'**adoption de la fixture porte un identifiant neuf** depuis T5.4 —
+  retirée puis réadoptée pour éprouver le refus (e), avec les mêmes valeurs, `unlink` ne rendant pas
+  sa ligne. La dérive a servi T4.4 : elle avait déjà mis un Audit UX en
   « terminée » sans résultat, soit le cas exact que la fixture ne porte pas.
   **Règle posée le 14/08/2026 : la base de développement est jetable.** La règle 4 protège la donnée
   métier, pas une fixture locale. Conséquence : un critère de ticket passé ne s'y relit pas
