@@ -6,6 +6,7 @@
  * rien à devenir « du 30 juin 2026 ».
  */
 
+import type { IndicatorDirection } from "@/lib/queries/indicators";
 import type { ResourceType } from "@/lib/queries/resources";
 
 const MONTH = new Intl.DateTimeFormat("fr-FR", {
@@ -58,6 +59,23 @@ const DAY = new Intl.DateTimeFormat("fr-FR", {
 /** « 31 mai 2024 ». Reçoit la chaîne `YYYY-MM-DD` d'une colonne `date`. */
 export function formatDay(value: string): string {
   return DAY.format(parseDay(value));
+}
+
+/**
+ * « juin 2026 » — le mois d'une colonne `date`, reçue en « YYYY-MM-DD ».
+ *
+ * `formatMonth` prend un `Date` et `parseDay` est privé : sans cette fonction,
+ * chaque écran qui lit une colonne `date` referait la conversion, et avec elle
+ * la raison du fuseau explicite — un serveur à l'ouest ferait reculer d'un mois
+ * toute date tombant un premier. Une règle qui vit à trois endroits n'en est
+ * plus une.
+ *
+ * C'est le **mois** (D13), et non le jour de `formatDay` : la date d'un relevé
+ * d'indicateur situe une mesure dans le temps long du produit, elle ne date pas
+ * un fait ponctuel comme la mesure d'un résultat d'audit.
+ */
+export function formatDateMonth(value: string): string {
+  return formatMonth(parseDay(value));
 }
 
 /**
@@ -166,6 +184,20 @@ export function formatProjects(count: number): string {
 }
 
 /**
+ * « 3 relevés » · « 1 relevé » · « Aucun relevé ».
+ *
+ * Le compteur d'un indicateur, sur la page produit. Zéro s'écrit en toutes
+ * lettres, pour la raison des deux fonctions ci-dessus — et pour une de plus
+ * ici : un indicateur sans relevé n'est pas un indicateur en défaut, c'est un
+ * indicateur qu'on n'a pas encore mesuré, et « 0 relevé » se lirait comme un
+ * manque à combler.
+ */
+export function formatReadings(count: number): string {
+  if (count === 0) return "Aucun relevé";
+  return `${count} relevé${count > 1 ? "s" : ""}`;
+}
+
+/**
  * Le type d'une ressource, en toutes lettres : « PowerPoint », « PDF », « Lien ».
  *
  * Les sept valeurs de l'énuméré `resource_type`, saisies et jamais déduites de
@@ -189,6 +221,31 @@ const RESOURCE_TYPES: Record<ResourceType, string> = {
 
 export function formatResourceType(type: ResourceType): string {
   return RESOURCE_TYPES[type];
+}
+
+/**
+ * Le sens de lecture d'un indicateur : « Plus haut vaut mieux » · « Plus bas
+ * vaut mieux ».
+ *
+ * **Ce n'est pas un jugement, et la formulation le tient.** `direction` oriente
+ * la lecture d'une **courbe** — elle dit dans quel sens la série se lit, jamais
+ * si un chiffre est bon. Aucune couleur, aucun pictogramme, aucun mot appliqué à
+ * une valeur ne s'en tire : D39 interdit tout indice calculé par Vision pour
+ * qualifier un produit, et « 71 %, c'est bien » en serait un.
+ *
+ * Le `Record` est **exhaustif à la compilation**, comme celui des types de
+ * ressource : le jour où l'énuméré s'allonge, ce fichier ne compile plus tant
+ * qu'on ne l'a pas complété.
+ */
+const INDICATOR_DIRECTIONS: Record<IndicatorDirection, string> = {
+  higher_is_better: "Plus haut vaut mieux",
+  lower_is_better: "Plus bas vaut mieux",
+};
+
+export function formatIndicatorDirection(
+  direction: IndicatorDirection,
+): string {
+  return INDICATOR_DIRECTIONS[direction];
 }
 
 /**

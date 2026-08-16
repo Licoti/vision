@@ -1,6 +1,6 @@
 /**
  * Les tests des deux formatages posés par T4.3 — `formatDay` et
- * `formatResultValue`.
+ * `formatResultValue` —, puis des trois de T5.1.
  *
  * **Écart de périmètre déclaré** : la fiche du ticket ne nomme que
  * `lib/format.ts`, qui n'avait aucun fichier de tests. Le ticket y ajoute trois
@@ -9,11 +9,12 @@
  * lues dans le HTML servi, elles ne s'éprouvent que sur les deux résultats de
  * la fixture, et aucun cas limite ne l'est.
  *
- * Ils ne couvrent **que ces deux fonctions**. Le reste du fichier — les
- * périodes, les initiales, les compteurs — n'est pas du périmètre de ce
- * ticket, et un fichier de tests n'est pas une invitation à le déborder.
+ * Ils ne couvrent **que les fonctions des tickets qui les ont écrits**. Le reste
+ * du fichier — les périodes, les initiales, les compteurs de projets — n'est du
+ * périmètre d'aucun des deux, et un fichier de tests n'est pas une invitation à
+ * le déborder.
  *
- * Aucune base : ces deux fonctions sont pures.
+ * Aucune base : ces fonctions sont pures.
  *
  * **L'insécable s'éprouve sur le point de code**, jamais à l'œil : U+00A0 et
  * l'espace ordinaire sont indiscernables dans un fichier source comme dans un
@@ -23,7 +24,13 @@
 
 import { describe, expect, test } from "vitest";
 
-import { formatDay, formatResultValue } from "./format";
+import {
+  formatDateMonth,
+  formatDay,
+  formatIndicatorDirection,
+  formatReadings,
+  formatResultValue,
+} from "./format";
 
 describe("formatDay", () => {
   test("rend le jour, le mois en toutes lettres et l'année", () => {
@@ -86,5 +93,65 @@ describe("formatResultValue — l'unité", () => {
   test("une unité vide ne laisse pas d'espace en suspens", () => {
     expect(formatResultValue("62.0000", "")).toBe("62");
     expect(formatResultValue("62.0000", null)).toBe("62");
+  });
+});
+
+/* ==========================================================================
+   Les trois formatages de T5.1
+   ========================================================================== */
+
+describe("formatDateMonth", () => {
+  test("rend le mois en toutes lettres et l'année, jamais le jour", () => {
+    // La date d'un relevé se lit au mois (D13), là où `formatDay` garde le
+    // jour d'une date de mesure de résultat.
+    expect(formatDateMonth("2026-06-01")).toBe("juin 2026");
+    expect(formatDateMonth("2024-09-15")).toBe("septembre 2024");
+  });
+
+  test("un premier du mois ne recule pas d'un mois", () => {
+    // Le piège du fuseau : sans `timeZone: "UTC"`, un serveur à l'ouest
+    // rendrait « décembre 2025 ». Les trois relevés de la fixture tombent tous
+    // un premier du mois — c'est le cas nominal, pas un cas limite.
+    expect(formatDateMonth("2026-01-01")).toBe("janvier 2026");
+  });
+});
+
+describe("formatReadings", () => {
+  test("zéro s'écrit en toutes lettres", () => {
+    // Un indicateur sans relevé n'est pas un indicateur en défaut : « 0 relevé »
+    // se lirait comme un manque.
+    expect(formatReadings(0)).toBe("Aucun relevé");
+  });
+
+  test("un relevé reste au singulier", () => {
+    expect(formatReadings(1)).toBe("1 relevé");
+  });
+
+  test("au-delà, le pluriel", () => {
+    expect(formatReadings(3)).toBe("3 relevés");
+  });
+});
+
+describe("formatIndicatorDirection", () => {
+  test("les deux sens de lecture sont écrits en toutes lettres", () => {
+    expect(formatIndicatorDirection("higher_is_better")).toBe(
+      "Plus haut vaut mieux",
+    );
+    expect(formatIndicatorDirection("lower_is_better")).toBe(
+      "Plus bas vaut mieux",
+    );
+  });
+
+  test("aucune formulation ne qualifie une valeur", () => {
+    /* La garde de l'interdit de la fiche, et de D39 : la direction dit dans
+       quel sens la courbe se lit, jamais si un chiffre est bon. Un « objectif »,
+       une « cible » ou un « bon » ici feraient de Vision un outil
+       d'évaluation. */
+    const both = [
+      formatIndicatorDirection("higher_is_better"),
+      formatIndicatorDirection("lower_is_better"),
+    ].join(" ");
+
+    expect(both).not.toMatch(/bon|mauvais|objectif|cible|atteint/iu);
   });
 });

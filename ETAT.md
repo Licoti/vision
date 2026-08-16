@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 15/08/2026 — session de découpage de C5. C4bis replié, `tickets-C5.md` écrit.
-**Chantier en cours :** C5 — indicateurs et lecture dans le temps, six tickets découpés
-**Ticket suivant :** T5.1 — le bloc « Indicateurs » de la page produit, en lecture
+**Dernière mise à jour :** 16/08/2026 — T5.1 livré : le bloc « Indicateurs » de la page produit.
+**Chantier en cours :** C5 — indicateurs et lecture dans le temps, un ticket sur six livré
+**Ticket suivant :** T5.2 — créer, corriger et archiver un indicateur
 
 ---
 
@@ -17,7 +17,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C3 — Activités et roadmap | T3.1 → T3.6 | **terminé** |
 | C4 — Ressources et résultats | T4.1 → T4.4 | **terminé** |
 | C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **terminé** |
-| C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **en cours** |
+| C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **en cours** — T5.1 livré |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
@@ -58,7 +58,12 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
 
 **C5 — en cours** *(une ligne par ticket jusqu'au repliage du chantier)*
 
-- *(aucun ticket livré — le chantier vient d'être découpé.)*
+- **T5.1 — le bloc « Indicateurs » de la page produit, en lecture, le 16/08/2026.** Première
+  lecture des trois tables dormantes depuis T1.2 : `listProductIndicators` rend en **une** requête
+  jointe le dernier relevé, sa date et le décompte — l'agrégat ordonné `(array_agg(… order by
+  read_on desc, id desc))[1]`, qu'un `max()` n'aurait pas donné. Le parcours d'archivage produit,
+  dû depuis T4bis.2, a été joué : ses six points tiennent, et il a mis en défaut le **pluriel du
+  refus (e)**.
 
 ---
 
@@ -85,15 +90,15 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
 
 ### b. Assignés à un ticket
 
-- **Le parcours d'archivage d'un produit n'a jamais été joué à l'écran.** T4bis.3 a lancé les
-  commandes que T4bis.2 n'avait pas pu lancer — `tsc`, `lint`, `vitest`, `next dev` — et a mis en
-  défaut le `select` de `findProjectDetail`. Ce qu'aucune commande ne joue reste dû, et ne concerne
-  que le **produit** : le parcours archiver / rétablir depuis sa page, `/produits/{id}/modifier` en
-  404, `updateProduct` reposté après archivage, `archiveProduct` et `restoreProduct` sous le cookie
-  d'un membre, et surtout le **refus (e) dont le message doit dire combien** — le seul de C4bis qui
-  n'ait aucun équivalent côté projet. Le protocole de re-soumission de T4bis.3 s'y transpose tel quel
-  (`JOURNAL-TECHNIQUE.md`). Destination posée le 15/08/2026, session de découpage de C5 : c'est le
-  premier ticket qui ouvre `produits/`. → **dû à T5.1**, hors de son périmètre de fichiers.
+- **Le refus (e) d'`archiveProduct` reste au pluriel dans sa dernière phrase.** Relevé le
+  16/08/2026 par le parcours d'archivage produit de T5.1, qui l'a lu au singulier pour la première
+  fois : « Ce produit porte encore **1 accompagnement** non archivé. Archivez-**le** d'abord :
+  ranger le produit **les** ferait disparaître des listes sans les ranger. » Le `plural` de
+  `app/(app)/produits/actions.ts:246` gouverne le nom et le premier pronom, jamais les deux
+  derniers — ils sont écrits en dur. Défaut de langue seul : le refus refuse, et la base ne bouge
+  pas. Hors du périmètre de fichiers de T5.1, règle 3. → **T5.4**, seul ticket de C5 dont la fiche
+  ouvre `app/(app)/produits/actions.ts`, et qui doit y reprendre « la forme exacte du refus (e)
+  d'`archiveProduct` » : à corriger avant de la recopier. C7 au plus tard.
 - **`createProject` accepte encore un produit archivé.** Le formulaire ne le propose plus et la page
   produit n'y mène plus, mais l'action ne relit pas l'`archived_at` du produit **reçu** : une
   soumission forgée rattacherait un accompagnement neuf à un produit rangé, invisible partout. Relevé

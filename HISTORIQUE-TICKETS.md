@@ -105,6 +105,14 @@ portaient en plus vivent dans le récit ci-dessous, ticket par ticket.)*
   résultat » ; les deux gestes suivent le **résultat** et non le groupe « Terminé » ; la valeur se
   réaffiche rognée de ses zéros décimaux. Clôt C4bis.
 
+**C5 — Indicateurs et lecture dans le temps**
+
+- **T5.1 — 16/08/2026 — le bloc « Indicateurs » de la page produit, en lecture.** Écart de
+  périmètre déclaré et tranché avant écriture : `lib/format.ts` et son test, hors des quatre
+  fichiers de la fiche, pour les trois formats neufs. Second arbitrage : le bloc en pleine largeur,
+  la page produit ne portant aucune grille. Porte en plus le **dû hors périmètre de fichiers** — le
+  parcours d'archivage produit, joué pour la première fois depuis T4bis.2.
+
 ---
 
 ## Journal des tickets — récit détaillé
@@ -1086,6 +1094,92 @@ puis le filtre de domaine de `tools` neutralisé dans la couche, font tomber le 
 isole. C'est le trou que T4bis.5 avait découvert **après coup** sur `findResourceActivity` ; ici le
 test isolant a été écrit d'avance, et il tient.
 
+- **T5.1 — 16/08/2026 — le bloc « Indicateurs » de la page produit, en lecture.** Les trois tables
+  d'indicateurs dorment depuis T1.2 ; ce ticket en ouvre la première lecture, et la page produit dit
+  enfin ce que le produit mesure. Six fichiers : `lib/queries/indicators.ts` et son test,
+  `components/products/indicators.tsx`, la page produit, plus `lib/format.ts` et son test au titre de
+  l'écart déclaré.
+
+**L'agrégat est le seul choix technique du ticket, et il se justifie par ce qu'un `max()` ne donne
+pas.** La fiche exige « une seule lecture par écran, jointe, jamais une requête par indicateur »,
+avec le dernier relevé **et** le décompte. `count(readings.id)` se pose sans effort ; la date aussi,
+par `max(read_on)` ; mais la **valeur** portée par la ligne la plus récente n'est pas la plus grande
+des valeurs, et un `max(value)` aurait rendu la bonne réponse sur la série croissante du brief — 54,
+63, 71 — en mentant sur toute série décroissante. Retenu :
+`(array_agg(<colonne> order by read_on desc, id desc))[1]`, deux fois, dans le même passage que le
+décompte. Le `leftJoin` fait le reste : sur zéro ligne jointe, `count` vaut 0 et `array_agg` vaut
+`null`, si bien que l'indicateur sans relevé sort **sans un cas particulier dans le code**. Le
+`id desc` départage deux relevés du même jour — `read_on` seule ne tranche pas, et un ordre qui
+varierait d'un affichage à l'autre serait un défaut.
+
+**Les tests portent quatre pièges que la seule fixture n'aurait pas montrés.** Un indicateur
+alphabétiquement **premier** mais archivé — sans le filtre, il ouvre la liste ; une série
+**décroissante**, seule à distinguer l'agrégat ordonné d'un `max(value)` ; deux relevés au **même
+jour**, dont on éprouve la stabilité d'un appel à l'autre plutôt qu'une valeur qu'un tirage décide ;
+un relevé **forgé** écrit hors couche scopée, sans lequel `filter(indicatorReadings)` reste
+infalsifiable — la leçon de `resources.test.ts`, la jointure portant sur une clé primaire que la
+couche refuse déjà d'écrire de travers. Les libellés de la fixture sont **sans accent**, l'ordre
+alphabétique d'un caractère accentué dépendant de la collation de la base : un test d'ordre ne se
+fait pas dépendre d'elle.
+
+**La mise en défaut a porté trois fois, et une seule a demandé une explication.** Neutraliser
+`filter(indicators)` fait tomber **un** test, celui du produit d'un autre domaine — et pas le
+second test d'étanchéité, `eq(productId)` le rattrapant déjà : c'est la propriété relevée de T2.2 à
+T3.1, « les filtres se rattrapent l'un l'autre », vérifiée une septième fois. Neutraliser
+`filter(indicatorReadings)` fait tomber le seul test de relevé forgé. Neutraliser le filtre
+d'archivage en fait tomber **deux** — celui qui nomme l'indicateur archivé et celui de l'ordre, qui
+l'attend absent de la tête de liste : c'est le même fait constaté deux fois, et c'est la fixture qui
+l'a voulu ainsi.
+
+**Trois formats neufs, et l'écart de périmètre qui les accompagne.** `formatMonth` prend un `Date`,
+`parseDay` est privé, et aucune fonction ne rendait le **mois** d'une colonne `date` : sans
+`formatDateMonth`, chaque écran refaisait la conversion et avec elle la raison du fuseau explicite.
+`formatReadings` écrit zéro en toutes lettres, comme `formatAccompaniments` et `formatProjects`.
+`formatIndicatorDirection` porte un `Record` exhaustif à la compilation, comme
+`formatResourceType` — et son test épingle l'interdit : aucune des deux formulations ne contient
+« bon », « mauvais », « objectif », « cible » ni « atteint ». La direction dit dans quel sens la
+courbe se lit, jamais si un chiffre est bon.
+
+**Le critère s'est lu dans le HTML servi, trois fois.** L'indicateur du brief avec « 71 % » — dont
+l'espace insécable a été vérifiée sur le point de code, `od -c` —, « juin 2026 » et « 3 relevés » ;
+un indicateur ajouté à la main **sans relevé**, qui affiche « Aucun relevé pour l'instant. » et dont
+le bloc entier ne contient **aucune** date ; deux produits sans indicateur, qui rendent le paragraphe
+d'état vide sous un `h2` unique. Contrastes mesurés sur le fond du bloc : 17,87:1 pour le libellé,
+8,12:1 pour le dernier relevé, 4,98:1 pour la ligne de contexte et pour le séparateur `·` — aucun
+couple neuf par la position, tous repris de `Section` et de `Resources`, et **aucun septième
+substitut** inventé.
+
+**Le dû hors périmètre — le parcours d'archivage produit, joué en entier.** Il attendait depuis
+T4bis.2, faute d'une session qui puisse lancer `next dev`. Le protocole de re-soumission de T4bis.3
+s'y est transposé tel quel, sur le produit jetable « test » dont l'unique accompagnement a été rangé
+d'abord — l'arbitrage (e) l'exigeant. **Ses six points, un par un :** (1) archiver puis rétablir
+depuis la page, tous deux acceptés, la page archivée gardant sa mention datée « en août 2026 », son
+seul geste « Rétablir », et son bloc « Indicateurs » toujours lu — règle 4 ; (2) `/produits/{id}/
+modifier` en **404** sur le produit archivé ; (3) `updateProduct` reposté après archivage, refusé —
+et ce refus **isolé**, la route en 404 ne prouvant rien : le `notFound()` de `modifier/page.tsx` a
+été neutralisé le temps d'une soumission, la page a rendu 200, l'action a refusé seule par « Ce
+produit est archivé : il ne se modifie plus. », la base est restée intacte, et le fichier a été remis
+à l'identique — `git diff` vide ; (4) `archiveProduct` sous cookie de membre, refusé par « réservés
+au responsable de domaine » ; (5) `restoreProduct` sous le même cookie, refusé en silence, base
+comptée avant et après ; (6) le **refus (e) relu deux fois** — « 3 accompagnements non archivés » sur
+« Espace client web », « 1 accompagnement non archivé » sur « Déclaration de sinistre en ligne ».
+
+**C'est l'étape qui ferme le raisonnement qui a coûté le plus de soin.** Un refus seul ne prouve
+rien : une charge malformée refuse pareil. Chacune des quatre charges a donc été rejouée
+**non retouchée** sous l'autre identité ou dans l'autre état — même charge, deux issues. La preuve
+tient à cette différence, jamais au refus. Une charge de `restoreProduct` a d'abord été bâtie avec un
+`$ACTION_KEY` que le formulaire de rétablissement **ne porte pas** — c'est un formulaire nu, sans
+`useActionState` — et elle a donc été refaite avant de compter quoi que ce soit : une charge qui
+n'est pas celle de l'écran ne prouve rien non plus.
+
+**Ce que le parcours a trouvé, et que personne n'avait lu.** Le refus (e) au **singulier** dit :
+« Ce produit porte encore 1 accompagnement non archivé. Archivez-**le** d'abord : ranger le produit
+**les** ferait disparaître des listes sans les ranger. » Le `plural` gouverne le nom et le premier
+pronom ; les deux derniers sont écrits en dur au pluriel. Défaut de langue seul, sans conséquence sur
+le refus ni sur la base — hors périmètre de fichiers, consigné dans `ETAT.md` avec sa destination.
+La base de développement a été **remise dans son état d'avant** : nom du produit, accompagnement
+rétabli, indicateur de sonde retiré. La dérive inventoriée dans `ETAT.md` n'a pas augmenté.
+
 ---
 
 ## Points ouverts refermés
@@ -1093,6 +1187,16 @@ test isolant a été écrit d'avance, et il tient.
 *(archivés depuis `ETAT.md` le 14/08/2026 — ils étaient barrés dans la section « Points ouverts »,
 où ils occupaient encore la place. Conservés tels quels : un point refermé documente comment il
 l%s été.)*
+
+- ~~**Le parcours d'archivage d'un produit n'a jamais été joué à l'écran.**~~ **Refermé le
+  16/08/2026 par T5.1**, à qui la session de découpage de C5 l'avait assigné comme dû hors périmètre
+  de fichiers. Ses six points ont été joués et rapportés — archiver et rétablir depuis la page,
+  `/produits/{id}/modifier` en 404, `updateProduct` reposté après archivage et refusé **garde
+  isolée**, `archiveProduct` et `restoreProduct` sous cookie de membre, et le refus (e) relu au
+  singulier comme au pluriel. Le détail est dans le récit de T5.1 ci-dessus. **Le point ne se referme
+  pas les mains vides** : le singulier du refus (e) laisse un pronom pluriel en fin de phrase, ce
+  qu'aucune lecture d'écran n'avait montré, et qui devient un point ouvert à part entière. Ce que
+  T4bis.2 devait au parcours est payé ; ce que le parcours a trouvé est écrit.
 
 - ~~**C4bis est livré en entier, et la matrice « corriger / archiver » est pleine.**~~ **Refermé le
   15/08/2026 par la session de découpage de C5, geste 2.** Les six manques sont refermés par six

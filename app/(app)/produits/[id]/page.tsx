@@ -3,8 +3,9 @@
  *
  * Elle répond à « qu'avons-nous fait sur ce produit dans le temps » : un
  * en-tête d'identité, puis les accompagnements du plus récent au plus ancien
- * (docs/06 §6). La frise du temps long viendra **au-dessus** de cette liste en
- * C5, sans la déplacer — aucun indicateur, aucune courbe ici.
+ * (docs/06 §6), et depuis T5.1 le bloc « Indicateurs » — ce que le produit
+ * mesure — **sous** cette liste. La frise du temps long viendra **au-dessus**
+ * d'elle en T5.5, sans la déplacer, et les courbes en T5.6 : aucune ici.
  *
  * L'identifiant vient de l'URL : sa forme est vérifiée avant la base, faute de
  * quoi un paramètre fantaisiste ne produit pas un 404 mais une erreur
@@ -37,6 +38,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { archiveProduct, restoreProduct } from "../actions";
+import { Indicators } from "@/components/products/indicators";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
 import { AvatarGroup } from "@/components/ui/avatar";
 import { ConfirmPanel } from "@/components/ui/confirm-panel";
@@ -48,6 +50,7 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { requireSession } from "@/lib/auth/provider";
 import { formatAccompaniments, formatMonth, formatPeriod } from "@/lib/format";
 import { ARCHIVE_PANEL_CONFIRM, ROUTES } from "@/lib/navigation";
+import { listProductIndicators } from "@/lib/queries/indicators";
 import { findProductDetail, listProductProjects } from "@/lib/queries/products";
 import { isUuid } from "@/lib/uuid";
 
@@ -70,7 +73,14 @@ export default async function ProductPage({
   const product = await findProductDetail(session.db, id);
   if (!product) notFound();
 
-  const projects = await listProductProjects(session.db, product.id);
+  /* Deux lectures indépendantes, un seul temps d'attente — la discipline de
+     T4.1 sur la page projet. Ni l'une ni l'autre ne dépend du droit : le bloc
+     « Indicateurs » se lit par tout le domaine (D9), sur un produit vivant
+     comme archivé (règle 4). */
+  const [projects, productIndicators] = await Promise.all([
+    listProductProjects(session.db, product.id),
+    listProductIndicators(session.db, product.id),
+  ]);
 
   const archived = product.archivedAt !== null;
   /* Le droit décide de tout ce qui suit, et l'archivage avec lui : on ne
@@ -232,6 +242,13 @@ export default async function ProductPage({
               />
             )}
           </section>
+
+          {/* Sous la liste, jamais au-dessus : la frise de T5.5 prendra la
+              place au-dessus d'elle, sans la déplacer (docs/06 §6). Le bloc est
+              en pleine largeur, comme la liste — la page produit ne porte
+              aucune grille de blocs de référence, à la différence de la page
+              projet. */}
+          <Indicators indicators={productIndicators} />
         </Page>
       </div>
     </>

@@ -2509,3 +2509,58 @@ poser la ligne de chantier : rien à déplacer, rien à récrire, rien à perdre
 portaient davantage — les vérifications jouées, les charges refusées —, et ce détail vit dans le
 récit détaillé, ticket par ticket. `ETAT.md` passe de **256 à 219 lignes**. **À garder pour C5** :
 la section « C5 » de `HISTORIQUE-TICKETS.md` s'ouvre au premier ticket livré, avec la même consigne.
+
+**T5.1 — le dernier relevé ne s'obtient pas par un `max()`, et la fixture du brief l'aurait
+caché.** La lecture doit rendre, en une requête jointe, le décompte des relevés **et** la valeur du
+plus récent. Le décompte est un `count`, la date un `max(read_on)` — mais la valeur portée par la
+ligne la plus récente n'est pas la plus grande des valeurs. Sur la série du brief, croissante (54,
+63, 71), un `max(value)` aurait rendu 71 et serait passé pour juste. Retenu :
+`(array_agg(<colonne> order by read_on desc, id desc))[1]`, deux fois. Les alternatives écartées :
+une sous-requête corrélée par colonne — deux fois le même parcours, et le décompte à part —, et un
+`leftJoinLateral` que Drizzle expose mais qui aurait introduit une forme de jointure que le dépôt
+n'emploie nulle part. **Le test qui l'épingle a dû être ajouté après coup** : la fixture recopiait la
+série du brief, et aucun de ses tests ne distinguait les deux écritures. Un indicateur à série
+**décroissante** l'isole. Leçon reprise de T4bis.5 : un test qui ne tombe pas quand on neutralise la
+règle n'éprouve pas la règle.
+
+**T5.1 — l'indicateur sans relevé ne coûte pas un cas particulier.** `count(readings.id)` vaut 0 et
+`array_agg` vaut `null` sur un `leftJoin` sans correspondance : les trois champs tombent justes sans
+un `if`. C'est ce qui permet au composant de n'avoir qu'une seule condition — `lastReadOn` nulle ou
+non —, et à `docs/03` §7 d'être tenu sans y penser : sans relevé, aucune date n'est affichée, donc
+aucune date n'est inventée.
+
+**T5.1 — écart de périmètre déclaré et tranché avant écriture : `lib/format.ts` et son test.** La
+fiche ne nomme que quatre fichiers, et le ticket en a touché six. Trois formats neufs étaient
+nécessaires — le mois d'une colonne `date`, le décompte de relevés, le libellé de `direction` — et
+les trois avaient déjà leur place écrite dans `lib/format.ts` : `formatDay` pour le premier,
+`formatAccompaniments` et `formatProjects` pour le deuxième, `formatResourceType` et son `Record`
+exhaustif pour le troisième. Les garder dans le composant aurait mis un formatage de date hors du
+module des formats, et fait de `formatActivityPeriod` — dont le nom parle de période d'activité — le
+formateur d'une date de relevé. Arbitrage posé à l'humain avant écriture, tranché option A.
+`formatDateMonth` servira T5.3 et T5.6.
+
+**T5.1 — un test d'ordre alphabétique ne se fait pas dépendre de la collation.** Les libellés de la
+fixture ont d'abord porté un accent (« Égalité »). En collation `C`, un caractère accentué encodé en
+UTF-8 trie **après** « Z » ; en `en_US.UTF-8` ou en ICU, il trie entre « E » et « F ». Le test aurait
+donc dit la collation de la branche Neon, pas le tri de la requête. Libellés remis en ASCII. À garder
+pour tout test d'ordre à venir sur du texte français.
+
+**T5.1 — le parcours d'archivage produit : deux pièges du harnais, avant même la première preuve.**
+(1) La charge de `restoreProduct` a d'abord été bâtie avec un champ `$ACTION_KEY` — présent sur les
+formulaires de `useActionState`, **absent** du formulaire de rétablissement, qui est un formulaire
+nu. Une charge qui n'est pas celle de l'écran ne prouve rien : elle a été refaite. (2) Le bloc de
+champs `$ACTION_1:1` porte du JSON, donc des guillemets, qu'un heredoc de shell mange en silence — le
+premier rejeu a rendu un 500 et une `SyntaxError` dans le journal de `next dev`, et non le refus
+attendu. La charge vit désormais dans un fichier, lue par `$(cat …)` et passée en `--form-string`.
+**Un 500 n'est pas un refus**, et un harnais qui n'atteint pas l'action produit exactement l'écran
+d'un droit qui refuse : c'est toute la raison de l'étape témoin du protocole de T4bis.3.
+
+**T5.1 — le refus (e) d'`archiveProduct` reste au pluriel dans sa dernière phrase.** Trouvé en
+relisant le message au singulier, ce qu'aucune session n'avait fait : « Ce produit porte encore
+1 accompagnement non archivé. Archivez-**le** d'abord : ranger le produit **les** ferait disparaître
+des listes sans les ranger. » Le `plural` de `app/(app)/produits/actions.ts:246` gouverne le nom et le
+premier pronom ; les deux derniers sont écrits en dur. Défaut de langue seul — le refus refuse, la
+base ne bouge pas. Hors du périmètre de fichiers de T5.1, règle 3 : consigné dans `ETAT.md` avec sa
+destination, **T5.4**, seul ticket de C5 dont la fiche ouvre ce fichier, et qui doit précisément y
+recopier « la forme exacte du refus (e) d'`archiveProduct` ». Un défaut se corrige avant d'être
+recopié.
