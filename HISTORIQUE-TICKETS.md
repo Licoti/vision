@@ -112,6 +112,10 @@ portaient en plus vivent dans le récit ci-dessous, ticket par ticket.)*
   fichiers de la fiche, pour les trois formats neufs. Second arbitrage : le bloc en pleine largeur,
   la page produit ne portant aucune grille. Porte en plus le **dû hors périmètre de fichiers** — le
   parcours d'archivage produit, joué pour la première fois depuis T4bis.2.
+- **T5.2 — 16/08/2026 — créer, corriger et archiver un indicateur.** Aucun écart de périmètre :
+  sept fichiers, dont `lib/queries/indicators.ts` **ouvert et laissé intact**. Trois arbitrages
+  tranchés avant écriture : un produit archivé ne reçoit plus de saisie d'indicateur ; la porte lit
+  le produit avant d'évaluer le droit ; le fichier de lecture est déclaré sans être touché.
 
 ---
 
@@ -1179,6 +1183,78 @@ pronom ; les deux derniers sont écrits en dur au pluriel. Défaut de langue seu
 le refus ni sur la base — hors périmètre de fichiers, consigné dans `ETAT.md` avec sa destination.
 La base de développement a été **remise dans son état d'avant** : nom du produit, accompagnement
 rétabli, indicateur de sonde retiré. La dérive inventoriée dans `ETAT.md` n'a pas augmenté.
+
+- **T5.2 — 16/08/2026 — créer, corriger et archiver un indicateur.** Le premier écran d'écriture de
+la page produit depuis T2.5, et le premier objet de C5 livré **avec ses trois gestes** (arbitrage (a)
+de `tickets-C5.md`) : un objet livré sans son geste de correction est une dette datée du jour de sa
+livraison, et C4bis a coûté six tickets pour rattraper leur absence sur cinq objets.
+
+**Le droit dérivé, et ce qu'il coûte : rien.** L'arbitrage (b) veut `manageDomain`, ou contributeur
+désigné d'au moins un accompagnement du produit. À l'écran, aucune requête neuve — `projects` est
+déjà lu, et `session.can.writeProject` répond sur chacun ; dans l'action, une lecture scopée
+ordinaire des accompagnements du produit **reçu**, dont `list` écarte les archivés d'elle-même, si
+bien que l'écran et l'action posent exactement la même question. Le responsable de domaine
+court-circuite la condition : sa requête n'a pas lieu.
+
+**Trois arbitrages tranchés avant écriture.** (1) **Un produit archivé ne reçoit plus de saisie
+d'indicateur** — la fiche ne le disait pas ; c'est la transposition de T4bis.2, où `updateProduct`
+refuse le produit archivé reçu, et de T4bis.3, où un accompagnement archivé est en lecture seule
+strictement. Sans elle, le responsable de domaine écrirait des indicateurs sur un produit que plus
+aucune liste n'affiche. (2) **La porte lit le produit avant d'évaluer le droit**, l'inverse
+d'`openProduct` : `manageDomain` ne dépend d'aucun identifiant et s'énonce avant toute lecture, là
+où un droit **dérivé des accompagnements du produit** ne s'énonce pas avant de connaître le produit.
+L'ordre ne divulgue rien — la page produit est lisible par tout le domaine (D9). (3)
+**`lib/queries/indicators.ts`, nommé par la fiche, n'a rien reçu** : `listProductIndicators` écarte
+déjà les archivés, et le panneau en correction lit sa ligne par `session.db.find`, la forme de la
+page projet avec `find(activities, …)`. Toucher un fichier pour honorer une liste aurait été l'écrire
+sans raison.
+
+**La règle d'exclusivité arrive sur la page produit, et elle y arrive par décompte.** Deux clés
+seulement — `archiver` et `indicateur` —, ce qu'une comparaison binaire aurait suffi à porter ; c'est
+la forme de la page projet (T4.4, T4bis.3) qui a été reprise, parce qu'elle reste juste quand T5.3
+ajoutera `releve`. Un seul `panelOpen`, un seul `inert`, un seul panneau monté.
+
+**Le critère s'est lu dans le HTML servi, geste par geste.** Le panneau s'ouvre vide sur
+`?indicateur=nouvel`, `role="dialog"` et `inert` comptés à 1 chacun ; un indicateur créé — « Délai
+moyen de traitement d'une réclamation », `s`, « Plus bas vaut mieux » — paraît **aussitôt** dans le
+bloc de T5.1, à sa place alphabétique, avec « Aucun relevé pour l'instant. » et **aucune date
+inventée** ; corrigé, il s'affiche sous son nouveau libellé, son unité passée à « jours » et sa source
+vidée partie à `null` et non en chaîne vide ; archivé par le geste réel, il quitte le bloc et
+`archived_at` est posé — rien n'est supprimé. Les deux clés présentes ensemble rendent la **page
+nue** : zéro `dialog`, zéro `inert`. `?indicateur=n-importe-quoi` rend 200, jamais un 500, la forme
+étant vérifiée avant la base.
+
+**Le droit s'est éprouvé par l'action, jamais par l'écran.** Les charges récoltées sur la page servie
+à Camille Roux (responsable de domaine) ont été repostées sous le cookie de **Thomas Lemaire**,
+contributeur d'un accompagnement d'un **autre** produit : les trois actions refusent, chacune avec
+son message propre — vérifié dans le flux rendu, et non déduit de l'absence d'effet, un 500 refusant
+à l'identique —, et la base est restée à trois lignes, libellé inchangé, `archived_at` nul. La contre-
+épreuve fait la preuve : **Sofia Marchand**, membre contributrice de « Refonte du parcours de
+virement », qui est un accompagnement de ce produit, écrit — sa ligne est en base. Une charge
+**forgée** réécrivant le produit lié vers « Déclaration de sinistre en ligne » tout en gardant
+l'indicateur d'« Espace client web » est refusée par « Cet indicateur n'existe plus sur ce produit. »
+(D11). Sur le produit archivé à la main, la charge récoltée **avant** l'archivage est refusée par
+« Ce produit est archivé : il ne reçoit plus de saisie. » — une route retirée n'a jamais protégé
+l'action qu'elle affichait. Le piège de T5.1 a resservi : `$ACTION_KEY` n'existe que sur les
+formulaires de `useActionState`, et le formulaire nu d'archivage ne le porte pas ; les charges sont
+donc récoltées **formulaire par formulaire**, jamais page par page.
+
+**Les tests se sont mis en défaut, deux fois, et rien d'autre n'est tombé.** Neutraliser l'obligation
+du libellé fait tomber trois tests — les deux qui l'isolent, et celui qui nomme `label` parmi les
+deux erreurs simultanées. Neutraliser la liste fermée du sens de lecture en fait tomber deux, ceux
+qui l'isolent. Le module a été relu intact après chaque neutralisation, `git diff` vide.
+
+**Contraste mesuré, et aucun couple neuf.** Huit couples relevés, tous retombant sur des valeurs déjà
+consignées : 15,72:1 pour « Modifier », « Archiver » et « + Ajouter un indicateur » en
+`content-primary-dark`, 3,88:1 pour la bordure du lien et celle des contrôles, 13,65:1 pour le bouton
+plein de l'état vide, 17,87:1 pour le libellé, 4,98:1 pour le décompte, 8,12:1 pour le filet du
+panneau. **Aucun septième substitut** inventé — la règle de T2.3, tenue pour un quatrième formulaire.
+
+**Ce que le ticket laisse derrière lui.** Une **quatrième copie de `PanelField`**, redite plutôt
+qu'importée pour la raison des trois précédentes, et une seconde copie d'`ACTION_LINK` — la dette est
+au journal, l'extraction appartient au ticket qui pourra toucher les fichiers ensemble. Deux
+indicateurs archivés dans la base de développement, ajoutés à l'inventaire de dérive d'`ETAT.md` : la
+base est jetable, règle du 14/08/2026.
 
 ---
 

@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 16/08/2026 — T5.1 livré : le bloc « Indicateurs » de la page produit.
-**Chantier en cours :** C5 — indicateurs et lecture dans le temps, un ticket sur six livré
-**Ticket suivant :** T5.2 — créer, corriger et archiver un indicateur
+**Dernière mise à jour :** 16/08/2026 — T5.2 livré : créer, corriger et archiver un indicateur.
+**Chantier en cours :** C5 — indicateurs et lecture dans le temps, deux tickets sur six livrés
+**Ticket suivant :** T5.3 — saisir, corriger et retirer un relevé, et sa migration
 
 ---
 
@@ -17,7 +17,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C3 — Activités et roadmap | T3.1 → T3.6 | **terminé** |
 | C4 — Ressources et résultats | T4.1 → T4.4 | **terminé** |
 | C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **terminé** |
-| C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **en cours** — T5.1 livré |
+| C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **en cours** — T5.1, T5.2 livrés |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
@@ -64,6 +64,12 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   read_on desc, id desc))[1]`, qu'un `max()` n'aurait pas donné. Le parcours d'archivage produit,
   dû depuis T4bis.2, a été joué : ses six points tiennent, et il a mis en défaut le **pluriel du
   refus (e)**.
+- **T5.2 — créer, corriger et archiver un indicateur, le 16/08/2026.** Premier écran d'écriture de
+  la page produit depuis T2.5, premier objet de C5 livré **avec ses trois gestes**. Le droit de
+  l'arbitrage (b) se dérive des accompagnements sans une requête neuve, et se redérive sur
+  l'identifiant **reçu** par `openProductWrite` — la porte lit le produit **avant** le droit,
+  l'inverse d'`openProduct`, un droit dérivé ne s'énonçant pas avant ce dont il dérive. La page
+  prend la règle d'exclusivité **par décompte** de la page projet, juste d'avance pour T5.3.
 
 ---
 
@@ -145,7 +151,8 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   Berthier) ; six activités archivées depuis T3.3 ; quatre transitions non revenues en arrière depuis
   T3.5 ; deux ressources de plus depuis T4.2 ; un « Test projet » et un produit « test » d'une session
   antérieure, dont l'audit porte depuis T4bis.6 **deux résultats, un rangé et un vivant** — l'état que
-  seule l'unicité partielle autorise. La dérive a servi T4.4 : elle avait déjà mis un Audit UX en
+  seule l'unicité partielle autorise ; deux indicateurs archivés depuis T5.2, dont un saisi sous le
+  cookie d'une contributrice. La dérive a servi T4.4 : elle avait déjà mis un Audit UX en
   « terminée » sans résultat, soit le cas exact que la fixture ne porte pas.
   **Règle posée le 14/08/2026 : la base de développement est jetable.** La règle 4 protège la donnée
   métier, pas une fixture locale. Conséquence : un critère de ticket passé ne s'y relit pas

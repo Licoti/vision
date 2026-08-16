@@ -8,10 +8,12 @@
  * T4.1 — et se place **sous la liste des accompagnements** : la frise de T5.5
  * viendra au-dessus d'elle, ce bloc reste en dessous.
  *
- * **Aucun geste, aucune prop d'écriture.** T5.1 lit ; T5.2 ajoute le panneau
- * d'indicateur et T5.3 celui de relevé, avec les `addHref` / `editHref` que
- * `Resources` porte déjà. Le composant ne connaît donc aucun droit, et il n'a
- * rien à en connaître tant que rien ne s'écrit ici.
+ * **Trois gestes depuis T5.2**, et la promesse écrite ici par T5.1 est tenue :
+ * `addHref`, `editHref` et `archiveIndicator` sont exactement les props que
+ * `Resources` porte depuis T4bis.5. T5.3 y ajoutera la série des relevés et ses
+ * propres gestes. Le composant, lui, ne connaît **aucun droit** : à `null`, une
+ * prop retire son point d'entrée, et c'est l'appelant qui lit la session — la
+ * règle de `Roadmap`, de `Resources` et de `PageHeader`.
  *
  * **Vision juxtapose, elle ne prouve pas.** Chaque entrée n'affiche que des
  * valeurs reportées : la dernière mesure, sa date, le décompte. Aucun écart à
@@ -30,11 +32,14 @@
  *
  * L'état vide est un paragraphe et non un `EmptyState`, qui porterait un `h2`
  * en doublon sous celui de la section — la règle de `Resources`. Il dit ce que
- * le bloc contiendra, sans annoncer un geste que T5.2 n'a pas encore livré.
+ * le bloc contiendra, et porte le geste depuis T5.2, comme celui de `Resources`
+ * depuis T4.2.
  *
  * Le composant ne lit aucune base : `indicators` est ce que
  * `listProductIndicators` a déjà lu, filtré et trié.
  */
+
+import Link from "next/link";
 
 import { Section, SectionHeader } from "@/components/ui/section";
 import {
@@ -45,16 +50,54 @@ import {
 } from "@/lib/format";
 import type { ProductIndicator } from "@/lib/queries/indicators";
 
+/**
+ * Les classes d'un geste texte — la constante `ACTION_LINK` de `resources.tsx`,
+ * **redite** plutôt qu'importée : ce module ne l'exporte pas, et il n'appartient
+ * pas au périmètre de ce ticket. La dette est consignée au journal, et
+ * l'extraction appartient au ticket qui pourra toucher les trois composants
+ * ensemble.
+ *
+ * `content-primary-dark` sur `surface-neutral-pale` n'est **pas un couple neuf
+ * par la position** : c'est celui des deux gestes de `Resources`, sur le même
+ * fond de `Section`, et celui de « Ajouter un indicateur » en tête de ce bloc.
+ */
+const ACTION_LINK = "text-xs font-semibold text-content-primary-dark underline";
+
 export function Indicators({
   indicators,
+  addHref,
+  editHref,
+  archiveIndicator,
 }: {
   indicators: ProductIndicator[];
+  /**
+   * L'ouverture du panneau, ou `null` pour qui ne peut pas écrire — et sur un
+   * produit archivé (T5.2). Le droit se lit chez l'appelant, jamais ici.
+   */
+  addHref: string | null;
+  /** L'ouverture du panneau sur un indicateur donné. Même règle de droit. */
+  editHref: ((indicatorId: string) => string) | null;
+  /**
+   * Le rangement d'un indicateur — l'action serveur **déjà liée au produit**
+   * côté serveur, à lier à l'indicateur au moment du rendu. Même règle de droit.
+   */
+  archiveIndicator: ((indicatorId: string) => Promise<void>) | null;
 }) {
   return (
     <Section>
       <SectionHeader
         title="Indicateurs"
         note="Ce que ce produit mesure, dans le temps."
+        {...(addHref
+          ? {
+              action: (
+                <AddIndicator
+                  href={addHref}
+                  className="border border-content-neutral-normal bg-surface-neutral-pale text-content-primary-dark"
+                />
+              ),
+            }
+          : {})}
       />
 
       {indicators.length > 0 ? (
@@ -113,18 +156,97 @@ export function Indicators({
                   </>
                 ) : null}
               </p>
+
+              {/* Les deux gestes de T5.2, sous la ligne de décompte et jamais à
+                  droite : le bloc porte des entrées à trois lignes, et une
+                  colonne d'actions y écraserait le libellé.
+
+                  Le nom accessible porte le libellé de l'indicateur, comme celui
+                  de « Modifier » dans `Resources` : « Modifier » répété dix fois
+                  dans une liste de liens ne dit pas lequel. Le mot reste écrit à
+                  l'écran — l'`aria-label` complète, il ne remplace pas.
+
+                  « Archiver » est un formulaire nu : ni confirmation
+                  (arbitrage (c) de `tickets-C4bis.md` — un indicateur se
+                  retape), ni motif. Le mot est celui de l'arbitrage (d), jamais
+                  « Supprimer » : rien n'est supprimé (règle 4). */}
+              {/* Un `div` et non un `p` : `<form>` est du contenu de flux, et
+                  un paragraphe n'accepte que du phrasé — le balisage servi
+                  serait réécrit par le navigateur, et l'hydratation
+                  divergerait. */}
+              {editHref || archiveIndicator ? (
+                <div className="mt-1.5 flex flex-wrap items-center gap-4">
+                  {editHref ? (
+                    <Link
+                      href={editHref(indicator.id)}
+                      aria-label={`Modifier l'indicateur ${indicator.label}`}
+                      className={ACTION_LINK}
+                    >
+                      Modifier
+                    </Link>
+                  ) : null}
+                  {archiveIndicator ? (
+                    <form action={archiveIndicator.bind(null, indicator.id)}>
+                      <button
+                        type="submit"
+                        aria-label={`Archiver l'indicateur ${indicator.label}`}
+                        className={ACTION_LINK}
+                      >
+                        Archiver
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>
       ) : (
-        <p className="text-sm leading-175 text-content-neutral-base">
-          Les mesures suivies sur ce produit s&apos;afficheront ici, chacune avec
-          son dernier relevé daté et le nombre de relevés qui le précèdent. Un
-          indicateur appartient au produit et se poursuit d&apos;un
-          accompagnement à l&apos;autre : c&apos;est ce qui permet de lire son
-          évolution dans le temps long.
-        </p>
+        <div className="flex flex-col items-start gap-4">
+          <p className="text-sm leading-175 text-content-neutral-base">
+            Les mesures suivies sur ce produit s&apos;afficheront ici, chacune
+            avec son dernier relevé daté et le nombre de relevés qui le
+            précèdent. Un indicateur appartient au produit et se poursuit d&apos;un
+            accompagnement à l&apos;autre : c&apos;est ce qui permet de lire son
+            évolution dans le temps long.
+          </p>
+          {addHref ? (
+            <AddIndicator
+              href={addHref}
+              className="bg-surface-primary-base text-content-neutral-pale"
+            />
+          ) : null}
+        </div>
       )}
     </Section>
+  );
+}
+
+/**
+ * L'action d'ouverture du panneau, aux deux emplacements — la forme de
+ * `LinkResource` dans `resources.tsx`, et pour la même raison.
+ *
+ * C'est un lien et non un bouton, parce que c'en est un : il mène à une URL,
+ * celle de la page du produit portant `?indicateur=nouvel`. Il se copie, se
+ * partage, s'ouvre dans un onglet — ce qu'un bouton d'ouverture piloté par du
+ * JavaScript n'aurait fait dans aucun des trois cas.
+ *
+ * Le `+` est décoratif : « Ajouter un indicateur » se lit seul.
+ */
+function AddIndicator({
+  href,
+  className,
+}: {
+  href: string;
+  className: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold ${className}`}
+    >
+      <span aria-hidden="true">+</span>
+      Ajouter un indicateur
+    </Link>
   );
 }

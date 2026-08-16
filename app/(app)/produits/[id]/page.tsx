@@ -18,17 +18,40 @@
  * absentes du rendu pour tout autre, pas grisées.
  *
  * **Un produit archivé garde sa page** (règle 4, T4bis.2) : elle reste servie
- * entière, mention datée en tête, et ce sont ses deux actions d'écriture qui
+ * entière, mention datée en tête, et ce sont ses actions d'écriture qui
  * disparaissent — « Modifier » et « Nouvel accompagnement », l'état vide
- * compris. Seul « Rétablir » s'y ajoute, pour le responsable de domaine. Ce
- * n'est pas ce rendu qui protège : `updateProduct` refuse le produit archivé
- * **reçu**, une route retirée n'ayant jamais protégé l'action qu'elle affichait.
+ * compris, **et les trois gestes du bloc « Indicateurs » depuis T5.2**. Seul
+ * « Rétablir » s'y ajoute, pour le responsable de domaine. Ce n'est pas ce rendu
+ * qui protège : `updateProduct` refuse le produit archivé **reçu**, et
+ * `openProductWrite` fait de même pour les indicateurs — une route retirée n'a
+ * jamais protégé l'action qu'elle affichait.
  *
- * **Le panneau de confirmation est cette page, plus un paramètre** (D30, T3.2,
- * repris de la page projet) : `?archiver=confirmation` l'ouvre, la page reste
- * rendue derrière et porte alors l'attribut HTML `inert`. Toute autre valeur
- * n'ouvre rien — une seule valeur d'ouverture, l'objet visé étant celui de la
- * page.
+ * **Les panneaux sont cette page, plus un paramètre** (D30, T3.2, repris de la
+ * page projet) : `?archiver=confirmation` ouvre la confirmation d'archivage
+ * (T4bis.2) — une seule valeur d'ouverture, l'objet visé étant celui de la page.
+ * `?indicateur=nouvel` ouvre le panneau d'indicateur vide et
+ * `?indicateur=<identifiant>` l'ouvre sur un indicateur à corriger (T5.2) : une
+ * seule clé, dont la **valeur** porte le cas, et un seul formulaire pour les
+ * deux gestes. La page reste rendue derrière eux, et porte alors l'attribut HTML
+ * `inert`.
+ *
+ * **Les deux clés sont mutuellement exclusives, et le sont par une règle unique :
+ * plusieurs présentes ensemble n'ouvrent rien** — la règle de la page projet
+ * depuis T4.2, reprise ici sous sa forme par **décompte** (T4.4, T4bis.3). Deux
+ * `role="dialog"` ou deux `inert` concurrents ne se rattrapent pas après coup, et
+ * aucune préséance ne s'invente entre deux gestes de même rang. Un seul
+ * `panelOpen`, un seul `inert`, un seul panneau monté : la propriété se lit dans
+ * le code, elle ne se déduit pas de deux conditions éparses — et l'énoncé restera
+ * juste quand T5.3 ajoutera `releve`.
+ *
+ * **Le droit d'écrire un indicateur se dérive des accompagnements du produit**
+ * (arbitrage (b) de `tickets-C5.md`) : `manageDomain`, ou contributeur désigné
+ * d'au moins un accompagnement de ce produit. **Aucune requête neuve** — la page
+ * lit déjà ses accompagnements, et `session.can.writeProject` répond sur chacun.
+ * Un membre non contributeur qui tape l'URL d'ouverture obtient la page nue —
+ * pas un 404 : la page produit reste lisible par tout le domaine (D9), seul le
+ * panneau disparaît. Et ce n'est pas ce rendu qui protège : les actions
+ * redérivent le droit sur l'identifiant **reçu**.
  *
  * Aucune requête directe : tout passe par `session.db`, déjà scopé sur le
  * domaine courant. Règle 1.
@@ -37,7 +60,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { createIndicator, updateIndicator, archiveIndicator } from "./actions";
 import { archiveProduct, restoreProduct } from "../actions";
+import { IndicatorPanel } from "@/components/products/indicator-panel";
 import { Indicators } from "@/components/products/indicators";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
 import { AvatarGroup } from "@/components/ui/avatar";
@@ -48,8 +73,14 @@ import { Page, PageHeader } from "@/components/ui/page";
 import { SectionHeader } from "@/components/ui/section";
 import { StatusDot } from "@/components/ui/status-dot";
 import { requireSession } from "@/lib/auth/provider";
+import { indicators } from "@/lib/db/schema";
+import { toIndicatorFormValues } from "@/lib/forms/indicator";
 import { formatAccompaniments, formatMonth, formatPeriod } from "@/lib/format";
-import { ARCHIVE_PANEL_CONFIRM, ROUTES } from "@/lib/navigation";
+import {
+  ARCHIVE_PANEL_CONFIRM,
+  INDICATOR_PANEL_NEW,
+  ROUTES,
+} from "@/lib/navigation";
 import { listProductIndicators } from "@/lib/queries/indicators";
 import { findProductDetail, listProductProjects } from "@/lib/queries/products";
 import { isUuid } from "@/lib/uuid";
@@ -63,7 +94,7 @@ export default async function ProductPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ archiver?: string }>;
+  searchParams: Promise<{ archiver?: string; indicateur?: string }>;
 }) {
   const { id } = await params;
   if (!isUuid(id)) notFound();
@@ -83,17 +114,78 @@ export default async function ProductPage({
   ]);
 
   const archived = product.archivedAt !== null;
+
+  /* Le droit d'écrire un indicateur, **dérivé des accompagnements du produit**
+     (arbitrage (b) de `tickets-C5.md`) : `manageDomain`, ou contributeur désigné
+     d'au moins un accompagnement. Aucune requête neuve — `projects` vient d'être
+     lu pour l'écran, et `listProductProjects` en écarte déjà les archivés, si
+     bien que ce sont bien les accompagnements **vivants** qui ouvrent le droit.
+
+     **Un produit archivé est en lecture seule** (arbitrage du 16/08/2026), la
+     transposition de T4bis.2 et de T4bis.3 : un seul `&&` fait tomber ensemble
+     le panneau et les trois gestes du bloc. Ce n'est pas ce rendu qui protège —
+     `openProductWrite` refuse le produit archivé **reçu**. */
+  const canWriteIndicators =
+    !archived &&
+    (session.can.manageDomain ||
+      projects.some((project) => session.can.writeProject(project.id)));
+
+  const { archiver, indicateur } = await searchParams;
+
+  /* L'exclusivité, avant tout le reste : plusieurs clés d'ouverture
+     concurrentes n'en ouvrent aucune. Tout ce qui suit lit `asked`, pas les
+     paramètres bruts, si bien qu'aucun chemin ne peut ouvrir deux panneaux à la
+     fois — la garantie est dans le code, pas dans la relecture.
+
+     La forme est celle de la page projet (T4.4, T4bis.3) : un **décompte**, et
+     non une comparaison binaire, parce qu'un décompte reste juste quand T5.3
+     ajoutera `releve`. */
+  const keys = { archiver, indicateur };
+  const conflict =
+    Object.values(keys).filter((value) => value !== undefined).length > 1;
+  const asked: Partial<typeof keys> = conflict ? {} : keys;
+
   /* Le droit décide de tout ce qui suit, et l'archivage avec lui : on ne
      confirme pas l'archivage de ce qui est déjà rangé. Un membre qui tape
      l'URL d'ouverture obtient la page nue — pas un 404 : la page produit reste
      lisible par tout le domaine (D9), seul le panneau disparaît. */
-  const { archiver } = await searchParams;
-  const panelOpen =
-    session.can.manageDomain && !archived && archiver === ARCHIVE_PANEL_CONFIRM;
+  const archivePanelOpen =
+    session.can.manageDomain &&
+    !archived &&
+    asked.archiver === ARCHIVE_PANEL_CONFIRM;
+
+  /* Une seule clé, dont la **valeur** porte le cas (T3.2, T4bis.5) : `nouvel`
+     crée, un identifiant corrige, tout le reste n'ouvre rien. L'indicateur est
+     confronté au produit et à l'archivage — le bloc n'affiche aucun lien vers un
+     indicateur archivé, mais une URL se tape.
+
+     La forme est vérifiée avant la base, comme pour l'identifiant de la page :
+     une colonne `uuid` interrogée avec n'importe quoi rend une erreur
+     PostgreSQL, donc un 500, là où l'on attend une page nue. */
+  const editedIndicator =
+    canWriteIndicators &&
+    asked.indicateur &&
+    asked.indicateur !== INDICATOR_PANEL_NEW &&
+    isUuid(asked.indicateur)
+      ? await session.db.find(indicators, asked.indicateur)
+      : undefined;
+
+  const indicator =
+    editedIndicator &&
+    editedIndicator.productId === product.id &&
+    editedIndicator.archivedAt === null
+      ? editedIndicator
+      : null;
+
+  const indicatorPanelOpen =
+    canWriteIndicators &&
+    (asked.indicateur === INDICATOR_PANEL_NEW || indicator !== null);
+
+  const panelOpen = archivePanelOpen || indicatorPanelOpen;
 
   return (
     <>
-      {panelOpen ? (
+      {archivePanelOpen ? (
         /* L'action est liée **côté serveur** au produit courant : l'identifiant
            sort de la saisie, et le panneau ne connaît pas ce qu'il archive. Ce
            n'est pas un verrou — Next sérialise les arguments liés dans un champ
@@ -122,6 +214,38 @@ export default async function ProductPage({
             <p>Le geste se défait : « Rétablir » ramène le produit.</p>
           </div>
         </ConfirmPanel>
+      ) : null}
+
+      {indicatorPanelOpen ? (
+        /* L'action est liée **côté serveur** — au produit courant en création,
+           au produit et à l'indicateur en correction (la forme d'`updateResource`
+           depuis T4bis.5) : les identifiants sortent de la saisie, et le panneau
+           ne connaît ni le produit ni l'indicateur qu'il écrit. Ce n'est pas un
+           verrou — Next sérialise les arguments liés dans un champ `$ACTION_…`,
+           réécrivable. Le verrou est dans l'action, qui dérive le droit sur le
+           produit **reçu** puis rapproche l'indicateur **reçu** de ce produit ;
+           un panneau absent du rendu n'a jamais protégé le point d'entrée HTTP
+           qui l'accompagne. */
+        <IndicatorPanel
+          /* La `key` change avec ce que le panneau édite, pour la raison écrite
+             sur celle du panneau d'activité : `useActionState` ne relit son état
+             initial qu'au montage. */
+          key={indicator ? indicator.id : INDICATOR_PANEL_NEW}
+          productName={product.name}
+          closeHref={ROUTES.product(product.id)}
+          action={
+            indicator
+              ? updateIndicator.bind(null, product.id, indicator.id)
+              : createIndicator.bind(null, product.id)
+          }
+          {...(indicator
+            ? {
+                title: "Modifier l'indicateur",
+                submitLabel: "Enregistrer les modifications",
+                initial: toIndicatorFormValues(indicator),
+              }
+            : {})}
+        />
       ) : null}
 
       {/* `inert` est un attribut HTML, pas un script : le contenu reste lu et
@@ -247,8 +371,31 @@ export default async function ProductPage({
               place au-dessus d'elle, sans la déplacer (docs/06 §6). Le bloc est
               en pleine largeur, comme la liste — la page produit ne porte
               aucune grille de blocs de référence, à la différence de la page
-              projet. */}
-          <Indicators indicators={productIndicators} />
+              projet.
+
+              Les trois points d'entrée tombent avec le même `canWriteIndicators` :
+              le droit dérivé (arbitrage (b)) et la lecture seule d'un produit
+              archivé. Aucune condition ne s'ajoute ici — c'est la propriété que
+              ce `&&` cherchait, celle du `canWrite` de la page projet.
+              `archiveIndicator` est liée au produit **côté serveur** ; le bloc y
+              ajoutera l'indicateur au rendu. */}
+          <Indicators
+            indicators={productIndicators}
+            addHref={
+              canWriteIndicators ? ROUTES.productIndicatorNew(product.id) : null
+            }
+            editHref={
+              canWriteIndicators
+                ? (indicatorId) =>
+                    ROUTES.productIndicatorEdit(product.id, indicatorId)
+                : null
+            }
+            archiveIndicator={
+              canWriteIndicators
+                ? archiveIndicator.bind(null, product.id)
+                : null
+            }
+          />
         </Page>
       </div>
     </>

@@ -106,6 +106,32 @@ export const ARCHIVE_PANEL_PARAM = "archiver";
 export const ARCHIVE_PANEL_CONFIRM = "confirmation";
 
 /**
+ * Le panneau de saisie d'un **indicateur** (T5.2), sur la page du **produit** —
+ * la première clé d'ouverture de cette page qui ne soit pas une confirmation.
+ * Même mécanique que les quatre précédentes : une URL, pas un état.
+ *
+ * **Deux valeurs d'ouverture**, comme `activite` depuis T3.4 et `ressource`
+ * depuis T4bis.5 : `nouvel` crée, l'identifiant d'un **indicateur** corrige, et
+ * toute autre valeur n'ouvre rien — un UUID ne peut pas valoir `nouvel`. Un seul
+ * formulaire pour les deux gestes, l'arbitrage (a) de `tickets-C5.md` voulant
+ * que chaque objet arrive avec ses trois gestes.
+ *
+ * **La page produit prend la règle d'exclusivité par décompte** de la page
+ * projet : `archiver` et `indicateur` présentes ensemble n'ouvrent **rien**.
+ * Deux `role="dialog"` ou deux `inert` concurrents ne se rattrapent pas après
+ * coup, et aucune préséance ne s'invente entre deux gestes de même rang. La
+ * forme est celle d'`app/(app)/projets/[id]/page.tsx`, choisie pour rester juste
+ * quand T5.3 ajoutera `releve`.
+ *
+ * **T5.4 reprendra cette même clé sur la page projet**, pour l'adoption : ce
+ * sont deux pages, jamais la même URL, et rien n'aura à changer ici.
+ */
+export const INDICATOR_PANEL_PARAM = "indicateur";
+
+/** La valeur d'ouverture en création. Toute autre valeur est un identifiant. */
+export const INDICATOR_PANEL_NEW = "nouvel";
+
+/**
  * Les adresses des six écrans, et des formulaires qui les alimentent. Les
  * pages de détail prennent un identifiant : le schéma en pose des UUID, et
  * rien ne promet encore de slug — ce choix revient à C2, avec l'écran qui
@@ -130,6 +156,21 @@ export const ROUTES = {
    */
   productArchive: (id: string) =>
     `/produits/${id}?${ARCHIVE_PANEL_PARAM}=${ARCHIVE_PANEL_CONFIRM}`,
+  /**
+   * La page du produit, panneau d'indicateur ouvert (T5.2). **Ce n'est pas un
+   * écran de plus** : c'est le même, avec un paramètre — et la fermeture est
+   * donc `product(id)`, qui n'a pas besoin d'entrée à elle.
+   */
+  productIndicatorNew: (id: string) =>
+    `/produits/${id}?${INDICATOR_PANEL_PARAM}=${INDICATOR_PANEL_NEW}`,
+  /**
+   * Le même panneau, sur un indicateur existant (T5.2) : un seul formulaire,
+   * deux points d'entrée — la forme de `projectResourceEdit` jusqu'au nom de la
+   * clé. La fermeture reste `product(id)` : corriger un indicateur ne fait pas
+   * davantage quitter la page du produit que d'en saisir un.
+   */
+  productIndicatorEdit: (id: string, indicatorId: string) =>
+    `/produits/${id}?${INDICATOR_PANEL_PARAM}=${indicatorId}`,
   projects: "/projets",
   project: (id: string) => `/projets/${id}`,
   projectNew: "/projets/nouveau",

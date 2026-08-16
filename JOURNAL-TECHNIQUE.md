@@ -2564,3 +2564,57 @@ base ne bouge pas. Hors du périmètre de fichiers de T5.1, règle 3 : consigné
 destination, **T5.4**, seul ticket de C5 dont la fiche ouvre ce fichier, et qui doit précisément y
 recopier « la forme exacte du refus (e) d'`archiveProduct` ». Un défaut se corrige avant d'être
 recopié.
+
+**T5.2 — le droit dérivé oblige à retourner l'ordre de la porte, et c'est la première fois.** Les
+quatre portes du projet — `openProduct`, `openProject`, `openActivity`, `openResource`, `openResult` —
+interrogent toutes le **droit** avant de chercher la ligne, parce que `manageDomain` et
+`writeProject` répondent sans rien lire d'autre que la session. L'arbitrage (b) de C5 pose un
+troisième cas : un droit **dérivé des accompagnements du produit**, qui ne s'énonce pas avant de
+connaître le produit. `openProductWrite` lit donc le produit, puis son archivage, puis le droit.
+Alternative écartée : demander `contributorProjectIds` à la session et compter les projets du produit
+qui s'y trouvent — même requête, ordre inversé pour rien, et un `inArray` sur une liste vide à
+traiter à part. L'ordre ne divulgue rien de plus que l'écran, la page produit étant lisible par tout
+le domaine (D9) ; **à relire si un jour une page de détail cesse de l'être.**
+
+**T5.2 — un produit archivé ne reçoit plus de saisie d'indicateur, et la fiche ne le disait pas.**
+Ni `tickets-C5.md` ni la fiche T5.2 ne nomment le cas ; ils ne nomment pas non plus son contraire.
+Deux lectures se défendaient : laisser le responsable de domaine écrire — un indicateur n'est pas un
+accompagnement —, ou fermer le produit comme T4bis.3 ferme l'accompagnement. Retenu : **fermer**.
+`updateProduct` refuse déjà le produit archivé **reçu** depuis T4bis.2, et autoriser des indicateurs
+neufs sur un produit que plus aucune liste n'affiche aurait créé une donnée que personne ne peut
+relire par un chemin de navigation. La conséquence est un `&&` unique dans la page — le `canWrite`
+de T4bis.3 transposé — qui fait tomber ensemble le panneau et les trois gestes du bloc. Arbitrage
+posé à l'humain avant écriture, tranché option A.
+
+**T5.2 — un fichier nommé par une fiche n'est pas un fichier à écrire.** Le périmètre de T5.2 liste
+`lib/queries/indicators.ts` et son test. Rien n'y était à faire : `listProductIndicators` écarte déjà
+les indicateurs archivés — son test « un indicateur archivé n'apparaît nulle part » couvre le geste
+d'archivage de ce ticket sans une ligne de plus —, et le panneau en correction lit sa ligne par
+`session.db.find(indicators, …)`, la forme exacte de la page projet avec `find(activities, …)`, qui
+n'ajoute aucune fonction de lecture. Le fichier est donc **ouvert et laissé intact**. Écrire une
+fonction pour honorer une liste aurait ajouté un lecteur de plus à maintenir pour rien — règle 3, par
+l'autre bout.
+
+**T5.2 — la quatrième copie de `PanelField`, et la deuxième d'`ACTION_LINK`.** La dette de T4.2 n'a
+pas bougé, elle s'est épaissie : `project-form.tsx` (T2.5), `activity-panel.tsx` (T3.3),
+`resource-panel.tsx` (T4.2) et maintenant `indicator-panel.tsx` portent le même composant de champ,
+et `resources.tsx` comme `indicators.tsx` portent la même constante de geste texte. Aucun des
+fichiers sources ne l'exporte, et aucun n'appartenait au périmètre de ce ticket. **L'extraction
+appartient au ticket qui pourra toucher les quatre fichiers ensemble** — elle ne se fera pas au
+détour d'un cinquième panneau.
+
+**T5.2 — le piège du `$ACTION_KEY` de T5.1 ne se contourne pas, il se structure.** Le harnais de
+rejeu récoltait d'abord les champs cachés **page par page**, ce qui collait le `$ACTION_KEY` du
+panneau — un formulaire de `useActionState` — sur la charge du formulaire nu d'archivage, qui n'en
+porte pas. C'est exactement la charge que T5.1 avait dû refaire. La parade est de découper le
+balisage **par `<form>`** avant d'en extraire les champs : une charge est alors, par construction,
+celle d'un formulaire réel de l'écran. À reprendre tel quel en T5.3 et T5.4, qui rejoueront tous deux
+un panneau et un geste nu.
+
+**T5.2 — un refus ne se lit pas dans le HTML d'une action, et l'absence d'effet ne prouve rien.** La
+réponse d'une action serveur est un flux RSC, pas une page : le premier jet du harnais cherchait le
+bandeau `role="alert"` dans le corps de la réponse et n'y trouvait rien, ce qui aurait pu passer pour
+« aucun refus » alors que les trois actions refusaient bel et bien. Le message se lit dans le flux
+(`"message":"…"`), et la base se compte à côté. **Un 500 laisse la base intacte exactement comme un
+refus** : compter les lignes ne suffit jamais, il faut lire le message — la leçon de l'étape témoin
+de T4bis.3, retrouvée par un autre chemin.
