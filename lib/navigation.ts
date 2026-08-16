@@ -132,6 +132,31 @@ export const INDICATOR_PANEL_PARAM = "indicateur";
 export const INDICATOR_PANEL_NEW = "nouvel";
 
 /**
+ * Le panneau de saisie d'un **relevé** (T5.3), sixième clé d'ouverture du
+ * projet — la seconde de la page produit. Même mécanique que les cinq
+ * précédentes : une URL, pas un état.
+ *
+ * **Aucune valeur d'ouverture fixe**, à la différence d'`indicateur` : la forme
+ * est celle de `resultat` (T4.4), et pour la même raison — la valeur désigne la
+ * **cible** du geste, et `nouveau` n'aurait rien désigné. L'identifiant d'un
+ * **indicateur** ouvre la saisie d'un relevé sur cet indicateur, celui d'un
+ * **relevé** ouvre sa correction. Un UUID d'`indicators` n'est pas un UUID
+ * d'`indicator_readings` : deux lectures scopées successives tranchent, et ce
+ * qui n'est ni l'un ni l'autre n'ouvre rien.
+ *
+ * **Une clé distincte d'`indicateur`, et non une valeur de plus sur elle** : ce
+ * sont deux objets, pas deux gestes sur le même — la règle posée pour
+ * `ressource` en T4.2. Une seule clé les porterait au prix d'une valeur
+ * polymorphe que rien ne désambiguïserait : un identifiant d'indicateur y
+ * voudrait dire « corriger cet indicateur » d'un côté et « lui ajouter un
+ * relevé » de l'autre.
+ *
+ * **La règle d'exclusivité de la page produit passe de deux clés à trois sans
+ * changer d'énoncé**, le décompte de T5.2 ayant été écrit pour cela.
+ */
+export const READING_PANEL_PARAM = "releve";
+
+/**
  * Les adresses des six écrans, et des formulaires qui les alimentent. Les
  * pages de détail prennent un identifiant : le schéma en pose des UUID, et
  * rien ne promet encore de slug — ce choix revient à C2, avec l'écran qui
@@ -171,6 +196,21 @@ export const ROUTES = {
    */
   productIndicatorEdit: (id: string, indicatorId: string) =>
     `/produits/${id}?${INDICATOR_PANEL_PARAM}=${indicatorId}`,
+  /**
+   * La page du produit, panneau de relevé ouvert sur un indicateur donné (T5.3).
+   * Le geste part de l'entrée de l'indicateur dans le bloc — jamais d'ailleurs :
+   * un relevé n'existe pas hors de l'indicateur qu'il mesure. La fermeture reste
+   * `product(id)`.
+   */
+  productReadingNew: (id: string, indicatorId: string) =>
+    `/produits/${id}?${READING_PANEL_PARAM}=${indicatorId}`,
+  /**
+   * Le même panneau, sur un relevé existant (T5.3) : un seul formulaire, deux
+   * points d'entrée — la forme de `productIndicatorEdit` jusqu'au nom de la clé,
+   * à ceci près que la valeur change ici de **table** et non de nature.
+   */
+  productReadingEdit: (id: string, readingId: string) =>
+    `/produits/${id}?${READING_PANEL_PARAM}=${readingId}`,
   projects: "/projets",
   project: (id: string) => `/projets/${id}`,
   projectNew: "/projets/nouveau",

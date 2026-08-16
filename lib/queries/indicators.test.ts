@@ -1,5 +1,6 @@
 /**
- * Les tests de la lecture des indicateurs d'un produit.
+ * Les tests des deux lectures du bloc « Indicateurs » : les indicateurs d'un
+ * produit avec leur dernier relevé (T5.1), et leur série datée (T5.3).
  *
  * Ils tournent sur la branche Neon dédiée — `vitest.config.mts` remappe
  * `DATABASE_URL` sur `TEST_DATABASE_URL` — et écrivent réellement : un
@@ -25,7 +26,11 @@ import {
   products,
 } from "@/lib/db/schema";
 
-import { listProductIndicators, type ProductIndicator } from "./indicators";
+import {
+  listProductIndicators,
+  listProductReadings,
+  type ProductIndicator,
+} from "./indicators";
 
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
 const teardownOrder = [indicatorReadings, indicators, products, entities];
@@ -43,6 +48,10 @@ type Fixture = {
   archivedIndicatorId: string;
   /** L'indicateur aux trois relevés du brief §7. */
   autonomyId: string;
+  /** L'indicateur aux deux relevés du même jour. */
+  tieId: string;
+  /** Le relevé **retiré**, identifié nommément (T5.3). */
+  archivedReadingId: string;
   /** L'indicateur du produit voisin — la cible des relevés forgés. */
   otherIndicatorId: string;
 };
@@ -146,6 +155,17 @@ async function seedDomain(label: string): Promise<Fixture> {
 
   /* --- Ce que la lecture doit écarter ------------------------------------ */
 
+  /* Un relevé **retiré**, et le plus récent de tous ceux d'`Autonomie` (T5.3).
+     Sans le filtre posé dans le `on` de la jointure, il ferait tomber les trois
+     agrégats d'un coup : il deviendrait *le* dernier relevé, sa valeur
+     remplacerait le 71 du brief, et le décompte passerait de 3 à 4. */
+  const archivedReading = await reading({
+    indicatorId: autonomy.id,
+    value: "88",
+    readOn: "2026-08-01",
+  });
+  await scope.archive(indicatorReadings, archivedReading.id);
+
   /* Alphabétiquement **premier** de tous : sans le filtre d'archivage, il
      ouvrirait la liste au lieu d'en être absent. */
   const archived = await indicator({ productId: full.id, label: "Ancien" });
@@ -166,6 +186,8 @@ async function seedDomain(label: string): Promise<Fixture> {
     otherId: other.id,
     archivedIndicatorId: archived.id,
     autonomyId: autonomy.id,
+    tieId: tie.id,
+    archivedReadingId: archivedReading.id,
     otherIndicatorId: otherIndicator.id,
   };
 }
@@ -300,6 +322,21 @@ describe("listProductIndicators — le périmètre", () => {
     expect(labels(rows)).not.toContain("Ancien a");
   });
 
+  test("un relevé retiré ne compte pas et ne fournit pas le dernier relevé", async () => {
+    /* Les **trois** agrégats d'un coup : c'est ce que le filtre posé dans le
+       `on` de la jointure — et non dans le `where`, qui emporterait l'indicateur
+       avec ses relevés — garantit ensemble. Le relevé retiré est le plus récent
+       et porte 88 ; sans lui, la lecture reste sur les trois du brief. */
+    const rows = await listProductIndicators(a.scope, a.fullId);
+    const autonomy = rows.find((row) => row.id === a.autonomyId);
+
+    expect(autonomy).toMatchObject({
+      readingCount: 3,
+      lastValue: "71.0000",
+      lastReadOn: "2026-06-01",
+    });
+  });
+
   test("les indicateurs d'un autre produit du même domaine n'apparaissent pas", async () => {
     const rows = await listProductIndicators(a.scope, a.fullId);
 
@@ -365,5 +402,148 @@ describe("listProductIndicators — étanchéité du domaine", () => {
       lastValue: null,
       lastReadOn: null,
     });
+  });
+});
+
+/* ==========================================================================
+   La série datée — T5.3
+
+   Une lecture **plate** : tous les relevés vivants des indicateurs vivants du
+   produit, du plus récent au plus ancien, le regroupement appartenant à
+   l'écran. Ce que ces tests éprouvent, en plus des filtres, est la **jointure
+   des deux lectures** : la première ligne de la série d'un indicateur est, par
+   construction, le « dernier relevé » que l'autre fonction affiche.
+   ========================================================================== */
+
+describe("listProductReadings — l'ordre", () => {
+  test("la série va du plus récent au plus ancien", async () => {
+    const rows = await listProductReadings(a.scope, a.fullId);
+
+    const dates = rows.map((row) => row.readOn);
+    expect(dates).toEqual([...dates].sort().reverse());
+
+    // Les trois du brief, les deux de « Baisse », les deux de « Doublon ».
+    expect(rows).toHaveLength(7);
+  });
+
+  test("deux relevés du même jour se départagent de façon stable", async () => {
+    /* `read_on` seule ne tranche pas, et l'ordre physique varie d'un plan
+       d'exécution à l'autre : sans le `id desc`, deux affichages successifs
+       pourraient intervertir les deux lignes. */
+    const first = await listProductReadings(a.scope, a.fullId);
+    const second = await listProductReadings(a.scope, a.fullId);
+
+    const idsOf = (rows: Awaited<ReturnType<typeof listProductReadings>>) =>
+      rows.filter((row) => row.indicatorId === a.tieId).map((row) => row.id);
+
+    expect(idsOf(first)).toHaveLength(2);
+    expect(idsOf(first)).toEqual(idsOf(second));
+  });
+
+  test("la première ligne d'une série est le dernier relevé de son indicateur", async () => {
+    /* **La propriété que les deux lectures partagent**, et le seul test qui la
+       retienne : elles trient sur le même couple `read_on desc, id desc`, si
+       bien que la tête de la série et la valeur affichée au-dessus d'elle dans
+       le bloc sont le même relevé — par construction, non par coïncidence. Deux
+       tris différents feraient mentir l'un des deux affichages. */
+    const [indicatorRows, readingRows] = await Promise.all([
+      listProductIndicators(a.scope, a.fullId),
+      listProductReadings(a.scope, a.fullId),
+    ]);
+
+    const measured = indicatorRows.filter((row) => row.readingCount > 0);
+    expect(measured.length).toBeGreaterThan(0);
+
+    for (const indicator of measured) {
+      const head = readingRows.find((row) => row.indicatorId === indicator.id);
+
+      expect(head?.value).toBe(indicator.lastValue);
+      expect(head?.readOn).toBe(indicator.lastReadOn);
+    }
+  });
+});
+
+describe("listProductReadings — les champs", () => {
+  test("une ligne rend ses cinq colonnes, brutes", async () => {
+    const rows = await listProductReadings(a.scope, a.fullId);
+    const head = rows.find((row) => row.indicatorId === a.autonomyId);
+
+    expect(head).toMatchObject({
+      indicatorId: a.autonomyId,
+      // `numeric(18,4)` revient en chaîne du pilote : la mise en forme
+      // appartient à l'écran, jamais à la lecture.
+      value: "71.0000",
+      readOn: "2026-06-01",
+      sourceNote: null,
+    });
+    expect(head?.id).toEqual(expect.any(String));
+  });
+});
+
+describe("listProductReadings — le périmètre", () => {
+  test("un relevé retiré n'apparaît pas dans la série", async () => {
+    const rows = await listProductReadings(a.scope, a.fullId);
+
+    // Le plus récent de tous : sans le filtre, il ouvrirait la série.
+    expect(rows.map((row) => row.id)).not.toContain(a.archivedReadingId);
+    expect(rows.map((row) => row.readOn)).not.toContain("2026-08-01");
+  });
+
+  test("les relevés d'un indicateur archivé sortent avec lui", async () => {
+    /* `Ancien` porte un relevé bien vivant : c'est l'`innerJoin` qui l'écarte,
+       et non un filtre sur le relevé. Un relevé dont l'indicateur ne s'affiche
+       plus n'a nulle part où s'afficher. */
+    const rows = await listProductReadings(a.scope, a.fullId);
+
+    expect(rows.map((row) => row.indicatorId)).not.toContain(
+      a.archivedIndicatorId,
+    );
+    expect(rows.map((row) => row.value)).not.toContain("99.0000");
+  });
+
+  test("les relevés d'un autre produit du même domaine n'apparaissent pas", async () => {
+    const rows = await listProductReadings(a.scope, a.fullId);
+
+    expect(rows.map((row) => row.indicatorId)).not.toContain(
+      a.otherIndicatorId,
+    );
+  });
+
+  test("un produit sans relevé rend un tableau vide", async () => {
+    expect(await listProductReadings(a.scope, a.emptyId)).toEqual([]);
+  });
+});
+
+describe("listProductReadings — étanchéité du domaine", () => {
+  test("les relevés d'un produit d'un autre domaine ne se lisent pas", async () => {
+    expect(await listProductReadings(b.scope, a.fullId)).toEqual([]);
+  });
+
+  test("chaque domaine ne lit que les relevés de ses propres indicateurs", async () => {
+    const [own, rows] = await Promise.all([
+      listProductIndicators(b.scope, b.fullId),
+      listProductReadings(b.scope, b.fullId),
+    ]);
+
+    const ids = new Set(own.map((row) => row.id));
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((row) => ids.has(row.indicatorId))).toBe(true);
+  });
+
+  test("un relevé forgé d'un autre domaine ne se lit pas", async () => {
+    /* Le contournement de `resources.test.ts`, transposé et réécrit ici plutôt
+       qu'emprunté au test voisin : `filter(indicatorReadings)` est
+       **infalsifiable** sans une ligne que la couche scopée refuse d'écrire, et
+       un test qui dépendrait de l'ordre d'exécution d'un autre ne prouverait
+       rien le jour où l'un des deux bouge. */
+    await db.insert(indicatorReadings).values({
+      // La liaison interdite : un relevé du domaine `a` sur un indicateur `b`.
+      domainId: a.domainId,
+      indicatorId: b.otherIndicatorId,
+      value: "888",
+      readOn: "2031-01-01",
+    });
+
+    expect(await listProductReadings(b.scope, b.otherId)).toEqual([]);
   });
 });

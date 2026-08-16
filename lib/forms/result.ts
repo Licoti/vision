@@ -100,8 +100,14 @@ export const EMPTY_RESULT_VALUES: ResultFormValues = {
  * **Le tour est exact** : ce qui est réaffiché passe `validateResultForm` sans
  * modification et réécrit la même valeur — la propriété qui fait qu'une
  * re-soumission à l'identique ne change rien, et qu'un test éprouve.
+ *
+ * **Exportée depuis T5.3**, pour `lib/forms/reading.ts` : `indicator_readings.value`
+ * est le **même** `numeric(18,4)`, et le pilote lui rend « 71.0000 » de la même
+ * façon. Recopier ces sept lignes aurait posé une seconde règle de réaffichage,
+ * qui divergerait un jour de celle-ci — le danger que l'en-tête de ce module
+ * nomme déjà pour la validation.
  */
-function decimalAsTyped(value: string): string {
+export function decimalAsTyped(value: string): string {
   if (!value.includes(".")) return value;
   return value.replace(/\.?0+$/, "") || "0";
 }
@@ -194,7 +200,15 @@ export function normalizeDecimal(value: string): string {
   return value.replace(",", ".");
 }
 
-function isDecimal(value: string): boolean {
+/**
+ * **Exportée depuis T5.3**, pour `lib/forms/reading.ts`. Ce que cette fonction
+ * accepte est **exactement** ce qu'une colonne `numeric(18,4)` accepte, et
+ * `indicator_readings.value` en est une, à l'identique de `results.value`. Une
+ * copie aurait posé la seconde autorité que l'en-tête de ce module refuse : le
+ * jour où la précision d'une des deux colonnes bougerait, une seule des deux
+ * copies le saurait.
+ */
+export function isDecimal(value: string): boolean {
   if (!DECIMAL_FORM.test(value)) return false;
 
   const [integer = ""] = normalizeDecimal(value).replace("-", "").split(".");

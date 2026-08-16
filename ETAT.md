@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 16/08/2026 — T5.2 livré : créer, corriger et archiver un indicateur.
-**Chantier en cours :** C5 — indicateurs et lecture dans le temps, deux tickets sur six livrés
-**Ticket suivant :** T5.3 — saisir, corriger et retirer un relevé, et sa migration
+**Dernière mise à jour :** 16/08/2026 — T5.3 livré : saisir, corriger et retirer un relevé.
+**Chantier en cours :** C5 — indicateurs et lecture dans le temps, trois tickets sur six livrés
+**Ticket suivant :** T5.4 — adopter un indicateur depuis l'accompagnement
 
 ---
 
@@ -17,7 +17,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C3 — Activités et roadmap | T3.1 → T3.6 | **terminé** |
 | C4 — Ressources et résultats | T4.1 → T4.4 | **terminé** |
 | C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **terminé** |
-| C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **en cours** — T5.1, T5.2 livrés |
+| C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **en cours** — T5.1 → T5.3 livrés |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
@@ -70,6 +70,13 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   l'identifiant **reçu** par `openProductWrite` — la porte lit le produit **avant** le droit,
   l'inverse d'`openProduct`, un droit dérivé ne s'énonçant pas avant ce dont il dérive. La page
   prend la règle d'exclusivité **par décompte** de la page projet, juste d'avance pour T5.3.
+- **T5.3 — saisir, corriger et retirer un relevé, et sa migration, le 16/08/2026.** La seule
+  migration de C5, et la **première épreuve d'`hasArchivedAt`** : `archived_at` ajoutée à
+  `indicator_readings`, et `archive`, `restore` et le filtre des vivants couvrent la table sans
+  qu'une ligne de `lib/db/scoped.ts` change — la propriété que T1.3 cherchait. Le filtre des
+  relevés retirés se pose **dans le `on`** de la jointure, à l'emplacement que T5.1 avait écrit
+  d'avance. Le décompte d'exclusivité de T5.2 a absorbé une troisième clé sans changer d'énoncé,
+  et les six points d'entrée du bloc tombent avec le même `canWriteIndicators`.
 
 ---
 

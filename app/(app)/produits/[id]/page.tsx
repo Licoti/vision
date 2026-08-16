@@ -4,8 +4,9 @@
  * Elle répond à « qu'avons-nous fait sur ce produit dans le temps » : un
  * en-tête d'identité, puis les accompagnements du plus récent au plus ancien
  * (docs/06 §6), et depuis T5.1 le bloc « Indicateurs » — ce que le produit
- * mesure — **sous** cette liste. La frise du temps long viendra **au-dessus**
- * d'elle en T5.5, sans la déplacer, et les courbes en T5.6 : aucune ici.
+ * mesure — **sous** cette liste, chaque indicateur portant sa série datée depuis
+ * T5.3. La frise du temps long viendra **au-dessus** d'elle en T5.5, sans la
+ * déplacer, et les courbes en T5.6 : aucune ici.
  *
  * L'identifiant vient de l'URL : sa forme est vérifiée avant la base, faute de
  * quoi un paramètre fantaisiste ne produit pas un 404 mais une erreur
@@ -32,17 +33,21 @@
  * `?indicateur=nouvel` ouvre le panneau d'indicateur vide et
  * `?indicateur=<identifiant>` l'ouvre sur un indicateur à corriger (T5.2) : une
  * seule clé, dont la **valeur** porte le cas, et un seul formulaire pour les
- * deux gestes. La page reste rendue derrière eux, et porte alors l'attribut HTML
- * `inert`.
+ * deux gestes. `?releve=<identifiant>` ouvre le panneau de relevé (T5.3), et sa
+ * valeur change de **table** plutôt que de nature : un identifiant
+ * d'**indicateur** saisit un relevé sur cet indicateur, un identifiant de
+ * **relevé** le corrige. La page reste rendue derrière eux, et porte alors
+ * l'attribut HTML `inert`.
  *
- * **Les deux clés sont mutuellement exclusives, et le sont par une règle unique :
+ * **Les trois clés sont mutuellement exclusives, et le sont par une règle unique :
  * plusieurs présentes ensemble n'ouvrent rien** — la règle de la page projet
  * depuis T4.2, reprise ici sous sa forme par **décompte** (T4.4, T4bis.3). Deux
  * `role="dialog"` ou deux `inert` concurrents ne se rattrapent pas après coup, et
  * aucune préséance ne s'invente entre deux gestes de même rang. Un seul
  * `panelOpen`, un seul `inert`, un seul panneau monté : la propriété se lit dans
- * le code, elle ne se déduit pas de deux conditions éparses — et l'énoncé restera
- * juste quand T5.3 ajoutera `releve`.
+ * le code, elle ne se déduit pas de trois conditions éparses — et l'énoncé n'a
+ * pas eu à changer quand T5.3 a ajouté sa clé, ce pour quoi il avait été écrit
+ * en décompte.
  *
  * **Le droit d'écrire un indicateur se dérive des accompagnements du produit**
  * (arbitrage (b) de `tickets-C5.md`) : `manageDomain`, ou contributeur désigné
@@ -60,10 +65,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { createIndicator, updateIndicator, archiveIndicator } from "./actions";
+import {
+  archiveIndicator,
+  archiveReading,
+  createIndicator,
+  createReading,
+  updateIndicator,
+  updateReading,
+} from "./actions";
 import { archiveProduct, restoreProduct } from "../actions";
 import { IndicatorPanel } from "@/components/products/indicator-panel";
 import { Indicators } from "@/components/products/indicators";
+import { ReadingPanel } from "@/components/products/reading-panel";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
 import { AvatarGroup } from "@/components/ui/avatar";
 import { ConfirmPanel } from "@/components/ui/confirm-panel";
@@ -73,15 +86,19 @@ import { Page, PageHeader } from "@/components/ui/page";
 import { SectionHeader } from "@/components/ui/section";
 import { StatusDot } from "@/components/ui/status-dot";
 import { requireSession } from "@/lib/auth/provider";
-import { indicators } from "@/lib/db/schema";
+import { indicatorReadings, indicators } from "@/lib/db/schema";
 import { toIndicatorFormValues } from "@/lib/forms/indicator";
+import { toReadingFormValues } from "@/lib/forms/reading";
 import { formatAccompaniments, formatMonth, formatPeriod } from "@/lib/format";
 import {
   ARCHIVE_PANEL_CONFIRM,
   INDICATOR_PANEL_NEW,
   ROUTES,
 } from "@/lib/navigation";
-import { listProductIndicators } from "@/lib/queries/indicators";
+import {
+  listProductIndicators,
+  listProductReadings,
+} from "@/lib/queries/indicators";
 import { findProductDetail, listProductProjects } from "@/lib/queries/products";
 import { isUuid } from "@/lib/uuid";
 
@@ -94,7 +111,11 @@ export default async function ProductPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ archiver?: string; indicateur?: string }>;
+  searchParams: Promise<{
+    archiver?: string;
+    indicateur?: string;
+    releve?: string;
+  }>;
 }) {
   const { id } = await params;
   if (!isUuid(id)) notFound();
@@ -104,13 +125,18 @@ export default async function ProductPage({
   const product = await findProductDetail(session.db, id);
   if (!product) notFound();
 
-  /* Deux lectures indépendantes, un seul temps d'attente — la discipline de
-     T4.1 sur la page projet. Ni l'une ni l'autre ne dépend du droit : le bloc
-     « Indicateurs » se lit par tout le domaine (D9), sur un produit vivant
-     comme archivé (règle 4). */
-  const [projects, productIndicators] = await Promise.all([
+  /* Trois lectures indépendantes, un seul temps d'attente — la discipline de
+     T4.1 sur la page projet. Aucune ne dépend du droit : le bloc
+     « Indicateurs » et la série de chaque indicateur se lisent par tout le
+     domaine (D9), sur un produit vivant comme archivé (règle 4).
+
+     La série arrive **plate**, une seule requête pour tout le bloc : le
+     regroupement par indicateur appartient au composant, et une lecture par
+     indicateur serait exactement ce que T5.1 s'est interdit. */
+  const [projects, productIndicators, productReadings] = await Promise.all([
     listProductProjects(session.db, product.id),
     listProductIndicators(session.db, product.id),
+    listProductReadings(session.db, product.id),
   ]);
 
   const archived = product.archivedAt !== null;
@@ -130,7 +156,7 @@ export default async function ProductPage({
     (session.can.manageDomain ||
       projects.some((project) => session.can.writeProject(project.id)));
 
-  const { archiver, indicateur } = await searchParams;
+  const { archiver, indicateur, releve } = await searchParams;
 
   /* L'exclusivité, avant tout le reste : plusieurs clés d'ouverture
      concurrentes n'en ouvrent aucune. Tout ce qui suit lit `asked`, pas les
@@ -138,9 +164,10 @@ export default async function ProductPage({
      fois — la garantie est dans le code, pas dans la relecture.
 
      La forme est celle de la page projet (T4.4, T4bis.3) : un **décompte**, et
-     non une comparaison binaire, parce qu'un décompte reste juste quand T5.3
-     ajoutera `releve`. */
-  const keys = { archiver, indicateur };
+     non une comparaison binaire. T5.3 y a ajouté `releve` sans que l'énoncé
+     change d'un caractère — c'est très exactement ce pour quoi il avait été
+     écrit ainsi. */
+  const keys = { archiver, indicateur, releve };
   const conflict =
     Object.values(keys).filter((value) => value !== undefined).length > 1;
   const asked: Partial<typeof keys> = conflict ? {} : keys;
@@ -181,7 +208,59 @@ export default async function ProductPage({
     canWriteIndicators &&
     (asked.indicateur === INDICATOR_PANEL_NEW || indicator !== null);
 
-  const panelOpen = archivePanelOpen || indicatorPanelOpen;
+  /* La clé de T5.3, dont la valeur change de **table** et non de nature :
+     l'identifiant d'un indicateur saisit un relevé, celui d'un relevé le
+     corrige. Deux lectures scopées successives tranchent — un UUID d'`indicators`
+     n'est pas un UUID d'`indicator_readings` —, et ce qui n'est ni l'un ni
+     l'autre n'ouvre rien.
+
+     La forme est vérifiée avant la base, comme partout ailleurs sur cette page :
+     une colonne `uuid` interrogée avec n'importe quoi rend une erreur
+     PostgreSQL, donc un 500, là où l'on attend une page nue. */
+  const readingTarget =
+    canWriteIndicators && asked.releve && isUuid(asked.releve)
+      ? asked.releve
+      : null;
+
+  /* L'indicateur d'abord : c'est le cas courant, et le seul qu'un lien de
+     l'écran atteint. Il doit être vivant et appartenir à **ce** produit — le
+     bloc ne montre aucun indicateur archivé, mais une URL se tape. */
+  const readingIndicator = readingTarget
+    ? await session.db.find(indicators, readingTarget)
+    : undefined;
+
+  const newReadingFor =
+    readingIndicator &&
+    readingIndicator.productId === product.id &&
+    readingIndicator.archivedAt === null
+      ? readingIndicator
+      : null;
+
+  /* Le relevé ensuite, et sa chaîne remontée jusqu'au produit — relevé,
+     indicateur, produit : la même que remonte `openReading` dans l'action, et
+     pour la même raison. Un relevé retiré, ou porté par un indicateur archivé ou
+     rattaché à un autre produit, n'ouvre rien. */
+  const editedReading =
+    readingTarget && !newReadingFor
+      ? await session.db.find(indicatorReadings, readingTarget)
+      : undefined;
+
+  const editedReadingIndicator =
+    editedReading && editedReading.archivedAt === null
+      ? await session.db.find(indicators, editedReading.indicatorId)
+      : undefined;
+
+  const readingPanel = newReadingFor
+    ? { indicator: newReadingFor, reading: null }
+    : editedReading &&
+        editedReadingIndicator &&
+        editedReadingIndicator.productId === product.id &&
+        editedReadingIndicator.archivedAt === null
+      ? { indicator: editedReadingIndicator, reading: editedReading }
+      : null;
+
+  const panelOpen =
+    archivePanelOpen || indicatorPanelOpen || readingPanel !== null;
 
   return (
     <>
@@ -243,6 +322,41 @@ export default async function ProductPage({
                 title: "Modifier l'indicateur",
                 submitLabel: "Enregistrer les modifications",
                 initial: toIndicatorFormValues(indicator),
+              }
+            : {})}
+        />
+      ) : null}
+
+      {readingPanel ? (
+        /* Les identifiants sont liés **côté serveur** — au produit et à
+           l'indicateur en saisie, au produit et au relevé en correction : le
+           panneau ne connaît ni l'un ni l'autre. Ce n'est pas un verrou, Next
+           les sérialisant en clair dans un champ `$ACTION_…`. Le verrou est dans
+           l'action : `createReading` passe par `openIndicator`, `updateReading`
+           par `openReading`, et les deux s'arrêtent au même `openProductWrite`
+           sur le produit **reçu**. */
+        <ReadingPanel
+          /* La `key` change avec ce que le panneau édite — et distingue la
+             saisie d'un indicateur de celle d'un autre : `useActionState` ne
+             relit son état initial qu'au montage. */
+          key={
+            readingPanel.reading
+              ? readingPanel.reading.id
+              : `nouveau-${readingPanel.indicator.id}`
+          }
+          productName={product.name}
+          indicatorLabel={readingPanel.indicator.label}
+          closeHref={ROUTES.product(product.id)}
+          action={
+            readingPanel.reading
+              ? updateReading.bind(null, product.id, readingPanel.reading.id)
+              : createReading.bind(null, product.id, readingPanel.indicator.id)
+          }
+          {...(readingPanel.reading
+            ? {
+                title: "Modifier le relevé",
+                submitLabel: "Enregistrer les modifications",
+                initial: toReadingFormValues(readingPanel.reading),
               }
             : {})}
         />
@@ -373,14 +487,17 @@ export default async function ProductPage({
               aucune grille de blocs de référence, à la différence de la page
               projet.
 
-              Les trois points d'entrée tombent avec le même `canWriteIndicators` :
-              le droit dérivé (arbitrage (b)) et la lecture seule d'un produit
-              archivé. Aucune condition ne s'ajoute ici — c'est la propriété que
-              ce `&&` cherchait, celle du `canWrite` de la page projet.
-              `archiveIndicator` est liée au produit **côté serveur** ; le bloc y
-              ajoutera l'indicateur au rendu. */}
+              Les **six** points d'entrée tombent avec le même
+              `canWriteIndicators` : le droit dérivé (arbitrage (b)) et la
+              lecture seule d'un produit archivé. Les trois gestes des relevés
+              s'y sont ajoutés en T5.3 sans qu'une condition s'écrive — c'est la
+              propriété que ce `&&` cherchait, celle du `canWrite` de la page
+              projet. `archiveIndicator` et `archiveReading` sont liées au
+              produit **côté serveur** ; le bloc y ajoute l'indicateur ou le
+              relevé au rendu. */}
           <Indicators
             indicators={productIndicators}
+            readings={productReadings}
             addHref={
               canWriteIndicators ? ROUTES.productIndicatorNew(product.id) : null
             }
@@ -394,6 +511,21 @@ export default async function ProductPage({
               canWriteIndicators
                 ? archiveIndicator.bind(null, product.id)
                 : null
+            }
+            addReadingHref={
+              canWriteIndicators
+                ? (indicatorId) =>
+                    ROUTES.productReadingNew(product.id, indicatorId)
+                : null
+            }
+            editReadingHref={
+              canWriteIndicators
+                ? (readingId) =>
+                    ROUTES.productReadingEdit(product.id, readingId)
+                : null
+            }
+            archiveReading={
+              canWriteIndicators ? archiveReading.bind(null, product.id) : null
             }
           />
         </Page>

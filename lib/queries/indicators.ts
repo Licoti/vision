@@ -22,7 +22,7 @@
  * courant. Règle 1.
  */
 
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 
 import type { ScopedDb } from "@/lib/db/scoped";
 import {
@@ -87,11 +87,12 @@ export type ProductIndicator = {
  * ligne jointe, `count` vaut 0 et `array_agg` vaut `null` — les trois champs
  * tombent juste sans un cas particulier dans le code.
  *
- * **Aucun filtre d'archivage sur les relevés, et c'est daté** :
- * `indicator_readings` ne porte pas `archived_at` (`lib/db/schema.ts:681`).
- * T5.3 ajoute la colonne par migration ; le jour où elle existe, un
- * `isNull(indicatorReadings.archivedAt)` s'ajoute **ici**, dans le `on` de la
- * jointure, pour que les trois agrégats l'écartent ensemble.
+ * **Les relevés archivés sont écartés dans le `on` de la jointure, et c'est là
+ * que ça compte** (T5.3). T5.1 avait posé l'emplacement d'avance, faute de
+ * colonne : le filtre est **dans la jointure** et non dans le `where`, sans quoi
+ * il emporterait l'indicateur avec ses relevés au lieu de n'écarter que les
+ * relevés. Les trois agrégats l'écartent donc ensemble — un relevé retiré ne
+ * compte plus, et ne fournit plus le dernier relevé, du même geste.
  *
  * Les indicateurs archivés sont écartés. Un produit sans indicateur rend un
  * tableau vide : l'état vide appartient à l'écran (règle 5).
@@ -118,6 +119,7 @@ export function listProductIndicators(
         and(
           eq(indicatorReadings.indicatorId, indicators.id),
           filter(indicatorReadings),
+          isNull(indicatorReadings.archivedAt),
         ),
       )
       .where(
@@ -130,5 +132,86 @@ export function listProductIndicators(
       // La clé primaire suffit à PostgreSQL pour les autres colonnes du groupe.
       .groupBy(indicators.id)
       .orderBy(asc(indicators.label), asc(indicators.id));
+  });
+}
+
+/* ==========================================================================
+   La série datée — T5.3
+   ========================================================================== */
+
+/** Une ligne de la série d'un indicateur : sa valeur, sa date, sa note. */
+export type ProductReading = {
+  id: string;
+  /** L'indicateur auquel cette ligne appartient — la clé du regroupement. */
+  indicatorId: string;
+  /**
+   * La valeur relevée, brute — « 71.0000 ». `numeric(18,4)` revient en chaîne
+   * du pilote, et la mise en forme appartient à l'écran, jamais à la lecture.
+   */
+  value: string;
+  /** « YYYY-MM-DD » — colonne `date`. Obligatoire en base comme au formulaire. */
+  readOn: string;
+  /** « Relevé trimestriel »… Nulle tant qu'elle n'est pas renseignée. */
+  sourceNote: string | null;
+};
+
+/**
+ * Tous les relevés vivants des indicateurs vivants d'un produit, du plus récent
+ * au plus ancien.
+ *
+ * **Une lecture plate, et le regroupement à l'écran** : une requête par
+ * indicateur serait exactement ce que T5.1 s'est interdit, et le composant tient
+ * la série de chaque indicateur d'un seul parcours du tableau reçu. Deux
+ * lectures pour tout le bloc, quel que soit le nombre d'indicateurs.
+ *
+ * **Le tri est le même couple que l'agrégat ordonné de `listProductIndicators`**
+ * — `read_on desc, id desc`, et ce n'est pas une coïncidence à préserver par la
+ * relecture : c'est ce qui fait que la **première ligne de la série est, par
+ * construction, le « dernier relevé »** affiché juste au-dessus dans le même
+ * bloc. Deux tris différents feraient mentir l'un des deux, et le jour où deux
+ * relevés partagent une date, `id desc` est la seule chose qui les départage de
+ * façon stable d'un affichage à l'autre.
+ *
+ * **`innerJoin` et non `leftJoin`, à l'inverse de la lecture ci-dessus** : un
+ * relevé dont l'indicateur ne se lit pas dans ce domaine ne s'affiche pas —
+ * la règle de `findResourceActivity`. Ici la jointure n'est pas là pour rendre
+ * une colonne, elle **est** la question : elle porte le rattachement au produit
+ * et l'archivage de l'indicateur, si bien qu'un relevé d'indicateur archivé sort
+ * de la lecture en même temps que son indicateur sort du bloc.
+ *
+ * Trois filtres, trois raisons : `filter` sur chaque table jointe (la condition
+ * de `joinedRead`, et un oubli serait une fuite), l'archivage de l'indicateur,
+ * l'archivage du relevé. Un produit sans relevé rend un tableau vide.
+ */
+export function listProductReadings(
+  scope: ScopedDb,
+  productId: string,
+): Promise<ProductReading[]> {
+  return scope.joinedRead(async (database, { filter }) => {
+    return database
+      .select({
+        id: indicatorReadings.id,
+        indicatorId: indicatorReadings.indicatorId,
+        value: indicatorReadings.value,
+        readOn: indicatorReadings.readOn,
+        sourceNote: indicatorReadings.sourceNote,
+      })
+      .from(indicatorReadings)
+      .innerJoin(
+        indicators,
+        and(
+          eq(indicators.id, indicatorReadings.indicatorId),
+          filter(indicators),
+          eq(indicators.productId, productId),
+          isNull(indicators.archivedAt),
+        ),
+      )
+      .where(
+        and(
+          filter(indicatorReadings),
+          isNull(indicatorReadings.archivedAt),
+        ),
+      )
+      .orderBy(desc(indicatorReadings.readOn), desc(indicatorReadings.id));
   });
 }

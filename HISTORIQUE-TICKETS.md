@@ -116,6 +116,11 @@ portaient en plus vivent dans le récit ci-dessous, ticket par ticket.)*
   sept fichiers, dont `lib/queries/indicators.ts` **ouvert et laissé intact**. Trois arbitrages
   tranchés avant écriture : un produit archivé ne reçoit plus de saisie d'indicateur ; la porte lit
   le produit avant d'évaluer le droit ; le fichier de lecture est déclaré sans être touché.
+- **T5.3 — 16/08/2026 — saisir, corriger et retirer un relevé, et sa migration.** La seule migration
+  de C5, et la première épreuve d'`hasArchivedAt` : la couche d'accès n'a pas changé d'un caractère.
+  Deux arbitrages tranchés avant écriture : la date de chaque ligne de série au **mois**, une seule
+  règle de date dans tout le bloc ; la série **toujours dépliée**, sans geste d'ouverture. Aucun
+  écart de périmètre — huit fichiers, ceux de la fiche.
 
 ---
 
@@ -1255,6 +1260,91 @@ qu'importée pour la raison des trois précédentes, et une seconde copie d'`ACT
 au journal, l'extraction appartient au ticket qui pourra toucher les fichiers ensemble. Deux
 indicateurs archivés dans la base de développement, ajoutés à l'inventaire de dérive d'`ETAT.md` : la
 base est jetable, règle du 14/08/2026.
+
+- **T5.3 — 16/08/2026 — saisir, corriger et retirer un relevé, et sa migration.** La série datée sans
+laquelle la frise de T5.6 n'a rien à tracer, et le seul ticket de C5 qui touche le schéma.
+
+**La migration d'abord, et elle tient en une ligne.** `ALTER TABLE "indicator_readings" ADD COLUMN
+"archived_at" timestamp with time zone` — nullable, sans valeur par défaut, sans toucher une ligne.
+Le SQL généré a été relu **avant** exécution, et il ne contient rien d'autre. Sans elle, retirer un
+relevé saisi en double n'avait que la suppression pour chemin, que la règle 4 interdit et que la
+couche d'accès n'expose pas.
+
+**C'est la première épreuve d'`hasArchivedAt`, et elle réussit sans qu'une ligne change.** `archive`,
+`restore` et le filtre des vivants de `lib/db/scoped.ts` introspectent le schéma : le jour où la
+colonne existe, la table est couverte. C'est la propriété que T1.3 cherchait, écrite depuis C1 et
+jamais vérifiée par un cas réel — un `archiveReading` de quatre lignes en fait la démonstration.
+
+**Le filtre des relevés retirés se pose dans le `on`, à l'emplacement que T5.1 avait écrit
+d'avance.** Le module portait la consigne depuis la veille : « le filtre est **dans la jointure** et
+non dans le `where`, sans quoi il emporterait l'indicateur avec ses relevés au lieu de n'écarter que
+les relevés ». Les trois agrégats l'écartent donc ensemble — un relevé retiré ne compte plus et ne
+fournit plus le dernier relevé, du même geste. La lecture de la série, elle, filtre dans son `where`,
+et c'est un **second** filtre, distinct : les deux mises en défaut le prouvent séparément.
+
+**Deux lectures, et le regroupement à l'écran.** `listProductReadings` rend la série **plate** et déjà
+ordonnée `read_on desc, id desc` — le **même** couple que l'agrégat ordonné de T5.1, et ce n'est pas
+une coïncidence à préserver par la relecture : c'est ce qui fait que la première ligne de la série
+d'un indicateur **est** le « dernier relevé » affiché au-dessus d'elle. Un test le retient
+explicitement, pour tous les indicateurs mesurés à la fois. La jointure est un `innerJoin`, à
+l'inverse de celle de T5.1 : elle n'est pas là pour rendre une colonne, elle **est** la question —
+elle porte le rattachement au produit et l'archivage de l'indicateur, si bien que les relevés d'un
+indicateur archivé sortent avec lui.
+
+**Le décompte d'exclusivité a absorbé une troisième clé sans changer d'énoncé.** `releve` entre dans
+l'objet `keys`, et rien d'autre ne bouge : c'est très exactement ce pour quoi T4.4 avait remplacé la
+comparaison binaire par un décompte. Sa valeur change de **table** et non de nature — un identifiant
+d'indicateur saisit, un identifiant de relevé corrige —, tranché par deux lectures scopées
+successives, la forme est vérifiée avant la base, et ce qui n'est ni l'un ni l'autre n'ouvre rien.
+
+**Le critère se lit dans le HTML servi, en quatre temps.** Un relevé saisi à 45,5 % en juillet 2026
+paraît **en tête de sa série** et devient le « dernier relevé » du bloc, le décompte passant à
+4 ; corrigé sur février 2024, il descend en queue de série et le dernier relevé redevient
+« 71 % · juin 2026 » ; retiré, il disparaît de l'écran et **reste en base, marqué archivé** ;
+**ressaisi à l'identique, il est accepté** — le critère de T4bis.6, et la seule preuve que la
+migration tient. Un indicateur créé sans relevé affiche « Aucun relevé pour l'instant. », « Aucun
+relevé », **aucune date nulle part**, et « Ajouter un relevé » juste sous la phrase qui dit
+l'absence.
+
+**Le droit s'est éprouvé par l'action, sur des charges non retouchées.** Sous le cookie d'Awa Diallo
+— membre du domaine, membre d'un accompagnement de ce produit mais **non contributrice** —, l'écran
+sert le bloc et sa série **sans un seul geste**, et la charge de saisie récoltée chez la responsable
+est refusée mot pour mot : « La saisie d'un relevé est réservée au responsable de domaine et aux
+contributeurs désignés d'un accompagnement de ce produit. » Le retrait, lui, refuse **en silence** :
+il a fallu la différence entre deux identités sur la **même** charge pour le prouver — refusée sous
+son cookie, la base à quatre relevés vivants ; acceptée sous celui de la responsable, trois. Deux
+charges délibérément forgées ont été refusées de leur côté : le relevé de ce produit présenté comme
+celui d'un autre (« Ce relevé n'existe plus sur ce produit. ») et la saisie sur un indicateur
+inexistant (« Cet indicateur n'existe plus sur ce produit. »), base comptée avant et après chacune.
+
+**Les tests se sont mis en défaut, trois fois, et rien d'autre n'est tombé.** Neutraliser
+l'obligation de date fait tomber **deux** tests, les deux qui soumettent une date vide. Neutraliser
+le filtre des relevés retirés **dans le `on`** de `listProductIndicators` en fait tomber **quatre**,
+tous ceux qui lisent le dernier relevé ou le décompte d'`Autonomie`, le test croisé compris.
+Neutraliser celui du `where` de `listProductReadings` en fait tomber **quatre** autres, ceux de la
+série — et le test croisé tombe dans les deux cas, ce qui est sa raison d'être. Les deux modules ont
+été relus intacts après chaque neutralisation.
+
+**Contraste mesuré, aucun couple neuf par la position.** 8,12:1 pour la valeur d'une ligne de série,
+4,98:1 pour son mois, sa source et le `·` qui les sépare, 15,72:1 pour « Ajouter un relevé »,
+« Modifier » et « Archiver ». Le filet de retrait de la série est `surface-neutral-lighter`, le
+séparateur d'entrées du bloc depuis T5.1 : décoratif, mesuré à 1,24:1 et ne portant aucune
+information — la série est déjà imbriquée dans le balisage. **Aucun septième substitut.**
+
+**Un piège de harnais, et il ressemblait à un refus.** Les premières re-soumissions rendaient un 500
+et « Failed to find Server Action » : le harnais récoltait les champs cachés par `name="…" value="…"`
+et manquait `$ACTION_REF_<n>`, **rendu sans attribut `value`**. C'est exactement le piège consigné en
+T4.4, retrouvé faute d'avoir relu le journal avant d'écrire le harnais. Une action introuvable laisse
+la base intacte **exactement comme un droit qui refuse** — il a fallu lire le journal du serveur pour
+le savoir. Le harnais final récolte formulaire par formulaire (T5.2) et poste tous les champs cachés,
+`value` vide comprise.
+
+**Ce que le ticket laisse derrière lui.** Une **cinquième copie de `PanelField`** et une troisième
+d'`ACTION_LINK`, redites plutôt qu'importées pour la raison des précédentes ; deux fonctions de
+`lib/forms/result.ts` — `isDecimal` et `decimalAsTyped` — **exportées** plutôt que recopiées, la
+colonne `numeric(18,4)` étant la même des deux côtés. La base de développement est revenue à son état
+d'avant : trois relevés, aucun archivé, trois indicateurs dont deux archivés depuis T5.2. L'inventaire
+de dérive d'`ETAT.md` n'a pas grossi.
 
 ---
 

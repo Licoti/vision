@@ -2618,3 +2618,48 @@ bandeau `role="alert"` dans le corps de la réponse et n'y trouvait rien, ce qui
 (`"message":"…"`), et la base se compte à côté. **Un 500 laisse la base intacte exactement comme un
 refus** : compter les lignes ne suffit jamais, il faut lire le message — la leçon de l'étape témoin
 de T4bis.3, retrouvée par un autre chemin.
+
+**T5.3 — `hasArchivedAt` a tenu sa promesse, et c'est la première fois qu'on la lui demande.**
+`lib/db/scoped.ts` introspecte le schéma pour savoir si une table porte `archived_at` : `archive`,
+`restore` et le filtre des vivants couvrent donc `indicator_readings` du jour où la migration passe,
+**sans qu'une ligne de la couche change**. La propriété est écrite depuis T1.3 et n'avait jamais eu
+de cas réel. Elle en a un. À retenir pour les tables qui gagneront la colonne plus tard : la
+migration suffit, il n'y a rien à câbler.
+
+**T5.3 — deux filtres d'archivage des relevés, et ils ne se remplacent pas.** Celui de
+`listProductIndicators` est dans le **`on`** de la jointure ; celui de `listProductReadings` est dans
+son `where`. Déplacer le premier dans le `where` ferait disparaître l'indicateur **avec** ses relevés
+retirés au lieu de n'écarter que ceux-ci — un indicateur dont tous les relevés seraient retirés
+sortirait du bloc. Les deux mises en défaut le montrent séparément : chacune fait tomber quatre
+tests, et un seul test tombe dans les deux cas — celui qui vérifie que la tête de série et le
+« dernier relevé » sont le même relevé. C'est sa raison d'être.
+
+**T5.3 — `isDecimal` et `decimalAsTyped` exportées, plutôt qu'une cinquième copie.**
+`indicator_readings.value` et `results.value` sont **la même** `numeric(18,4)`, et deux copies d'une
+règle de validation divergent le jour où l'une des deux précisions bouge. L'import croisé est la
+règle du dossier `lib/forms/` — `result.ts` lit déjà `isWebUrl` de `resource.ts` et `isIsoDay` de
+`project.ts`. Ce qui se recopie dans ce dossier, ce sont les libellés et les messages ; ce qui
+s'importe, ce sont les règles.
+
+**T5.3 — `$ACTION_REF_<n>` sans `value` : le piège de T4.4, repayé faute d'avoir relu le journal.**
+Le harnais de rejeu a été réécrit de zéro et a reproduit exactement le défaut consigné en T4.4 : les
+champs cachés récoltés par `name="…" value="…"`, donc `$ACTION_REF_<n>` manquant, donc « Failed to
+find Server Action » et un 500. **Une action introuvable laisse la base intacte exactement comme un
+droit qui refuse** — sans le journal du serveur de développement, la conclusion aurait été qu'un
+droit tenait. Deux enseignements : le journal se relit **avant** d'écrire un harnais, et le journal
+de Next se lit dans `.next/dev/logs/next-development.log`, y compris pour un serveur qu'on n'a pas
+démarré soi-même.
+
+**T5.3 — un serveur de développement de longue durée sert des identifiants d'action périmés.** Avant
+de trouver le vrai défaut ci-dessus, le serveur en place depuis la session précédente a été relancé,
+sans effet : la piste était fausse. À retenir pour ne pas la reprendre — « Failed to find Server
+Action » désigne d'abord une charge incomplète, pas un serveur fatigué. Le serveur `next dev` tourne
+désormais sous un processus lancé par la session, journal capturé dans le répertoire de travail
+temporaire.
+
+**T5.3 — la cinquième copie de `PanelField` et la troisième d'`ACTION_LINK`.** La dette de T4.2, déjà
+récrite en T5.2, s'alourdit d'un cran : `project-form.tsx`, `activity-panel.tsx`,
+`resource-panel.tsx`, `indicator-panel.tsx` et maintenant `reading-panel.tsx` portent le même
+composant de champ ; `roadmap.tsx`, `resources.tsx` et `indicators.tsx` la même constante de geste
+texte. Aucun des fichiers ne l'exporte, aucun n'appartenait au périmètre. **À cinq copies, le ticket
+d'extraction ne se repousse plus par la même phrase** : il se pose, ou la dette cesse d'être bornée.

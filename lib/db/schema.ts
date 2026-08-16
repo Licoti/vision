@@ -689,6 +689,18 @@ export const indicatorReadings = pgTable(
     value: numeric("value", { precision: 18, scale: 4 }).notNull(),
     readOn: date("read_on").notNull(),
     sourceNote: text("source_note"),
+    /* **Ajoutée par T5.3, et avec le geste qu'elle autorise.** Règle 4 : un
+       relevé saisi en double se retire, il ne se supprime pas — et sans cette
+       colonne, le retrait n'avait que la suppression pour chemin. Une colonne
+       posée sans lecteur est une colonne qu'on relit sans savoir pourquoi ;
+       celle-ci arrive le jour où « Archiver » paraît sous chaque relevé.
+
+       **La couche d'accès n'a pas changé d'un caractère** : `hasArchivedAt`
+       (`lib/db/scoped.ts`) introspecte le schéma, si bien qu'`archive`,
+       `restore` et le filtre des vivants couvrent cette table du jour où la
+       colonne existe. C'est la propriété que T1.3 cherchait, éprouvée ici pour
+       la première fois. */
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
     ...stamps,
   },
   (t) => [

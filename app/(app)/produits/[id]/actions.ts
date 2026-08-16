@@ -1,7 +1,8 @@
 "use server";
 
 /**
- * Les écritures de la page **produit** — les indicateurs, depuis T5.2.
+ * Les écritures de la page **produit** — les indicateurs depuis T5.2, leurs
+ * relevés depuis T5.3.
  *
  * C'est le premier fichier d'actions attaché à la page d'un produit :
  * `produits/actions.ts` porte les écritures de l'**identité** du produit, qui
@@ -50,10 +51,16 @@
  * rien de plus que l'écran : la page produit est lisible par tout le domaine
  * (D9).
  *
- * **Aucun recalcul de `last_activity_at`** : un indicateur n'est pas un fait
- * d'accompagnement, et appeler `refreshLastActivity` ferait croire le contraire
- * à qui lit ce fichier — la leçon de T4.2. La revalidation s'en tient à la page
- * du produit : la liste des produits n'affiche aucun indicateur.
+ * **Le droit d'un relevé est celui de son indicateur, par la même porte**
+ * (T5.3) : un relevé appartient à un indicateur, qui appartient à un produit, et
+ * inventer une troisième règle pour l'objet du bout de la chaîne serait le
+ * troisième niveau de droit que D9 refuse. `openReading` remonte simplement la
+ * chaîne — relevé, indicateur, produit — et s'arrête au même `openProductWrite`.
+ *
+ * **Aucun recalcul de `last_activity_at`** : ni un indicateur ni un relevé n'est
+ * un fait d'accompagnement, et appeler `refreshLastActivity` ferait croire le
+ * contraire à qui lit ce fichier — la leçon de T4.2. La revalidation s'en tient
+ * à la page du produit : la liste des produits n'affiche aucun indicateur.
  *
  * Aucune écriture directe : tout passe par `session.db`, déjà scopé sur le
  * domaine courant et sur la personne courante — `domain_id` et `created_by` sont
@@ -69,13 +76,23 @@ import { redirect } from "next/navigation";
 
 import { requireSession } from "@/lib/auth/provider";
 import type { Session } from "@/lib/auth/session";
-import { indicators, products, projects } from "@/lib/db/schema";
+import {
+  indicatorReadings,
+  indicators,
+  products,
+  projects,
+} from "@/lib/db/schema";
 import { DomainScopeError, type Row } from "@/lib/db/scoped";
 import {
   parseIndicatorForm,
   readIndicatorForm,
   type IndicatorFormState,
 } from "@/lib/forms/indicator";
+import {
+  parseReadingForm,
+  readReadingForm,
+  type ReadingFormState,
+} from "@/lib/forms/reading";
 import { ROUTES } from "@/lib/navigation";
 
 /**
@@ -86,6 +103,14 @@ import { ROUTES } from "@/lib/navigation";
  */
 function refusal(formData: FormData, message: string): IndicatorFormState {
   return { values: readIndicatorForm(formData), errors: {}, message };
+}
+
+/** Le même refus, sur la saisie d'un relevé — jumeau explicite du précédent. */
+function readingRefusal(
+  formData: FormData,
+  message: string,
+): ReadingFormState {
+  return { values: readReadingForm(formData), errors: {}, message };
 }
 
 /* ==========================================================================
@@ -185,12 +210,91 @@ async function openIndicator(
 }
 
 /**
+ * Le relevé reçu, remonté jusqu'au produit reçu — la troisième porte, sur le
+ * modèle exact des deux précédentes.
+ *
+ * **La chaîne se remonte, elle ne se raccourcit pas** : relevé → indicateur →
+ * produit. Le droit d'écrire un relevé est celui de son indicateur, qui est
+ * celui de son produit ; inventer une règle propre au relevé serait le troisième
+ * niveau de droit que D9 refuse.
+ *
+ * Trois contrôles, et chacun ferme une porte :
+ *
+ * 1. `openProductWrite` sur le `productId` **reçu** — le droit dérivé,
+ *    l'appartenance au domaine et la lecture seule d'un produit archivé ;
+ * 2. le relevé reçu existe dans ce domaine et n'est pas déjà retiré ;
+ * 3. son indicateur appartient **à ce produit** et n'est pas archivé. Sans ce
+ *    dernier contrôle, une soumission forgée corrigerait ou retirerait le relevé
+ *    d'un indicateur d'un autre produit — les identifiants liés étant sérialisés
+ *    en clair dans un champ `$ACTION_…`.
+ *
+ * **L'ordre est celui d'`openIndicator`, et non celui de la chaîne de données** :
+ * le droit d'abord, la ligne ensuite. Lire le relevé avant d'avoir interrogé le
+ * droit n'aurait rien divulgué de plus que l'écran — la page produit est lisible
+ * par tout le domaine (D9) —, mais l'ordre inverse est ce qui rend la porte
+ * relisable : on ne cherche une ligne qu'après avoir établi qu'on a le droit d'y
+ * toucher.
+ *
+ * Les trois refus se ressemblent volontairement : l'écran ne distingue pas le
+ * relevé inconnu de celui d'un autre produit, pour la même raison que la page
+ * produit rend 404 dans les deux cas.
+ *
+ * Le message n'est utilisé que par `updateReading` : `archiveReading` refuse en
+ * silence, n'ayant aucune saisie à rendre.
+ */
+async function openReading(
+  session: Session,
+  productId: string,
+  readingId: string,
+  refused: string,
+): Promise<
+  | {
+      indicator: Row<typeof indicators>;
+      reading: Row<typeof indicatorReadings>;
+    }
+  | { message: string }
+> {
+  const gate = await openProductWrite(session, productId, refused);
+  if ("message" in gate) return gate;
+
+  const missing = { message: "Ce relevé n'existe plus sur ce produit." };
+
+  const reading = await session.db.find(indicatorReadings, readingId);
+  if (!reading || reading.archivedAt !== null) return missing;
+
+  const indicator = await session.db.find(indicators, reading.indicatorId);
+  if (
+    !indicator ||
+    indicator.productId !== productId ||
+    indicator.archivedAt !== null
+  ) {
+    return missing;
+  }
+
+  return { indicator, reading };
+}
+
+/**
  * Le second filet : une référence a franchi la vérification et la couche l'a
  * refusée. L'écran le dit plutôt que de rendre une page en erreur.
  */
 function scopeRefusal(error: unknown, formData: FormData): IndicatorFormState {
   if (error instanceof DomainScopeError) {
     return refusal(
+      formData,
+      "Une référence de ce formulaire n'appartient pas au domaine : la saisie n'a pas été enregistrée.",
+    );
+  }
+  throw error;
+}
+
+/** Le même filet, sur la saisie d'un relevé — jumeau explicite du précédent. */
+function readingScopeRefusal(
+  error: unknown,
+  formData: FormData,
+): ReadingFormState {
+  if (error instanceof DomainScopeError) {
+    return readingRefusal(
       formData,
       "Une référence de ce formulaire n'appartient pas au domaine : la saisie n'a pas été enregistrée.",
     );
@@ -356,6 +460,163 @@ export async function archiveIndicator(
   if ("message" in gate) return;
 
   await session.db.archive(indicators, indicatorId);
+
+  revalidatePath(ROUTES.product(productId));
+}
+
+/* ==========================================================================
+   Les relevés — T5.3
+
+   Les trois mêmes gestes, un cran plus bas dans la hiérarchie, et **aucune
+   règle de droit neuve** : `openIndicator` pour la saisie, `openReading` pour
+   les deux autres, et les deux s'arrêtent au même `openProductWrite`.
+
+   **Aucun recalcul de `last_activity_at`**, comme pour les indicateurs : un
+   relevé n'est pas un fait d'accompagnement. La fiche l'interdit en toutes
+   lettres, et la raison est la leçon de T4.2 — appeler `refresh()` ferait croire
+   le contraire à qui lit le fichier.
+   ========================================================================== */
+
+/**
+ * Saisir un relevé sur un indicateur.
+ *
+ * `productId` et `indicatorId` sont liés côté serveur — ce ne sont pas des
+ * secrets pour autant : Next les sérialise en clair dans un champ `$ACTION_…`,
+ * et une soumission peut les réécrire. Ce qui protège est `openIndicator`, qui
+ * dérive le droit du produit **reçu** puis rapproche l'indicateur **reçu** de ce
+ * produit.
+ *
+ * **`read_on` n'a pas de valeur par défaut, et ce n'est pas un oubli** : ni ici,
+ * ni dans le formulaire, ni dans le panneau. Un relevé sans date est refusé par
+ * `parseReadingForm` plutôt que daté d'office — `docs/03` §7 refuse qu'une mesure
+ * soit « positionnée arbitrairement à aujourd'hui », et une valeur par défaut est
+ * exactement la façon dont cela arriverait sans que personne ne l'ait décidé.
+ */
+export async function createReading(
+  productId: string,
+  indicatorId: string,
+  _previous: ReadingFormState,
+  formData: FormData,
+): Promise<ReadingFormState> {
+  const session = await requireSession();
+
+  const gate = await openIndicator(
+    session,
+    productId,
+    indicatorId,
+    "La saisie d'un relevé est réservée au responsable de domaine et aux contributeurs désignés d'un accompagnement de ce produit.",
+  );
+  if ("message" in gate) return readingRefusal(formData, gate.message);
+
+  const { values, errors, input } = parseReadingForm(formData);
+  if (!input) return { values, errors };
+
+  try {
+    await session.db.insert(indicatorReadings, { indicatorId, ...input });
+  } catch (error) {
+    return readingScopeRefusal(error, formData);
+  }
+
+  revalidatePath(ROUTES.product(productId));
+
+  // La page nue, panneau refermé : le relevé paraît en tête de sa série et
+  // devient le « dernier relevé » du bloc, et c'est toute la confirmation
+  // (`docs/06` §9). `redirect` lève : elle est appelée hors de tout `try`, faute
+  // de quoi le `catch` ci-dessus avalerait la navigation.
+  redirect(ROUTES.product(productId));
+}
+
+/**
+ * Corriger un relevé déjà saisi : **le même formulaire, la même validation, les
+ * mêmes refus** qu'à la saisie — la propriété qui fait qu'un seul panneau sert
+ * les deux gestes, posée en T3.4 et tenue depuis.
+ *
+ * **L'indicateur ne se corrige pas ici** : `indicator_readings.indicator_id`
+ * n'est pas un champ du formulaire et ne le devient pas. Déplacer un relevé d'un
+ * indicateur à l'autre serait un geste que la fiche ne demande pas — et deux
+ * indicateurs ne mesurent pas la même chose, ni forcément dans la même unité.
+ *
+ * **La date, elle, se corrige** : c'est même le cas que la fiche demande
+ * d'éprouver à l'écran, le relevé changeant alors de place dans sa série sans
+ * qu'aucun tri ne soit rejoué à la main — l'ordre vit dans la lecture.
+ */
+export async function updateReading(
+  productId: string,
+  readingId: string,
+  _previous: ReadingFormState,
+  formData: FormData,
+): Promise<ReadingFormState> {
+  const session = await requireSession();
+
+  const gate = await openReading(
+    session,
+    productId,
+    readingId,
+    "La modification d'un relevé est réservée au responsable de domaine et aux contributeurs désignés d'un accompagnement de ce produit.",
+  );
+  if ("message" in gate) return readingRefusal(formData, gate.message);
+
+  const { values, errors, input } = parseReadingForm(formData);
+  if (!input) return { values, errors };
+
+  try {
+    const updated = await session.db.update(
+      indicatorReadings,
+      readingId,
+      input,
+    );
+    if (!updated) {
+      return readingRefusal(formData, "Ce relevé n'existe plus sur ce produit.");
+    }
+  } catch (error) {
+    return readingScopeRefusal(error, formData);
+  }
+
+  revalidatePath(ROUTES.product(productId));
+
+  // La page nue, panneau refermé : la série se réordonne d'elle-même, et c'est
+  // toute la confirmation (`docs/06` §9). `redirect` lève, donc hors du `try`.
+  redirect(ROUTES.product(productId));
+}
+
+/**
+ * Retirer un relevé : il quitte la série, rien n'est supprimé (règle 4).
+ *
+ * **C'est le geste que la migration de ce ticket autorise.** Sans `archived_at`
+ * sur `indicator_readings`, retirer un relevé saisi en double n'avait que la
+ * suppression pour chemin — et la couche d'accès n'expose pas de `delete`. La
+ * colonne existe désormais, et `archive` la couvre sans qu'une ligne de
+ * `lib/db/scoped.ts` ait changé : `hasArchivedAt` introspecte le schéma.
+ *
+ * **Sans confirmation** — arbitrage (c) de `tickets-C4bis.md` : elle se justifie
+ * là où le geste retire de la lecture tout un ensemble. Un relevé se retape, et
+ * `docs/06` §9 proscrit la confirmation partout où elle ne protège rien.
+ *
+ * **Aucun rétablissement** — arbitrage (b) de `tickets-C4bis.md` : le
+ * rétablissement existe pour les deux objets qui ont une page, et un relevé n'en
+ * a pas. Il se retape, comme l'activité, la ressource et le résultat.
+ *
+ * **Le refus est muet**, comme `archiveIndicator`, `archiveResource` et
+ * `archiveResult` : ce geste n'a aucune saisie à rendre, et rien ne justifie de
+ * lui inventer un message que l'écran n'atteint jamais en usage normal — le point
+ * d'entrée n'est rendu qu'à qui peut écrire, sur un relevé vivant de ce produit.
+ */
+export async function archiveReading(
+  productId: string,
+  readingId: string,
+): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openReading(
+    session,
+    productId,
+    readingId,
+    // Jamais rendu : ce geste n'affiche aucun refus.
+    "Le retrait d'un relevé est réservé au responsable de domaine et aux contributeurs désignés d'un accompagnement de ce produit.",
+  );
+  if ("message" in gate) return;
+
+  await session.db.archive(indicatorReadings, readingId);
 
   revalidatePath(ROUTES.product(productId));
 }
