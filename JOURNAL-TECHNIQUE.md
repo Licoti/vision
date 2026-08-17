@@ -3269,3 +3269,55 @@ n'est pas un pourcentage).
 sparkline montre une **forme** ; partir de zéro l'aplatirait jusqu'à l'illisible. Elle n'est pas
 décorative pour autant : la carte écrit la valeur, sa date, le sens de lecture et le décompte à
 côté. Le grand tracé, lui, a un axe chiffré et part de zéro.
+
+**Hors ticket, 17/08/2026 — deux défauts du graphe North Star, signalés et corrigés.**
+
+**(1) La valeur du dernier point mangeait le libellé de cible.** Le libellé vit au bord droit ; le
+dernier relevé se pose à `(n − 0,5) / n` de l'axe, soit ~97 % sur une série large, et sa valeur
+centrée débordait dessus. Le tracé et ses points reculent donc derrière une **gouttière de 96 px**
+(`right-24`), là où les filets et les traits de cible gardent toute la largeur — ce sont eux qui
+portent le libellé, et les rétrécir l'aurait décollé du bord. **La rangée de graduations a dû
+prendre la même gouttière** (`mr-24`) : sans elle, la dernière graduation tombait à droite du point
+qu'elle situe — un défaut introduit par le correctif lui-même, et rattrapé avant d'être servi. Les
+valeurs des points se calent en outre comme les graduations : centrées au milieu, rentrées aux deux
+bouts.
+
+**(2) La cible s'affichait deux fois.** Quand un accompagnement s'est donné **la même cible que le
+produit** — le cas courant, puisque c'est souvent le même objectif —, son trait se superposait
+exactement à celui du produit et son libellé s'imprimait par-dessus : deux fois « Cible 85 % » au
+même pixel. Le dédoublonnage se fait sur `valueOffset` et non sur la chaîne brute — « 85 » et
+« 85.0000 » sont la même cible et se superposeraient tout autant. Les cibles d'adoption qui
+subsistent passent au **même rouge** que celle du produit : ce sont des cibles, et la couleur le
+dit ; c'est le libellé ★ qui distingue l'objectif global, pas une seconde teinte.
+
+**Hors ticket, 17/08/2026 — une exécution rouge non reproduite.** Un `npm test` a rendu 10 échecs,
+soit exactement la taille d'`actions.test.ts`, puis cinq exécutions consécutives — trois complètes,
+deux ciblées — sont vertes, et aucun domaine `__test__%` ne subsiste en base. Cause non établie :
+la branche Neon est partagée par tous les fichiers de test et par le serveur de développement qui
+tournait à côté, et `beforeAll` y crée un domaine entier. **Je n'ai pas de démonstration, seulement
+une absence de reproduction** — noté pour que la prochaine occurrence ne soit pas prise pour la
+première. → **à surveiller ; un `beforeAll` qui échoue rend tout le fichier rouge d'un coup, ce qui
+est la signature observée.**
+
+**Hors ticket, 17/08/2026 — `relative` et `absolute` se disputaient la même propriété, et l'ordre
+des classes ne tranche pas.** Le menu « … » des cartes s'affichait en haut à **gauche**, dans le
+flux, au lieu du coin haut-droit. `IndicatorMenu` pose `relative` sur sa racine — son déroulant en a
+besoin pour s'ancrer — et la carte lui passait `className="absolute right-3 top-3"`, concaténé
+après. **Deux utilitaires de `position` dans un même attribut ne se départagent pas par leur ordre
+d'écriture** : c'est l'ordre de la feuille générée qui décide, et Tailwind y émet `relative` après
+`absolute`. Le prop `className` est donc **retiré** du composant — il invitait au piège — et qui
+veut placer le menu l'enveloppe dans un conteneur positionné. La règle vaut pour tout composant qui
+pose lui-même sa `position` : elle ne se surcharge pas de l'extérieur.
+
+**Hors ticket, 17/08/2026 — les sparklines des cartes sont retirées, et le crochet d'écart avec.**
+Les sparklines prenaient de la hauteur sans porter de lecture que la valeur, la date, le sens et le
+décompte écrits à côté ne portaient déjà (demande du 17/08/2026). Le grand tracé de la North Star,
+lui, reste : il a un axe chiffré et il porte la question du bloc.
+
+**Le crochet d'écart était calculé et jamais rendu**, découvert en nettoyant : son JSX avait disparu
+d'une réécriture antérieure alors que son `const` survivait, et je l'avais rapporté comme présent en
+me fiant à un `grep` sur `border-dotted` qui, à ce moment-là, disait vrai. **Il n'a pas été
+rétabli** : l'écart est déjà écrit en toutes lettres dans la colonne de gauche, et le redoubler sur
+le graphe serait une seconde affirmation du même indice — celui que D39 interdit déjà. Le `const`
+mort est retiré ; la question était posée dans le plan et se referme ainsi. → **si le crochet est
+voulu un jour, il se réécrit à partir de `targetGap`.**

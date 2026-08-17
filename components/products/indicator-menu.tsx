@@ -25,6 +25,14 @@
  * Trois comportements que le clavier exige, et qu'un `onClick` seul n'aurait pas
  * donnés : `Échap` referme, un clic hors du menu referme, et le focus revient au
  * bouton — sans quoi la tabulation repartirait du début du document.
+ *
+ * **Il ne prend aucun `className`, et c'est délibéré** (correctif du
+ * 17/08/2026) : sa racine porte `relative`, dont son menu déroulant a besoin
+ * pour s'ancrer. Un positionnement passé de l'extérieur entrait en conflit avec
+ * lui — `absolute` et `relative` se disputent la même propriété, et l'ordre des
+ * classes ne tranche pas, seul l'ordre de la feuille générée. Le bouton restait
+ * alors dans le flux, en haut à **gauche** de la carte. Qui veut le placer
+ * l'enveloppe dans un conteneur positionné.
  */
 
 import {
@@ -38,7 +46,6 @@ import {
 export function IndicatorMenu({
   label,
   children,
-  className = "",
 }: {
   /**
    * Ce que le bouton dit à l'assistance : « Options du bloc », « Options de
@@ -49,7 +56,6 @@ export function IndicatorMenu({
   label: string;
   /** Les gestes, décidés par le serveur : des liens et des formulaires. */
   children: ReactNode;
-  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const menuId = useId();
@@ -90,7 +96,7 @@ export function IndicatorMenu({
   }, [open]);
 
   return (
-    <div ref={container} className={`relative ${className}`}>
+    <div ref={container} className="relative">
       <button
         ref={trigger}
         type="button"

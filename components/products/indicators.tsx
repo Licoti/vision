@@ -81,7 +81,6 @@ import {
   monthTicks,
   timelineScale,
   valueOffset,
-  valueScale,
   type ValueScale,
 } from "@/lib/queries/timeline";
 
@@ -161,9 +160,8 @@ export function Indicators({
             </span>
             North Star produit
           </h2>
-          <p className="mt-1 max-w-160 text-sm leading-175 text-content-neutral-dark">
+          <p className="mt-1 max-w-160 text-sm text-content-neutral-dark">
             L&apos;objectif global du produit, tous accompagnements confondus.
-            Les accompagnements sont les moyens d&apos;y arriver.
           </p>
         </div>
 
@@ -201,7 +199,7 @@ export function Indicators({
         ) : null}
       </div>
 
-      <div className="mt-3">
+      <div className="mt-4">
         {northStar ? (
           <NorthStar
             indicator={northStar}
@@ -238,7 +236,6 @@ export function Indicators({
           <IndicatorCard
             key={indicator.id}
             indicator={indicator}
-            series={series.get(indicator.id) ?? []}
             editHref={editHref}
             archiveIndicator={archiveIndicator}
             addReadingHref={addReadingHref}
@@ -250,7 +247,7 @@ export function Indicators({
         {addHref ? (
           <Link
             href={addHref}
-            className="flex min-h-43 items-center justify-center gap-2 rounded-2xl border border-dashed border-border-primary-light text-sm font-semibold text-content-primary-dark"
+            className="flex min-h-24 items-center justify-center gap-2 rounded-2xl border border-dashed border-border-primary-light text-sm font-semibold text-content-primary-dark"
           >
             <span aria-hidden="true" className="text-lg leading-none">
               +
@@ -481,17 +478,22 @@ function Curve({
     label: formatResultValue(reading.value, unit),
   }));
 
-  const last = points[points.length - 1];
   const targetTop = productTarget === null ? null : topOf(productTarget);
 
-  /* ⚠ Le crochet d'écart : la seconde forme visuelle de l'indice calculé que
-     D39 interdit, arbitré le 17/08/2026. Il ne se trace qu'entre deux valeurs
-     connues, et seulement quand elles diffèrent — un crochet de hauteur nulle
-     n'aurait rien à dire. */
-  const bracket =
-    targetTop !== null && last && Math.abs(targetTop - (100 - last.y)) > 0.5
-      ? { top: Math.min(targetTop, 100 - last.y), height: Math.abs(targetTop - (100 - last.y)), x: last.x }
-      : null;
+  /* Les cibles d'adoption qui **ajoutent quelque chose** : ni celle du produit
+     répétée, ni deux fois la même. `valueOffset` sert de clé plutôt que la
+     chaîne brute — « 85 » et « 85.0000 » sont la même cible, et se
+     superposeraient au pixel près. */
+  const seen = new Set(
+    productTarget === null ? [] : [valueOffset(scale, productTarget)],
+  );
+  const distinctTargets = adoptions.flatMap((adoption) => {
+    if (adoption.targetValue === null) return [];
+    const at = valueOffset(scale, adoption.targetValue);
+    if (seen.has(at)) return [];
+    seen.add(at);
+    return [{ projectId: adoption.projectId, value: adoption.targetValue }];
+  });
 
   return (
     <div>
@@ -539,35 +541,35 @@ function Curve({
             </>
           ) : null}
 
-          {/* Les cibles d'accompagnement : la valeur seule (demande du
-              17/08/2026). Un trait plus discret que celui du produit — sans
-              quoi rien ne dirait laquelle est l'objectif global. */}
-          {adoptions.map((adoption) =>
-            adoption.targetValue === null ? null : (
-              <div
-                key={adoption.projectId}
-                className="absolute inset-x-0 border-t border-dashed border-content-neutral-normal"
-                style={{ top: `${topOf(adoption.targetValue)}%` }}
-              >
-                <span className="absolute right-0.5 -translate-y-1/2 bg-surface-primary-lighter px-1.5 text-2xs text-content-neutral-dark">
-                  Cible {formatResultValue(adoption.targetValue, unit)}
-                </span>
-              </div>
-            ),
-          )}
+          {/* Les cibles d'accompagnement, **dédoublonnées de celle du produit**
+              (correctif du 17/08/2026) : quand un accompagnement s'est donné la
+              même cible que le produit — le cas courant —, son trait se
+              superposait exactement à celui du produit et son libellé
+              s'affichait par-dessus. Deux fois « Cible 85 % » au même endroit.
+              `distinctTargets` ne garde que les valeurs qui disent autre chose.
 
-          {bracket ? (
+              Même rouge que la cible du produit : ce sont des cibles, et la
+              couleur les dit. C'est le libellé ★ du produit qui distingue
+              l'objectif global, pas une seconde teinte. */}
+          {distinctTargets.map((target) => (
             <div
-              aria-hidden="true"
-              className="absolute w-0 border-l-[length:var(--border-width-1)] border-dotted border-content-warning-darker"
-              style={{
-                left: `${bracket.x}%`,
-                top: `${bracket.top}%`,
-                height: `${bracket.height}%`,
-              }}
-            />
-          ) : null}
+              key={target.projectId}
+              className="absolute inset-x-0 border-t border-dashed border-content-warning-darker"
+              style={{ top: `${topOf(target.value)}%` }}
+            >
+              <span className="absolute right-0.5 -translate-y-1/2 bg-surface-primary-lighter px-1.5 text-2xs font-semibold text-content-warning-darker">
+                Cible {formatResultValue(target.value, unit)}
+              </span>
+            </div>
+          ))}
 
+          {/* **La gouttière de droite** (correctif du 17/08/2026) : la valeur du
+              dernier point venait manger le libellé de cible, qui vit au bord
+              droit. Le tracé et ses points s'arrêtent donc avant lui, là où les
+              filets et les traits de cible gardent toute la largeur — ce sont
+              eux qui portent le libellé, et les rétrécir l'aurait décollé du
+              bord. */}
+          <div className="absolute inset-y-0 left-0 right-24">
           <svg
             aria-hidden="true"
             viewBox="0 0 100 100"
@@ -600,16 +602,32 @@ function Curve({
               />
               {/* La valeur écrite : c'est elle qui empêche la courbe d'être un
                   graphique décoratif. */}
-              <span className="absolute bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs font-semibold text-content-primary-dark">
+              {/* Le libellé se cale sur la position, comme les graduations de
+                  temps : centré au milieu, mais rentré aux deux bouts — sinon
+                  la moitié du premier sort à gauche et la moitié du dernier
+                  déborde dans la gouttière. */}
+              <span
+                className={`absolute bottom-4 whitespace-nowrap text-xs font-semibold text-content-primary-dark ${
+                  point.x <= 8
+                    ? "left-0"
+                    : point.x >= 92
+                      ? "right-0"
+                      : "left-1/2 -translate-x-1/2"
+                }`}
+              >
                 {point.label}
               </span>
             </div>
           ))}
+          </div>
         </div>
       </div>
 
-      {/* Les graduations de temps, alignées sur la zone de tracé. */}
-      <div className="relative ml-11 mt-2 h-4.5">
+      {/* Les graduations de temps, **alignées sur la zone de tracé** : même
+          retrait à gauche pour les libellés d'axe (`ml-11`) et même gouttière à
+          droite (`mr-24`) que le tracé. Sans la seconde, la dernière graduation
+          tomberait à droite du dernier point qu'elle situe. */}
+      <div className="relative ml-11 mr-24 mt-2 h-4.5">
         {ticks.map((tick) => (
           <span
             key={tick.month}
@@ -643,7 +661,6 @@ function Curve({
  */
 function IndicatorCard({
   indicator,
-  series,
   editHref,
   archiveIndicator,
   addReadingHref,
@@ -651,43 +668,21 @@ function IndicatorCard({
   setNorthStar,
 }: {
   indicator: ProductIndicator;
-  series: ProductReading[];
   editHref: ((indicatorId: string) => string) | null;
   archiveIndicator: ((indicatorId: string) => Promise<void>) | null;
   addReadingHref: ((indicatorId: string) => string) | null;
   readingsHref: ((indicatorId: string) => string) | null;
   setNorthStar: ((indicatorId: string | null) => Promise<void>) | null;
 }) {
-  const ordered = [...series].reverse();
-  /* **`valueScale` et non `axisScale`** : une sparkline montre une **forme**, et
-     c'est ce que fait le `spark()` de la maquette — il borne sur min et max de
-     la série. Partir de zéro l'aplatirait jusqu'à l'illisible, et la carte
-     écrit de toute façon la valeur, sa date et le décompte à côté : rien n'est
-     porté par le seul dessin. Le grand tracé, lui, a un axe chiffré et part de
-     zéro. */
-  const scale = valueScale(ordered.map((reading) => reading.value));
-  const timeline = timelineScale(ordered.map((reading) => reading.readOn));
   const lastValue = formatResultValue(indicator.lastValue, indicator.unit);
 
-  /* La sparkline dans sa boîte de 34 : `curvePath` rend des pourcentages, le
-     `viewBox` les étire. Un seul calcul à corriger le jour où le tracé change. */
-  const spark =
-    scale && timeline
-      ? curvePath(
-          ordered.map((reading) => ({
-            x: monthMark(timeline, reading.readOn),
-            y: valueOffset(scale, reading.value) * 0.34,
-          })),
-        )
-      : null;
-
   return (
-    <div className="relative rounded-2xl border border-surface-neutral-lighter bg-surface-neutral-pale p-4">
+    <div className="relative rounded-2xl border border-surface-neutral-lighter bg-surface-neutral-pale p-3.5">
       {editHref || addReadingHref || readingsHref || setNorthStar ? (
-        <IndicatorMenu
-          label={`Options de l'indicateur ${indicator.label}`}
-          className="absolute right-3 top-3"
-        >
+        /* **Le conteneur porte le positionnement, jamais le menu** : sa racine
+           est `relative`, dont son déroulant a besoin pour s'ancrer. */
+        <div className="absolute right-3 top-3">
+        <IndicatorMenu label={`Options de l'indicateur ${indicator.label}`}>
           {editHref ? (
             <Link
               href={editHref(indicator.id)}
@@ -736,15 +731,16 @@ function IndicatorCard({
             </form>
           ) : null}
         </IndicatorMenu>
+        </div>
       ) : null}
 
-      <p className="min-h-9 pr-9 text-sm font-semibold leading-125 text-content-neutral-darkest">
+      <p className="min-h-8 pr-9 text-sm font-semibold leading-125 text-content-neutral-darkest">
         {indicator.label}
       </p>
 
       {lastValue && indicator.lastReadOn ? (
-        <p className="mt-3 flex flex-wrap items-baseline gap-2">
-          <span className="text-3xl font-bold leading-none text-content-neutral-darkest">
+        <p className="mt-2 flex flex-wrap items-baseline gap-2">
+          <span className="text-2xl font-bold leading-none text-content-neutral-darkest">
             {lastValue}
           </span>
           <span className="text-xs text-content-neutral-base">
@@ -753,32 +749,13 @@ function IndicatorCard({
           </span>
         </p>
       ) : (
-        <p className="mt-3 text-xs text-content-neutral-base">
+        <p className="mt-2 text-xs text-content-neutral-base">
           Aucun relevé pour l&apos;instant.
         </p>
       )}
 
-      {spark ? (
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 100 34"
-          preserveAspectRatio="none"
-          className="mt-3.5 h-8.5 w-full overflow-visible"
-        >
-          <path
-            d={spark}
-            fill="none"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            vectorEffect="non-scaling-stroke"
-            className="stroke-content-primary-normal"
-          />
-        </svg>
-      ) : null}
-
-      <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-content-neutral-base">
-        <span className="rounded-full bg-surface-neutral-lightest px-2.25 py-0.5 text-2xs font-semibold text-content-neutral-dark">
+      <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-content-neutral-base">
+        <span className="rounded-full bg-surface-primary-lighter px-2.25 py-0.5 text-2xs font-semibold text-content-neutral-dark">
           {formatIndicatorDirection(indicator.direction)}
         </span>
         {formatReadings(indicator.readingCount)}
