@@ -38,9 +38,20 @@
  * « Indicateurs adoptés ». C'est ce qui a raccourci le bloc, avec la ligne
  * « Cible du produit » que la jauge a absorbée.
  *
- * **Des marges par élément, jamais un `gap` uniforme.** Un `gap` met la même
- * valeur partout ; la maquette rythme 18/24/30/34/22/12/14. C'était la cause
- * directe du « trop d'espacements ».
+ * **Des marges par élément, jamais un `gap` uniforme — mais à l'intérieur des
+ * sous-parties seulement.** Un `gap` met la même valeur partout ; la maquette
+ * rythme 18/24/30/12/14, et c'était la cause directe du « trop d'espacements ».
+ * La règle vaut toujours dans `NorthStar` et dans `IndicatorCard`. Elle ne vaut
+ * **plus au premier rang du bloc** (17/08/2026) : en-tête, North Star,
+ * séparateur et grille sont espacés par le `gap-5` de `Block`, comme les enfants
+ * de premier rang des deux autres blocs de la page. Un rythme propre à ce bloc
+ * était précisément ce que la mise en cohérence retirait.
+ *
+ * **La coquille et l'en-tête sont ceux de `components/ui/block.tsx`**, partagés
+ * avec « Accompagnements » et « Roadmap ». Ce que ce bloc garde en propre est
+ * sa **tonalité** — la surface bleue, qui dit que c'est l'objectif du produit —,
+ * son ★ et son contenu. Ce qu'il a perdu : son surtitre de 12 pixels en
+ * capitales, devenu un titre de plein rang comme les deux autres.
  *
  * **Le tracé est en `path`, et c'est neuf.** La contrainte de T5.6 — pas de
  * `viewBox`, donc pas de `path` — tenait à ce que le SVG portait du texte. Ici
@@ -60,6 +71,7 @@ import {
   MENU_ITEM,
   MENU_ITEM_DANGER,
 } from "@/components/products/indicator-menu";
+import { Block, BlockDivider, BlockHeader } from "@/components/ui/block";
 import {
   formatDateMonth,
   formatIndicatorDirection,
@@ -149,87 +161,75 @@ export function Indicators({
   const others = indicators.filter((indicator) => !indicator.isNorthStar);
 
   return (
-    <section className="rounded-3xl border border-border-primary-lighter bg-surface-primary-lighter p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="flex items-center gap-2 text-xs font-bold uppercase text-content-primary-dark">
-            {/* L'étoile est décorative : le titre est écrit juste à côté, et la
-                couleur ne porte jamais seule (docs/06 §11). */}
-            <span aria-hidden="true" className="text-content-warning-darker">
-              ★
-            </span>
-            North Star produit
-          </h2>
-          <p className="mt-1 max-w-160 text-sm text-content-neutral-dark">
-            L&apos;objectif global du produit, tous accompagnements confondus.
-          </p>
-        </div>
-
-        {setNorthStar ? (
-          <IndicatorMenu label="Options du bloc des indicateurs">
-            {indicators.map((indicator) => (
-              <form
-                key={indicator.id}
-                action={setNorthStar.bind(null, indicator.id)}
-              >
-                <button
-                  type="submit"
-                  role="menuitem"
-                  disabled={indicator.isNorthStar}
-                  className={`${MENU_ITEM} disabled:text-content-neutral-light`}
+    <Block tone="primary">
+      <BlockHeader
+        /* L'étoile est décorative : le titre est écrit juste à côté, et la
+           couleur ne porte jamais seule (docs/06 §11). */
+        mark={<span className="text-content-warning-darker">★</span>}
+        title="North Star produit"
+        note="L'objectif global du produit, tous accompagnements confondus."
+        action={
+          setNorthStar ? (
+            <IndicatorMenu label="Options du bloc des indicateurs">
+              {indicators.map((indicator) => (
+                <form
+                  key={indicator.id}
+                  action={setNorthStar.bind(null, indicator.id)}
                 >
-                  {indicator.isNorthStar
-                    ? `★ ${indicator.label}`
-                    : `Désigner ${indicator.label}`}
-                </button>
-              </form>
-            ))}
-            {northStar ? (
-              <form action={setNorthStar.bind(null, null)}>
-                <button
-                  type="submit"
-                  role="menuitem"
-                  className={MENU_ITEM_DANGER}
-                >
-                  Retirer la North Star
-                </button>
-              </form>
-            ) : null}
-          </IndicatorMenu>
-        ) : null}
-      </div>
+                  <button
+                    type="submit"
+                    role="menuitem"
+                    disabled={indicator.isNorthStar}
+                    className={`${MENU_ITEM} disabled:text-content-neutral-light`}
+                  >
+                    {indicator.isNorthStar
+                      ? `★ ${indicator.label}`
+                      : `Désigner ${indicator.label}`}
+                  </button>
+                </form>
+              ))}
+              {northStar ? (
+                <form action={setNorthStar.bind(null, null)}>
+                  <button
+                    type="submit"
+                    role="menuitem"
+                    className={MENU_ITEM_DANGER}
+                  >
+                    Retirer la North Star
+                  </button>
+                </form>
+              ) : null}
+            </IndicatorMenu>
+          ) : null
+        }
+      />
 
-      <div className="mt-4">
-        {northStar ? (
-          <NorthStar
-            indicator={northStar}
-            series={series.get(northStar.id) ?? []}
-            adoptions={adopted.get(northStar.id) ?? []}
-          />
-        ) : (
-          /* Un paragraphe et non un `EmptyState` — la règle de `Resources` et
-             d'`Indicators` : **deux phrases distinctes**, là où `EmptyState` n'a
-             qu'un `description`. N'avoir aucun indicateur et n'en avoir désigné
-             aucun ne sont pas la même chose, et l'écran ne les confond pas. */
-          <p className="text-sm leading-175 text-content-neutral-dark">
-            {indicators.length === 0
-              ? "Aucun indicateur pour l'instant. Le premier que ce produit portera pourra être désigné North Star : celui qui dit où le produit veut aller."
-              : "Aucune North Star désignée. Le menu de ce bloc permet de choisir lequel de ces indicateurs porte l'objectif global du produit."}
-          </p>
-        )}
-      </div>
-
-      {/* Le séparateur de la maquette : `34px` au-dessus, `22px` en dessous.
-          L'interlettrage de `.14em` n'est pas rendu — aucun jeton, dette n°4. */}
-      <div className="mt-4 mb-2 flex items-center gap-3">
-        <h3 className="text-xs font-bold uppercase text-content-neutral-dark">
-          Autres indicateurs
-        </h3>
-        <span
-          aria-hidden="true"
-          className="h-px flex-1 bg-border-primary-lighter"
+      {northStar ? (
+        <NorthStar
+          indicator={northStar}
+          series={series.get(northStar.id) ?? []}
+          adoptions={adopted.get(northStar.id) ?? []}
         />
-      </div>
+      ) : (
+        /* Un paragraphe et non un `EmptyState` — la règle de `Resources` et
+           d'`Indicators` : **deux phrases distinctes**, là où `EmptyState` n'a
+           qu'un `description`. N'avoir aucun indicateur et n'en avoir désigné
+           aucun ne sont pas la même chose, et l'écran ne les confond pas. */
+        <p className="text-sm leading-175 text-content-neutral-dark">
+          {indicators.length === 0
+            ? "Aucun indicateur pour l'instant. Le premier que ce produit portera pourra être désigné North Star : celui qui dit où le produit veut aller."
+            : "Aucune North Star désignée. Le menu de ce bloc permet de choisir lequel de ces indicateurs porte l'objectif global du produit."}
+        </p>
+      )}
+
+      {/* Le séparateur, désormais **espacé par le `gap-5` du bloc** comme tout
+          le reste : la maquette rythmait 34/22 de part et d'autre, et ce rythme
+          propre était l'un des trois que la page portait. L'interlettrage de
+          `.14em` n'est toujours pas rendu — aucun jeton, dette n°4. */}
+      <BlockDivider
+        title="Autres indicateurs"
+        rule="bg-border-primary-lighter"
+      />
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
         {others.map((indicator) => (
@@ -262,7 +262,7 @@ export function Indicators({
           </p>
         ) : null}
       </div>
-    </section>
+    </Block>
   );
 }
 

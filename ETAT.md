@@ -2,7 +2,7 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 17/08/2026 — hors ticket : roadmap en HTML filtrable, bloc North Star fusionné (migration 0003), page réordonnée.
+**Dernière mise à jour :** 17/08/2026 — hors ticket : roadmap en HTML filtrable, bloc North Star fusionné (migration 0003), page réordonnée, puis ses trois blocs mis sous une coquille et un en-tête communs (`components/ui/block.tsx`).
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
 **Ticket suivant :** **T5bis.1** — le schéma : compétences, niveaux, profil (`tickets-C5bis.md`)
 
@@ -129,6 +129,16 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   alors à `products.kind` et aux deux lectures de projet qui ne remontent pas `persons.kind`.
   → **ticket propre, C7** (destination posée le 14/08/2026, confirmée aux découpages de C5 et de
   C5bis : aucune de leurs fiches n'ouvre `listProductProjects` ni la liste transverse).
+- **`Section` et `Block` cohabitent, et les deux pages de détail divergent.** La mise en cohérence
+  de la page produit (hors ticket, 17/08/2026) a sorti la coquille et l'en-tête de ses trois blocs
+  dans `components/ui/block.tsx` — rayon `3xl`, titre `xl`, note dessous, `gap-5` —, format que les
+  maquettes de `docs/design/maquettes/blocs/` donnent aux blocs de cette page. La page projet garde
+  `Section` — rayon `xl`, titre `md` — pour ses blocs de référence de `docs/06` §5. Deux blocs de
+  même nature n'ont donc pas la même forme selon la page qui les porte. Écart **assumé et borné** :
+  la demande portait sur la page produit, et élargir aurait touché des écrans qu'elle ne visait pas
+  (règle 3). Ce qui reste à trancher n'est pas technique — les deux composants sont interchangeables
+  — mais éditorial : la page projet doit-elle monter au format produit, ou les deux formats
+  disent-ils deux rangs de bloc différents ? → **ticket propre, C7 au plus tard.**
 - **Le contenu rédigé d'`/a-propos` reste à écrire.** La page a son en-tête et son état vide. Son
   contenu — ce qu'est Vision, le vocabulaire, ce qu'elle ne fait pas, l'état daté — ne demande
   aucune lecture en base. → **ticket propre, C7 au plus tard.**

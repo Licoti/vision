@@ -3321,3 +3321,56 @@ rétabli** : l'écart est déjà écrit en toutes lettres dans la colonne de gau
 le graphe serait une seconde affirmation du même indice — celui que D39 interdit déjà. Le `const`
 mort est retiré ; la question était posée dans le plan et se referme ainsi. → **si le crochet est
 voulu un jour, il se réécrit à partir de `targetGap`.**
+
+**Hors ticket, 17/08/2026 — la page produit portait trois langages visuels, et le bloc du milieu
+n'en avait aucun.** Demande de cohérence d'ensemble sur « North Star », « Accompagnements » et
+« Roadmap ». L'état de départ : deux cartes et **une section nue** ; trois graisses de titre
+(12 px capitales primaire · 16 px demi-gras · 20 px gras) ; une note tantôt sous le titre, tantôt
+**à côté** de lui ; trois rythmes verticaux (`mt-4` ad hoc · `gap-4` · `gap-5`). Rien de tout cela
+n'était un défaut isolé — chaque bloc était cohérent avec sa propre maquette. **Les deux maquettes
+ne s'accordent pas entre elles** : `roadmap/Roadmap.dc.html` donne un titre de 22 px, et
+`northstar/NorthStar.dc.html` un surtitre de 12 px en capitales, pour deux blocs de même rang sur
+la même page. Elles s'accordent en revanche sur la **coquille** — rayon 22 px, filet, même padding.
+C'est donc la coquille qui a fait référence, et le surtitre de la North Star qui est devenu un
+titre de plein rang.
+
+**Le langage tient en cinq points**, et vit dans `components/ui/block.tsx` : coquille `Block` à deux
+tonalités (`neutral`, `primary` pour la North Star, seule spécificité qui lui reste dans la
+coquille) ; en-tête `BlockHeader` — marque décorative facultative, `h2`, note **toujours dessous**,
+emplacement d'action à droite aligné en haut ; `gap-5` au premier rang des trois blocs ;
+`rounded-2xl` pour les surfaces posées **dans** un bloc, le `3xl` restant celui du bloc ; un seul
+jeton de note et un seul d'état vide.
+
+**C'est une mesure qui a tranché la couleur de note, pas un goût.** `SectionHeader` note en
+`content-neutral-base` ; sur `surface-primary-lighter` ce jeton tombe à **3,75:1**, sous la limite
+du texte courant. Un en-tête commun devant tenir sur les deux tonalités, c'est le jeton qui passe
+partout qui gagne : `content-neutral-dark`, **6,11:1** sur la surface bleue et **8,12:1** sur la
+pâle. La roadmap a donc changé de jeton, et non l'inverse. Titre en `content-neutral-darkest` :
+**13,45:1** sur la bleue, mesuré aussi.
+
+**`flush` retire la carte d'une liste, jamais ses lignes.** Le bloc « Accompagnements » entrant dans
+une carte, sa `List` en portait une seconde à l'intérieur. Le prop **se passe aux deux** — la liste
+pour la surface, la ligne pour le retrait horizontal — faute d'un contexte : `list.tsx` est rendu
+sur le serveur, et `createContext` y imposerait un `"use client"` que rien d'autre ne justifie. Le
+défaut est `false`, aucun autre appelant ne bouge. Les lignes d'accompagnement sont depuis
+exactement celles de la roadmap juste en dessous : même filet, même `py-4`.
+
+**Un commentaire JSX ne peut pas être frère de la racine retournée.** `return ( {/* … */} <div> )`
+donne `TS1005: ')' expected` — quatre erreurs en cascade pour un commentaire mal placé. Un
+`/* … */` JavaScript au même endroit passe : c'est une expression parenthésée, pas du JSX.
+
+**Les deux états vides ont été éprouvés en mettant la règle en défaut**, non en les décrivant :
+`projects.length > 0` forcé à `false` fait paraître l'`EmptyState` dans la carte, en `h3` sous le
+`h2` du bloc — et rien d'autre ne bouge ; `!scale` forcé à vrai fait paraître le paragraphe de
+roadmap sans date, **avec la promesse de filtre retirée de la note**, ce qui est la seule raison
+qui restait à `Header` d'être local. Les deux neutralisations ont été défaites avant la vérification
+finale.
+
+**Un écart connu et non traité : `Section` et `Block` cohabitent.** La page projet garde `Section`
+— rayon `xl`, titre `md` —, la page produit prend `Block`. Les deux pages divergent donc entre
+elles là où leurs blocs sont de même nature. Hors du périmètre de la demande, qui portait sur la
+page produit. → **ETAT.md, point ouvert.**
+
+**Une incohérence documentaire relevée en passant, non corrigée** : l'en-tête de `roadmap.tsx`
+renvoie encore à `indicator-curves.tsx`, supprimé le 17/08/2026 et fusionné dans `indicators.tsx`.
+Règle 3 — le fichier n'était ouvert que pour sa coquille.

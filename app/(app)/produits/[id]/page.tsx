@@ -89,11 +89,11 @@ import { ReadingsPanel } from "@/components/products/readings-panel";
 import { Roadmap } from "@/components/products/roadmap";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
 import { AvatarGroup } from "@/components/ui/avatar";
+import { Block, BlockHeader } from "@/components/ui/block";
 import { ConfirmPanel } from "@/components/ui/confirm-panel";
 import { EmptyState } from "@/components/ui/empty-state";
 import { List, ListRow } from "@/components/ui/list";
 import { Page, PageHeader } from "@/components/ui/page";
-import { SectionHeader } from "@/components/ui/section";
 import { StatusDot } from "@/components/ui/status-dot";
 import { requireSession } from "@/lib/auth/provider";
 import { indicatorReadings, indicators } from "@/lib/db/schema";
@@ -567,16 +567,35 @@ export default async function ProductPage({
               canWriteIndicators ? setNorthStar.bind(null, product.id) : null
             }
           />
-          <section className="flex flex-col gap-4">
-            <SectionHeader
+          {/* **Le bloc du milieu, aligné sur les deux autres** (17/08/2026) :
+              il était la seule section nue de la page — sans carte, sous un
+              titre de rang moindre, sa note posée à côté du titre plutôt que
+              dessous. Il porte désormais la même coquille et le même en-tête
+              que « North Star » et « Roadmap ».
+
+              **Sa liste est à fond perdu** : la carte est celle du bloc, et
+              une liste qui gardait la sienne faisait une carte dans une carte.
+              Il ne reste que les lignes, leurs filets et leur rythme — ceux
+              des lignes de la roadmap juste en dessous, ce qui était le but.
+
+              L'état vide garde son `EmptyState`, à la différence des deux
+              autres blocs qui rendent un paragraphe : c'est le seul des trois
+              qui porte un **geste**, et `EmptyState` est ce qui le place
+              (règle 5). */}
+          <Block>
+            <BlockHeader
               title="Accompagnements"
-              note="Du plus récent au plus ancien."
+              note="Les accompagnements de ce produit, du plus récent au plus ancien."
             />
 
             {projects.length > 0 ? (
-              <List label="Accompagnements de ce produit">
+              <List flush label="Accompagnements de ce produit">
                 {projects.map((project) => (
-                  <ListRow key={project.id} href={ROUTES.project(project.id)}>
+                  <ListRow
+                    key={project.id}
+                    flush
+                    href={ROUTES.project(project.id)}
+                  >
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
                       <span className="flex flex-wrap items-center gap-2 text-xs">
                         <span className="flex items-center gap-2 font-semibold text-content-neutral-dark">
@@ -621,7 +640,7 @@ export default async function ProductPage({
                   : {})}
               />
             )}
-          </section>
+          </Block>
 
           {/* **La roadmap ferme la page** (demande du 17/08/2026), alors que
               `docs/06` §6 la veut « au-dessus de la liste, sans la déplacer ».

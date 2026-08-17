@@ -59,6 +59,7 @@
 
 import Link from "next/link";
 
+import { Block, BlockHeader } from "@/components/ui/block";
 import { BAND_BG, STATUS_PILL } from "@/components/ui/status-dot";
 import {
   formatDay,
@@ -185,7 +186,9 @@ function FilterBar({
     }`;
 
   return (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-surface-neutral-lighter bg-surface-neutral-lightest px-4 py-3">
+    /* `rounded-2xl` comme les cartes d'indicateur : c'est le rayon des surfaces
+       posées **dans** un bloc, le `3xl` restant celui du bloc lui-même. */
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl border border-surface-neutral-lighter bg-surface-neutral-lightest px-4 py-3">
       <div className="flex flex-wrap items-center gap-3">
         <span
           id="roadmap-scale-label"
@@ -316,19 +319,23 @@ export function Roadmap({
      d'axe à filtrer, et la barre de filtre n'aurait rien à offrir. */
   if (!scale) {
     return (
-      <Card>
+      <Block>
         <Header filterable={false} />
         {/* Un paragraphe et non un `EmptyState` — la règle de `Resources` et de
             `Indicators`. La raison qui reste après TD.1, qui a donné un `level`
             à `EmptyState` : **deux phrases distinctes**, là où `EmptyState` n'a
             qu'un `description`. N'avoir aucun accompagnement et n'en avoir aucun
             de daté ne sont pas la même chose, et l'écran ne les confond pas. */}
-        <p className="text-sm leading-175 text-content-neutral-base">
+        {/* `content-neutral-dark`, comme les paragraphes vides des deux autres
+            blocs : c'est le jeton d'état vide de la page, et il passe sur les
+            deux tonalités de `Block` — 8,12:1 sur la pâle, 6,11:1 sur la bleue,
+            là où `content-neutral-base` tombe à 3,75:1 sur la seconde. */}
+        <p className="text-sm leading-175 text-content-neutral-dark">
           {projects.length === 0
             ? "La roadmap s'affichera ici dès qu'un accompagnement sera daté : les périodes en barres, les activités porteuses d'un résultat en repères, sur un axe commun."
             : "Aucun accompagnement de ce produit ne porte de date : il n'y a rien à situer sur un axe. La liste ci-dessous porte tous les accompagnements."}
         </p>
-      </Card>
+      </Block>
     );
   }
 
@@ -362,7 +369,7 @@ export function Roadmap({
   const ticks = monthTicks(window);
 
   return (
-    <Card>
+    <Block>
       <Header filterable />
       <FilterBar productId={productId} scale={scale} window={window} />
 
@@ -486,7 +493,7 @@ export function Roadmap({
         ) : null}
 
         {bands.length === 0 ? (
-          <p className="border-t border-surface-neutral-lighter py-6 text-center text-sm leading-175 text-content-neutral-base">
+          <p className="border-t border-surface-neutral-lighter py-6 text-center text-sm leading-175 text-content-neutral-dark">
             Aucun accompagnement sur cette période.
           </p>
         ) : null}
@@ -497,48 +504,35 @@ export function Roadmap({
           {hiddenNotice(hidden)}
         </p>
       ) : null}
-    </Card>
+    </Block>
   );
 }
 
 /**
- * La carte de la roadmap — propre à ce bloc, et non le `Section` partagé.
+ * Le titre du bloc.
  *
- * Arbitré le 17/08/2026 : la maquette lui donne un cadre plus ample que les
- * autres blocs de la page, et c'est ce qui la distingue comme la vue d'ensemble
- * du produit. **Sans ombre portée** — le design system nomme ses trois
- * élévations sans leur donner de valeur (`tokens.css` §8), et aucun septième
- * substitut ne s'invente (`ETAT.md`). Écart consigné.
- */
-function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <section className="flex flex-col gap-5 rounded-3xl border border-surface-neutral-lighter bg-surface-neutral-pale p-6">
-      {children}
-    </section>
-  );
-}
-
-/**
- * Le titre du bloc, hors de `SectionHeader` pour la raison de `Card` : la
- * maquette lui donne un rang visuel supérieur aux autres blocs. Le `h2` est
- * celui de `SectionHeader` — la hiérarchie des titres est vérifiée en audit
- * d'accessibilité, et le centre en fait métier (`docs/06` §11).
+ * **La carte et l'en-tête ne sont plus propres à ce bloc** (17/08/2026) : ils
+ * viennent de `components/ui/block.tsx`, partagés avec « North Star » et
+ * « Accompagnements ». C'est cette roadmap qui a servi de référence — son cadre
+ * ample et son titre de plein rang sont ce que les trois blocs portent
+ * désormais —, si bien que sa coquille n'a pas changé d'apparence en devenant
+ * partagée. Ce qui a changé ici tient en un jeton : la note passe de
+ * `content-neutral-base` à `content-neutral-dark`, parce que le premier tombe à
+ * 3,75:1 sur la surface bleue de la North Star et qu'un en-tête commun prend le
+ * jeton qui passe sur les deux tonalités.
  *
- * **La note ne promet le filtre que lorsqu'il est rendu.** Sans axe, il n'y a
- * pas de barre de filtre — et une note qui inviterait à filtrer désignerait
- * alors un contrôle absent de l'écran.
+ * Il ne reste de local que ce petit composant, et pour une seule raison : **la
+ * note ne promet le filtre que lorsqu'il est rendu.** Sans axe, il n'y a pas de
+ * barre de filtre — et une note qui inviterait à filtrer désignerait alors un
+ * contrôle absent de l'écran.
  */
 function Header({ filterable }: { filterable: boolean }) {
   return (
-    <div>
-      <h2 className="text-xl font-bold text-content-neutral-darkest">
-        Roadmap
-      </h2>
-      <p className="text-sm leading-175 text-content-neutral-base">
-        Les accompagnements et les activités porteuses d&apos;un résultat, sur un
-        axe commun.
-        {filterable ? " Filtrez la période affichée." : null}
-      </p>
-    </div>
+    <BlockHeader
+      title="Roadmap"
+      note={`Les accompagnements et les activités porteuses d'un résultat, sur un axe commun.${
+        filterable ? " Filtrez la période affichée." : ""
+      }`}
+    />
   );
 }
