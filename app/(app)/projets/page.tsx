@@ -8,7 +8,7 @@
  *
  * **Les filtres passent par l'URL** et non par un état client : ils se
  * partagent, ils survivent à un rechargement, et l'écran reste un composant
- * serveur. Quatre dimensions plus une recherche font un formulaire `GET` — la
+ * serveur. Deux dimensions plus une recherche font un formulaire `GET` — la
  * forme en pastilles de la liste des produits tenait à une seule dimension ;
  * ici elle produirait une vingtaine de pastilles. Le formulaire fonctionne
  * sans JavaScript.
@@ -33,7 +33,7 @@ import { List, ListHeader, ListRow } from "@/components/ui/list";
 import { Page, PageHeader } from "@/components/ui/page";
 import { StatusDot } from "@/components/ui/status-dot";
 import { requireSession } from "@/lib/auth/provider";
-import { approaches, entities, jobs, projectStatuses } from "@/lib/db/schema";
+import { approaches, projectStatuses } from "@/lib/db/schema";
 import { formatMonth, formatProjects } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
 import {
@@ -53,9 +53,7 @@ export const metadata = {
 const COLUMN = {
   name: "min-w-0 flex-[1.4]",
   product: "min-w-0 flex-1",
-  entity: "w-32 flex-none",
   status: "w-28 flex-none",
-  jobs: "w-40 flex-none",
   team: "w-28 flex-none",
   freshness: "w-28 flex-none text-right",
 } as const;
@@ -63,8 +61,6 @@ const COLUMN = {
 /** Les noms des paramètres d'URL. En français, comme les segments de route. */
 const PARAM = {
   search: "recherche",
-  entity: "entite",
-  job: "metier",
   approach: "approche",
   status: "statut",
 } as const;
@@ -87,30 +83,23 @@ export default async function ProjectsPage({
 
   const search = params[PARAM.search]?.trim() ?? "";
 
-  const requestedEntity = uuidParam(params[PARAM.entity]);
-  const requestedJob = uuidParam(params[PARAM.job]);
   const requestedApproach = uuidParam(params[PARAM.approach]);
   const requestedStatus = uuidParam(params[PARAM.status]);
 
   // Chaque paramètre est confronté au domaine avant d'être cru. `find` est
   // scopé : la valeur d'un autre domaine n'existe pas, elle ne « manque » pas.
-  const [activeEntity, activeJob, activeApproach, activeStatus] =
-    await Promise.all([
-      requestedEntity ? session.db.find(entities, requestedEntity) : undefined,
-      requestedJob ? session.db.find(jobs, requestedJob) : undefined,
-      requestedApproach
-        ? session.db.find(approaches, requestedApproach)
-        : undefined,
-      requestedStatus
-        ? session.db.find(projectStatuses, requestedStatus)
-        : undefined,
-    ]);
+  const [activeApproach, activeStatus] = await Promise.all([
+    requestedApproach
+      ? session.db.find(approaches, requestedApproach)
+      : undefined,
+    requestedStatus
+      ? session.db.find(projectStatuses, requestedStatus)
+      : undefined,
+  ]);
 
   const options = await listProjectFilterOptions(session.db);
 
   const rows = await listProjects(session.db, {
-    entityId: activeEntity?.id,
-    jobId: activeJob?.id,
     approachId: activeApproach?.id,
     statusId: activeStatus?.id,
     search: search || undefined,
@@ -120,8 +109,6 @@ export default async function ProjectsPage({
    *  lue en base, jamais du paramètre. */
   const applied: { field: string; value: string }[] = [
     ...(search ? [{ field: "Recherche", value: `« ${search} »` }] : []),
-    ...(activeEntity ? [{ field: "Entité", value: activeEntity.label }] : []),
-    ...(activeJob ? [{ field: "Métier", value: activeJob.label }] : []),
     ...(activeApproach
       ? [{ field: "Approche", value: activeApproach.label }]
       : []),
@@ -129,10 +116,7 @@ export default async function ProjectsPage({
   ];
 
   const hasOptions =
-    options.entities.length > 0 ||
-    options.jobs.length > 0 ||
-    options.approaches.length > 0 ||
-    options.statuses.length > 0;
+    options.approaches.length > 0 || options.statuses.length > 0;
 
   return (
     <Page>
@@ -146,8 +130,6 @@ export default async function ProjectsPage({
         <ProjectFilters
           options={options}
           search={search}
-          entityId={activeEntity?.id}
-          jobId={activeJob?.id}
           approachId={activeApproach?.id}
           statusId={activeStatus?.id}
         />
@@ -190,9 +172,7 @@ export default async function ProjectsPage({
           <ListHeader>
             <span className={COLUMN.name}>Projet</span>
             <span className={COLUMN.product}>Produit</span>
-            <span className={COLUMN.entity}>Entité</span>
             <span className={COLUMN.status}>Statut</span>
-            <span className={COLUMN.jobs}>Métiers</span>
             <span className={COLUMN.team}>Équipe</span>
             <span className={COLUMN.freshness}>Dernière act.</span>
           </ListHeader>
@@ -220,26 +200,12 @@ export default async function ProjectsPage({
                 </Link>
               </span>
 
-              <span className={COLUMN.entity}>
-                <span className="sr-only">Entité : </span>
-                {row.entityLabel}
-              </span>
-
               <span className={`${COLUMN.status} flex items-center gap-2`}>
                 <StatusDot nature={row.statusNature} />
                 <span>
                   <span className="sr-only">Statut : </span>
                   {row.statusLabel}
                 </span>
-              </span>
-
-              <span className={`${COLUMN.jobs} text-content-neutral-base`}>
-                {row.jobLabels.length > 0 ? (
-                  <>
-                    <span className="sr-only">Métiers : </span>
-                    {row.jobLabels.join(" · ")}
-                  </>
-                ) : null}
               </span>
 
               <span className={COLUMN.team}>
@@ -312,15 +278,11 @@ function NewProjectLink() {
 function ProjectFilters({
   options,
   search,
-  entityId,
-  jobId,
   approachId,
   statusId,
 }: {
   options: ProjectFilterOptions;
   search: string;
-  entityId: string | undefined;
-  jobId: string | undefined;
   approachId: string | undefined;
   statusId: string | undefined;
 }) {
@@ -342,22 +304,6 @@ function ProjectFilters({
         />
       </Field>
 
-      <Select
-        id="filtre-entite"
-        label="Entité"
-        name={PARAM.entity}
-        all="Toutes"
-        options={options.entities}
-        value={entityId}
-      />
-      <Select
-        id="filtre-metier"
-        label="Métier"
-        name={PARAM.job}
-        all="Tous"
-        options={options.jobs}
-        value={jobId}
-      />
       <Select
         id="filtre-approche"
         label="Approche"

@@ -51,26 +51,21 @@ export type ProjectStatusNature = (typeof projectStatusNature.enumValues)[number
 /** Un membre d'équipe, tel qu'il s'affiche : un nom. */
 export type ProjectRowMember = { id: string; fullName: string };
 
-/** Une ligne de la liste transverse — les sept colonnes de docs/06 §4. */
+/** Une ligne de la liste transverse — ses cinq colonnes. */
 export type ProjectRow = {
   id: string;
   name: string;
   /** Le rattachement, affiché **et cliquable** : la hiérarchie reste lisible. */
   productId: string;
   productName: string;
-  entityLabel: string;
   statusLabel: string;
   statusNature: ProjectStatusNature;
-  /** Les métiers **déclarés** du projet (D44), pas ceux déduits de l'équipe. */
-  jobLabels: string[];
   team: ProjectRowMember[];
   lastActivityAt: Date | null;
 };
 
 /** Les filtres combinables de l'écran. Tous facultatifs, tous cumulatifs. */
 export type ProjectFilters = {
-  entityId?: string | undefined;
-  jobId?: string | undefined;
   approachId?: string | undefined;
   statusId?: string | undefined;
   /** Le texte saisi, déjà coupé. Vide vaut absent. */
@@ -98,22 +93,20 @@ function likePattern(search: string): string {
  * `started_on` parce qu'elle raconte une chronologie d'accompagnements ; ici on
  * cherche ce qui a bougé.
  *
- * Un projet n'a pas d'entité propre : elle vient de son produit (D-produit,
- * `docs/02` — l'entité qualifie les produits). Les projets archivés sont exclus,
- * et ceux d'un produit archivé avec eux : un accompagnement rangé n'est plus un
- * accompagnement affiché.
+ * Les projets archivés sont exclus, et ceux d'un produit archivé avec eux : un
+ * accompagnement rangé n'est plus un accompagnement affiché.
  *
- * Métiers et approches passent par `exists`. Sur un filtre à valeur unique une
- * jointure ferait le même résultat — la vérification a été faite, elle ne
- * duplique rien. `exists` est retenu parce qu'il ne touche pas à la forme du
- * jeu de résultats : le jour où le filtre acceptera plusieurs valeurs, la
- * jointure se mettrait à doubler les lignes et celui-ci non.
+ * L'approche passe par `exists`. Sur un filtre à valeur unique une jointure
+ * ferait le même résultat — la vérification a été faite, elle ne duplique rien.
+ * `exists` est retenu parce qu'il ne touche pas à la forme du jeu de résultats :
+ * le jour où le filtre acceptera plusieurs valeurs, la jointure se mettrait à
+ * doubler les lignes et celui-ci non.
  *
- * Équipe et métiers sont lus en deux requêtes supplémentaires plutôt qu'agrégés
- * en SQL : un `json_agg` ferait tenir le tout en un aller-retour, au prix d'un
- * type que rien ne vérifie à la sortie du pilote. `is_contributor` n'est pas
- * retenu — D9 sépare l'appartenance à l'équipe du droit d'écrire, et cette
- * liste affiche une équipe, pas des droits.
+ * L'équipe est lue en une requête supplémentaire plutôt qu'agrégée en SQL : un
+ * `json_agg` ferait tenir le tout en un aller-retour, au prix d'un type que rien
+ * ne vérifie à la sortie du pilote. `is_contributor` n'est pas retenu — D9 sépare
+ * l'appartenance à l'équipe du droit d'écrire, et cette liste affiche une équipe,
+ * pas des droits.
  */
 export function listProjects(
   scope: ScopedDb,
@@ -126,25 +119,7 @@ export function listProjects(
       isNull(products.archivedAt),
     ];
 
-    if (filters.entityId) conditions.push(eq(products.entityId, filters.entityId));
     if (filters.statusId) conditions.push(eq(projects.statusId, filters.statusId));
-
-    if (filters.jobId) {
-      conditions.push(
-        exists(
-          database
-            .select({ one: sql`1` })
-            .from(projectJobs)
-            .where(
-              and(
-                filter(projectJobs),
-                eq(projectJobs.projectId, projects.id),
-                eq(projectJobs.jobId, filters.jobId),
-              ),
-            ),
-        ),
-      );
-    }
 
     if (filters.approachId) {
       conditions.push(
@@ -198,7 +173,6 @@ export function listProjects(
         name: projects.name,
         productId: products.id,
         productName: products.name,
-        entityLabel: entities.label,
         statusLabel: projectStatuses.label,
         statusNature: projectStatuses.nature,
         lastActivityAt: projects.lastActivityAt,
@@ -207,10 +181,6 @@ export function listProjects(
       .innerJoin(
         products,
         and(eq(products.id, projects.productId), filter(products)),
-      )
-      .innerJoin(
-        entities,
-        and(eq(entities.id, products.entityId), filter(entities)),
       )
       .innerJoin(
         projectStatuses,
@@ -237,13 +207,6 @@ export function listProjects(
       .where(and(filter(projectMembers), inArray(projectMembers.projectId, ids)))
       .orderBy(asc(persons.fullName));
 
-    const declaredJobs = await database
-      .select({ projectId: projectJobs.projectId, label: jobs.label })
-      .from(projectJobs)
-      .innerJoin(jobs, and(eq(jobs.id, projectJobs.jobId), filter(jobs)))
-      .where(and(filter(projectJobs), inArray(projectJobs.projectId, ids)))
-      .orderBy(asc(jobs.position), asc(jobs.label));
-
     const teams = new Map<string, ProjectRowMember[]>();
     for (const member of members) {
       const team = teams.get(member.projectId) ?? [];
@@ -251,16 +214,8 @@ export function listProjects(
       teams.set(member.projectId, team);
     }
 
-    const jobLabels = new Map<string, string[]>();
-    for (const row of declaredJobs) {
-      const labels = jobLabels.get(row.projectId) ?? [];
-      labels.push(row.label);
-      jobLabels.set(row.projectId, labels);
-    }
-
     return rows.map((row) => ({
       ...row,
-      jobLabels: jobLabels.get(row.id) ?? [],
       team: teams.get(row.id) ?? [],
     }));
   });
@@ -269,10 +224,8 @@ export function listProjects(
 /** Une valeur proposée au filtrage. */
 export type FilterOption = { id: string; label: string };
 
-/** Les quatre listes de la barre de filtres. */
+/** Les deux listes de la barre de filtres. */
 export type ProjectFilterOptions = {
-  entities: FilterOption[];
-  jobs: FilterOption[];
   approaches: FilterOption[];
   statuses: FilterOption[];
 };
@@ -299,20 +252,6 @@ export function listProjectFilterOptions(
       isNull(products.archivedAt),
     );
 
-    const entityRows = await database
-      .selectDistinct({ id: entities.id, label: entities.label, position: entities.position })
-      .from(entities)
-      .innerJoin(
-        products,
-        and(eq(products.entityId, entities.id), filter(products)),
-      )
-      .innerJoin(
-        projects,
-        and(eq(projects.productId, products.id), filter(projects)),
-      )
-      .where(and(filter(entities), liveProject))
-      .orderBy(asc(entities.position), asc(entities.label));
-
     const statusRows = await database
       .selectDistinct({
         id: projectStatuses.id,
@@ -330,21 +269,6 @@ export function listProjectFilterOptions(
       )
       .where(and(filter(projectStatuses), liveProject))
       .orderBy(asc(projectStatuses.position), asc(projectStatuses.label));
-
-    const jobRows = await database
-      .selectDistinct({ id: jobs.id, label: jobs.label, position: jobs.position })
-      .from(jobs)
-      .innerJoin(projectJobs, and(eq(projectJobs.jobId, jobs.id), filter(projectJobs)))
-      .innerJoin(
-        projects,
-        and(eq(projects.id, projectJobs.projectId), filter(projects)),
-      )
-      .innerJoin(
-        products,
-        and(eq(products.id, projects.productId), filter(products)),
-      )
-      .where(and(filter(jobs), liveProject))
-      .orderBy(asc(jobs.position), asc(jobs.label));
 
     const approachRows = await database
       .selectDistinct({
@@ -372,8 +296,6 @@ export function listProjectFilterOptions(
       rows.map((row) => ({ id: row.id, label: row.label }));
 
     return {
-      entities: strip(entityRows),
-      jobs: strip(jobRows),
       approaches: strip(approachRows),
       statuses: strip(statusRows),
     };

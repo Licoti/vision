@@ -3021,3 +3021,45 @@ une personne la retire du référentiel et des choix du formulaire de projet, ma
 des accompagnements passés**, que `findProjectDetail` lit par `joinedRead` et `filter(persons)`.
 C'est la règle 4 tenue — une donnée ne disparaît pas d'un écran qui la racontait. **Propriété à
 vérifier au ticket, jamais à supposer** : elle tient à une ligne de la couche d'accès.
+
+
+**Hors ticket, 17/08/2026 — la liste transverse perd deux de ses sept colonnes, contre la lettre de
+`docs/06` §4.** Le document énumère « nom du projet, produit de rattachement, entité, statut,
+métiers, équipe, date de dernière activité. Rien d'autre », et « Filtres : entité, métier, approche,
+statut » ; `docs/05` §3 reprend la même liste sur la ligne « Vue globale des projets ». Sur demande
+du 17/08/2026, la colonne
+**Entité** et la colonne **Métiers** sont retirées, et les deux filtres avec elles : la ligne était
+trop chargée pour la comparaison ligne à ligne, qui est le but de l'écran. Restent cinq colonnes et
+trois dimensions — recherche, approche, statut. **L'écart est consigné, il ne se discute pas** ;
+`docs/` est figé et n'a pas été touché.
+
+**Hors ticket, 17/08/2026 — deux décisions frôlées, aucune rouverte.** (1) **D44** pose que les
+métiers déclarés « font foi pour le filtrage et l'affichage » : la décision garde tout son objet au
+formulaire de projet, qui les saisit toujours, et n'en a plus sur cette liste. Son périmètre se
+réduit, sa règle ne change pas. (2) **D29** écarte la page personne parce que « les filtres par
+métier et la recherche par nom sur la liste transverse » suffisent à répondre à « qui travaille sur
+quoi ». La moitié « métier » de cette justification disparaît **au moment précis où C5bis la
+remplace mieux** : T5bis.3 donne à `/equipe` son propre filtre `metier`, conjoint avec les
+compétences. La moitié « entité », elle, reste servie par `?entite=` sur `/produits`, qui la garde.
+**Vérifié avant d'écrire : aucun lien du dépôt ne construit `/projets?entite=…` ni `?metier=…`** —
+la vue d'ensemble, qui promet des chiffres cliquables, est encore un gabarit sans lien.
+
+**Hors ticket, 17/08/2026 — retirer un filtre se prouve par un paramètre survivant, jamais par un
+écran.** Un `<select>` absent du rendu ne dit rien du sort du paramètre : le code aurait pu garder
+la condition et perdre seulement son contrôle. Le seul geste qui distingue « retiré » de « caché »
+est de rejouer l'URL complète — `/projets?entite=<uuid réel>&metier=<uuid réel>` rend les **cinq**
+lignes, comme `/projets` nu, sans mention dans le résumé des filtres actifs ni lien « Retirer tous
+les filtres ». C'est la transposition au filtre de la règle éprouvée en C4bis sur le droit : **il
+s'éprouve par la requête, pas par le rendu.** Le diff avant/après du HTML servi, par `git stash`, ne
+montre que les deux `<select>` et les deux colonnes — rien d'autre n'a bougé.
+
+**Hors ticket, 17/08/2026 — deux colonnes de moins, quatre requêtes SQL de moins par affichage.**
+`listProjects` passe de trois allers-retours à deux (la requête `declaredJobs` disparaît, et la
+jointure `entities` avec elle, dont `entityLabel` était le seul lecteur) ; `listProjectFilterOptions`
+passe de quatre à deux. Le gain n'était pas le but, il est la conséquence d'être allé **jusqu'à la
+requête** plutôt que de s'arrêter au rendu : une colonne alimentée sans lecteur est exactement ce que
+T5.2 a appris à ne pas laisser derrière soi. Deux tests ont été **reportés et non supprimés** — la
+combinaison cumulative des filtres, rejouée sur `statut × approche × recherche`, et le seul test
+d'étanchéité de domaine sur un filtre, rejoué sur `approachId` : ce sont des propriétés de la
+mécanique, pas des dimensions retirées. Mise en défaut jouée deux fois : neutraliser `statusId` fait
+tomber 2 tests, neutraliser `approachId` en fait tomber 3, exactement ceux qui les portent.

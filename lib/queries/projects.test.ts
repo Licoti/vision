@@ -58,14 +58,9 @@ type Fixture = {
   domainId: string;
   scope: ScopedDb;
   entityId: string;
-  /** Une entité sans aucun produit : elle ne doit être proposée nulle part. */
-  emptyEntityId: string;
   doneStatusId: string;
   activeStatusId: string;
   researchJobId: string;
-  interfaceJobId: string;
-  /** Un métier du référentiel qu'aucun projet ne déclare. */
-  orphanJobId: string;
   approachId: string;
   orphanApproachId: string;
 };
@@ -75,10 +70,9 @@ let a: Fixture;
 let b: Fixture;
 
 /**
- * Un domaine complet : deux entités dont une vide, deux statuts, trois métiers
- * dont un orphelin, deux approches dont une orpheline, un produit vivant et un
- * produit archivé, et cinq projets — un frais, un ancien, un sans activité, un
- * archivé, un rattaché au produit archivé.
+ * Un domaine complet : une entité, deux statuts, un métier, deux approches dont
+ * une orpheline, un produit vivant et un produit archivé, et cinq projets — un
+ * frais, un ancien, un sans activité, un archivé, un rattaché au produit archivé.
  */
 async function seedDomain(label: string): Promise<Fixture> {
   const domain = await superAdmin.createDomain({
@@ -88,9 +82,6 @@ async function seedDomain(label: string): Promise<Fixture> {
   const scope = forDomain({ domainId: domain.id });
 
   const entity = await scope.insert(entities, { label: `Entité ${label}` });
-  const emptyEntity = await scope.insert(entities, {
-    label: `Entité vide ${label}`,
-  });
 
   const active = await scope.insert(projectStatuses, {
     label: "En cours",
@@ -103,17 +94,12 @@ async function seedDomain(label: string): Promise<Fixture> {
     position: "1",
   });
 
-  // `position` inversé par rapport à l'alphabet : c'est l'ordre du domaine qui
-  // doit sortir des options, pas celui du dictionnaire.
+  // Le référentiel des métiers du domaine : la liste transverse ne les affiche
+  // ni ne les filtre plus, mais le formulaire de projet les propose toujours.
   const research = await scope.insert(jobs, {
     label: `UX Research ${label}`,
     position: "2",
   });
-  const ui = await scope.insert(jobs, {
-    label: `UI Design ${label}`,
-    position: "1",
-  });
-  const orphanJob = await scope.insert(jobs, { label: `Métier orphelin ${label}` });
 
   const approach = await scope.insert(approaches, { label: `Research ${label}` });
   const orphanApproach = await scope.insert(approaches, {
@@ -195,23 +181,13 @@ async function seedDomain(label: string): Promise<Fixture> {
     isContributor: false,
   });
 
-  // Deux métiers sur le projet frais, un seul sur l'ancien : de quoi observer
-  // qu'un projet qui déclare deux métiers ne sort qu'une fois.
-  await scope.insert(projectJobs, { projectId: fresh.id, jobId: research.id });
-  await scope.insert(projectJobs, { projectId: fresh.id, jobId: ui.id });
-  await scope.insert(projectJobs, { projectId: old.id, jobId: research.id });
-
   await scope.insert(projectApproaches, {
     projectId: fresh.id,
     approachId: approach.id,
   });
 
-  // Le projet archivé déclare le métier orphelin et l'approche orpheline :
-  // ni l'un ni l'autre ne doit être proposé au filtrage.
-  await scope.insert(projectJobs, {
-    projectId: archivedProject.id,
-    jobId: orphanJob.id,
-  });
+  // Le projet archivé déclare l'approche orpheline : elle ne doit pas être
+  // proposée au filtrage.
   await scope.insert(projectApproaches, {
     projectId: archivedProject.id,
     approachId: orphanApproach.id,
@@ -221,12 +197,9 @@ async function seedDomain(label: string): Promise<Fixture> {
     domainId: domain.id,
     scope,
     entityId: entity.id,
-    emptyEntityId: emptyEntity.id,
     activeStatusId: active.id,
     doneStatusId: done.id,
     researchJobId: research.id,
-    interfaceJobId: ui.id,
-    orphanJobId: orphanJob.id,
     approachId: approach.id,
     orphanApproachId: orphanApproach.id,
   };
@@ -607,18 +580,15 @@ describe("listProjects — ordre et périmètre", () => {
     expect(names(others).some((name) => name.endsWith(" a"))).toBe(false);
   });
 
-  test("chaque ligne porte son produit, son entité, son statut et ses métiers", async () => {
+  test("chaque ligne porte son produit, son statut, son équipe et sa fraîcheur", async () => {
     // Recherche par nom et non par position : ce test ne doit rien dire du
     // tri, sans quoi une régression d'ordre en ferait tomber deux.
     const rows = await listProjects(a.scope);
     const fresh = rows.find((row) => row.name === "Frais a");
 
     expect(fresh?.productName).toBe("Produit a");
-    expect(fresh?.entityLabel).toBe("Entité a");
     expect(fresh?.statusLabel).toBe("En cours");
     expect(fresh?.statusNature).toBe("active");
-    // L'ordre des métiers suit le `position` du domaine, pas l'alphabet.
-    expect(fresh?.jobLabels).toEqual(["UI Design a", "UX Research a"]);
     expect(fresh?.team.map((member) => member.fullName)).toEqual([
       "Inès Kaddour a",
     ]);
@@ -627,12 +597,11 @@ describe("listProjects — ordre et périmètre", () => {
     );
   });
 
-  test("un projet sans équipe ni métier reste une ligne normale", async () => {
+  test("un projet sans équipe reste une ligne normale", async () => {
     const rows = await listProjects(a.scope);
     const mute = rows.find((row) => row.name === "Muet a");
 
     expect(mute?.team).toEqual([]);
-    expect(mute?.jobLabels).toEqual([]);
     expect(mute?.lastActivityAt).toBeNull();
   });
 });
@@ -642,26 +611,9 @@ describe("listProjects — ordre et périmètre", () => {
    ========================================================================== */
 
 describe("listProjects — filtres", () => {
-  test("le filtre d'entité retient les projets de ses produits", async () => {
-    const rows = await listProjects(a.scope, { entityId: a.entityId });
-    expect(rows).toHaveLength(4);
-
-    const empty = await listProjects(a.scope, { entityId: a.emptyEntityId });
-    expect(empty).toEqual([]);
-  });
-
   test("le filtre de statut retient les projets de ce statut", async () => {
     const rows = await listProjects(a.scope, { statusId: a.doneStatusId });
     expect(names(rows)).toEqual(["Ancien a"]);
-  });
-
-  test("le filtre de métier retient les projets qui le déclarent, une fois chacun", async () => {
-    // « Frais a » déclare deux métiers : il ne doit sortir qu'une ligne.
-    const research = await listProjects(a.scope, { jobId: a.researchJobId });
-    expect(names(research)).toEqual(["Frais a", "Ancien a"]);
-
-    const ui = await listProjects(a.scope, { jobId: a.interfaceJobId });
-    expect(names(ui)).toEqual(["Frais a"]);
   });
 
   test("le filtre d'approche retient le projet qui la déclare", async () => {
@@ -670,26 +622,26 @@ describe("listProjects — filtres", () => {
   });
 
   test("les filtres se combinent, chacun restreignant le précédent", async () => {
-    const research = await listProjects(a.scope, { jobId: a.researchJobId });
-    expect(research).toHaveLength(2);
+    const active = await listProjects(a.scope, { statusId: a.activeStatusId });
+    expect(active).toHaveLength(3);
 
-    const andActive = await listProjects(a.scope, {
-      jobId: a.researchJobId,
+    const andApproach = await listProjects(a.scope, {
       statusId: a.activeStatusId,
+      approachId: a.approachId,
     });
-    expect(names(andActive)).toEqual(["Frais a"]);
+    expect(names(andApproach)).toEqual(["Frais a"]);
 
     // Une troisième dimension qui ne recoupe pas : la combinaison se vide.
-    const andOther = await listProjects(a.scope, {
-      jobId: a.researchJobId,
+    const andSearch = await listProjects(a.scope, {
       statusId: a.activeStatusId,
-      approachId: a.orphanApproachId,
+      approachId: a.approachId,
+      search: "Ancien",
     });
-    expect(andOther).toEqual([]);
+    expect(andSearch).toEqual([]);
   });
 
   test("un filtre ne laisse pas passer une valeur d'un autre domaine", async () => {
-    const rows = await listProjects(a.scope, { jobId: b.researchJobId });
+    const rows = await listProjects(a.scope, { approachId: b.approachId });
     expect(rows).toEqual([]);
   });
 });
@@ -749,27 +701,19 @@ describe("listProjectFilterOptions", () => {
   test("elle ne propose que ce qui porte au moins un projet vivant", async () => {
     const options = await listProjectFilterOptions(a.scope);
 
-    expect(options.entities.map((option) => option.label)).toEqual([
-      "Entité a",
-    ]);
-    // Les statuts et métiers suivent le `position` du domaine, pas l'alphabet.
+    // Les statuts suivent le `position` du domaine, pas l'alphabet.
     expect(options.statuses.map((option) => option.label)).toEqual([
       "Terminé",
       "En cours",
-    ]);
-    expect(options.jobs.map((option) => option.label)).toEqual([
-      "UI Design a",
-      "UX Research a",
     ]);
     expect(options.approaches.map((option) => option.label)).toEqual([
       "Research a",
     ]);
   });
 
-  test("le métier et l'approche du seul projet archivé ne sont pas proposés", async () => {
+  test("l'approche du seul projet archivé n'est pas proposée", async () => {
     const options = await listProjectFilterOptions(a.scope);
 
-    expect(options.jobs.map((option) => option.id)).not.toContain(a.orphanJobId);
     expect(options.approaches.map((option) => option.id)).not.toContain(
       a.orphanApproachId,
     );
@@ -777,15 +721,10 @@ describe("listProjectFilterOptions", () => {
 
   test("aucune option ne vient d'un autre domaine", async () => {
     const options = await listProjectFilterOptions(a.scope);
-    const all = [
-      ...options.entities,
-      ...options.jobs,
-      ...options.approaches,
-      ...options.statuses,
-    ];
+    const all = [...options.approaches, ...options.statuses];
 
     expect(all.some((option) => option.label.endsWith(" b"))).toBe(false);
-    expect(all.map((option) => option.id)).not.toContain(b.entityId);
+    expect(all.map((option) => option.id)).not.toContain(b.approachId);
   });
 });
 
