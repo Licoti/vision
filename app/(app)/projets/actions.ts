@@ -89,8 +89,14 @@ type Outcome =
  * filtre d'archivage — T4bis.1.
  *
  * `keep` est nul en création : rien n'est encore lié, rien n'est toléré.
+ *
+ * `productId` a rejoint les trois listes en TD.1, pour la même raison qu'elles :
+ * un accompagnement resté sous un produit rangé — état atteignable, cf. le point
+ * ouvert d'`ETAT.md` sur le rétablissement — doit continuer de se modifier.
+ * L'exception est **nominative** : ce produit-là, et lui seul.
  */
 type ProjectLinksKeep = {
+  productId: string;
   jobIds: readonly string[];
   approachIds: readonly string[];
   personIds: readonly string[];
@@ -119,8 +125,21 @@ function toCheck(
  * Les trois listes se vérifient par `list`, qui écarte les lignes archivées :
  * **on n'accepte que des valeurs vivantes**, sauf celles que `keep` tolère
  * nommément. Le produit et le statut passent, eux, par `find`, qui rend les
- * lignes archivées — ils n'ont donc jamais eu besoin de cette exception, et
- * n'en reçoivent pas.
+ * lignes archivées — d'où le contrôle explicite ci-dessous pour le premier.
+ *
+ * **Un produit archivé n'accueille pas d'accompagnement**, et c'est ici que la
+ * règle vit — la porte que les deux actions traversent, comme `openProject`
+ * porte la lecture seule pour les cinq gestes de la page projet (T4bis.3). Le
+ * trou était ouvert depuis T4bis.2 : le formulaire ne propose plus le produit
+ * rangé et la page produit n'y mène plus, mais `find` rend les lignes archivées,
+ * si bien qu'une soumission **forgée** rattachait un accompagnement neuf à un
+ * produit qu'aucune liste n'affiche. `updateProject` portait le même trou en
+ * déplacement de rattachement (D20).
+ *
+ * Le refus est un **message de champ** et non un refus de tronc commun : le
+ * produit est un champ de ce formulaire, et emprunter le canal du « n'existe
+ * plus dans ce domaine » aurait menti — il existe, il est lisible, et sa page
+ * est servie deux clics plus loin (la leçon de T4bis.2).
  */
 async function checkReferences(
   session: Session,
@@ -135,6 +154,10 @@ async function checkReferences(
   ]);
 
   if (!product) errors.productId = "Ce produit n'existe pas dans ce domaine.";
+  else if (product.archivedAt && keep?.productId !== product.id) {
+    errors.productId =
+      "Ce produit est archivé : il n'accueille plus d'accompagnement. Rétablissez-le d'abord.";
+  }
   if (!status) errors.statusId = "Ce statut n'existe pas dans ce domaine.";
 
   const jobIds = toCheck(input.jobIds, keep?.jobIds);
@@ -327,12 +350,18 @@ async function addManualPerson(
  * `editing` porte l'identifiant du projet dont les liaisons se tolèrent
  * (T4bis.1). Il n'est fourni qu'en modification : en création, rien n'est
  * encore lié, et l'exception n'aurait rien à désigner.
+ *
+ * La ligne éditée est lue **ici, une fois**, et passée à `write` : l'exception
+ * nominative et le contrôle d'archivage du projet la veulent tous deux, et deux
+ * lectures de la même ligne dans la même soumission seraient deux occasions de
+ * divergence. `write` la reçoit donc en second argument, `null` en création.
  */
 async function submit(
   formData: FormData,
   write: (
     session: Session,
     input: ProjectInput,
+    before: Row<typeof projects> | undefined,
   ) => Promise<
     { projectId: string; productIds: string[] } | { refused: string } | null
   >,
@@ -359,13 +388,24 @@ async function submit(
      valeur archivée depuis serait refusée par `checkReferences` alors même que
      le formulaire vient de la réafficher, sélectionnée — la moitié invisible
      de T4bis.1. */
-  const keep = editing
-    ? await findProjectLinks(session.db, editing).then((links) => ({
-        jobIds: links.jobIds,
-        approachIds: links.approachIds,
-        personIds: links.members.map((member) => member.personId),
-      }))
-    : null;
+  const [before, links] = editing
+    ? await Promise.all([
+        session.db.find(projects, editing),
+        findProjectLinks(session.db, editing),
+      ])
+    : [undefined, undefined];
+
+  /* Le projet à modifier n'existe plus : `write` rendra le même `null`, et le
+     message est le sien. Rien ne se tolère au nom d'une ligne absente. */
+  const keep =
+    before && links
+      ? {
+          productId: before.productId,
+          jobIds: links.jobIds,
+          approachIds: links.approachIds,
+          personIds: links.members.map((member) => member.personId),
+        }
+      : null;
 
   const unknown = await checkReferences(session, input, keep);
   if (Object.keys(unknown).length > 0) {
@@ -373,7 +413,7 @@ async function submit(
   }
 
   try {
-    const written = await write(session, input);
+    const written = await write(session, input, before);
 
     if (written && "refused" in written) {
       return { state: { values, errors: {}, message: written.refused } };
@@ -457,11 +497,11 @@ export async function updateProject(
   _previous: ProjectFormState,
   formData: FormData,
 ): Promise<ProjectFormState> {
-  const outcome = await submit(formData, async (session, input) => {
-    // Le rattachement d'avant, lu avant l'écriture : si le projet change de
-    // produit (D20), l'ancienne page produit doit être réactualisée elle aussi,
-    // sans quoi elle continuerait d'afficher un accompagnement parti ailleurs.
-    const before = await session.db.find(projects, id);
+  const outcome = await submit(formData, async (session, input, before) => {
+    // Le rattachement d'avant est lu par `submit`, qui en a besoin pour
+    // l'exception nominative : si le projet change de produit (D20), l'ancienne
+    // page produit doit être réactualisée elle aussi, sans quoi elle
+    // continuerait d'afficher un accompagnement parti ailleurs.
     if (!before) return null;
 
     /* Un accompagnement archivé ne se modifie plus (T4bis.3, arbitrage (a)).

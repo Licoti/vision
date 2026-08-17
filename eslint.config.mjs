@@ -26,11 +26,33 @@ const dbClientLock = {
   },
 };
 
+/**
+ * Un paramètre inutilisé nommé `_…` est **imposé par une signature**, pas oublié.
+ *
+ * Les actions de confirmation reçoivent `(_previous, _formData)` parce que
+ * `useActionState` les appelle ainsi : l'action n'a rien à saisir, mais elle ne
+ * peut pas déclarer moins d'arguments que le crochet n'en passe avant celui qui
+ * l'intéresse. Quatre avertissements permanents en découlaient depuis T4bis.2 —
+ * et un avertissement permanent est un avertissement qu'on cesse de lire, donc
+ * un avertissement neuf qu'on ne verra pas. Le souligné dit l'intention ; cette
+ * règle le fait reconnaître (TD.1).
+ */
+const underscoreIsIntentional = {
+  files: ["**/*.{ts,tsx}"],
+  rules: {
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+    ],
+  },
+};
+
 const eslintConfig = [
   { ignores: [".next/**", "node_modules/**", "docs/**"] },
   ...coreWebVitals,
   ...typescript,
   dbClientLock,
+  underscoreIsIntentional,
 ];
 
 export default eslintConfig;

@@ -8,6 +8,16 @@
  * tels quels, jamais recalculés ici.
  *
  * Interdit du ticket : aucune page de connexion. Ceci n'authentifie rien.
+ *
+ * **Cinq textes ont quitté `content-neutral-light` en TD.1.** T1.6 avait mesuré
+ * ce jeton à 2,11:1 sur le fond de page — très en dessous des 4,5:1 qu'exige un
+ * texte — et l'avait laissé ici, « route de développement, à corriger si elle
+ * survit au stub ». Elle y a survécu cinq chantiers. Retenu
+ * `content-neutral-base`, **4,73:1 mesuré** sur le fond de page. La pastille
+ * « non » fait exception et prend `content-neutral-dark` : son fond n'est pas le
+ * fond de page mais un voile à 8 % — `#e5e5e6` —, où `-base` retombe à 4,02:1 et
+ * `-dark` donne **6,56:1**, symétrique du 6,87:1 de la pastille « oui ».
+ * C'est la position qui décide du jeton, jamais la provenance (leçon de T5.4).
  */
 
 import { asc, inArray } from "drizzle-orm";
@@ -59,7 +69,7 @@ export default async function DevSessionPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-180 flex-col gap-8 px-10 py-18">
       <header className="flex flex-col gap-2">
-        <p className="text-xs font-semibold text-content-neutral-light uppercase">
+        <p className="text-xs font-semibold text-content-neutral-base uppercase">
           Développement
         </p>
         <h1 className="text-3xl font-bold text-content-neutral-darkest">
@@ -114,7 +124,7 @@ export default async function DevSessionPage() {
               <Field label="Personne">
                 {session.person.fullName}
                 {session.person.email ? (
-                  <span className="text-content-neutral-light">
+                  <span className="text-content-neutral-base">
                     {" "}
                     · {session.person.email}
                   </span>
@@ -122,7 +132,7 @@ export default async function DevSessionPage() {
               </Field>
               <Field label="Domaine">
                 {session.domain.name}
-                <span className="text-content-neutral-light">
+                <span className="text-content-neutral-base">
                   {" "}
                   · centre {session.domain.competenceCenterName}
                 </span>
@@ -203,14 +213,14 @@ function Right({
         className={
           granted
             ? "rounded-full bg-surface-success-lightest px-3 py-1 text-xs font-semibold text-content-success-dark"
-            : "rounded-full bg-surface-neutral-opacity-faded px-3 py-1 text-xs font-semibold text-content-neutral-light"
+            : "rounded-full bg-surface-neutral-opacity-faded px-3 py-1 text-xs font-semibold text-content-neutral-dark"
         }
       >
         {granted ? "oui" : "non"}
       </span>
       <span
         className={
-          granted ? "text-content-neutral-darkest" : "text-content-neutral-light"
+          granted ? "text-content-neutral-darkest" : "text-content-neutral-base"
         }
       >
         {children}

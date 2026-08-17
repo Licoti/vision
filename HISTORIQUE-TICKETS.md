@@ -1617,11 +1617,147 @@ T5.3, sous une autre forme et pour un autre tri : troisième dette de recopie du
 
 ---
 
+### TD.1 — le socle des panneaux, et quatre correctifs de dette — 17/08/2026
+
+**Pourquoi un ticket hors chantier.** C5 est clos, C6 n'est pas découpé : c'est la seule fenêtre où
+un ticket peut ouvrir ensemble des fichiers que les fiches de chantier interdisaient de toucher.
+`JOURNAL-TECHNIQUE.md` portait la même phrase quatre fois, de T4.2 à T5.6 — « le ticket qui pourra
+ouvrir les fichiers concernés ensemble extrait, ou la dette cesse d'être bornée par la phrase qui la
+reporte » —, et T5.4 était allé plus loin : « la dette n'est plus bornée par une phrase, et il faut
+le dire ainsi ». Elle ne l'était plus. Périmètre arrêté avec l'humain avant écriture.
+
+**Ce que le ticket livre.** Trois fichiers de socle, et huit fichiers qui cessent de se répéter.
+`components/ui/form-field.tsx` remplace **huit copies** du même composant de champ — six
+`PanelField` et deux `FormField` — et porte aussi `CONTROL`, `CONTROL_TEXT`, `borderOf` et
+`FormAlert`, tous à huit exemplaires. `components/ui/panel.tsx` remplace **six coquilles** de
+panneau, vérifiées identiques ligne à ligne : `FocusTrap`, voile, `role="dialog"`, en-tête, croix
+`autoFocus`, bandeau `role="alert"`, `<form>` enveloppant, pied à deux gestes.
+`components/ui/action-link.ts` remplace **quatre** `ACTION_LINK`. Bilan : **−2 181 / +1 205** lignes
+sur les fichiers suivis, 332 dans les trois fichiers neufs, soit **−644 lignes nettes**.
+
+**Le critère central était que rien ne change, et il a été lu.** Les 26 écrans et rendus de panneaux
+ont été capturés servis avant modification, puis rejoués : les 12 rendus de panneaux dans leurs deux
+modes, les deux panneaux de confirmation, les deux formulaires pleine page, les listes, la page
+produit avec sa frise et son bloc d'indicateurs, la page projet, `/dev/session`. **Différences, à
+données constantes : 18 espaces finaux dans un attribut `class`, et les 2 jetons de couleur de
+`/dev/session`.** Rien d'autre. Les 18 viennent d'`activity-panel.tsx` et de `project-form.tsx`, les
+deux seuls à interpoler `${className ?? ""}` : leurs champs sans `className` servaient
+`class="flex flex-col gap-1.5 "`.
+
+**Une donnée concurrente a d'abord faussé l'instrument, et c'est une leçon.** La comparaison finale
+montrait un diff volumineux sur six écrans. Vérification faite en base : un indicateur « test » et
+son relevé de 30 % avaient été créés **quatre minutes plus tôt**, depuis le navigateur, par la
+personne courante — activité humaine concurrente dans la base de développement. Le diff a été refait
+à données constantes, par `git stash` du travail, capture, `git stash pop`. **À retenir : une
+comparaison avant/après sur une base partagée n'est un instrument que si les données n'ont pas bougé
+entre les deux mesures ; sinon elle mesure la base, pas le code.**
+
+**Correctif 1 — un produit archivé n'accueille plus d'accompagnement.** Trou ouvert par T4bis.2,
+reporté par T4bis.3 dont la fiche portait l'interdit, destination écrite dans `ETAT.md` : « le
+prochain ticket qui ouvre `app/(app)/projets/actions.ts` sans que sa fiche l'en empêche ». La règle
+est posée dans `checkReferences`, **la porte que les deux actions traversent**, ce qui referme du
+même geste le trou jumeau que le journal ne consignait pas : `updateProject` déplaçant un
+accompagnement **vers** un produit rangé. L'exception est **nominative**, sur le modèle exact de
+T4bis.1 — le produit que l'accompagnement porte déjà est toléré, sans quoi un accompagnement resté
+sous un produit rangé deviendrait immodifiable. `submit` lit la ligne éditée **une fois** et la passe
+à `write` : `updateProject` cesse de la relire.
+
+**Le droit a été éprouvé par l'action, en six temps.** (1) Charge de `createProject` récoltée sur
+`/projets/nouveau` servie, `$ACTION_REF_1` **sans `value`** compris. (2) **Témoin** : la même charge
+sur un produit vivant écrit — 6 puis 7 projets. (3) Même charge, produit archivé substitué : refus
+**nommé** lu dans le flux, base à 7. (4) `updateProject` : renommage sans changer de produit accepté,
+déplacement vers le produit archivé refusé, et le nom resté celui du renommage — l'écriture entière
+bloquée, pas à moitié. (5) **Exception nominative** : l'accompagnement déjà sous le produit rangé se
+renomme toujours. (6) Règle neutralisée, **même charge** : acceptée, 8 projets, un accompagnement
+invisible partout — exactement le défaut que T4bis.2 décrivait. Rétablie : refusée de nouveau.
+
+**Un troisième visage du même piège de harnais.** T4.4 puis T5.3 avaient payé le `$ACTION_REF_<n>`
+sans `value` — charge incomplète, 500, base intacte. Ici le harnais postait en
+`application/x-www-form-urlencoded` là où React rend `encType="multipart/form-data"` : Next ne
+reconnaît pas l'invocation, **ré-rend la page nue et répond 200 sans le moindre message**. Trois
+formes, une seule conclusion : la base est intacte dans les trois cas, et dans les trois cas ce n'est
+pas un refus. **C'est l'étape témoin qui les distingue, et rien d'autre** — sans elle, ce ticket
+aurait conclu que la règle tenait alors que l'action ne s'exécutait pas.
+
+**Correctif 2 — le niveau de titre d'`EmptyState`.** Défaut relevé en T2.4, présent depuis T2.2 :
+le composant rendait un `h2`, `SectionHeader` aussi, et deux appels imbriquaient donc un `h2` sous un
+`h2`. `level?: 2 | 3` à 2 par défaut ; les sept appels de premier niveau ne changent pas d'un
+caractère, les deux imbriqués passent `level={3}`. Lu dans le HTML servi sur les deux : « Roadmap des
+activités » `h2` → « Aucune activité pour l'instant » `h3`, et « Accompagnements » `h2` → « Aucun
+accompagnement pour l'instant » `h3`. Mis en défaut : `level` neutralisé, les deux `h3` redeviennent
+`h2`. **Les trois blocs qui avaient contourné le composant par un `<p>` — `resources.tsx`,
+`indicators.tsx`, `timeline.tsx` — n'y sont pas ramenés** : leur raison de fond n'était pas le `h2`
+mais le cadre tireté à `px-8 py-11` dans une demi-largeur de grille, et pour `timeline.tsx` **deux
+phrases distinctes** là où `EmptyState` n'a qu'un `description`. Leurs commentaires sont récrits,
+puisqu'ils invoquaient un doublon qui n'existe plus.
+
+**Correctif 3 — le contraste de `/dev/session`.** T1.6 avait mesuré `content-neutral-light` à
+2,11:1 et l'avait laissé là, « à corriger si elle survit au stub » ; elle y a survécu cinq chantiers.
+Cinq textes, non trois : le surtitre, deux mentions secondaires, le libellé d'un droit refusé, et la
+pastille « non ». Mesures refaites avant d'être crues — 2,11:1 confirmé, `content-neutral-base` à
+**4,73:1**. **La pastille fait exception** : son fond est un voile de 8 % (`#e5e5e6`), pas le fond de
+page, où `-base` retombe à 4,02:1 ; retenu `content-neutral-dark`, **6,56:1**, symétrique du 6,87:1
+de la pastille « oui ». Deux des cinq se lisent sous une responsable de domaine, les trois autres
+sous un cookie de simple membre — relu ainsi, zéro `content-neutral-light` subsiste. Le cinquième,
+le courriel, ne se rend nulle part : la fixture n'en porte aucun (T1.5).
+
+**Correctif 4 — les petites recopies, et les avertissements.** La table `nature → couleur` de T5.5
+est **co-localisée** : `status-dot.tsx` exporte `BAND_FILL` en `fill-*` à côté de son `DOT` en
+`bg-*`. Deux littéraux subsistent — Tailwind ne voit que les classes écrites en toutes lettres —,
+mais ils sont voisins, et une couleur ne peut plus bouger d'un côté seul sans que ça se voie.
+`groupByIndicator` quitte `indicators.tsx` pour `lib/queries/indicators.ts`, où `curvesOf` le
+consomme et **inverse une copie** au lieu de refiltrer la liste entière par indicateur.
+`/produits/nouveau` passe par `listProductFormOptions`, refermant la dette de T4bis.1. Et
+`eslint.config.mjs` reconnaît le souligné comme intentionnel : les quatre avertissements de
+`useActionState` disparaissent — un avertissement permanent est un avertissement neuf qu'on ne verra
+pas.
+
+**La règle eslint s'est payée dans la minute.** Elle a débusqué un import mort — `ProjectStatusNature`
+dans `timeline.tsx`, devenu inutile avec `BAND_FILL` — que `tsc` laissait passer, `noUnusedLocals`
+étant désactivé. C'est le premier avertissement neuf qu'un journal saturé aurait masqué.
+
+**Le regroupement a reçu ses tests, contre le plan.** Le plan annonçait de mettre `groupByIndicator`
+en défaut ; il n'avait **aucun test** — il vivait dans un composant, où `vitest` ne va pas. Quatre
+tests écrits : l'accumulation, la conservation de l'ordre, la table vide, et l'identité distincte des
+séries — ce dernier justifiant la copie qu'inverse `curvesOf`. Deux mises en défaut jouées :
+l'accumulation écrasée, puis l'ordre inversé ; deux tests tombent à chaque fois, exactement ceux qui
+portent la règle. **568 tests verts sur 17 fichiers**, contre 564 avant.
+
+**Ce que le ticket laisse derrière lui.** La règle du correctif 1 n'est couverte par **aucun test** :
+elle vit dans `app/`, que `vitest` ne couvre pas, et seule la discipline de re-soumission l'éprouve —
+la dette de banc d'essai pour les actions serveur, inscrite en T4bis.3, n'est ni élargie ni refermée.
+Les sondes du ticket — deux produits, deux accompagnements, cinq lignes écrites par le harnais — sont
+**archivées, jamais supprimées** : le typage de `unlink` refuse une table qui porte `archived_at`,
+et c'est la règle 4 tenue par le compilateur.
+
+---
+
 ## Points ouverts refermés
 
 *(archivés depuis `ETAT.md` le 14/08/2026 — ils étaient barrés dans la section « Points ouverts »,
 où ils occupaient encore la place. Conservés tels quels : un point refermé documente comment il
 l%s été.)*
+
+- ~~**`createProject` accepte encore un produit archivé.**~~ **Refermé le 17/08/2026 par TD.1**, à
+  qui `ETAT.md` l'assignait — « le prochain ticket qui ouvre `app/(app)/projets/actions.ts` sans que
+  sa fiche l'en empêche ; C7 au plus tard ». Le point avait traversé T4bis.2, qui l'avait ouvert, et
+  T4bis.3, dont la fiche portait l'interdit de le refermer. Ce que le ticket a trouvé en le
+  refermant : **le trou avait un jumeau** que le journal ne consignait pas — `updateProject`
+  déplaçant un accompagnement **vers** un produit rangé, aussi invisible et par le même chemin. Les
+  deux tombent ensemble parce que la règle est posée dans `checkReferences`, la porte que les deux
+  actions traversent, et non dans chacune d'elles. **Et il fallait une exception** : l'accompagnement
+  déjà sous un produit rangé — état que le point ouvert sur le rétablissement décrit — deviendrait
+  sinon immodifiable ; elle est nominative, sur le modèle de T4bis.1. Éprouvé par l'action en six
+  temps, dont l'étape témoin et la neutralisation de la règle sous la même charge. Reste dû : la règle
+  n'est couverte par aucun test, `vitest` ne couvrant pas `app/`.
+
+- ~~**La lecture des entités est dupliquée entre deux écrans.**~~ **Refermé le 17/08/2026 par TD.1.**
+  T4bis.1 avait posé `listProductFormOptions` pour `/produits/[id]/modifier` et laissé
+  `/produits/nouveau` avec son `list(entities, …)` en ligne — la fiche disant que le formulaire de
+  création « ne change pas d'un caractère », et la page n'étant pas à son périmètre. Les deux tris
+  avaient été alignés à la main sur `asc(entities.label)` « pour que la duplication ne devienne pas
+  une divergence » ; ils n'ont plus à l'être. L'écran de création n'a pas d'exception nominative à
+  demander : rien n'y est encore rattaché, donc aucune entité archivée n'a à être tolérée.
 
 - ~~**Le refus (e) d'`archiveProduct` reste au pluriel dans sa dernière phrase.**~~ **Refermé le
   16/08/2026 par T5.4**, à qui `ETAT.md` l'avait assigné. Le point posait une tension que le ticket a
@@ -1759,6 +1895,14 @@ l%s été.)*
 
 *(ces deux entrées n'étaient plus des points ouverts mais des règles permanentes. `ETAT.md` en garde
 une forme courte ; le raisonnement complet est ici.)*
+
+- **C4bis a été intercalé sans décaler les autres chantiers**, et C5 est clos depuis le 17/08/2026.
+  C5, C6 et C7 gardent le sens que `docs/05` leur donne, « C7 » étant écrit dans D25, D28 et D37 que
+  la règle 6 interdit de rouvrir. C5 : six tickets, sept arbitrages rendus avant écriture, dans
+  `tickets-C5.md` ; sa leçon reprise de C4bis — **chaque objet arrive avec ses trois gestes, créer,
+  corriger, ranger, dans le ticket qui l'introduit** — a tenu sur ses six fiches. *(Versé depuis
+  `ETAT.md` le 17/08/2026 par TD.1, au titre du seuil de 250 lignes : deux notes de chantier devenues
+  des faits datés.)*
 
 - **Le panneau de saisie n'est plus un composant serveur.** T3.2 en faisait une propriété — « rien
   ici n'a d'état, et c'est tout le propos ». T3.3 l'a retournée : faire revenir une saisie refusée

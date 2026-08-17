@@ -28,9 +28,12 @@
  * que le design system ne nomme pas (règle 2), et la fiche de T4.1 l'écarte.
  *
  * L'état vide est un paragraphe et non un `EmptyState` : le bloc occupe une
- * demi-largeur de la grille, et `EmptyState` porte un `h2` qui ferait doublon
- * sous celui de la section. Il dit ce que le bloc contiendra — un projet sans
- * ressource est un projet normal, pas une page incomplète (`docs/06` §5).
+ * **demi-largeur de la grille**, où le cadre tireté d'`EmptyState` et son
+ * `px-8 py-11` ne tiennent pas. Le motif d'origine était aussi son `h2`, qui
+ * faisait doublon sous celui de la section ; ce n'en est plus un — `EmptyState`
+ * prend un `level` depuis TD.1 —, et le premier motif suffit. Il dit ce que le
+ * bloc contiendra : un projet sans ressource est un projet normal, pas une page
+ * incomplète (`docs/06` §5).
  *
  * Le composant ne lit aucune base : `resources` est ce que
  * `listProjectResources` a déjà lu, filtré et trié.
@@ -38,23 +41,11 @@
 
 import Link from "next/link";
 
+import { ACTION_LINK } from "@/components/ui/action-link";
 import { ExternalLink } from "@/components/ui/external-link";
 import { Section, SectionHeader } from "@/components/ui/section";
 import { formatResourceType } from "@/lib/format";
 import type { ProjectResource } from "@/lib/queries/resources";
-
-/**
- * Les classes d'un geste texte — la constante `ACTION_LINK` de `roadmap.tsx`,
- * **redite** plutôt qu'importée : ce module ne l'exporte pas, et il n'appartient
- * pas au périmètre de ce ticket. Deux fois trois jetons valent mieux qu'un
- * couplage entre deux composants pour si peu ; la dette est consignée au
- * journal, et l'extraction appartient au ticket qui pourra toucher les deux.
- *
- * `content-primary-dark` sur `surface-neutral-pale` n'est **pas un couple neuf
- * par la position** : c'est déjà celui de « Relier une ressource » en tête de ce
- * même bloc.
- */
-const ACTION_LINK = "text-xs font-semibold text-content-primary-dark underline";
 
 export function Resources({
   resources,

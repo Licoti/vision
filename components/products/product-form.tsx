@@ -23,7 +23,14 @@
  */
 
 import Link from "next/link";
-import { useActionState, useId, type ReactNode } from "react";
+import { useActionState, useId } from "react";
+
+import {
+  borderOf,
+  CONTROL_TEXT,
+  FormAlert,
+  FormField,
+} from "@/components/ui/form-field";
 
 import {
   EMPTY_PRODUCT_VALUES,
@@ -40,9 +47,6 @@ const KIND_HINT: Record<keyof typeof PRODUCT_KIND_LABEL, string> = {
   product: "Un objet durable de l'entreprise, accompagné dans le temps.",
   internal: "Une mission transverse, qui ne porte pas sur un produit précis.",
 };
-
-const CONTROL =
-  "w-full rounded-lg border bg-surface-neutral-pale px-3 py-2 text-sm text-content-neutral-darkest placeholder:text-content-neutral-base";
 
 export function ProductForm({
   action,
@@ -74,28 +78,10 @@ export function ProductForm({
      valeurs d'origine au premier rendu. */
   const values = state.values;
   const errors = state.errors;
-  const failed = Object.keys(errors).length > 0 || Boolean(state.message);
 
   return (
     <form action={submit} className="flex max-w-160 flex-col gap-6" noValidate>
-      {/* Une soumission refusée doit s'entendre, et pas seulement se voir. */}
-      {failed ? (
-        <div
-          role="alert"
-          className="flex flex-col gap-2 rounded-lg border border-content-danger-base bg-surface-danger-lightest px-4 py-3 text-sm text-content-danger-dark"
-        >
-          <p className="font-semibold">
-            {state.message ?? "La saisie n'a pas pu être enregistrée."}
-          </p>
-          {Object.keys(errors).length > 0 ? (
-            <ul className="flex list-disc flex-col gap-1 pl-5">
-              {Object.entries(errors).map(([field, message]) => (
-                <li key={field}>{message}</li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      ) : null}
+      <FormAlert message={state.message} errors={errors} />
 
       <FormField
         label="Nom du produit"
@@ -111,7 +97,7 @@ export function ProductForm({
           autoComplete="off"
           aria-invalid={errors.name ? true : undefined}
           aria-describedby={errors.name ? errorId("name") : undefined}
-          className={`${CONTROL} ${borderOf(errors.name)}`}
+          className={`${CONTROL_TEXT} ${borderOf(errors.name)}`}
         />
       </FormField>
 
@@ -128,7 +114,7 @@ export function ProductForm({
           defaultValue={values.entityId}
           aria-invalid={errors.entityId ? true : undefined}
           aria-describedby={errors.entityId ? errorId("entityId") : undefined}
-          className={`${CONTROL} ${borderOf(errors.entityId)}`}
+          className={`${CONTROL_TEXT} ${borderOf(errors.entityId)}`}
         >
           <option value="">Choisir une entité</option>
           {entities.map((entity) => (
@@ -183,7 +169,7 @@ export function ProductForm({
           name="description"
           rows={3}
           defaultValue={values.description}
-          className={`${CONTROL} ${borderOf(errors.description)}`}
+          className={`${CONTROL_TEXT} ${borderOf(errors.description)}`}
         />
       </FormField>
 
@@ -203,60 +189,5 @@ export function ProductForm({
         </Link>
       </div>
     </form>
-  );
-}
-
-/**
- * Le filet du champ : rouge en erreur, gris sinon.
- *
- * Le design system n'a pas de jeton `border-danger-*` — comme il n'a pas de
- * jeton de bordure de contrôle, point ouvert depuis T2.3. Un jeton de contenu
- * est donc employé comme bordure, ici comme là-bas : `content-danger-base`,
- * mesuré à 5,19:1 sur le fond du champ. **Le message d'erreur ne dépend jamais
- * de cette couleur** — il est écrit sous le champ, et repris dans le bandeau.
- */
-function borderOf(error: string | undefined): string {
-  return error ? "border-content-danger-base" : "border-content-neutral-normal";
-}
-
-/**
- * Un champ, son intitulé, sa note et son message.
- *
- * L'intitulé est un `<label for>` — jamais un `placeholder` en guise de nom :
- * il disparaîtrait à la première frappe, et l'assistance ne le lit pas.
- */
-function FormField({
-  label,
-  htmlFor,
-  note,
-  error,
-  errorId,
-  children,
-}: {
-  label: string;
-  htmlFor: string;
-  note?: string;
-  error?: string | undefined;
-  errorId: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label
-        htmlFor={htmlFor}
-        className="text-2xs font-semibold text-content-neutral-dark uppercase"
-      >
-        {label}
-      </label>
-      {note ? (
-        <p className="text-xs text-content-neutral-base">{note}</p>
-      ) : null}
-      {children}
-      {error ? (
-        <p id={errorId} className="text-xs font-semibold text-content-danger-dark">
-          {error}
-        </p>
-      ) : null}
-    </div>
   );
 }

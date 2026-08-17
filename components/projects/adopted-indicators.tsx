@@ -31,8 +31,10 @@
  * **Aucune création d'indicateur ici** (arbitrage (c) de `tickets-C5.md`) : un
  * indicateur appartient au produit, il se crée sur sa page, et le bloc y renvoie
  * — dans son état vide comme sous son panneau. Un quatrième formulaire aurait
- * recopié des choix de design system que cinq copies de `PanelField` portent
- * déjà.
+ * été un écran de plus pour une donnée qui n'est pas la sienne ; le motif
+ * d'origine — il aurait recopié les choix de design system que cinq copies de
+ * `PanelField` portaient déjà — a cessé de valoir avec TD.1, qui les a réunis
+ * dans `components/ui/form-field.tsx`. L'arbitrage tient sur sa vraie raison.
  *
  * Le composant ne lit aucune base : `adoptions` est ce que
  * `listProjectAdoptions` a déjà lu, filtré et trié.
@@ -40,23 +42,11 @@
 
 import Link from "next/link";
 
+import { ACTION_LINK } from "@/components/ui/action-link";
 import { Field } from "@/components/ui/field";
 import { Section, SectionHeader } from "@/components/ui/section";
 import { formatDateMonth, formatResultValue } from "@/lib/format";
 import type { ProjectAdoption } from "@/lib/queries/indicators";
-
-/**
- * Les classes d'un geste texte — la constante `ACTION_LINK` de `roadmap.tsx`,
- * **redite** pour la troisième fois après `resources.tsx` et `indicators.tsx` :
- * aucun de ces modules ne l'exporte, et aucun n'appartient au périmètre de ce
- * ticket. La dette est consignée au journal ; à quatre copies, elle mérite
- * `components/ui/`.
- *
- * `content-primary-dark` sur `surface-neutral-pale` n'est **pas un couple neuf
- * par la position** : c'est déjà celui des gestes de « Ressources », dans la
- * case voisine de la même grille, mesuré à 15,72:1.
- */
-const ACTION_LINK = "text-xs font-semibold text-content-primary-dark underline";
 
 export function AdoptedIndicators({
   adoptions,

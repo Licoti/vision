@@ -60,15 +60,16 @@
 import Link from "next/link";
 
 import { Section, SectionHeader } from "@/components/ui/section";
+import { BAND_FILL } from "@/components/ui/status-dot";
 import { formatDateMonth, formatDay, formatPeriod, formatResultValue } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
-import type {
-  IndicatorTarget,
-  ProductIndicator,
-  ProductReading,
+import {
+  groupByIndicator,
+  type IndicatorTarget,
+  type ProductIndicator,
+  type ProductReading,
 } from "@/lib/queries/indicators";
 import type { ProductProject } from "@/lib/queries/products";
-import type { ProjectStatusNature } from "@/lib/queries/projects";
 import {
   monthBand,
   monthMark,
@@ -136,25 +137,6 @@ const GEOMETRY = {
   targetDash: "5 4",
   targetLabelOffset: 5,
 } as const;
-
-/**
- * Le remplissage d'une bande, **par la nature du statut** et jamais par son
- * libellé : un domaine renomme « En cours », il ne renomme pas `active`.
- *
- * La table est celle de `StatusDot`, **redite** en `fill-*` plutôt qu'importée :
- * `components/ui/status-dot.tsx` porte des classes `bg-*`, ne les exporte pas, et
- * n'appartient pas au périmètre de ce ticket. La dette est consignée au journal,
- * comme celle d'`ACTION_LINK` en T5.1.
- *
- * Le `Record` est **exhaustif à la compilation** : le jour où l'énuméré
- * s'allonge, ce fichier ne compile plus tant qu'on ne l'a pas complété.
- */
-const BAND_FILL: Record<ProjectStatusNature, string> = {
-  framing: "fill-surface-info-base",
-  active: "fill-surface-primary-base",
-  paused: "fill-surface-neutral-base",
-  done: "fill-surface-success-base",
-};
 
 /**
  * Ce que la frise montre, dit d'une phrase entière.
@@ -248,10 +230,17 @@ function curvesOf(
 ): Curve[] {
   const curves: Curve[] = [];
 
+  /* Une passe pour tous les indicateurs, plutôt qu'un `filter` par indicateur :
+     `groupByIndicator` vit dans `lib/queries/indicators.ts` depuis TD.1, à côté
+     de la lecture qui produit ces relevés, et `indicators.tsx` s'en sert aussi. */
+  const grouped = groupByIndicator(readings);
+
   for (const indicator of indicators) {
-    const series = readings
-      .filter((reading) => reading.indicatorId === indicator.id)
-      .reverse();
+    /* La série se lit du plus ancien au plus récent, là où le bloc la lit dans
+       l'autre sens. **Une copie est inversée**, jamais le tableau du groupement :
+       il est partagé, et le retourner sur place ferait dépendre l'ordre d'un
+       autre composant de l'ordre de rendu. */
+    const series = [...(grouped.get(indicator.id) ?? [])].reverse();
     if (series.length === 0) continue;
 
     /* Les cibles de **cet** indicateur, et elles seules : une cible dont
@@ -425,11 +414,12 @@ export function Timeline({
           title="Frise du temps long"
           note="Les accompagnements, les activités porteuses d'un résultat et les relevés d'indicateurs, sur un axe commun."
         />
-        {/* Un paragraphe et non un `EmptyState`, qui porterait un `h2` en
-            doublon sous celui de la section — la règle de `Resources` et de
-            `Indicators`. Deux phrases distinctes : n'avoir aucun accompagnement
-            et n'en avoir aucun de daté ne sont pas la même chose, et l'écran ne
-            les confond pas. */}
+        {/* Un paragraphe et non un `EmptyState` — la règle de `Resources` et
+            de `Indicators`. La raison qui reste après TD.1, qui a donné un
+            `level` à `EmptyState` : **deux phrases distinctes**, là où
+            `EmptyState` n'a qu'un `description`. N'avoir aucun accompagnement et
+            n'en avoir aucun de daté ne sont pas la même chose, et l'écran ne les
+            confond pas. */}
         <p className="text-sm leading-175 text-content-neutral-base">
           {projects.length === 0
             ? "La frise s'affichera ici dès qu'un accompagnement sera daté ou qu'un indicateur portera un relevé : les périodes en bandes, les activités porteuses d'un résultat en repères, les relevés en courbes, sur un axe commun."

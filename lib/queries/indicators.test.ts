@@ -31,12 +31,14 @@ import {
 } from "@/lib/db/schema";
 
 import {
+  groupByIndicator,
   listAdoptableIndicators,
   listProductIndicators,
   listProductReadings,
   listProductTargets,
   listProjectAdoptions,
   type ProductIndicator,
+  type ProductReading,
 } from "./indicators";
 
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
@@ -1033,5 +1035,70 @@ describe("listProductTargets", () => {
     });
 
     expect(await listProductTargets(a.scope, b.fullId)).toEqual([]);
+  });
+});
+
+/* ==========================================================================
+   Le regroupement d'une série — TD.1
+
+   Fonction pure, et c'est ce qui la rend testable : elle vivait dans
+   `indicators.tsx`, où `vitest` ne va pas, et `timeline.tsx` en refaisait une
+   variante. Deux copies sans test valent moins qu'une avec.
+
+   Aucune base ici : le regroupement ne lit rien, il range ce qu'une lecture a
+   déjà trié.
+   ========================================================================== */
+
+describe("groupByIndicator", () => {
+  /** Un relevé réduit à ce que le regroupement regarde. */
+  const reading = (id: string, indicatorId: string): ProductReading =>
+    ({ id, indicatorId }) as ProductReading;
+
+  test("une série par indicateur, dans l'ordre reçu", () => {
+    const grouped = groupByIndicator([
+      reading("r1", "i1"),
+      reading("r2", "i2"),
+      reading("r3", "i1"),
+      reading("r4", "i1"),
+    ]);
+
+    expect([...grouped.keys()]).toEqual(["i1", "i2"]);
+    expect(grouped.get("i1")?.map((r) => r.id)).toEqual(["r1", "r3", "r4"]);
+    expect(grouped.get("i2")?.map((r) => r.id)).toEqual(["r2"]);
+  });
+
+  test("l'ordre reçu est conservé, jamais rejoué", () => {
+    /* La règle de T5.1 : une lecture trie, un composant affiche. Si le
+       regroupement retriait quoi que ce soit, le bloc et la frise liraient deux
+       chronologies différentes de la même colonne. Les relevés arrivent ici du
+       plus récent au plus ancien, et repartent dans cet ordre. */
+    const grouped = groupByIndicator([
+      reading("juin", "i1"),
+      reading("mai", "i1"),
+      reading("avril", "i1"),
+    ]);
+
+    expect(grouped.get("i1")?.map((r) => r.id)).toEqual([
+      "juin",
+      "mai",
+      "avril",
+    ]);
+  });
+
+  test("aucun relevé rend une table vide, pas une entrée vide", () => {
+    expect(groupByIndicator([]).size).toBe(0);
+  });
+
+  test("chaque série est un tableau distinct", () => {
+    /* `curvesOf` inverse une **copie** de la série, précisément parce que ce
+       tableau est partagé. Le vérifier ici, c'est vérifier que la copie a une
+       raison d'être : deux indicateurs ne doivent jamais partager la même
+       instance. */
+    const grouped = groupByIndicator([
+      reading("r1", "i1"),
+      reading("r2", "i2"),
+    ]);
+
+    expect(grouped.get("i1")).not.toBe(grouped.get("i2"));
   });
 });

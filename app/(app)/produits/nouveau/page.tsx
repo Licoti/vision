@@ -9,11 +9,20 @@
  *
  * Le formulaire est complet, comme le veut `docs/06` §9 pour une création.
  *
- * Aucune requête directe : les entités passent par `session.db`, déjà scopé
- * sur le domaine courant, et qui écarte seul les entités archivées. Règle 1.
+ * Aucune requête directe : les entités passent par `listProductFormOptions`,
+ * qui les lit à travers la couche scopée sur le domaine courant, et qui écarte
+ * seule les entités archivées. Règle 1.
+ *
+ * **La lecture est partagée avec `/produits/[id]/modifier` depuis TD.1.** T4bis.1
+ * avait posé `listProductFormOptions` pour l'écran de modification et laissé
+ * celui-ci avec son `list(entities, …)` en ligne — sa fiche disant que le
+ * formulaire de création « ne change pas d'un caractère », et la page n'étant pas
+ * à son périmètre. Les deux tris étaient alignés à la main sur `entities.label`
+ * pour que la duplication ne devienne pas une divergence ; ils n'ont plus à
+ * l'être. Cet écran n'a pas d'exception nominative à demander : rien n'est encore
+ * rattaché, donc aucune entité archivée n'a à être tolérée.
  */
 
-import { asc } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -22,8 +31,8 @@ import { ProductForm } from "@/components/products/product-form";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Page, PageHeader } from "@/components/ui/page";
 import { requireSession } from "@/lib/auth/provider";
-import { entities } from "@/lib/db/schema";
 import { ROUTES } from "@/lib/navigation";
+import { listProductFormOptions } from "@/lib/queries/products";
 
 import { createProduct } from "../actions";
 
@@ -35,9 +44,7 @@ export default async function NewProductPage() {
   const session = await requireSession();
   if (!session.can.manageDomain) notFound();
 
-  const options = await session.db.list(entities, {
-    orderBy: [asc(entities.label)],
-  });
+  const { entities: options } = await listProductFormOptions(session.db);
 
   return (
     <>
@@ -56,10 +63,7 @@ export default async function NewProductPage() {
         {options.length > 0 ? (
           <ProductForm
             action={createProduct}
-            entities={options.map((entity) => ({
-              id: entity.id,
-              label: entity.label,
-            }))}
+            entities={options}
             submitLabel="Créer le produit"
             cancelHref={ROUTES.products}
           />

@@ -61,10 +61,14 @@
  * d'un filet, deux jetons du thème.
  */
 
-import Link from "next/link";
-import { useActionState, type ReactNode } from "react";
+import { useActionState } from "react";
 
-import { FocusTrap } from "@/components/ui/focus-trap";
+import {
+  borderOf,
+  CONTROL,
+  FormField,
+} from "@/components/ui/form-field";
+import { Panel } from "@/components/ui/panel";
 import {
   EMPTY_ACTIVITY_VALUES,
   type ActivityFormState,
@@ -91,29 +95,6 @@ const FAMILY_LABEL: Record<ActivityFamily, string> = {
   measurement: "Mesure",
   transfer: "Transmission",
 };
-
-/**
- * Le filet des contrôles, plus sombre que celui des blocs.
- *
- * La raison est mesurée depuis T2.3 et reprise en T2.5 et T2.6 : la bordure
- * d'un champ est la limite d'un composant d'interface, elle se mesure à 3:1, et
- * aucun jeton `border-*` du design system ne l'atteint sur ce fond.
- * `content-neutral-normal` y arrive à 3,88:1.
- */
-const CONTROL =
-  "w-full rounded-lg border bg-surface-neutral-pale px-3 py-2 text-sm text-content-neutral-darkest";
-
-/**
- * Le filet du champ : rouge en erreur, gris sinon.
- *
- * Les deux mêmes jetons qu'en T2.5 et T2.6, sans en inventer un troisième — le
- * design system n'a pas plus de jeton `border-danger-*` que de jeton de bordure
- * de contrôle, point ouvert depuis T2.3. **Le message d'erreur ne dépend jamais
- * de cette couleur** : il est écrit sous le champ, et repris dans le bandeau.
- */
-function borderOf(error: string | undefined): string {
-  return error ? "border-content-danger-base" : "border-content-neutral-normal";
-}
 
 export function ActivityPanel({
   projectName,
@@ -158,10 +139,8 @@ export function ActivityPanel({
     errors: {},
   });
 
-  const titleId = "panneau-activite-titre";
-  const values = state.values;
+    const values = state.values;
   const errors = state.errors;
-  const failed = Object.keys(errors).length > 0 || Boolean(state.message);
 
   /* Le référentiel arrive déjà trié par famille : les regrouper ne demande
      donc qu'un passage, et l'ordre des `optgroup` est celui du référentiel du
@@ -176,417 +155,263 @@ export function ActivityPanel({
   }, []);
 
   return (
-    <FocusTrap
+    <Panel
+      titleId="panneau-activite-titre"
+      title={title}
+      subtitles={[projectName]}
       closeHref={closeHref}
-      className="fixed inset-0 z-40 flex justify-end"
+      action={submit}
+      pending={pending}
+      submitLabel={submitLabel}
+      message={state.message}
+      errors={errors}
     >
-      {/* Le voile ferme au clic, et **ne prend jamais le focus** : la fermeture
-          au clavier passe par la croix et par « Annuler », qui portent l'une
-          et l'autre un nom. Un lien sans texte, focalisable, serait un arrêt
-          de tabulation muet. */}
-      <Link
-        href={closeHref}
-        aria-hidden="true"
-        tabIndex={-1}
-        className="absolute inset-0 bg-surface-neutral-opacity-distinct"
-      />
-
-      {/* Le filet gauche est **plus sombre que celui des contrôles**, et il a
-          été mesuré avant d'être cru : `content-neutral-normal` — le choix
-          retenu partout depuis T2.3 — tombe à 1,46:1 contre le voile,
-          c'est-à-dire une limite de panneau qu'on devine. `content-neutral-dark`
-          donne 3,05:1 côté voile et 8,12:1 côté panneau. C'est ce filet qui
-          porte la séparation, faute d'ombre : le design system nomme ses
-          élévations sans les définir, et l'inventer est interdit. */}
-      <div
-        role="dialog"
-        aria-labelledby={titleId}
-        className="relative flex h-full w-110 max-w-full flex-col border-l border-content-neutral-dark bg-surface-neutral-pale"
+      {/* D16 — le type est le seul champ vraiment obligatoire, et il vient
+          du référentiel du domaine : jamais une liste codée en dur
+          (`docs/03` §2). */}
+      <FormField
+        label="Type d'activité"
+        htmlFor="activite-type"
+        error={errors.activityTypeId}
+        errorId="activite-type-erreur"
+        required
       >
-        <div className="flex flex-none items-start justify-between gap-4 border-b border-surface-neutral-lighter px-6 py-5">
-          <div className="min-w-0">
-            <h2
-              id={titleId}
-              className="text-md font-semibold text-content-neutral-darkest"
-            >
-              {title}
-            </h2>
-            {/* Le nom du projet : le panneau ne quitte pas son contexte, il
-                le rappelle. */}
-            <p className="mt-1 text-xs text-content-neutral-base">
-              {projectName}
-            </p>
-          </div>
-
-          {/* `autoFocus` est rendu dans le HTML servi : à l'ouverture, le focus
-              est déjà dans le panneau, et sur la sortie. C'est la moitié du
-              comportement modal qui ne coûte aucun script. */}
-          <Link
-            href={closeHref}
-            autoFocus
-            aria-label="Fermer le panneau"
-            className="flex size-8 flex-none items-center justify-center rounded-lg border border-content-neutral-normal text-sm text-content-neutral-dark"
+        {activityTypes.length > 0 ? (
+          <select
+            id="activite-type"
+            name="activityTypeId"
+            defaultValue={values.activityTypeId}
+            aria-invalid={errors.activityTypeId ? true : undefined}
+            aria-describedby={
+              errors.activityTypeId ? "activite-type-erreur" : undefined
+            }
+            className={`${CONTROL} ${borderOf(errors.activityTypeId)}`}
           >
-            <span aria-hidden="true">✕</span>
-          </Link>
+            <option value="">Choisir un type</option>
+            {families.map((group) => (
+              <optgroup
+                key={group.family}
+                label={FAMILY_LABEL[group.family]}
+              >
+                {group.types.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        ) : (
+          <p className="text-sm text-content-neutral-dark">
+            {"Aucun type d'activité au référentiel du domaine."}
+          </p>
+        )}
+      </FormField>
+
+      {/* D14 — « à planifier » n'est pas un état du schéma : c'est une
+          activité prévue qui n'a pas encore de date. La case et la période
+          se répondent, et le dire en toutes lettres est ce qui remplace le
+          masquage au clic de la maquette : sans JavaScript, un champ ne
+          disparaît pas. Les deux ensemble sont **refusées**, la saisie
+          revenant avec ses valeurs — plutôt que d'en jeter une des deux. */}
+      <fieldset className="flex flex-col gap-2.5">
+        <legend className="text-2xs font-semibold text-content-neutral-dark uppercase">
+          Période
+          <span className="font-normal text-content-neutral-base">
+            {" (obligatoire)"}
+          </span>
+        </legend>
+        <label
+          htmlFor="activite-unscheduled"
+          className="flex items-center gap-2 text-sm text-content-neutral-darkest"
+        >
+          <input
+            id="activite-unscheduled"
+            name="isUnscheduled"
+            type="checkbox"
+            defaultChecked={values.isUnscheduled}
+            aria-invalid={errors.isUnscheduled ? true : undefined}
+            aria-describedby={
+              errors.isUnscheduled
+                ? "activite-unscheduled-erreur"
+                : undefined
+            }
+            className="accent-surface-primary-base"
+          />
+          À planifier, sans date
+        </label>
+        <p className="text-xs text-content-neutral-base">
+          {"Cochée, elle remplace la période : l'activité rejoint le groupe « à planifier » de la roadmap. La période se saisit au jour et se lit au mois."}
+        </p>
+        {errors.isUnscheduled ? (
+          <p
+            id="activite-unscheduled-erreur"
+            className="text-xs font-semibold text-content-danger-dark"
+          >
+            {errors.isUnscheduled}
+          </p>
+        ) : null}
+
+        <div className="flex flex-wrap gap-4">
+          <FormField
+            label="Début"
+            htmlFor="activite-debut"
+            error={errors.periodStart}
+            errorId="activite-debut-erreur"
+            className="flex-1"
+          >
+            <input
+              id="activite-debut"
+              name="periodStart"
+              type="date"
+              defaultValue={values.periodStart}
+              aria-invalid={errors.periodStart ? true : undefined}
+              aria-describedby={
+                errors.periodStart ? "activite-debut-erreur" : undefined
+              }
+              className={`${CONTROL} ${borderOf(errors.periodStart)}`}
+            />
+          </FormField>
+
+          <FormField
+            label="Fin"
+            htmlFor="activite-fin"
+            error={errors.periodEnd}
+            errorId="activite-fin-erreur"
+            className="flex-1"
+          >
+            <input
+              id="activite-fin"
+              name="periodEnd"
+              type="date"
+              defaultValue={values.periodEnd}
+              aria-invalid={errors.periodEnd ? true : undefined}
+              aria-describedby={
+                errors.periodEnd ? "activite-fin-erreur" : undefined
+              }
+              className={`${CONTROL} ${borderOf(errors.periodEnd)}`}
+            />
+          </FormField>
         </div>
 
-        {/* Le formulaire enveloppe le pied : « Enregistrer » vivait hors de lui
-            depuis T3.2, donc hors de toute soumission. */}
-        <form
-          action={submit}
-          noValidate
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
-            {/* Une soumission refusée doit s'entendre, et pas seulement se
-                voir. Vision ne jette jamais en silence ce qui a été tapé : les
-                valeurs sont réaffichées telles quelles. */}
-            {failed ? (
-              <div
-                role="alert"
-                className="flex flex-col gap-2 rounded-lg border border-content-danger-base bg-surface-danger-lightest px-4 py-3 text-sm text-content-danger-dark"
-              >
-                <p className="font-semibold">
-                  {state.message ?? "La saisie n'a pas pu être enregistrée."}
-                </p>
-                {Object.keys(errors).length > 0 ? (
-                  <ul className="flex list-disc flex-col gap-1 pl-5">
-                    {Object.entries(errors).map(([field, message]) => (
-                      <li key={field}>{message}</li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
-            ) : null}
+        {/* L'état n'est pas un champ : il se déduit de ce qui précède
+            (`docs/06` §9). Le dire évite qu'on le cherche. */}
+        <p className="text-xs text-content-neutral-base">
+          {"L'état ne se saisit pas : une période passée donne une activité terminée, une période en cours une activité en cours, une période à venir ou sans date une activité prévue."}
+        </p>
+      </fieldset>
 
-            {/* D16 — le type est le seul champ vraiment obligatoire, et il vient
-                du référentiel du domaine : jamais une liste codée en dur
-                (`docs/03` §2). */}
-            <PanelField
-              label="Type d'activité"
-              htmlFor="activite-type"
-              error={errors.activityTypeId}
-              errorId="activite-type-erreur"
-              required
-            >
-              {activityTypes.length > 0 ? (
-                <select
-                  id="activite-type"
-                  name="activityTypeId"
-                  defaultValue={values.activityTypeId}
-                  aria-invalid={errors.activityTypeId ? true : undefined}
-                  aria-describedby={
-                    errors.activityTypeId ? "activite-type-erreur" : undefined
-                  }
-                  className={`${CONTROL} ${borderOf(errors.activityTypeId)}`}
-                >
-                  <option value="">Choisir un type</option>
-                  {families.map((group) => (
-                    <optgroup
-                      key={group.family}
-                      label={FAMILY_LABEL[group.family]}
-                    >
-                      {group.types.map((type) => (
-                        <option key={type.id} value={type.id}>
-                          {type.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              ) : (
-                <p className="text-sm text-content-neutral-dark">
-                  {"Aucun type d'activité au référentiel du domaine."}
-                </p>
-              )}
-            </PanelField>
+      {/* D12 — approche et type sont deux axes distincts, et une activité
+          n'en porte qu'une. */}
+      <FormField
+        label="Approche"
+        htmlFor="activite-approche"
+        note="Facultative. Une seule par activité."
+        error={errors.approachId}
+        errorId="activite-approche-erreur"
+      >
+        {approaches.length > 0 ? (
+          <select
+            id="activite-approche"
+            name="approachId"
+            defaultValue={values.approachId}
+            aria-invalid={errors.approachId ? true : undefined}
+            aria-describedby={
+              errors.approachId ? "activite-approche-erreur" : undefined
+            }
+            className={`${CONTROL} ${borderOf(errors.approachId)}`}
+          >
+            <option value="">Aucune</option>
+            {approaches.map((approach) => (
+              <option key={approach.id} value={approach.id}>
+                {approach.label}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <p className="text-sm text-content-neutral-dark">
+            Aucune approche au référentiel du domaine.
+          </p>
+        )}
+      </FormField>
 
-            {/* D14 — « à planifier » n'est pas un état du schéma : c'est une
-                activité prévue qui n'a pas encore de date. La case et la période
-                se répondent, et le dire en toutes lettres est ce qui remplace le
-                masquage au clic de la maquette : sans JavaScript, un champ ne
-                disparaît pas. Les deux ensemble sont **refusées**, la saisie
-                revenant avec ses valeurs — plutôt que d'en jeter une des deux. */}
-            <fieldset className="flex flex-col gap-2.5">
-              <legend className="text-2xs font-semibold text-content-neutral-dark uppercase">
-                Période
-                <span className="font-normal text-content-neutral-base">
-                  {" (obligatoire)"}
-                </span>
-              </legend>
+      <FormField
+        label="Objectif"
+        htmlFor="activite-objectif"
+        note="Facultatif, et fortement encouragé. Une phrase qui dit ce que cette activité cherche à obtenir."
+        error={errors.objective}
+        errorId="activite-objectif-erreur"
+      >
+        <input
+          id="activite-objectif"
+          name="objective"
+          type="text"
+          defaultValue={values.objective}
+          autoComplete="off"
+          className={`${CONTROL} ${borderOf(errors.objective)}`}
+        />
+      </FormField>
+
+      {/* Facultatif (`docs/03` §4). Sur le modèle de l'équipe de projet
+          (T2.6) : les personnes viennent de la liste existante, aucune
+          création à la volée (D19). Aucun rôle, aucune quotité : la case
+          seule porte l'information. */}
+      <fieldset className="flex flex-col gap-2.5">
+        <legend className="text-2xs font-semibold text-content-neutral-dark uppercase">
+          Participants
+        </legend>
+        <p className="text-xs text-content-neutral-base">
+          {"Facultatif. Les personnes qui ont pris part à cette activité, parmi celles déjà référencées dans le domaine."}
+        </p>
+
+        {persons.length > 0 ? (
+          <div className="flex flex-col gap-2 rounded-lg border border-content-neutral-normal bg-surface-neutral-pale px-4 py-3">
+            {persons.map((person) => (
               <label
-                htmlFor="activite-unscheduled"
+                key={person.id}
+                htmlFor={`activite-participant-${person.id}`}
                 className="flex items-center gap-2 text-sm text-content-neutral-darkest"
               >
                 <input
-                  id="activite-unscheduled"
-                  name="isUnscheduled"
+                  id={`activite-participant-${person.id}`}
+                  name="participantIds"
                   type="checkbox"
-                  defaultChecked={values.isUnscheduled}
-                  aria-invalid={errors.isUnscheduled ? true : undefined}
+                  value={person.id}
+                  defaultChecked={values.participantIds.includes(person.id)}
                   aria-describedby={
-                    errors.isUnscheduled
-                      ? "activite-unscheduled-erreur"
+                    errors.participantIds
+                      ? "activite-participants-erreur"
                       : undefined
                   }
                   className="accent-surface-primary-base"
                 />
-                À planifier, sans date
+                {person.fullName}
+                {/* Texte, jamais couleur seule (`docs/06` §11) — la
+                    règle de T2.4 et T2.6, reprise ici pour un troisième
+                    écran. */}
+                {person.kind === "stakeholder" ? (
+                  <span className="text-xs text-content-neutral-base">
+                    {" · côté entité"}
+                  </span>
+                ) : null}
               </label>
-              <p className="text-xs text-content-neutral-base">
-                {"Cochée, elle remplace la période : l'activité rejoint le groupe « à planifier » de la roadmap. La période se saisit au jour et se lit au mois."}
-              </p>
-              {errors.isUnscheduled ? (
-                <p
-                  id="activite-unscheduled-erreur"
-                  className="text-xs font-semibold text-content-danger-dark"
-                >
-                  {errors.isUnscheduled}
-                </p>
-              ) : null}
-
-              <div className="flex flex-wrap gap-4">
-                <PanelField
-                  label="Début"
-                  htmlFor="activite-debut"
-                  error={errors.periodStart}
-                  errorId="activite-debut-erreur"
-                  className="flex-1"
-                >
-                  <input
-                    id="activite-debut"
-                    name="periodStart"
-                    type="date"
-                    defaultValue={values.periodStart}
-                    aria-invalid={errors.periodStart ? true : undefined}
-                    aria-describedby={
-                      errors.periodStart ? "activite-debut-erreur" : undefined
-                    }
-                    className={`${CONTROL} ${borderOf(errors.periodStart)}`}
-                  />
-                </PanelField>
-
-                <PanelField
-                  label="Fin"
-                  htmlFor="activite-fin"
-                  error={errors.periodEnd}
-                  errorId="activite-fin-erreur"
-                  className="flex-1"
-                >
-                  <input
-                    id="activite-fin"
-                    name="periodEnd"
-                    type="date"
-                    defaultValue={values.periodEnd}
-                    aria-invalid={errors.periodEnd ? true : undefined}
-                    aria-describedby={
-                      errors.periodEnd ? "activite-fin-erreur" : undefined
-                    }
-                    className={`${CONTROL} ${borderOf(errors.periodEnd)}`}
-                  />
-                </PanelField>
-              </div>
-
-              {/* L'état n'est pas un champ : il se déduit de ce qui précède
-                  (`docs/06` §9). Le dire évite qu'on le cherche. */}
-              <p className="text-xs text-content-neutral-base">
-                {"L'état ne se saisit pas : une période passée donne une activité terminée, une période en cours une activité en cours, une période à venir ou sans date une activité prévue."}
-              </p>
-            </fieldset>
-
-            {/* D12 — approche et type sont deux axes distincts, et une activité
-                n'en porte qu'une. */}
-            <PanelField
-              label="Approche"
-              htmlFor="activite-approche"
-              note="Facultative. Une seule par activité."
-              error={errors.approachId}
-              errorId="activite-approche-erreur"
-            >
-              {approaches.length > 0 ? (
-                <select
-                  id="activite-approche"
-                  name="approachId"
-                  defaultValue={values.approachId}
-                  aria-invalid={errors.approachId ? true : undefined}
-                  aria-describedby={
-                    errors.approachId ? "activite-approche-erreur" : undefined
-                  }
-                  className={`${CONTROL} ${borderOf(errors.approachId)}`}
-                >
-                  <option value="">Aucune</option>
-                  {approaches.map((approach) => (
-                    <option key={approach.id} value={approach.id}>
-                      {approach.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <p className="text-sm text-content-neutral-dark">
-                  Aucune approche au référentiel du domaine.
-                </p>
-              )}
-            </PanelField>
-
-            <PanelField
-              label="Objectif"
-              htmlFor="activite-objectif"
-              note="Facultatif, et fortement encouragé. Une phrase qui dit ce que cette activité cherche à obtenir."
-              error={errors.objective}
-              errorId="activite-objectif-erreur"
-            >
-              <input
-                id="activite-objectif"
-                name="objective"
-                type="text"
-                defaultValue={values.objective}
-                autoComplete="off"
-                className={`${CONTROL} ${borderOf(errors.objective)}`}
-              />
-            </PanelField>
-
-            {/* Facultatif (`docs/03` §4). Sur le modèle de l'équipe de projet
-                (T2.6) : les personnes viennent de la liste existante, aucune
-                création à la volée (D19). Aucun rôle, aucune quotité : la case
-                seule porte l'information. */}
-            <fieldset className="flex flex-col gap-2.5">
-              <legend className="text-2xs font-semibold text-content-neutral-dark uppercase">
-                Participants
-              </legend>
-              <p className="text-xs text-content-neutral-base">
-                {"Facultatif. Les personnes qui ont pris part à cette activité, parmi celles déjà référencées dans le domaine."}
-              </p>
-
-              {persons.length > 0 ? (
-                <div className="flex flex-col gap-2 rounded-lg border border-content-neutral-normal bg-surface-neutral-pale px-4 py-3">
-                  {persons.map((person) => (
-                    <label
-                      key={person.id}
-                      htmlFor={`activite-participant-${person.id}`}
-                      className="flex items-center gap-2 text-sm text-content-neutral-darkest"
-                    >
-                      <input
-                        id={`activite-participant-${person.id}`}
-                        name="participantIds"
-                        type="checkbox"
-                        value={person.id}
-                        defaultChecked={values.participantIds.includes(person.id)}
-                        aria-describedby={
-                          errors.participantIds
-                            ? "activite-participants-erreur"
-                            : undefined
-                        }
-                        className="accent-surface-primary-base"
-                      />
-                      {person.fullName}
-                      {/* Texte, jamais couleur seule (`docs/06` §11) — la
-                          règle de T2.4 et T2.6, reprise ici pour un troisième
-                          écran. */}
-                      {person.kind === "stakeholder" ? (
-                        <span className="text-xs text-content-neutral-base">
-                          {" · côté entité"}
-                        </span>
-                      ) : null}
-                    </label>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-content-neutral-dark">
-                  Aucune personne référencée dans ce domaine.
-                </p>
-              )}
-
-              {errors.participantIds ? (
-                <p
-                  id="activite-participants-erreur"
-                  className="text-xs font-semibold text-content-danger-dark"
-                >
-                  {errors.participantIds}
-                </p>
-              ) : null}
-            </fieldset>
+            ))}
           </div>
+        ) : (
+          <p className="text-sm text-content-neutral-dark">
+            Aucune personne référencée dans ce domaine.
+          </p>
+        )}
 
-          {/* Enregistrement sans confirmation intermédiaire (`docs/06` §9) :
-              l'activité paraît aussitôt dans la roadmap, et c'est toute la
-              confirmation. */}
-          <div className="flex flex-none flex-wrap items-center gap-4 border-t border-surface-neutral-lighter px-6 py-4">
-            <button
-              type="submit"
-              disabled={pending}
-              className="rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale disabled:opacity-60"
-            >
-              {pending ? "Enregistrement…" : submitLabel}
-            </button>
-            <Link
-              href={closeHref}
-              className="text-sm font-semibold text-content-primary-dark underline"
-            >
-              Annuler
-            </Link>
-          </div>
-        </form>
-      </div>
-    </FocusTrap>
-  );
-}
-
-/**
- * Un champ du panneau : son intitulé, sa note, son contrôle, son message.
- *
- * Jumeau du `FormField` de `project-form.tsx`, et redit ici plutôt
- * qu'importé : deux composants de quinze lignes de balisage, dont les intitulés
- * n'ont ni la même taille ni le même poids — le panneau est dense, la page ne
- * l'est pas. Dette assumée, consignée au journal.
- *
- * L'intitulé est un `<label for>` — jamais un `placeholder` en guise de nom :
- * il disparaîtrait à la première frappe, et l'assistance ne le lit pas.
- */
-function PanelField({
-  label,
-  htmlFor,
-  note,
-  error,
-  errorId,
-  required,
-  className,
-  children,
-}: {
-  label: string;
-  htmlFor: string;
-  note?: string;
-  error?: string | undefined;
-  errorId: string;
-  required?: boolean;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className={`flex flex-col gap-1.5 ${className ?? ""}`}>
-      <label
-        htmlFor={htmlFor}
-        className="text-2xs font-semibold text-content-neutral-dark uppercase"
-      >
-        {label}
-        {/* « obligatoire » est écrit, pas seulement marqué d'une étoile : un
-            symbole coloré ne porte jamais seul une information. */}
-        {required ? (
-          <span className="font-normal text-content-neutral-base">
-            {" (obligatoire)"}
-          </span>
+        {errors.participantIds ? (
+          <p
+            id="activite-participants-erreur"
+            className="text-xs font-semibold text-content-danger-dark"
+          >
+            {errors.participantIds}
+          </p>
         ) : null}
-      </label>
-      {note ? <p className="text-xs text-content-neutral-base">{note}</p> : null}
-      {children}
-      {error ? (
-        <p
-          id={errorId}
-          className="text-xs font-semibold text-content-danger-dark"
-        >
-          {error}
-        </p>
-      ) : null}
-    </div>
+      </fieldset>
+    </Panel>
   );
 }

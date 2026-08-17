@@ -2,7 +2,7 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 17/08/2026 — T5.6 livré : les courbes d'indicateurs sur la même frise. C5 est clos.
+**Dernière mise à jour :** 17/08/2026 — TD.1 livré : le socle des panneaux, et quatre correctifs de dette.
 **Chantier en cours :** aucun — C5 terminé, C6 à découper
 **Ticket suivant :** aucun — **session de découpage de C6** (liens et journal), protocole « Session de découpage »
 
@@ -18,18 +18,12 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C4 — Ressources et résultats | T4.1 → T4.4 | **terminé** |
 | C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **terminé** |
 | C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **terminé** |
+| TD — Dette technique | TD.1 | **terminé** |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
 **Point de bascule atteint :** C1 à C3 constituent le POC minimal démontrable ; C4 y ajoute la
 boucle complète de `docs/05` §2 — saisir, attacher le lien, reporter le résultat.
-
-**Sur C4bis, désormais clos.** Intercalé **sans décaler les autres** : C5, C6 et C7 gardent le sens
-que `docs/05` leur donne, « C7 » étant écrit dans D25, D28 et D37 que la règle 6 interdit de rouvrir.
-
-**Sur C5, ouvert le 15/08/2026.** Six tickets, sept arbitrages rendus avant écriture, dans
-`tickets-C5.md`. Sa leçon reprise de C4bis : **chaque objet arrive avec ses trois gestes — créer,
-corriger, ranger — dans le ticket qui l'introduit.**
 
 ---
 
@@ -108,6 +102,21 @@ session de découpage de C6 — le seul moment où `ETAT.md` se balaie. D'ici l�
   resservi la leçon de T4bis.5 : le test d'étanchéité des cibles restait **vert** au retrait de
   `filter(projects)` ; il a fallu forger l'adoption qui l'isole.
 
+- **TD.1 — le socle des panneaux, et quatre correctifs de dette, le 17/08/2026.** Ticket **hors
+  chantier**, dans la seule fenêtre où les fiches n'interdisent plus rien : C5 clos, C6 non découpé.
+  La dette de recopie que quatre entrées du journal reportaient est refermée — **huit** copies du
+  composant de champ, **six** coquilles de panneau et **quatre** `ACTION_LINK` deviennent trois
+  fichiers de `components/ui/`, soit **−644 lignes nettes**. Le critère était que rien ne change, et il
+  se lit : 26 écrans et rendus de panneaux capturés servis avant et après, **à données constantes**,
+  pour 18 espaces finaux dans un `class` et 2 jetons de couleur de différence. Quatre correctifs
+  l'accompagnent : le **produit archivé** refusé par `createProject` **et** par le déplacement
+  d'`updateProject` — jumeau que le journal ne consignait pas —, avec l'exception nominative de
+  T4bis.1 et six temps d'épreuve par l'action ; le **niveau de titre** d'`EmptyState` ; les **cinq**
+  textes sous-contrastés de `/dev/session`, dont la pastille « non » qui a demandé un jeton plus
+  sombre que les autres parce que son fond est un voile ; et trois recopies mineures. La leçon la plus
+  transportable n'est pas dans le code : **un harnais qui poste en urlencoded là où React rend du
+  multipart obtient un 200 muet**, indiscernable d'un refus sans étape témoin.
+
 ---
 
 ## Points ouverts
@@ -141,13 +150,6 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   un jour sans savoir pourquoi. Le geste manquant est donc **une phrase sur le pourquoi d'une
   cible**, et il se juge à l'usage, pas au schéma. → **ticket propre, C7 au plus tard ; ou jamais, si
   personne ne la réclame.**
-- **`createProject` accepte encore un produit archivé.** Le formulaire ne le propose plus et la page
-  produit n'y mène plus, mais l'action ne relit pas l'`archived_at` du produit **reçu** : une
-  soumission forgée rattacherait un accompagnement neuf à un produit rangé, invisible partout. Relevé
-  par T4bis.2, non refermé par T4bis.3 malgré le fichier ouvert — sa fiche porte l'interdit « ce
-  ticket ne rouvre pas T4bis.2 », règle 3, arbitrage tranché le 15/08/2026.
-  → **le prochain ticket qui ouvre `app/(app)/projets/actions.ts` sans que sa fiche l'en empêche ;
-  C7 au plus tard.**
 - **L'outil par défaut d'un type d'activité ne présélectionne rien.** `activity_types.default_tool_id`
   existe depuis T1.2, `docs/04` §2 le dit « habituellement associé », et la fixture le pose sur les
   deux types d'audit du brief. Le panneau de T4.4 ne l'a pas lu — la fiche ne le demandait pas,
@@ -181,21 +183,18 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
 
 ### c. Dettes assumées, sans échéance
 
-- **La base de développement a dérivé de la fixture, et c'est acté.** Inventaire au 16/08/2026 :
-  un accompagnement de plus (« Refonte de l'espace documents », T2.6, avec commanditaire et une
-  personne `source = manual`) ; un « Test projet » et un produit « test » d'une session antérieure,
-  dont l'audit porte **deux résultats, un rangé et un vivant** (T4bis.6) ; six activités archivées
-  (T3.3), quatre transitions non revenues en arrière (T3.5), deux ressources (T4.2), deux indicateurs
-  archivés dont un sous le cookie d'une contributrice (T5.2) ; l'adoption de la fixture porte un
-  **identifiant neuf** depuis T5.4, `unlink` ne rendant pas sa ligne. T5.5 n'a rien laissé : ses trois
-  produits de sonde ont été retirés après lecture, et T5.6 non plus — deux produits et trois
-  indicateurs de sonde, retirés de même.
-  **Règle posée le 14/08/2026 : la base de développement est jetable** — la règle 4 protège la donnée
-  métier, pas une fixture locale. Deux conséquences : un critère de ticket passé ne s'y relit pas
-  nécessairement (T2.1 à T2.4 se lisaient sur « 2 accompagnements », il y en a 3) et ce n'est pas un
-  défaut ; et c'est ce qui autorise à écrire des lignes à la main pour éprouver un critère. Il
-  n'existe **pas de `db:reset`**, `db:seed` ignorant ce qu'il n'a pas semé. → **sans échéance ; un
-  ticket d'outillage si le besoin devient réel.**
+- **La base de développement a dérivé de la fixture, et c'est acté.** **Règle du 14/08/2026 : elle
+  est jetable** — la règle 4 protège la donnée métier, pas une fixture locale. Trois conséquences :
+  un critère de ticket passé ne s'y relit pas nécessairement (T2.1 à T2.4 se lisaient sur
+  « 2 accompagnements », il y en a 4) et ce n'est pas un défaut ; c'est ce qui autorise à y écrire à
+  la main pour éprouver un critère ; et **une comparaison avant/après n'y est un instrument que si
+  les données n'ont pas bougé entre les deux mesures** — TD.1 a vu un indicateur créé au navigateur
+  pendant sa capture, et a dû la refaire par `git stash`. La dérive au 17/08/2026 tient en une
+  phrase : tout ce qu'aucun `db:seed` ne connaît, essentiellement des lignes de sonde et des
+  archivages de tickets passés, TD.1 comprise — dont les sondes sont **archivées et non supprimées**,
+  le typage d'`unlink` refusant une table à `archived_at`. Il n'existe **pas de `db:reset`**,
+  `db:seed` ignorant ce qu'il n'a pas semé. → **sans échéance ; un ticket d'outillage si le besoin
+  devient réel.**
 - **Le design system a six manques, et aucun n'a été inventé.** (1) Les trois **élévations** et les
   deux **gradients** sont nommés sans valeur. (2) Aucun jeton de **bordure de contrôle** : le plus
   sombre des `border-*` ne dépasse pas 1,2:1 là où la limite d'un composant se mesure à 3:1.
@@ -203,12 +202,13 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   maquettes portent `.04em`, rendues sans. (5) Aucune **surface de voile** au-delà de 40 % — un
   voile qui porterait seul la séparation d'un panneau laisse sa surface à 2,66:1, mesuré.
   (6) Aucun jeton de **séparateur**.
-  **Substituts en vigueur, tous mesurés :** `content-neutral-normal` (3,88:1) pour une bordure de
-  contrôle, `content-danger-base` (5,19:1) pour un champ en erreur, `content-neutral-dark` (3,05:1
-  contre le voile) pour le filet du panneau latéral, `content-neutral-base` (4,98:1) pour un
-  séparateur entre deux textes de même graisse. **Règle : tout nouveau formulaire reprend ces choix
-  sans en inventer un septième.** Elle tient depuis T2.3 et n'a pas été enfreinte.
-  → **à faire remonter à qui maintient le design system.**
+  **Substituts en vigueur, tous mesurés**, et **désormais à un seul endroit** : TD.1 les a réunis dans
+  `components/ui/form-field.tsx` et `components/ui/panel.tsx` — `content-neutral-normal` (3,88:1) pour
+  une bordure de contrôle, `content-danger-base` (5,19:1) pour un champ en erreur,
+  `content-neutral-dark` (3,05:1 contre le voile) pour le filet du panneau, `content-neutral-base`
+  (4,98:1) pour un séparateur. **Règle : aucun septième substitut ne s'invente** ; elle tient depuis
+  T2.3 et il n'y a plus qu'un fichier où l'enfreindre. → **à faire remonter à qui maintient le design
+  system.**
 - **La création d'un projet n'est pas atomique, et ne peut pas l'être.** `neon-http` n'a pas de
   transaction interactive — la couche n'a que `batch`. La parade est de tout confronter au domaine
   **avant** d'écrire, et d'ordonner les ajouts avant les retraits (T3.6). Reste non refermé : une

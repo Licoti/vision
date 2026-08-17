@@ -31,6 +31,7 @@
 
 import Link from "next/link";
 
+import { ACTION_LINK } from "@/components/ui/action-link";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ExternalLink } from "@/components/ui/external-link";
 import { SectionHeader } from "@/components/ui/section";
@@ -181,6 +182,7 @@ export function Roadmap({
         </div>
       ) : (
         <EmptyState
+          level={3}
           title="Aucune activité pour l'instant"
           description="La roadmap réunira ici les ateliers, tests, audits et restitutions de l'accompagnement, groupés par état : en cours, prévu, à planifier, terminé. Chaque activité portera son type, son objectif, sa période, son approche et, le cas échéant, son résultat avec le lien vers l'outil qui l'a produit."
           {...(addHref
@@ -407,9 +409,6 @@ function Result({ result }: { result: ActivityResult }) {
     </p>
   );
 }
-
-/** Les classes d'un geste texte, communes à « Modifier » et aux gestes de T3.5. */
-const ACTION_LINK = "text-xs font-semibold text-content-primary-dark underline";
 
 /**
  * Une entrée : son type, son approche, son objectif, sa période, et le cas

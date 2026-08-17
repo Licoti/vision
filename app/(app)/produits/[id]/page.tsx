@@ -510,6 +510,7 @@ export default async function ProductPage({
               </List>
             ) : (
               <EmptyState
+                level={3}
                 title="Aucun accompagnement pour l'instant"
                 description="Les accompagnements de ce produit s'afficheront ici, du plus récent au plus ancien, chacun avec sa période, son statut, son objectif et son équipe."
                 {...(session.can.manageDomain && !archived

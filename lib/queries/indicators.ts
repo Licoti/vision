@@ -248,6 +248,34 @@ export function listProductReadings(
    ========================================================================== */
 
 /** Une entrée du bloc « Indicateurs adoptés » de la page projet. */
+/**
+ * La série de chaque indicateur, en une passe.
+ *
+ * Elle vit ici, **à côté de la lecture qui produit ces relevés**, et non dans
+ * l'écran qui les affiche : `indicators.tsx` la portait depuis T5.3 et
+ * `timeline.tsx` en refaisait une autre dans `curvesOf` (T5.6) — un `filter` par
+ * indicateur, donc un parcours de la liste entière autant de fois qu'il y a
+ * d'indicateurs. Une seule passe, un seul appelant à corriger le jour où
+ * l'ordre change.
+ *
+ * `readings` arrive **plat et déjà ordonné** — une lecture par écran, jamais une
+ * par indicateur (la règle de T5.1). Le regroupement conserve l'ordre reçu, si
+ * bien que chaque série sort triée sans qu'un second tri s'écrive ailleurs : une
+ * lecture trie, un composant affiche. La frise, qui lit du plus ancien au plus
+ * récent, **inverse une copie** plutôt que de demander un autre ordre.
+ */
+export function groupByIndicator(
+  readings: readonly ProductReading[],
+): Map<string, ProductReading[]> {
+  const grouped = new Map<string, ProductReading[]>();
+  for (const reading of readings) {
+    const series = grouped.get(reading.indicatorId);
+    if (series) series.push(reading);
+    else grouped.set(reading.indicatorId, [reading]);
+  }
+  return grouped;
+}
+
 export type ProjectAdoption = {
   /**
    * L'identifiant de l'**adoption**, pas de l'indicateur : c'est elle que la

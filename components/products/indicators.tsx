@@ -38,10 +38,12 @@
  * signalé comme tel plutôt que positionné arbitrairement à aujourd'hui »
  * (`docs/03` §7).
  *
- * L'état vide est un paragraphe et non un `EmptyState`, qui porterait un `h2`
- * en doublon sous celui de la section — la règle de `Resources`. Il dit ce que
- * le bloc contiendra, et porte le geste depuis T5.2, comme celui de `Resources`
- * depuis T4.2.
+ * L'état vide est un paragraphe et non un `EmptyState` — la règle de
+ * `Resources`, et pour sa raison de fond : le cadre tireté d'un état vide plein
+ * écran ne se pose pas dans un bloc de référence. Le doublon de `h2` qui
+ * s'ajoutait à cette raison n'en est plus une, `EmptyState` prenant un `level`
+ * depuis TD.1. Il dit ce que le bloc contiendra, et porte le geste depuis T5.2,
+ * comme celui de `Resources` depuis T4.2.
  *
  * Le composant ne lit aucune base : `indicators` et `readings` sont ce que
  * `listProductIndicators` et `listProductReadings` ont déjà lu, filtré et trié.
@@ -49,6 +51,7 @@
 
 import Link from "next/link";
 
+import { ACTION_LINK } from "@/components/ui/action-link";
 import { Section, SectionHeader } from "@/components/ui/section";
 import {
   formatDateMonth,
@@ -56,23 +59,11 @@ import {
   formatReadings,
   formatResultValue,
 } from "@/lib/format";
-import type {
-  ProductIndicator,
-  ProductReading,
+import {
+  groupByIndicator,
+  type ProductIndicator,
+  type ProductReading,
 } from "@/lib/queries/indicators";
-
-/**
- * Les classes d'un geste texte — la constante `ACTION_LINK` de `resources.tsx`,
- * **redite** plutôt qu'importée : ce module ne l'exporte pas, et il n'appartient
- * pas au périmètre de ce ticket. La dette est consignée au journal, et
- * l'extraction appartient au ticket qui pourra toucher les trois composants
- * ensemble.
- *
- * `content-primary-dark` sur `surface-neutral-pale` n'est **pas un couple neuf
- * par la position** : c'est celui des deux gestes de `Resources`, sur le même
- * fond de `Section`, et celui de « Ajouter un indicateur » en tête de ce bloc.
- */
-const ACTION_LINK = "text-xs font-semibold text-content-primary-dark underline";
 
 /**
  * Ce qui remplace « Archiver » quand l'indicateur est adopté — le refus (e) de
@@ -89,26 +80,6 @@ function adoptionNotice(count: number): string {
   return count > 1
     ? `Adopté par ${count} accompagnements — retirez ces adoptions pour pouvoir le ranger.`
     : "Adopté par 1 accompagnement — retirez cette adoption pour pouvoir le ranger.";
-}
-
-/**
- * La série de chaque indicateur, en une passe.
- *
- * `readings` arrive **plat et déjà ordonné** — une lecture par écran, jamais une
- * par indicateur (la règle de T5.1). Le regroupement conserve l'ordre reçu, si
- * bien que chaque série sort triée sans qu'un second tri s'écrive ici : une
- * lecture trie, un composant affiche.
- */
-function groupByIndicator(
-  readings: ProductReading[],
-): Map<string, ProductReading[]> {
-  const grouped = new Map<string, ProductReading[]>();
-  for (const reading of readings) {
-    const series = grouped.get(reading.indicatorId);
-    if (series) series.push(reading);
-    else grouped.set(reading.indicatorId, [reading]);
-  }
-  return grouped;
 }
 
 /**

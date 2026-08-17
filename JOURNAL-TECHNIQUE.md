@@ -2855,3 +2855,121 @@ ligne près par le balayage de T5.5, qui écrivait « T5.6 franchira le seuil à
 lignes de ticket de C5 se replient en une seule au **repliage**, geste 1 de la session de découpage
 de C6 et seul moment où `ETAT.md` se balaie : c'est lui qui rendra la marge, et le dépassement est
 précisément ce qui l'appelle.
+
+**TD.1 — huit copies d'un composant de champ, et la seule fenêtre pour les réunir.** La dette de T4.2
+avait été reportée cinq fois par la même phrase — « l'extraction appartient au ticket qui pourra
+toucher les fichiers ensemble » —, et T5.4 avait fini par écrire qu'elle n'était « plus bornée par une
+phrase ». Elle ne l'était plus parce que **aucune fiche de chantier ne peut ouvrir huit fichiers de
+huit tickets différents** : une fiche a un périmètre, et la règle 3 le rend contraignant. La fenêtre
+n'était donc pas un ticket mais l'**entre-deux-chantiers** — C5 clos, C6 non découpé. **À retenir pour
+les découpages : une dette qui traverse un chantier ne se referme pas dans un ticket de chantier ; il
+faut lui en ouvrir un hors chantier, ou elle se reportera indéfiniment par une phrase juste.**
+
+**TD.1 — la coquille de panneau était identique aux six exemplaires, et personne ne l'avait mesuré.**
+Le journal ne consignait que `PanelField` et `ACTION_LINK`. En comparant les six panneaux ligne à
+ligne, la **coquille entière** — `FocusTrap`, voile, `role="dialog"`, en-tête, croix, bandeau
+`role="alert"`, `<form>` enveloppant, pied — s'est révélée identique, aux seuls titre, sous-titres et
+identifiant de titre près, plus `CONTROL` et `borderOf` à huit exemplaires chacun. **La dette
+consignée était la partie visible de la dette réelle** : ce qui se recopie se remarque quand un
+ticket ajoute le geste, pas quand il ajoute l'enveloppe. Bilan de l'extraction : −2 181 / +1 205
+lignes suivies, 332 dans trois fichiers neufs, **−644 nettes**.
+
+**TD.1 — un `${className ?? ""}` interpolé sert un espace final, et c'est la seule différence.**
+`activity-panel.tsx` et `project-form.tsx` écrivaient `` className={`flex flex-col gap-1.5 ${className ?? ""}`} ``,
+si bien que leurs champs sans `className` servaient `class="flex flex-col gap-1.5 "`. Le composant
+partagé n'ajoute l'espace que lorsqu'il y a quelque chose à séparer : **18 lignes du diff HTML**, sans
+effet sur le rendu ni sur les règles CSS. C'est la seule différence de balisage de tout le ticket, et
+elle valait d'être vue plutôt que masquée par un `diff -w` — **un diff qu'on assouplit cesse d'être un
+instrument.**
+
+**TD.1 — une donnée créée au navigateur pendant la mesure a faussé le diff, et le diagnostic a tenu à
+une date.** La comparaison finale montrait un diff volumineux sur six écrans. Rien dans le code ne
+l'expliquait ; la base, elle, portait un indicateur « test » et un relevé de 30 % créés **quatre
+minutes plus tôt** par la personne courante, depuis le navigateur. La comparaison a été refaite à
+données constantes — `git stash push -u`, capture, `git stash pop` — et n'a plus montré que les 18
+espaces et les 2 jetons de couleur attendus. **À retenir : sur une base de développement partagée avec
+un humain qui l'utilise, une capture avant/après ne mesure le code que si les données n'ont pas bougé
+entre les deux ; sinon elle mesure la base. Le réflexe n'est pas de douter du code, c'est de dater les
+lignes.**
+
+**TD.1 — un harnais qui poste en urlencoded obtient 200 sans message, et ce n'est pas un refus.** Le
+`<form>` que React rend pour une action serveur porte `encType="multipart/form-data"`. Posté en
+`application/x-www-form-urlencoded`, Next **ne reconnaît pas l'invocation** : il ré-rend la page nue,
+répond **200**, n'écrit rien et ne dit rien. C'est la **troisième forme** du même piège, après les deux
+consignées en T4.4 et T5.3 — `$ACTION_REF_<n>` sans `value` donnant un 500 « Failed to find Server
+Action ». Dans les trois cas la base est intacte, et dans les trois cas l'action ne s'est pas exécutée.
+**Seule l'étape témoin les distingue d'un refus**, et il faut l'exiger *avant* de conclure, jamais
+après : sans elle, ce ticket aurait rapporté que la règle du produit archivé tenait alors que l'action
+n'était jamais atteinte. La leçon générale de T5.3 se précise donc : ce n'est pas seulement la charge
+qui doit être complète, c'est **l'encodage qui doit être celui du formulaire servi**.
+
+**TD.1 — le trou de `createProject` avait un jumeau, et c'est la porte unique qui l'a révélé.** Le
+point ouvert ne nommait que la création. En posant la règle dans `checkReferences` — la porte que les
+deux actions traversent, discipline de T4bis.3 — le déplacement d'`updateProject` **vers** un produit
+rangé s'est refermé du même geste, alors qu'il n'était consigné nulle part. L'inverse aurait été vrai
+aussi : écrire la règle dans `createProject` seule aurait refermé le point ouvert **en laissant le
+défaut**. **À retenir : quand un point ouvert nomme un point d'entrée, chercher la porte plutôt que le
+point d'entrée — la porte dira s'il y en avait d'autres.**
+
+**TD.1 — l'exception nominative était nécessaire, et le point ouvert voisin le disait.** Refuser tout
+produit archivé rendait immodifiable un accompagnement resté sous un produit rangé — état que le point
+ouvert d'`ETAT.md` sur le rétablissement décrit comme atteignable, et même normal après un archivage
+de produit. `ProjectLinksKeep` gagne donc `productId`, sur le modèle exact de T4bis.1. **Deux points
+ouverts se lisent ensemble ou pas du tout** : celui qu'on referme et celui qui décrit l'état que la
+règle va rencontrer.
+
+**TD.1 — un défaut d'accessibilité avait produit trois contournements avant d'être corrigé.**
+`EmptyState` rendait un `h2` ; trois blocs — `resources.tsx`, `indicators.tsx`, `timeline.tsx` — ont
+écrit un `<p>` à la main pour l'éviter, chacun citant le précédent. Le `level` corrige le défaut, et
+**les trois contournements restent** : leur raison de fond n'était pas le titre mais le cadre tireté à
+`px-8 py-11` dans une demi-largeur de grille, et pour `timeline.tsx` deux phrases distinctes là où
+`EmptyState` n'a qu'un `description`. Leurs commentaires ont été récrits — ils invoquaient un doublon
+qui n'existe plus. **À retenir : un contournement recopié trois fois signale un composant à corriger,
+et le corriger ne rend pas les contournements caducs pour autant ; il faut relire ce que chacun
+évitait vraiment.**
+
+**TD.1 — une pastille et un surtitre ne se corrigent pas avec le même jeton, et la mesure seule le
+dit.** Les cinq textes de `/dev/session` semblaient un seul remplacement. Quatre sont sur le fond de
+page, où `content-neutral-base` donne 4,73:1 ; la pastille « non » est sur un voile de 8 %
+(`#e5e5e6`), où le même jeton retombe à **4,02:1** — sous les 4,5:1. Retenu `content-neutral-dark`,
+**6,56:1**, symétrique du 6,87:1 mesuré sur la pastille « oui ». C'est la leçon de T5.4 sur un autre
+écran : **un jeton recopié d'une ligne voisine n'est pas un jeton mesuré ; c'est la position qui
+décide.** Et trois des cinq ne se rendent que sous un cookie de simple membre — un correctif de
+contraste se relit sous le profil qui déclenche la couleur, pas sous celui qu'on a.
+
+**TD.1 — la règle eslint sur le souligné a débusqué un import mort dans la minute.** Ajouter
+`argsIgnorePattern: "^_"` était censé faire taire quatre avertissements structurels de
+`useActionState`. Le premier lancement en a rendu **un cinquième, réel** : `ProjectStatusNature`
+importé dans `timeline.tsx` et devenu inutile avec `BAND_FILL`. `tsc` ne le voyait pas,
+`noUnusedLocals` étant désactivé. **Démonstration en acte de la raison du changement** : un journal
+qui porte des avertissements permanents ne montre pas les avertissements neufs.
+
+**TD.1 — le plan annonçait une mise en défaut sur une fonction qui n'avait pas de test.** Il écrivait
+que la neutralisation de `groupByIndicator` « doit faire tomber les tests de la frise ». Aucun ne
+serait tombé : la fonction vivait dans un composant, et `vitest` ne couvre pas `components/`. La
+déplacer dans `lib/queries/` la rendait testable, mais ne la testait pas. Quatre tests écrits, deux
+mutations jouées — accumulation écrasée, ordre inversé —, deux tests tombés à chaque fois, exactement
+ceux qui portent la règle. **À retenir : « la mise en défaut portera sur X » n'est vérifiable qu'après
+avoir vérifié que X a un test ; un plan peut affirmer une couverture qui n'existe pas.**
+
+**TD.1 — la règle du produit archivé n'est couverte par aucun test, et il faut le dire.** Elle vit
+dans `app/(app)/projets/actions.ts`, que `vitest` ne couvre pas. Sa neutralisation ne fait tomber
+aucun test — elle a été éprouvée par re-soumission, en six temps dont l'étape témoin et la
+neutralisation sous la même charge. La dette de banc d'essai pour les actions serveur, inscrite en
+T4bis.3, n'est **ni élargie ni refermée**.
+
+**TD.1 — les sondes s'archivent, et c'est le compilateur qui l'impose.** Deux produits, deux
+accompagnements et cinq lignes écrites par le harnais devaient disparaître. `unlink` est réservé par
+le typage aux tables sans `archived_at` — `products` et `projects` en portent une —, si bien que
+`scope.unlink(products, id)` ne compile pas. **La règle 4 est tenue par le type, pas par la
+discipline**, jusque dans un script jetable. Les sondes sont donc archivées ; elles quittent les
+listes, ce qui suffit, et l'inventaire de dérive d'`ETAT.md` le note.
+
+**TD.1 — `ETAT.md` a été balayé sans le repliage de C5, qui n'appartient pas à un ticket.** Le fichier
+montait à 272 lignes. Le repliage des six lignes de C5 en une seule est le geste 1 de la session de
+découpage, seul moment où le fichier se balaie : il n'a **pas** été fait ici. Trois gestes que le
+protocole autorise à l'étape 5 ont suffi — l'inventaire de dérive **récrit** plutôt qu'augmenté, le
+point du design system resserré autour du fait neuf (les substituts ont désormais un seul lieu), et
+deux notes de chantier devenues des faits datés versées aux « Faits acquis » de
+`HISTORIQUE-TICKETS.md`. Résultat : **263 lignes**. La marge reste due au repliage.
+
