@@ -11,9 +11,17 @@
  * donc à l'action et à `lib/db/scoped.ts`. Revérifier ici poserait une seconde
  * autorité, qui divergerait un jour de la première.
  *
- * **Quatre champs, et pas un de plus** (fiche T5.2) : libellé, unité, sens de
- * lecture, source. `product_id` ne se lit pas ici — il est lié côté serveur ;
- * `archived_at` non plus — il ne se pose que par `archive()`.
+ * **Cinq champs depuis le 17/08/2026** : libellé, unité, sens de lecture,
+ * source, et la **cible du produit**. `product_id` ne se lit pas ici — il est
+ * lié côté serveur ; `archived_at` non plus — il ne se pose que par `archive()` ;
+ * `is_north_star` non plus — la désignation est un **geste à part**, pas un
+ * champ de formulaire : elle doit éteindre la North Star précédente dans le même
+ * mouvement, ce qu'une case à cocher au milieu d'un formulaire ne dirait pas.
+ *
+ * **La cible saisie ici est celle du produit**, l'objectif global — jamais celle
+ * d'une adoption, qui vit sur `project_indicators` et se saisit dans le panneau
+ * d'adoption de la page projet (`lib/forms/adoption.ts`). Deux cibles, deux
+ * formulaires, deux sens.
  *
  * **L'unité est un texte libre, et c'est le schéma qui le dit** :
  * `indicators.unit` est un `text` nullable, il n'existe aucun référentiel
@@ -27,6 +35,11 @@
 
 import { indicatorDirection } from "@/lib/db/schema";
 import { valueOrNull } from "@/lib/forms/project";
+import {
+  decimalAsTyped,
+  isDecimal,
+  normalizeDecimal,
+} from "@/lib/forms/result";
 
 /**
  * `higher_is_better` · `lower_is_better`. Dérivé du schéma, jamais réécrit à la
@@ -68,6 +81,11 @@ export type IndicatorFormValues = {
   direction: string;
   /** « Portail analytics ». Facultative — la colonne est nullable. */
   source: string;
+  /**
+   * La cible du produit — « 85 ». Facultative : un indicateur peut n'en porter
+   * aucune, et c'est un état normal.
+   */
+  targetValue: string;
 };
 
 export type IndicatorFormErrors = Partial<
@@ -91,6 +109,7 @@ export const EMPTY_INDICATOR_VALUES: IndicatorFormValues = {
   unit: "",
   direction: "",
   source: "",
+  targetValue: "",
 };
 
 /**
@@ -110,12 +129,17 @@ export function toIndicatorFormValues(row: {
   unit: string | null;
   direction: IndicatorDirectionValue;
   source: string | null;
+  targetValue: string | null;
 }): IndicatorFormValues {
   return {
     label: row.label,
     unit: row.unit ?? "",
     direction: row.direction,
     source: row.source ?? "",
+    /* La colonne rend « 85.0000 » ; `decimalAsTyped` rend « 85 », c'est-à-dire
+       ce que la personne avait tapé. La règle de `toAdoptionFormValues`. */
+    targetValue:
+      row.targetValue === null ? "" : decimalAsTyped(row.targetValue),
   };
 }
 
@@ -138,6 +162,7 @@ export function readIndicatorForm(formData: FormData): IndicatorFormValues {
     unit: field(formData, "unit"),
     direction: field(formData, "direction"),
     source: field(formData, "source"),
+    targetValue: field(formData, "targetValue"),
   };
 }
 
@@ -167,6 +192,14 @@ export function validateIndicatorForm(
   // `unit` et `source` ne sont pas validées : deux textes libres, nullables en
   // base. Leur imposer une forme serait inventer un référentiel (D25, C7).
 
+  /* La cible est facultative — la colonne est nullable —, mais saisie, elle doit
+     être un nombre : le patron de `results.value` et des trois valeurs de
+     l'adoption. Elle n'est comparée à rien ici : la comparaison au dernier
+     relevé appartient à `targetGap`, et elle est arbitrée à part. */
+  if (values.targetValue && !isDecimal(values.targetValue)) {
+    errors.targetValue = "La cible doit être un nombre.";
+  }
+
   return errors;
 }
 
@@ -187,6 +220,8 @@ export type IndicatorRowInput = {
   direction: IndicatorDirectionValue;
   /** `null` quand rien n'est saisi : la colonne est nullable. */
   source: string | null;
+  /** `null` quand rien n'est saisi : un indicateur peut n'avoir aucune cible. */
+  targetValue: string | null;
 };
 
 /**
@@ -230,6 +265,13 @@ export function parseIndicatorForm(formData: FormData): {
       unit: valueOrNull(values.unit),
       direction,
       source: valueOrNull(values.source),
+      targetValue: decimalOrNull(values.targetValue),
     },
   };
+}
+
+/** Point décimal pour la colonne, ou `null` quand le champ est vide. */
+function decimalOrNull(value: string): string | null {
+  const kept = valueOrNull(value);
+  return kept === null ? null : normalizeDecimal(kept);
 }

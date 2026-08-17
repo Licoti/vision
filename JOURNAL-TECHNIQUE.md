@@ -3063,3 +3063,209 @@ combinaison cumulative des filtres, rejouée sur `statut × approche × recherch
 d'étanchéité de domaine sur un filtre, rejoué sur `approachId` : ce sont des propriétés de la
 mécanique, pas des dimensions retirées. Mise en défaut jouée deux fois : neutraliser `statusId` fait
 tomber 2 tests, neutraliser `approachId` en fait tomber 3, exactement ceux qui les portent.
+
+**Hors ticket, 17/08/2026 — la roadmap quitte le SVG, et l'arbitrage (d) de `tickets-C5.md` avec
+lui.** La maquette `docs/design/maquettes/blocs/roadmap/Roadmap.dc.html` dessine une grille de texte
+à deux colonnes, pas un tracé vectoriel : la frise est reconstruite en HTML, et les courbes
+d'indicateurs sortent dans leur propre bloc (`components/products/indicator-curves.tsx`). **L'axe
+commun aux trois couches, que l'arbitrage (d) posait explicitement, est donc perdu** — la roadmap
+porte le sien, filtrable, les courbes le leur, déduit de leurs seuls relevés. C'est un désaccord
+assumé avec une décision de chantier, pas un oubli : deux blocs distincts ne peuvent pas partager
+une abscisse sans que l'un impose sa fenêtre à l'autre, et c'est la séparation qui était demandée.
+Ce que (d) protégeait vraiment reste tenu : **une bande par indicateur, jamais deux unités sur une
+même verticale.**
+
+**Hors ticket, 17/08/2026 — la contrainte « pas de `viewBox`, donc pas de `polyline` » survit à
+moitié.** Elle gouvernait `timeline.tsx` depuis T5.5. La roadmap, passée au HTML, s'en affranchit
+entièrement — ses barres sont des `<div>` en pourcentage. Le bloc des courbes, lui, reste en SVG
+parce qu'une courbe l'est, et garde donc la règle intacte : une `<line>` par segment, jamais un
+`path`. La note de T5.6 reste vraie, mais **elle ne vaut plus que pour un fichier sur deux** — la
+relire comme une règle du projet serait désormais un contresens.
+
+**Hors ticket, 17/08/2026 — trois éléments de la maquette ne sont pas rendus.** (1) L'**ombre
+portée** de la carte : le design system nomme ses trois élévations sans leur donner de valeur
+(`tokens.css` §8), et la règle « aucun septième substitut ne s'invente » interdit d'en écrire une à
+la main. La carte se distingue par son rayon et son ampleur, pas par sa profondeur. (2) Le **menu
+« … »** (exporter en PDF, partager le lien, paramètres d'affichage) : hors du périmètre de
+`docs/05`, et impossible sans JavaScript. (3) L'application du filtre **à l'`onChange`** : remplacée
+par un bouton « Appliquer », qui est le prix d'un `<form method="get">` natif — le bloc reste
+entièrement rendu sur le serveur, filtre compris.
+
+**Hors ticket, 17/08/2026 — `de` et `a` n'entrent pas dans le décompte d'exclusivité des panneaux.**
+La page produit refuse d'ouvrir un panneau quand plusieurs clés d'ouverture sont présentes (T5.2,
+T5.3). Les deux bornes de la fenêtre de roadmap **n'y sont pas ajoutées**, et c'est délibéré : elles
+n'ouvrent rien, ne posent ni `role="dialog"` ni `inert`, et leur absence est l'état sans filtre
+plutôt qu'une fermeture. Les faire compter fermerait un panneau chaque fois que la roadmap est
+filtrée. La contrepartie assumée est l'inverse : ouvrir un panneau perd la fenêtre, ce qui est
+exactement la dette déjà consignée dans `ETAT.md` (« les filtres ne survivent pas à un aller-retour
+par la navigation principale »). Elle n'est ni creusée ni refermée.
+
+**Hors ticket, 17/08/2026 — `monthBand` borne, donc il fallait un prédicat pour faire disparaître.**
+Piège non évident : `clampIndex` ramène toute borne dans la fenêtre, si bien qu'un accompagnement de
+2024 regardé à travers une fenêtre 2026 ne disparaît pas — il rend une barre **écrasée contre le
+bord gauche**, qui affirme une présence que sa période dément. `withinWindow` est ce qui l'écarte, et
+`hiddenNotice` ce qui l'annonce. La même correction vaut pour les repères. Mise en défaut jouée sur
+quatre règles (`timelineWindow` : bornage, remise à l'endroit ; `withinWindow` : le prédicat ;
+`monthTicks` : le dernier mois forcé) — chacune fait tomber exactement les tests qui la nomment,
+2, 1, 4 et 2, et rien d'autre. **Le premier passage de mise en défaut a menti** : le `grep` de
+filtrage des résultats, calé sur des mots-clés, masquait un test en échec (« borné » ne contient pas
+« borne »). Un filtre lossy sur une sortie de test annule la moitié « et rien d'autre » de la
+discipline — rejoué en imprimant tous les échecs.
+
+**Hors ticket, 17/08/2026 — les sondes de vérification ont été archivées, y compris des anciennes.**
+Quatre états n'existaient dans aucune donnée semée (produit sans accompagnement, accompagnement non
+daté, indicateur sans relevé, indicateur muet à côté d'indicateurs traçés). Ils ont été créés à la
+main dans la base de développement, lus dans le HTML servi, puis archivés. Le nettoyage a filtré sur
+`label like 'SONDE —%'` et a donc **ré-archivé des sondes de tickets antérieurs** au passage :
+4 produits, 2 indicateurs et 2 accompagnements pour 5 lignes créées. Sans conséquence — la base de
+développement est jetable (règle du 14/08/2026) — mais c'est un `archived_at` réécrit sur des lignes
+qu'on n'avait pas créées, et il valait mieux cibler par identifiant.
+
+**Hors ticket, 17/08/2026 — « toutes les bordures en #E4E4EA », sauf celle des deux `<select>`.**
+La demande d'ajustement porte le bloc entier à `surface-neutral-lighter` (greyscale-200, exactement
+#E4E4EA) : carte, barre de filtre, séparateurs de ligne. **La bordure des deux sélecteurs de période
+reste à `content-neutral-normal`** (greyscale-400, 3,88:1 mesuré). Ce n'est pas un oubli : c'est la
+**limite d'un composant de saisie**, que WCAG 1.4.11 mesure à 3:1, et #E4E4EA sur `surface-neutral-pale`
+tombe à 1,24:1 — mesuré. C'est très exactement le manque n°2 du design system et le substitut en
+vigueur depuis T2.3. Un contrôle dont la limite ne se voit pas est un défaut d'accessibilité dans un
+produit dont le centre fait métier d'audits. **À faire trancher** : soit le design system se dote
+d'un jeton de bordure de contrôle, soit l'écart visuel des deux sélecteurs est accepté tel quel.
+
+**Hors ticket, 17/08/2026 — la ligne des repères est masquée par un drapeau, pas supprimée.**
+`SHOW_MILESTONES = false` dans `roadmap.tsx` : le POC n'a pas besoin des activités porteuses d'un
+résultat. Le choix du drapeau plutôt que de la suppression tient à ce que la couche est **entière et
+vivante** — `listProductMilestones`, `monthMark`, `milestoneTitle`, le filtrage par fenêtre. La
+supprimer aurait rendu morte une lecture scopée et testée, pour la ressusciter au prochain ticket.
+**Les dates de mesure continuent de porter l'axe** : rallumer la ligne ne déplacera donc aucune
+barre, ce qui est la propriété qu'on voulait — un drapeau qui change l'axe en le basculant serait un
+drapeau qui ment. Contrepartie assumée : l'axe peut s'étendre au-delà de ce qui est dessiné.
+
+**Hors ticket, 17/08/2026 — un `perl -0pi -e` qui ne s'applique pas ne fait échouer aucun test, et
+ça ressemble à un test faible.** Deuxième mise en défaut de `formatPeriodShort` : zéro échec, ce qui
+se lit d'abord comme « le test ne couvre pas la règle ». La substitution n'avait simplement pas
+trouvé sa cible — le motif multi-lignes ne correspondait pas à la source. Rejouée en **vérifiant que
+la mutation a bien touché le fichier** avant de lire le résultat : un seul test tombe, celui qui
+nomme la règle. **Une mise en défaut se vérifie en deux temps** — que la mutation a pris, puis ce
+qui tombe. Sans le premier, l'absence d'échec est ambiguë et se conclut à faux. C'est le pendant du
+`grep` lossy relevé plus haut le même jour : les deux fois, c'est l'outil de mesure qui mentait.
+
+**Hors ticket, 17/08/2026 — D39 est enfreinte sciemment, et voici où.** La page produit affiche
+désormais **l'écart du dernier relevé à la cible** (« Encore 14 % pour atteindre la cible »,
+« Cible atteinte ») et une **jauge de progression** vers cette cible. Quatre textes l'interdisent en
+propres termes : **D39** (`docs/07`, « est interdit tout indice **calculé par Vision** ») dont
+l'en-tête précise qu'« aucune ne se rouvre en cours de développement » ; **`docs/06` §6** (« aucun
+calcul d'écart […] le point de bascule où Vision cesserait d'être un outil de mémoire pour devenir
+un outil de justification ») ; l'**arbitrage (g)** de `tickets-C5.md` (« ni "atteinte", ni écart au
+dernier relevé, ni pourcentage de progression ») ; et **`brief-design.md` §4.3**. La jauge tombe en
+outre sous les interdits d'interface du `CLAUDE.md` et de `docs/06` §10 (« pourcentage
+d'avancement, jauge de complétion »).
+
+Arbitré par l'humain les 17/08/2026, en deux temps : l'écart d'abord, la jauge ensuite — elle avait
+été écartée au premier tour, puis redemandée. La règle 6 du `CLAUDE.md` prévoit exactement ce cas :
+« un désaccord se consigne dans `JOURNAL-TECHNIQUE.md`, et le travail continue. » C'est fait.
+**Les quatre textes restent en vigueur et disent le contraire du code** : qui les relira trouvera la
+divergence, et c'est ici qu'elle s'explique. Le calcul vit dans `targetGap`
+(`lib/queries/indicators.ts`), isolé et testé, plutôt qu'égrené dans un JSX — une dérogation qu'on
+assume se tient à un seul endroit.
+
+Un piège que la maquette portait et que le code ne reprend pas : elle fait `cible − courant` et
+annonce « Encore X pts », ce qui se lit **à l'envers** d'un indicateur `lower_is_better` — un taux
+d'abandon à 8 % pour une cible à 5 % y passait pour atteint. `targetGap` juge l'atteinte sur
+`direction` et rend une distance **non signée**.
+
+**Hors ticket, 17/08/2026 — la North Star est un concept sans document.** Elle n'existe ni dans
+`docs/02-concepts.md`, ni dans `docs/04-modele-donnees.md`, ni dans aucun chantier restant de
+`docs/05` §5. Elle vit sur `indicators.is_north_star` plutôt qu'en clé sur `products` parce que
+`docs/02` §10 écrit qu'un indicateur « reste un objet à part entière, relié à un produit, **et non
+une propriété de celui-ci** » — un drapeau respecte cette lecture, une clé sur le produit
+l'inverserait. L'unicité est un **index partiel** `(product_id) where is_north_star and archived_at
+is null` : la leçon de `results_activity_unique` (T4bis.6), un indicateur archivé qui garderait son
+drapeau occuperait la place et la désignation suivante lèverait un 500.
+
+**Hors ticket, 17/08/2026 — `indicators.target_value` est un second lieu de vérité pour la cible.**
+`project_indicators.target_value` reste celle d'une **adoption** — ce qu'un accompagnement s'est
+fixé (`docs/02` §4, « toute cible d'indicateur appartient à un projet ») ; la colonne neuve porte
+l'objectif **du produit**. Les deux coexistent et ne disent pas la même chose. L'écran les
+distingue par le dessin — la cible produit porte l'étoile et la jauge, celles d'adoption sont des
+traits discrets. Choix arbitré ; le risque est qu'on saisisse l'une pour l'autre, et la note du
+champ le dit.
+
+**Hors ticket, 17/08/2026 — `setNorthStar` éteint avant d'allumer, et l'ordre n'est pas
+indifférent.** L'index partiel refuse deux North Star vivantes, et `neon-http` n'a pas de
+transaction interactive (dette de T3.6). L'ordre inverse lèverait la violation une fois sur deux.
+C'est le **miroir de T3.6**, qui ordonnait les ajouts avant les retraits pour la raison symétrique :
+là c'est le retrait qui cassait, ici c'est l'ajout. La fenêtre entre les deux écritures laisse le
+produit **sans** North Star, jamais avec deux — l'état dégradé qu'on préfère, lisible et rejouable.
+
+**Hors ticket, 17/08/2026 — premier état d'ouverture côté client.** `indicator-menu.tsx` est un
+`"use client"` qui décide *lui-même* de ce qui est visible, là où les cinq composants clients
+existants (`panel.tsx` et les panneaux de saisie) rendent ce qu'une URL a décidé (D30, tenu depuis
+T3.2). **Sans JavaScript, le menu ne s'ouvre pas** — c'est la seule régression du bloc ; les gestes
+restent atteignables par leur URL (`?indicateur=`, `?releve=`, `?releves=`) mais plus par l'écran.
+Arbitré. Le composant ne reçoit ni droit ni action : ses entrées sont des `<Link>` et des `<form>`
+décidés par le serveur, comme `Panel` n'en reçoit aucune.
+
+**Hors ticket, 17/08/2026 — la contrainte « pas de `viewBox`, donc pas de `path` » ne vaut plus
+partout.** Elle gouvernait la frise depuis T5.6 parce que le SVG portait du **texte**, qu'un
+`viewBox` mis à l'échelle aurait grossi. Le bloc North Star n'en met aucun : points, valeurs et
+graduations sont du HTML posé en pourcentage par-dessus. `viewBox` + `preserveAspectRatio="none"` +
+`vector-effect="non-scaling-stroke"` redonnent donc `path`, et `curvePath` le rend, testé. La note
+de T5.6 reste vraie **pour un SVG qui porte du texte**, et la relire comme une règle du projet
+serait désormais un contresens.
+
+**Hors ticket, 17/08/2026 — l'axe du bloc North Star part de zéro.** `valueScale` bornait au plus
+petit et au plus grand des relevés : la courbe remplissait sa boîte, mais une progression de 54 à
+60 % y ressemblait à une envolée — l'œil lisait une pente qui n'existe pas à cette échelle.
+`axisScale` part de zéro quand toutes les valeurs sont positives, et retombe sur `valueScale` dès
+qu'une descend en dessous — une mesure signée n'a pas de plancher naturel à zéro. La jauge et la
+courbe partagent cette échelle, si bien que la jauge est la projection du dernier point sur l'axe
+du tracé, et non un second système de coordonnées à réconcilier de l'œil.
+
+**Hors ticket, 17/08/2026 — la roadmap est passée sous la liste, contre `docs/06` §6.** Le document
+la veut « au-dessus de la liste des accompagnements, sans la déplacer ». L'ordre de la page est
+désormais : North Star, liste, roadmap. La raison assumée : la North Star porte la question à
+laquelle le produit répond, la roadmap détaille le comment, et le détail vient après. `docs/06` §6
+reste en vigueur et dit le contraire.
+
+**Hors ticket, 17/08/2026 — `app/**` entre dans le périmètre des tests.** `vitest.config.mts`
+n'incluait que `lib/**`, si bien que la discipline « le droit s'éprouve par l'action » n'avait
+aucun chemin pour s'exercer : les actions vivent dans `app/`. `actions.test.ts` est le premier
+fichier de tests d'action du projet ; il remplace `next/headers` et `next/cache`, et rien d'autre —
+la base est réelle, les portes sont les vraies. **Il a démenti deux de mes premisses** : sans
+cookie, `requireSession` ne refuse pas et le domaine ne protège pas — `resolveDomainId` rend le
+premier domaine actif et `resolveAccount` y choisit un compte, si bien qu'on est quelqu'un, parfois
+le responsable. C'est le sélecteur de personne du POC (T1.4, D37), pas un défaut de l'action. Le
+test l'épingle et **tombera en C7**, quand Entra ID remplacera `lib/auth/provider.ts` : c'est ce
+qu'on lui demande.
+
+**Hors ticket, 17/08/2026 — une mise en défaut a révélé un test qui ne tient rien.** Retirer le
+`continue` de la boucle d'extinction de `setNorthStar` ne fait tomber **aucun** test, y compris
+celui nommé « redésigner la North Star en place la laisse en place ». C'est exact et non
+rattrapable par un meilleur test : sans `continue`, l'action écrit `false` puis `true` sur la même
+ligne, et l'état final est identique. Le `continue` est une **économie d'écriture, pas une garantie
+de correction** — le commentaire du code le disait de travers. Conservé pour l'économie, avec le
+commentaire corrigé. → **rien à faire ; noté pour qui relira le test.**
+
+**Hors ticket, 17/08/2026 — la jauge s'arrêtait à la cible, parce que l'échelle se bornait sur les
+données.** Défaut signalé et corrigé le jour même. `axisScale` prenait son maximum au plus haut des
+relevés **et de la cible** ; une cible à 85 % plus haute que tous les relevés devenait donc le
+maximum, et son marqueur se collait au bout de la piste — la jauge « allait jusqu'à 85 % » au lieu
+d'aller jusqu'à 100. Le cas n'est pas marginal : c'est le cas **normal** d'un objectif pas encore
+atteint.
+
+La correction ne peut pas être un référentiel d'unités — D25 en renvoie l'écran à C7, et le
+`CLAUDE.md` interdit d'inventer. Elle lit ce que **la personne a elle-même écrit** :
+`unitCeiling` reconnaît « % » (100) et « /N » (N), et rend `null` pour tout le reste — « jours »,
+« s », « € » n'ont aucun plafond naturel et l'échelle se borne alors sur les données, comme avant.
+Ce n'est pas un référentiel : c'est la lecture d'une notation.
+
+Deux gardes que la mise en défaut tient : le plafond **ne rogne jamais une donnée** (un 120 % saisi
+par erreur reste visible — une échelle qui cache une valeur ment davantage qu'une échelle trop
+haute), et il **ne s'applique pas à une grandeur signée** (une variation en points de pourcentage
+n'est pas un pourcentage).
+
+**Corollaire : la sparkline des cartes ne partage pas cette échelle.** Elle est revenue à
+`valueScale` — min → max de la série —, ce que fait aussi le `spark()` de la maquette. Une
+sparkline montre une **forme** ; partir de zéro l'aplatirait jusqu'à l'illisible. Elle n'est pas
+décorative pour autant : la carte écrit la valeur, sa date, le sens de lecture et le décompte à
+côté. Le grand tracé, lui, a un axe chiffré et part de zéro.

@@ -204,6 +204,38 @@ export function IndicatorPanel({
           className={`${CONTROL} ${borderOf(errors.source)}`}
         />
       </FormField>
+
+      {/* **La cible du produit, et non celle d'un accompagnement.** Les deux
+          existent et ne disent pas la même chose : celle-ci est l'objectif
+          global, celle de `project_indicators` est ce qu'un accompagnement
+          s'est fixé et se saisit dans le panneau d'adoption de la page projet.
+          La note le dit, faute de quoi on saisirait l'une pour l'autre.
+
+          `inputMode="decimal"` et jamais `type="number"` : la règle de
+          `results.value` et du relevé — un `number` refuse la virgule
+          française selon la locale du navigateur, et masque la saisie au lieu
+          de la refuser avec un message. */}
+      <FormField
+        label="Cible du produit"
+        htmlFor="indicateur-cible"
+        note="Facultative. L'objectif global du produit sur cette mesure — pas la cible que se donne un accompagnement."
+        error={errors.targetValue}
+        errorId="indicateur-cible-erreur"
+      >
+        <input
+          id="indicateur-cible"
+          name="targetValue"
+          type="text"
+          inputMode="decimal"
+          defaultValue={values.targetValue}
+          autoComplete="off"
+          aria-invalid={errors.targetValue ? true : undefined}
+          aria-describedby={
+            errors.targetValue ? "indicateur-cible-erreur" : undefined
+          }
+          className={`${CONTROL} ${borderOf(errors.targetValue)}`}
+        />
+      </FormField>
     </Panel>
   );
 }

@@ -22,9 +22,10 @@
  * courant. Règle 1.
  */
 
-import { and, asc, desc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, or, sql } from "drizzle-orm";
 
 import type { ScopedDb } from "@/lib/db/scoped";
+import { valueScale, type ValueScale } from "@/lib/queries/timeline";
 import {
   indicatorDirection,
   indicatorReadings,
@@ -76,6 +77,23 @@ export type ProductIndicator = {
    * accompagnements d'un produit depuis T2.2.
    */
   adoptionCount: number;
+  /**
+   * L'indicateur est-il la **North Star** du produit ? (hors ticket, 17/08/2026)
+   *
+   * Un produit en porte au plus une vivante — l'index unique partiel
+   * `indicators_north_star_unique` le garantit en base, pas seulement à l'écran.
+   * Aucune n'est un état normal, pas un manque.
+   */
+  isNorthStar: boolean;
+  /**
+   * La cible **du produit** sur cet indicateur, brute — « 85.0000 ».
+   *
+   * **Ce n'est pas la cible d'une adoption.** Celle-ci vit sur
+   * `project_indicators` et dit ce qu'un accompagnement s'est fixé ; celle-là
+   * dit l'objectif global du produit. Les deux se lisent côte à côte dans le
+   * bloc, nommées distinctement.
+   */
+  targetValue: string | null;
 };
 
 /**
@@ -130,6 +148,8 @@ export function listProductIndicators(
         unit: indicators.unit,
         direction: indicators.direction,
         source: indicators.source,
+        isNorthStar: indicators.isNorthStar,
+        targetValue: indicators.targetValue,
         readingCount: sql<number>`count(${indicatorReadings.id})::int`,
         lastValue: sql<string | null>`(array_agg(${indicatorReadings.value} order by ${indicatorReadings.readOn} desc, ${indicatorReadings.id} desc))[1]`,
         lastReadOn: sql<string | null>`(array_agg(${indicatorReadings.readOn} order by ${indicatorReadings.readOn} desc, ${indicatorReadings.id} desc))[1]`,
@@ -153,7 +173,15 @@ export function listProductIndicators(
       )
       // La clé primaire suffit à PostgreSQL pour les autres colonnes du groupe.
       .groupBy(indicators.id)
-      .orderBy(asc(indicators.label), asc(indicators.id));
+      /* **La North Star d'abord**, puis l'ordre alphabétique de T5.1 inchangé.
+         Le tri est ici et non à l'écran : un composant qui retrierait un tableau
+         déjà trié ferait dépendre l'ordre de deux endroits, et `desc` sur un
+         booléen met `true` en tête en PostgreSQL. */
+      .orderBy(
+        desc(indicators.isNorthStar),
+        asc(indicators.label),
+        asc(indicators.id),
+      );
   });
 }
 
@@ -274,6 +302,232 @@ export function groupByIndicator(
     else grouped.set(reading.indicatorId, [reading]);
   }
   return grouped;
+}
+
+/* ==========================================================================
+   L'écart à la cible — hors ticket, 17/08/2026
+
+   ⚠ **Cette fonction calcule ce que le projet interdit, et c'est délibéré.**
+   Elle soustrait une cible saisie d'un relevé daté, ce que quatre textes
+   refusent en propres termes :
+
+     · D39 (`docs/07`) — « est interdit tout indice **calculé par Vision** » ;
+     · `docs/06` §6 — « aucun calcul d'écart […] c'est le point de bascule où
+       Vision cesserait d'être un outil de mémoire pour devenir un outil de
+       justification » ;
+     · arbitrage (g) de `tickets-C5.md` — « Ni "atteinte", ni écart au dernier
+       relevé […] leur différence serait un indice » ;
+     · `docs/design/brief-design.md` §4.3, dans les mêmes termes.
+
+   Arbitré par l'humain le 17/08/2026, consigné dans `JOURNAL-TECHNIQUE.md`
+   comme le prévoit la règle 6 du `CLAUDE.md`. Les quatre textes restent en
+   vigueur et disent le contraire de ce code : quiconque les relit trouvera la
+   divergence, et c'est ici qu'elle s'explique.
+
+   Elle vit en `lib/` et non dans un JSX pour la raison de tout ce module : un
+   calcul s'éprouve par un test.
+   ========================================================================== */
+
+/** Où en est le dernier relevé par rapport à la cible du produit. */
+export type TargetGap = {
+  /** La cible est-elle atteinte, au sens de `direction` ? */
+  reached: boolean;
+  /**
+   * La distance qui reste, **en valeur absolue** et jamais signée : le sens est
+   * porté par `reached`, pas par un signe que le lecteur devrait interpréter.
+   * Vaut 0 quand la cible est exactement atteinte.
+   */
+  distance: number;
+};
+
+/**
+ * L'écart entre le dernier relevé et la cible du produit, **selon le sens de
+ * lecture de l'indicateur**.
+ *
+ * C'est le point où la maquette se trompait : elle fait `target - current` et
+ * annonce « Encore X pts », ce qui se lit à l'envers d'un indicateur
+ * `lower_is_better` — un taux d'abandon à 8 % pour une cible à 5 % n'a pas
+ * « atteint » sa cible parce que 8 dépasse 5. L'atteinte se juge donc sur
+ * `direction`, jamais sur le seul signe de la différence.
+ *
+ * Rend `null` quand il n'y a rien à comparer : pas de cible, pas de relevé, ou
+ * l'une des deux valeurs illisible. L'écran n'affiche alors aucune phrase — une
+ * comparaison sans ses deux termes ne s'invente pas.
+ */
+export function targetGap(
+  target: string | null,
+  lastValue: string | null,
+  direction: IndicatorDirection,
+): TargetGap | null {
+  const goal = toFiniteNumber(target);
+  const current = toFiniteNumber(lastValue);
+  if (goal === null || current === null) return null;
+
+  const reached =
+    direction === "higher_is_better" ? current >= goal : current <= goal;
+
+  return { reached, distance: Math.abs(goal - current) };
+}
+
+/**
+ * Ce qu'une valeur `numeric(18,4)` vaut en nombre, ou `null` si elle ne vaut
+ * rien. `Number("")` valant 0, la chaîne vide est écartée avant tout — une
+ * valeur absente n'est pas une valeur nulle. Le jumeau de `toNumber` dans
+ * `lib/queries/timeline.ts`, qui sert les échelles verticales.
+ */
+function toFiniteNumber(value: string | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  if (value.trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/* ==========================================================================
+   L'échelle verticale du bloc North Star — hors ticket, 17/08/2026
+
+   **Une seule échelle pour la jauge et pour la courbe**, si bien que les deux se
+   lisent ensemble : la jauge est la projection du dernier point sur l'axe du
+   tracé, et non un second système de coordonnées à réconcilier de l'œil.
+   ========================================================================== */
+
+/**
+ * Le plafond que l'**unité** déclare, quand elle en déclare un.
+ *
+ * `indicators.unit` est un texte libre — il n'existe aucun référentiel d'unités,
+ * et en inventer un serait l'écran de gestion des référentiels que D25 renvoie à
+ * C7. Mais deux formes d'unité **portent leur maximum dans leur écriture**, et
+ * s'en priver donnait le défaut du 17/08/2026 : une jauge dont la piste
+ * s'arrêtait à la cible, la cible étant la plus haute valeur connue.
+ *
+ *   · « % » — un pourcentage plafonne à 100 ;
+ *   · « /100 », « /5 », « /20 » — une note sur N plafonne à N.
+ *
+ * Tout le reste — « jours », « s », « €» — n'a **aucun plafond naturel**, et on
+ * n'en invente pas : `null`, et l'échelle se borne alors sur les données.
+ *
+ * Ce n'est pas un référentiel : c'est la lecture d'une notation que la personne
+ * a elle-même écrite. Une unité inconnue ne provoque rien.
+ */
+export function unitCeiling(unit: string | null | undefined): number | null {
+  if (!unit) return null;
+  const trimmed = unit.trim();
+
+  if (trimmed === "%") return 100;
+
+  /* « /100 » et ses variantes. La virgule décimale est acceptée : c'est la
+     notation française, et `normalizeDecimal` la tolère partout ailleurs. */
+  const fraction = /^\/\s*(\d+(?:[.,]\d+)?)$/u.exec(trimmed);
+  if (!fraction?.[1]) return null;
+
+  const ceiling = Number(fraction[1].replace(",", "."));
+  return Number.isFinite(ceiling) && ceiling > 0 ? ceiling : null;
+}
+
+/**
+ * L'échelle qui **part de zéro** quand elle le peut, et monte au plafond de
+ * l'unité quand celle-ci en déclare un.
+ *
+ * `valueScale` borne au plus petit et au plus grand des relevés : la courbe
+ * remplit sa boîte, mais une progression de 54 à 60 % y ressemble à une envolée
+ * — l'œil lit une pente qui n'existe pas à cette échelle. Partir de zéro rend
+ * l'amplitude vraie : six points se voient comme six points.
+ *
+ * **Le plafond de l'unité règle le défaut de la jauge** : sans lui, une cible à
+ * 85 % plus haute que tous les relevés devenait le maximum de l'échelle, et son
+ * marqueur se collait au bout de la piste — la jauge « s'arrêtait à 85 % ».
+ * Avec lui, la piste va jusqu'à 100 et la cible se lit là où elle est.
+ *
+ * **Le plafond ne rogne jamais une donnée** : `Math.max` le confronte au plus
+ * haut relevé, si bien qu'un 120 % saisi par erreur reste visible au lieu d'être
+ * écrêté hors de la boîte. Une échelle qui cache une valeur ment davantage
+ * qu'une échelle trop haute.
+ *
+ * **Le zéro n'est pas toujours possible**, et c'est le seul autre cas
+ * particulier : une mesure qui descend sous zéro — un solde, une variation —
+ * n'a pas de plancher naturel à zéro, et l'y forcer sortirait ses relevés de la
+ * boîte. On retombe alors sur `valueScale`, plafond d'unité compris : une
+ * grandeur signée n'est pas un pourcentage.
+ *
+ * Rend `null` quand rien n'est exploitable : il n'y a alors pas d'axe, et
+ * l'état vide appartient à l'écran (règle 5).
+ */
+export function axisScale(
+  values: readonly (string | number | null | undefined)[],
+  unit?: string | null,
+): ValueScale | null {
+  const bounds = valueScale(values);
+  if (!bounds) return null;
+  if (bounds.min < 0) return bounds;
+
+  const ceiling = unitCeiling(unit);
+
+  return {
+    min: 0,
+    max: ceiling === null ? bounds.max : Math.max(ceiling, bounds.max),
+  };
+}
+
+/* ==========================================================================
+   Le tracé d'une courbe — hors ticket, 17/08/2026
+
+   **La contrainte « pas de `viewBox`, donc pas de `path` » ne vaut plus ici**, et
+   la maquette montre pourquoi. La frise n'avait pas de `viewBox` parce que son
+   texte aurait été mis à l'échelle avec le dessin ; d'où l'interdiction de
+   `polyline` et de `path`, dont les attributs n'acceptent pas de pourcentage, et
+   une `<line>` par segment (T5.6, consigné).
+
+   Le bloc fusionné ne met **aucun texte dans le SVG** : les points, les valeurs
+   et les graduations sont des éléments HTML posés en pourcentage par-dessus. Le
+   `viewBox` redevient donc sans danger, et avec lui le `path` — à condition de
+   `preserveAspectRatio="none"` pour que le tracé remplisse sa boîte, et de
+   `vector-effect="non-scaling-stroke"` pour que le trait garde son épaisseur
+   malgré l'étirement.
+   ========================================================================== */
+
+/** Un point du tracé, en pourcentage des deux côtés de sa boîte. */
+export type CurvePoint = {
+  /** De 0 à 100, depuis la gauche. */
+  x: number;
+  /** De 0 à 100, depuis le **bas** — le sens de lecture d'une courbe. */
+  y: number;
+};
+
+/**
+ * L'attribut `d` d'un tracé, dans un `viewBox="0 0 100 100"`.
+ *
+ * Les ordonnées sont **retournées ici** : `y` arrive compté depuis le bas, le
+ * SVG compte le sien depuis le haut. Le retournement vit dans cette fonction et
+ * pas dans l'appelant, pour qu'il n'ait à se faire qu'une fois et qu'un test le
+ * tienne.
+ *
+ * **Un point isolé rend un segment nul** (`M x,y L x,y`) plutôt qu'une chaîne
+ * vide : un `path` sans `d` valide est ignoré par le navigateur, et le point
+ * seul disparaîtrait au lieu de se marquer. Deux relevés du même mois y donnent
+ * deux points superposés, ce qui est ce qu'ils disent.
+ *
+ * Aucune courbe de Bézier, aucun lissage : le segment joint deux faits, il n'en
+ * invente pas un troisième.
+ */
+export function curvePath(points: readonly CurvePoint[]): string {
+  if (points.length === 0) return "";
+
+  const at = (point: CurvePoint) =>
+    `${round4(point.x)},${round4(100 - point.y)}`;
+
+  if (points.length === 1) {
+    const only = points[0] as CurvePoint;
+    return `M${at(only)} L${at(only)}`;
+  }
+
+  return `M${points.map(at).join(" L")}`;
+}
+
+/**
+ * Quatre décimales : le HTML servi doit être **stable d'un rendu à l'autre**
+ * pour se relire et se tester. La règle de `round` dans `lib/queries/timeline`.
+ */
+function round4(value: number): number {
+  return Math.round(value * 10_000) / 10_000;
 }
 
 export type ProjectAdoption = {
@@ -430,72 +684,76 @@ export function listAdoptableIndicators(
 }
 
 /* ==========================================================================
-   Les cibles — T5.6
+   Les adoptions d'un produit — T5.6, élargi hors ticket le 17/08/2026
 
-   La cible d'une bande de courbe. Elle appartient à une **adoption**, jamais au
-   produit : c'est un accompagnement qui se donne un repère, et la même mesure
-   peut en porter deux si deux accompagnements l'ont adoptée.
+   Ce qu'un accompagnement s'est donné sur un indicateur du produit : sa
+   référence, sa cible, sa valeur finale. Une même mesure peut en porter deux si
+   deux accompagnements l'ont adoptée.
 
-   **La cible est un repère, jamais un état** (arbitrage (g), D39) : ce module
-   rend la valeur saisie, brute, avec l'accompagnement qui la porte. Ni écart au
-   dernier relevé, ni « atteinte », ni pourcentage de progression — `docs/03` §7
-   nomme le « +12 % depuis l'accompagnement » comme le point de bascule.
+   **Cette lecture remplace `listProductTargets`**, qui ne rendait que les
+   adoptions porteuses d'une cible. Le bloc fusionné a besoin des autres : il
+   écrit sous chaque indicateur les accompagnements qui l'ont adopté, cible ou
+   non. Une lecture qui filtrait pour un seul usage en servait un ; celle-ci en
+   sert deux sans coûter davantage — le `where` tombe, rien d'autre ne change.
+
+   **La cible d'adoption n'est pas la cible du produit.** Depuis le 17/08/2026,
+   `indicators.target_value` porte l'objectif global du produit ; celle-ci reste
+   ce qu'un accompagnement donné s'est fixé (`docs/02` §4). Les deux se lisent
+   côte à côte et l'écran les nomme distinctement.
    ========================================================================== */
 
-/** Une cible portée par une adoption : de quoi tracer un repère et le nommer. */
-export type IndicatorTarget = {
-  /** L'indicateur visé — la clé du regroupement par bande. */
+/** Ce qu'un accompagnement s'est donné sur un indicateur du produit. */
+export type ProductAdoption = {
+  /** L'indicateur visé — la clé du regroupement par indicateur. */
   indicatorId: string;
   projectId: string;
   /**
-   * Le nom de l'accompagnement. Une bande peut porter deux cibles ; sans lui,
-   * rien ne dirait laquelle vient d'où.
+   * Le nom de l'accompagnement. Un indicateur peut porter deux adoptions ; sans
+   * lui, rien ne dirait laquelle vient d'où.
    */
   projectName: string;
-  /** Brute — « 85.0000 ». La mise en forme appartient à l'écran. */
-  targetValue: string;
+  /** Brutes — « 85.0000 ». La mise en forme appartient à l'écran. */
+  baselineValue: string | null;
+  targetValue: string | null;
+  finalValue: string | null;
 };
 
 /**
- * Les cibles que les accompagnements **vivants** d'un produit se sont données.
+ * Les adoptions des accompagnements **vivants** d'un produit.
  *
  * **Une seule lecture pour toute la couche**, quel que soit le nombre
- * d'indicateurs : la frise ne descend pas indicateur par indicateur — la règle
- * de T5.1, tenue par les quatre lectures de cette page.
+ * d'indicateurs : le bloc ne descend pas indicateur par indicateur — la règle de
+ * T5.1, tenue par les lectures de cette page.
  *
  * `innerJoin` sur `projects` : la jointure **est** la question. Elle porte le
  * rattachement au produit, le nom de l'accompagnement, et son archivage. **Les
- * accompagnements archivés sont écartés parce que la frise les écarte déjà** —
- * `listProductProjects` pour les bandes, `listProductMilestones` pour les
- * repères : une cible sans bande sous laquelle se lire serait un repère
- * orphelin sur un axe qui ne porte plus son accompagnement.
+ * accompagnements archivés sont écartés parce que la roadmap les écarte déjà** —
+ * `listProductProjects` pour les barres, `listProductMilestones` pour les
+ * repères : une cible sans accompagnement sous lequel se lire serait un repère
+ * orphelin.
  *
  * **Aucune jointure sur `indicators`**, et c'est délibéré : le composant range
- * chaque cible sous la bande de son indicateur, et une cible dont l'indicateur
- * ne se lit pas — archivé, ou d'un autre produit — n'a aucune bande où se poser.
- * Elle est ignorée à l'écran sans qu'une seconde jointure la filtre ici.
- *
- * `isNotNull(targetValue)` plutôt qu'un tri des nulles à l'écran : une adoption
- * sans cible n'a pas de repère à tracer, et la lecture rend ce qui se dessine.
+ * chaque adoption sous son indicateur, et une adoption dont l'indicateur ne se
+ * lit pas — archivé, ou d'un autre produit — n'a nulle part où se poser. Elle
+ * est ignorée à l'écran sans qu'une seconde jointure la filtre ici.
  *
  * Le tri est par nom d'accompagnement, `id` départageant deux homonymes : un
  * ordre qui varierait d'un affichage à l'autre serait un défaut — la règle de
  * tri de `listProjectResources`.
  */
-export function listProductTargets(
+export function listProductAdoptions(
   scope: ScopedDb,
   productId: string,
-): Promise<IndicatorTarget[]> {
+): Promise<ProductAdoption[]> {
   return scope.joinedRead(async (database, { filter }) => {
     return database
       .select({
         indicatorId: projectIndicators.indicatorId,
         projectId: projects.id,
         projectName: projects.name,
-        /* La colonne est `numeric` **nullable** : le `isNotNull` du `where` la
-           rend non nulle en fait, et ce `sql` le dit au type — sans quoi
-           l'écran porterait un `string | null` qu'il ne peut plus rencontrer. */
-        targetValue: sql<string>`${projectIndicators.targetValue}`,
+        baselineValue: projectIndicators.baselineValue,
+        targetValue: projectIndicators.targetValue,
+        finalValue: projectIndicators.finalValue,
       })
       .from(projectIndicators)
       .innerJoin(
@@ -507,12 +765,7 @@ export function listProductTargets(
           isNull(projects.archivedAt),
         ),
       )
-      .where(
-        and(
-          filter(projectIndicators),
-          isNotNull(projectIndicators.targetValue),
-        ),
-      )
+      .where(filter(projectIndicators))
       .orderBy(asc(projects.name), asc(projectIndicators.id));
   });
 }

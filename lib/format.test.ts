@@ -28,6 +28,8 @@ import {
   formatDateMonth,
   formatDay,
   formatIndicatorDirection,
+  formatMonthTick,
+  formatPeriodShort,
   formatReadings,
   formatResultValue,
 } from "./format";
@@ -113,6 +115,54 @@ describe("formatDateMonth", () => {
     // rendrait « décembre 2025 ». Les trois relevés de la fixture tombent tous
     // un premier du mois — c'est le cas nominal, pas un cas limite.
     expect(formatDateMonth("2026-01-01")).toBe("janvier 2026");
+  });
+});
+
+describe("formatMonthTick", () => {
+  test("rend le mois abrégé et le millésime à deux chiffres", () => {
+    /* La graduation vit dans la largeur d'une tranche d'axe : « septembre 2026 »
+       écrit huit fois de suite se chevauche là où « sept. '26 » tient. */
+    expect(formatMonthTick("2026-09")).toBe("sept. '26");
+    expect(formatMonthTick("2024-03")).toBe("mars '24");
+  });
+
+  test("reçoit « YYYY-MM », et non une colonne `date`", () => {
+    // Une graduation situe un mois ; elle ne date aucun fait, donc pas de jour.
+    expect(formatMonthTick("2025-01")).toBe("janv. '25");
+  });
+
+  test("un janvier ne recule pas sur l'année précédente", () => {
+    /* Le piège du fuseau, en pire qu'ailleurs : la fonction force le jour au
+       premier, donc **toute** graduation reculerait sans `timeZone: "UTC"` —
+       et « janv. '26 » deviendrait « déc. '25 ». */
+    expect(formatMonthTick("2026-01")).toBe("janv. '26");
+  });
+});
+
+describe("formatPeriodShort", () => {
+  test("abrège le mois et garde le millésime entier", () => {
+    /* « septembre 2024 » poussait la période sous la pastille de statut dans la
+       colonne de 280 px de la roadmap. Le mois s'abrège, l'année non : une
+       période se lit seule, là où une graduation se lit dans son voisinage. */
+    expect(formatPeriodShort("2024-03-01", "2024-09-30")).toBe(
+      "mars 2024 → sept. 2024",
+    );
+  });
+
+  test("les quatre cas de `formatPeriod`, à l'identique", () => {
+    // Une période ouverte se dit « depuis » : un accompagnement en cours n'a
+    // pas une fin manquante, il n'en a pas encore.
+    expect(formatPeriodShort("2026-02-01", null)).toBe("depuis févr. 2026");
+    expect(formatPeriodShort(null, "2024-09-30")).toBe("jusqu'à sept. 2024");
+    expect(formatPeriodShort(null, null)).toBe("Période non renseignée");
+  });
+
+  test("un premier du mois ne recule pas d'un mois", () => {
+    // Le piège du fuseau, celui de `MONTH` : sans `timeZone: "UTC"`, un serveur
+    // à l'ouest rendrait « déc. 2025 ».
+    expect(formatPeriodShort("2026-01-01", "2026-01-31")).toBe(
+      "janv. 2026 → janv. 2026",
+    );
   });
 });
 

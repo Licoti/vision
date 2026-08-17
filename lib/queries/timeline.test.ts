@@ -35,10 +35,15 @@ import {
   listProductMilestones,
   monthBand,
   monthMark,
+  monthTicks,
   timelineScale,
+  timelineWindow,
   valueOffset,
   valueScale,
-  yearTicks,
+  windowMonths,
+  windowYears,
+  withinWindow,
+  yearWindow,
   type TimelineScale,
   type ValueScale,
 } from "./timeline";
@@ -162,27 +167,209 @@ describe("monthMark — la position d'un repère", () => {
   });
 });
 
-describe("yearTicks — les graduations d'année", () => {
-  test("un janvier compris dans la fenêtre porte son millésime", () => {
-    const scale = timelineScale(["2024-03-01", "2026-02-01"]) as TimelineScale;
+describe("monthTicks — les graduations de l'axe", () => {
+  test("le pas suit la largeur de la fenêtre, en trois paliers", () => {
+    /* ≤ 8 mois → 2 · ≤ 16 → 3 · au-delà → 6. Le décompte suffit à les
+       distinguer : 7 mois de pas 2 en donnent 4, de pas 3 en donneraient 3. */
+    const narrow = timelineScale(["2026-01-01", "2026-07-01"]) as TimelineScale;
+    const middle = timelineScale(["2026-01-01", "2027-01-01"]) as TimelineScale;
+    const wide = timelineScale(["2024-01-01", "2026-12-01"]) as TimelineScale;
 
-    expect(yearTicks(scale)).toEqual([
-      { year: 2025, left: round((10 * 100) / 24) },
-      { year: 2026, left: round((22 * 100) / 24) },
+    expect(narrow.monthCount).toBe(7);
+    expect(monthTicks(narrow).map((t) => t.month)).toEqual([
+      "2026-01",
+      "2026-03",
+      "2026-05",
+      "2026-07",
+    ]);
+
+    expect(middle.monthCount).toBe(13);
+    expect(monthTicks(middle).map((t) => t.month)).toEqual([
+      "2026-01",
+      "2026-04",
+      "2026-07",
+      "2026-10",
+      "2027-01",
+    ]);
+
+    expect(wide.monthCount).toBe(36);
+    expect(monthTicks(wide).map((t) => t.month)).toEqual([
+      "2024-01",
+      "2024-07",
+      "2025-01",
+      "2025-07",
+      "2026-01",
+      "2026-07",
+      "2026-12",
     ]);
   });
 
-  test("une fenêtre dans une seule année n'en porte aucune", () => {
-    const scale = timelineScale(["2026-03-01", "2026-09-01"]) as TimelineScale;
+  test("le dernier mois est toujours gradué, même hors du pas", () => {
+    /* Trente-six mois de pas 6 tombent sur le 31e ; la borne haute de l'axe
+       doit être écrite, sans quoi la fenêtre n'a pas de fin lisible. */
+    const scale = timelineScale(["2024-01-01", "2026-12-01"]) as TimelineScale;
 
-    expect(yearTicks(scale)).toEqual([]);
+    expect(monthTicks(scale).at(-1)?.month).toBe("2026-12");
   });
 
-  test("le janvier de la borne gauche n'est pas gradué", () => {
-    /* Sa graduation tomberait sur le libellé de la borne, déjà écrit. */
-    const scale = timelineScale(["2026-01-01", "2026-12-01"]) as TimelineScale;
+  test("la graduation tombe au bord gauche de la tranche de son mois", () => {
+    // Le même modèle que `monthBand` : filets verticaux et barres s'alignent.
+    const scale = timelineScale(["2024-03-01", "2026-02-01"]) as TimelineScale;
+    const [first, second] = monthTicks(scale);
 
-    expect(yearTicks(scale)).toEqual([]);
+    expect(first?.left).toBe(0);
+    expect(second?.month).toBe("2024-09");
+    expect(second?.left).toBe(round((6 * 100) / 24));
+    expect(monthBand(scale, "2024-09-01", null).left).toBe(second?.left);
+  });
+
+  test("le calage est positionnel : le premier au début, le dernier à la fin", () => {
+    const scale = timelineScale(["2024-01-01", "2026-12-01"]) as TimelineScale;
+    const ticks = monthTicks(scale);
+
+    expect(ticks.at(0)?.anchor).toBe("start");
+    expect(ticks.at(-1)?.anchor).toBe("end");
+    expect(ticks.slice(1, -1).every((t) => t.anchor === "middle")).toBe(true);
+    // Le milieu n'est pas vide : sans lui, les deux constats au-dessus
+    // passeraient sur une graduation unique qui serait ses deux bouts.
+    expect(ticks.slice(1, -1).length).toBeGreaterThan(0);
+  });
+
+  test("une fenêtre d'un seul mois porte une graduation, calée au début", () => {
+    const scale = timelineScale(["2026-08-14"]) as TimelineScale;
+
+    expect(monthTicks(scale)).toEqual([
+      { month: "2026-08", left: 0, anchor: "start" },
+    ]);
+  });
+});
+
+/* ==========================================================================
+   La fenêtre affichée — le filtre de période
+
+   Ce que ces tests épinglent : **tout ce qui vient de l'URL**. Neutraliser le
+   bornage, la garde des deux bornes ou la remise à l'endroit doit les faire
+   tomber, eux et rien d'autre.
+   ========================================================================== */
+
+describe("timelineWindow — la fenêtre demandée par l'URL", () => {
+  /* Mars 2024 → février 2026, vingt-quatre mois. */
+  const scale = timelineScale(["2024-03-01", "2026-02-01"]) as TimelineScale;
+
+  test("deux bornes valides font la fenêtre, bornes comprises", () => {
+    expect(timelineWindow(scale, "2025-01", "2025-12")).toEqual<TimelineScale>({
+      firstMonth: "2025-01",
+      lastMonth: "2025-12",
+      monthCount: 12,
+    });
+  });
+
+  test("sans paramètre, la fenêtre est l'axe entier", () => {
+    expect(timelineWindow(scale, undefined, undefined)).toEqual(scale);
+    expect(timelineWindow(scale, null, null)).toEqual(scale);
+  });
+
+  test("une seule borne ne suffit pas : deviner l'autre serait inventer", () => {
+    expect(timelineWindow(scale, "2025-01", undefined)).toEqual(scale);
+    expect(timelineWindow(scale, undefined, "2025-12")).toEqual(scale);
+  });
+
+  test("un mois malformé est ignoré, jamais réinterprété", () => {
+    /* « 2026-13 » n'est pas un mois : le lire comme janvier 2027 afficherait
+       une fenêtre que personne n'a demandée. */
+    for (const bad of ["oui", "2026", "2026-13", "2026-00", "26-01", ""]) {
+      expect(timelineWindow(scale, bad, "2025-12")).toEqual(scale);
+      expect(timelineWindow(scale, "2025-01", bad)).toEqual(scale);
+    }
+  });
+
+  test("deux bornes à l'envers se remettent à l'endroit", () => {
+    /* Les deux sélecteurs sont indépendants et sans JavaScript : choisir la fin
+       avant le début est un geste courant. */
+    expect(timelineWindow(scale, "2025-12", "2025-01")).toEqual(
+      timelineWindow(scale, "2025-01", "2025-12"),
+    );
+  });
+
+  test("rien n'élargit l'axe : une borne au-delà est ramenée dessus", () => {
+    expect(timelineWindow(scale, "2000-01", "2099-12")).toEqual(scale);
+  });
+
+  test("les deux bornes sur le même mois font une fenêtre d'un mois", () => {
+    expect(timelineWindow(scale, "2025-06", "2025-06")).toEqual<TimelineScale>({
+      firstMonth: "2025-06",
+      lastMonth: "2025-06",
+      monthCount: 1,
+    });
+  });
+});
+
+describe("withinWindow — ce que la fenêtre laisse voir", () => {
+  /* Janvier → décembre 2025. */
+  const scale = timelineScale(["2025-01-01", "2025-12-01"]) as TimelineScale;
+
+  test("une période entièrement antérieure ou postérieure est écartée", () => {
+    expect(withinWindow(scale, "2024-01-01", "2024-12-31")).toBe(false);
+    expect(withinWindow(scale, "2026-01-01", "2026-12-31")).toBe(false);
+  });
+
+  test("une période à cheval sur un bord est gardée", () => {
+    expect(withinWindow(scale, "2024-06-01", "2025-03-31")).toBe(true);
+    expect(withinWindow(scale, "2025-10-01", "2026-06-30")).toBe(true);
+  });
+
+  test("le contact sur un mois de bord suffit : les bornes sont comprises", () => {
+    expect(withinWindow(scale, "2024-01-01", "2025-01-31")).toBe(true);
+    expect(withinWindow(scale, "2025-12-01", "2026-12-31")).toBe(true);
+    /* Un mois de trop de chaque côté, et le contact est rompu. */
+    expect(withinWindow(scale, "2024-01-01", "2024-12-31")).toBe(false);
+  });
+
+  test("une période ouverte court jusqu'au bout du temps, pas jusqu'à l'axe", () => {
+    /* Un accompagnement commencé en 2023 et jamais clos traverse toute fenêtre
+       postérieure — y compris une fenêtre au-delà des données connues. */
+    expect(withinWindow(scale, "2023-01-01", null)).toBe(true);
+    /* Commencé après la fenêtre, il n'y entre pas pour autant. */
+    expect(withinWindow(scale, "2026-01-01", null)).toBe(false);
+  });
+
+  test("une fin antérieure au début se lit comme le seul mois de début", () => {
+    // La lecture de `monthBand`, tenue à l'identique.
+    expect(withinWindow(scale, "2025-06-01", "2024-06-01")).toBe(true);
+    expect(withinWindow(scale, "2024-06-01", "2023-06-01")).toBe(false);
+  });
+});
+
+describe("windowYears / yearWindow / windowMonths — la matière du filtre", () => {
+  const scale = timelineScale(["2024-03-01", "2026-02-01"]) as TimelineScale;
+
+  test("les millésimes proposés sont ceux que les données couvrent", () => {
+    /* Jamais une liste écrite en dur : un préréglage pour une année vide serait
+       un bouton qui ne mène qu'au vide. */
+    expect(windowYears(scale)).toEqual([2024, 2025, 2026]);
+  });
+
+  test("un préréglage d'année est borné à l'axe", () => {
+    // 2024 commence en mars dans les données, 2026 s'arrête en février.
+    expect(yearWindow(scale, 2024)).toEqual<TimelineScale>({
+      firstMonth: "2024-03",
+      lastMonth: "2024-12",
+      monthCount: 10,
+    });
+    expect(yearWindow(scale, 2026)).toEqual<TimelineScale>({
+      firstMonth: "2026-01",
+      lastMonth: "2026-02",
+      monthCount: 2,
+    });
+  });
+
+  test("les mois des sélecteurs sont tous ceux de l'axe, dans l'ordre", () => {
+    const months = windowMonths(scale);
+
+    expect(months).toHaveLength(24);
+    expect(months[0]).toBe("2024-03");
+    expect(months[11]).toBe("2025-02");
+    expect(months[23]).toBe("2026-02");
   });
 });
 

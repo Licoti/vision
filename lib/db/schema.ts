@@ -664,12 +664,47 @@ export const indicators = pgTable(
     direction: indicatorDirection("direction").notNull(),
     /** Portail analytics, outil métier… */
     source: text("source"),
+    /**
+     * La **North Star du produit** : l'indicateur mis en avant, celui qui porte
+     * l'objectif global tous accompagnements confondus.
+     *
+     * **Concept ajouté hors ticket le 17/08/2026**, absent de `docs/02` et de
+     * `docs/04`. Il vit sur l'indicateur et non en clé sur `products` parce que
+     * `docs/02` §10 écrit qu'un indicateur « reste un objet à part entière,
+     * relié à un produit, **et non une propriété de celui-ci** » : un drapeau
+     * respecte cette lecture, une clé sur le produit l'inverserait.
+     *
+     * Un produit peut n'en avoir aucune — c'est l'état par défaut, et un état
+     * normal, pas un manque.
+     */
+    isNorthStar: boolean("is_north_star").notNull().default(false),
+    /**
+     * La cible **du produit** sur cet indicateur — l'objectif global.
+     *
+     * **Ce n'est pas la cible de `project_indicators`**, qui reste celle d'une
+     * adoption : ce qu'un accompagnement donné s'est fixé (`docs/02` §4, « toute
+     * cible d'indicateur appartient à un projet »). Les deux coexistent et ne
+     * disent pas la même chose ; l'écran doit les nommer distinctement pour
+     * qu'on ne les confonde pas. Second lieu de vérité assumé, consigné dans
+     * `JOURNAL-TECHNIQUE.md`.
+     */
+    targetValue: numeric("target_value", { precision: 18, scale: 4 }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     ...stamps,
   },
   (t) => [
     index("indicators_domain_id_idx").on(t.domainId),
     index("indicators_product_id_idx").on(t.productId),
+    /* **Une seule North Star vivante par produit**, et l'unicité est *partielle*
+       pour deux raisons distinctes. `is_north_star` d'abord : une unicité totale
+       sur `product_id` interdirait au produit d'avoir deux indicateurs.
+       `archived_at` ensuite : c'est la leçon de `results_activity_unique`
+       (T4bis.6) — un indicateur archivé qui garderait son drapeau occuperait la
+       place, et désigner son successeur lèverait une violation d'unicité, donc
+       un 500 là où l'on attend un écran. */
+    uniqueIndex("indicators_north_star_unique")
+      .on(t.productId)
+      .where(sql`${t.isNorthStar} and ${t.archivedAt} is null`),
   ],
 );
 

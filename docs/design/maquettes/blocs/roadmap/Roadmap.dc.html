@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #ececed; font-family: 'Poppins', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: #211c5e; }
+  a:hover { color: #3a33a0; }
+  select { font-family: inherit; }
+</style>
+</helmet>
+<div style="min-height: 100%; padding: 40px; display: flex; flex-direction: column; align-items: center; gap: 24px; background: #ececed;">
+
+  <!-- ============ CARD A : ACCOMPAGNEMENTS ============ -->
+  <div style="width: 100%; max-width: 1200px; background: #ffffff; border-radius: 22px; border: 1px solid #e6e6e9; box-shadow: 0 1px 2px rgba(20,20,40,0.04); padding: 34px 40px 40px;">
+
+    <!-- Header + toolbar -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 22px;">
+      <div>
+        <div style="font-size: 22px; font-weight: 700; color: #17172b; letter-spacing: -0.01em;">Roadmap</div>
+        <p style="margin: 4px 0 0; font-size: 14px; color: #6a6a77; line-height: 1.5;">Les chantiers menés dans le temps. Filtrez la période affichée.</p>
+      </div>
+      <div style="position: relative;">
+        <button onClick="{{ toggleMenu }}" aria-label="Plus d'options" title="Plus d'options" style="width: 36px; height: 36px; border-radius: 9px; border: 1px solid #e6e6e9; background: #ffffff; cursor: pointer; display: flex; align-items: center; justify-content: center;" style-hover="background: #f4f4f6;">
+          <span style="display: flex; flex-direction: column; gap: 3px; align-items: center;">
+            <span style="width: 4px; height: 4px; border-radius: 50%; background: #55556e;"></span>
+            <span style="width: 4px; height: 4px; border-radius: 50%; background: #55556e;"></span>
+            <span style="width: 4px; height: 4px; border-radius: 50%; background: #55556e;"></span>
+          </span>
+        </button>
+        <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ closeMenu }}" style="position: fixed; inset: 0; z-index: 10;"></div>
+          <div style="position: absolute; top: calc(100% + 8px); right: 0; z-index: 20; min-width: 216px; background: #ffffff; border: 1px solid #e6e6e9; border-radius: 12px; box-shadow: 0 10px 28px rgba(20,20,40,0.14); padding: 6px;">
+            <sc-for list="{{ menuItems }}" as="mi" hint-placeholder-count="3">
+              <button onClick="{{ mi.onClick }}" style="display: block; width: 100%; text-align: left; padding: 9px 12px; border-radius: 8px; border: none; background: transparent; cursor: pointer; font-family: inherit; font-size: 13px; color: #33334a;" style-hover="background: #f4f4f6;">{{ mi.label }}</button>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+
+    <!-- Filter toolbar -->
+    <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 18px; background: #f7f7f9; border: 1px solid #eeeef1; border-radius: 12px; padding: 10px 14px; margin-bottom: 24px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #6a6a77;">Échelle</span>
+        <div style="display: inline-flex; background: #ececef; border-radius: 9px; padding: 3px; gap: 2px;">
+          <sc-for list="{{ presets }}" as="ps" hint-placeholder-count="5">
+            <button onClick="{{ ps.onClick }}" style="padding: 6px 13px; border-radius: 7px; font-size: 13px; font-weight: 500; border: none; cursor: pointer; font-family: inherit; {{ ps.btnStyle }}">{{ ps.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="width: 1px; height: 26px; background: #e2e2e6;"></div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 13px; color: #6a6a77;">De</span>
+        <select value="{{ from }}" onChange="{{ onFrom }}" style="border: 1px solid #dcdce1; border-radius: 8px; padding: 7px 10px; font-size: 13px; color: #33334a; background: #fff; cursor: pointer;">
+          <sc-for list="{{ monthOptions }}" as="o" hint-placeholder-count="6">
+            <option value="{{ o.idx }}">{{ o.label }}</option>
+          </sc-for>
+        </select>
+        <span style="font-size: 13px; color: #6a6a77;">à</span>
+        <select value="{{ to }}" onChange="{{ onTo }}" style="border: 1px solid #dcdce1; border-radius: 8px; padding: 7px 10px; font-size: 13px; color: #33334a; background: #fff; cursor: pointer;">
+          <sc-for list="{{ monthOptions }}" as="o" hint-placeholder-count="6">
+            <option value="{{ o.idx }}">{{ o.label }}</option>
+          </sc-for>
+        </select>
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div style="position: relative;">
+      <!-- gridlines over plot region -->
+      <div style="position: absolute; left: 304px; right: 0; top: 0; bottom: 0; pointer-events: none;">
+        <sc-for list="{{ ticks }}" as="t" hint-placeholder-count="6">
+          <div style="position: absolute; top: 0; bottom: 0; width: 1px; background: #f2f2f4; left: {{ t.pos }};"></div>
+        </sc-for>
+      </div>
+
+      <!-- axis header -->
+      <div style="display: grid; grid-template-columns: 280px 1fr; column-gap: 24px;">
+        <div></div>
+        <div style="position: relative; height: 34px;">
+          <div style="position: absolute; left: 0; right: 0; bottom: 20px; height: 1px; background: #dcdce0;"></div>
+          <sc-for list="{{ ticks }}" as="t" hint-placeholder-count="6">
+            <div style="position: absolute; bottom: 0; font-size: 12px; color: #6a6a77; white-space: nowrap; left: {{ t.pos }}; transform: {{ t.tf }};">{{ t.label }}</div>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- project rows -->
+      <sc-for list="{{ visibleProjects }}" as="p" hint-placeholder-count="3">
+        <div style="display: grid; grid-template-columns: 280px 1fr; column-gap: 24px; align-items: center; padding: 14px 0; border-top: 1px solid #f4f4f6;">
+          <div style="display: flex; gap: 11px; align-items: flex-start;">
+            
+            <div>
+              <div style="font-size: 16px; font-weight: 600; color: #23233a; line-height: 1.25;">{{ p.title }}</div>
+              <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 6px;">
+                <span style="font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 11px; white-space: nowrap; {{ p.pillStyle }}">{{ p.status }}</span>
+                <span style="font-size: 13px; color: #6a6a77;">{{ p.dateLabel }}</span>
+              </div>
+            </div>
+          </div>
+          <div style="position: relative; height: 16px;">
+            <div title="{{ p.title }}" style="position: absolute; top: 3px; height: 10px; border-radius: 5px; {{ p.barStyle }}"></div>
+          </div>
+        </div>
+      </sc-for>
+
+      <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="padding: 26px 0 6px; text-align: center; font-size: 14px; color: #6a6a77;">Aucun accompagnement sur cette période.</div>
+      </sc-if>
+      <sc-if value="{{ hasHidden }}" hint-placeholder-val="{{ false }}">
+        <div style="padding: 16px 0 0; font-size: 13px; color: #6a6a77;">{{ hiddenLabel }}</div>
+      </sc-if>
+    </div>
+  </div>
+
+  <!-- ============ CARD B : NORTH STAR (INDICATEURS) ============ -->
+  
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:900},&quot;targetValue&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:85,&quot;min&quot;:0,&quot;max&quot;:100,&quot;unit&quot;:&quot;%&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;North Star&quot;},&quot;emphasizeTarget&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;North Star&quot;}}">
+class Component extends DCLogic {
+  MONTHS = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+  DATA_FROM = 2024 * 12 + 2;   // mars 2024
+  DATA_TO   = 2027 * 12 + 2;   // mars 2027
+  state = { from: 2024 * 12 + 2, to: 2027 * 12 + 2, menuOpen: false };
+
+  ml(i) { return this.MONTHS[i % 12] + ' ' + Math.floor(i / 12); }
+  tl(i) { return this.MONTHS[i % 12] + " '" + String(Math.floor(i / 12)).slice(2); }
+
+  renderVals() {
+    const navy = '#211c5e', green = '#1f8a3b';
+    const DF = this.DATA_FROM, DT = this.DATA_TO;
+    const from = this.state.from, to = this.state.to, span = Math.max(1, to - from);
+
+    const monthOptions = [];
+    for (let i = DF; i <= DT; i++) monthOptions.push({ idx: i, label: this.ml(i) });
+
+    const clamp = (v) => Math.max(DF, Math.min(DT, v));
+    const rawPresets = [
+      { label: 'Tout', from: DF, to: DT },
+      { label: '2024', from: clamp(2024 * 12), to: clamp(2024 * 12 + 11) },
+      { label: '2025', from: clamp(2025 * 12), to: clamp(2025 * 12 + 11) },
+      { label: '2026', from: clamp(2026 * 12), to: clamp(2026 * 12 + 11) },
+      { label: '2027', from: clamp(2027 * 12), to: clamp(2027 * 12 + 11) },
+    ];
+    const presets = rawPresets.map(p => {
+      const active = p.from === from && p.to === to;
+      return {
+        label: p.label,
+        onClick: () => this.setState({ from: p.from, to: p.to }),
+        btnStyle: active ? 'background:#211c5e; color:#fff;' : 'background:transparent; color:#5a5a6e;',
+      };
+    });
+
+    const rawProjects = [
+      { title: "Refonte de l'espace documents", s: 2026 * 12 + 8, e: 2027 * 12 + 2, status: 'En cours', color: navy, ongoing: false },
+      { title: 'Autonomie des opérations courantes', s: 2026 * 12 + 1, e: DT, status: 'En cours', color: navy, ongoing: true },
+      { title: 'Refonte du parcours de virement', s: 2024 * 12 + 2, e: 2024 * 12 + 8, status: 'Terminé', color: green, ongoing: false },
+    ];
+    const projects = rawProjects.map(p => {
+      const visible = !(p.e <= from || p.s >= to);
+      const cs = Math.max(p.s, from), ce = Math.min(p.e, to);
+      const left = (cs - from) / span * 100;
+      const width = Math.max(0.5, (ce - cs) / span * 100);
+      const dateLabel = p.ongoing
+        ? 'depuis ' + this.ml(p.s)
+        : this.ml(p.s) + ' → ' + this.ml(p.e);
+      const pillStyle = p.status === 'Terminé'
+        ? 'background:#d2f5de; color:#0f6b33;'
+        : 'background:#cdd8f2; color:#211c5e;';
+      return { title: p.title, status: p.status, dateLabel, pillStyle, color: p.color, visible,
+        barStyle: `left:${left}%; width:${width}%; background:${p.color};` };
+    });
+    const visibleProjects = projects.filter(p => p.visible);
+    const hiddenCount = projects.length - visibleProjects.length;
+
+    const step = span <= 8 ? 2 : span <= 16 ? 3 : 6;
+    const idxs = [];
+    for (let i = from; i <= to; i += step) idxs.push(i);
+    if (idxs[idxs.length - 1] !== to) idxs.push(to);
+    const ticks = idxs.map(i => {
+      const pct = (i - from) / span * 100;
+      return { pos: pct + '%', label: this.tl(i),
+        tf: pct <= 0.5 ? 'translateX(0)' : pct >= 99.5 ? 'translateX(-100%)' : 'translateX(-50%)' };
+    });
+
+    const onFrom = e => { const v = +e.target.value; this.setState(s => ({ from: Math.min(v, s.to - 1) })); };
+    const onTo   = e => { const v = +e.target.value; this.setState(s => ({ to: Math.max(v, s.from + 1) })); };
+
+    const toggleMenu = () => this.setState(s => ({ menuOpen: !s.menuOpen }));
+    const closeMenu = () => this.setState({ menuOpen: false });
+    const menuItems = [
+      { label: 'Exporter en PDF', onClick: closeMenu },
+      { label: 'Partager le lien', onClick: closeMenu },
+      { label: "Paramètres d'affichage", onClick: closeMenu },
+    ];
+
+    // ---- North Star (independent of the filter) ----
+    const target = this.props.targetValue ?? 85;
+    const showGap = this.props.emphasizeTarget ?? true;
+    const H = 170;
+    const nsRaw = [
+      { left: 8, value: 54 }, { left: 42, value: 57 }, { left: 80, value: 60 },
+    ];
+    const current = nsRaw[nsRaw.length - 1].value;
+    const gap = target - current;
+    const nsPoints = nsRaw.map(p => ({ pos: p.left + '%', top: ((100 - p.value) / 100 * H) + 'px', valueLabel: p.value + ' %' }));
+    const nsPath = 'M' + nsRaw.map(p => p.left + ',' + (100 - p.value)).join(' L');
+    const targetTopPx = (100 - target) / 100 * H;
+    const currentTopPx = (100 - current) / 100 * H;
+    const lastX = nsRaw[nsRaw.length - 1].left;
+
+    return {
+      monthOptions, presets, visibleProjects, ticks, from, to,
+      onFrom, onTo,
+      menuOpen: this.state.menuOpen, toggleMenu, closeMenu, menuItems,
+      isEmpty: visibleProjects.length === 0,
+      hasHidden: hiddenCount > 0,
+      hiddenLabel: hiddenCount + (hiddenCount > 1 ? ' accompagnements masqués hors période' : ' accompagnement masqué hors période'),
+      nsName: 'Part des virements réalisés sans contact support',
+      current, currentLabel: current + ' %',
+      target, targetLabel: target + ' %',
+      progressFill: current + '%', targetMarker: target + '%',
+      gapText: gap > 0 ? ('Encore ' + gap + ' pts pour atteindre la cible.') : 'Cible atteinte.',
+      gapLabel: (gap > 0 ? '+' + gap : String(gap)) + ' pts',
+      showGap: showGap && gap > 0,
+      nsPoints, nsPath,
+      targetTop: targetTopPx + 'px',
+      gapStyle: `left:${lastX}%; top:${targetTopPx}px; height:${currentTopPx - targetTopPx}px;`,
+      gapLabelStyle: `left:${lastX}%; top:${(targetTopPx + currentTopPx) / 2}px;`,
+      nsTicks: [ { pos: '8%', label: '2024' }, { pos: '42%', label: '2025' }, { pos: '80%', label: '2026' } ],
+    };
+  }
+}
+</script>
+</body>
+</html>

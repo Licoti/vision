@@ -1,15 +1,21 @@
 /**
- * La frise du temps long de la page produit : ce qu'elle a besoin de lire, et
- * l'échelle sur laquelle elle se dessine (`docs/06` §6, D26 — « la couche temps
- * long attend C5 »).
+ * Le temps long de la page produit : ce qu'il a besoin de lire, et les échelles
+ * sur lesquelles il se dessine (`docs/06` §6, D26 — « la couche temps long
+ * attend C5 »).
  *
- * **Trois couches sur l'axe, et pas une de plus** (`docs/03` §7) : une bande par
- * accompagnement, un repère par activité porteuse d'un résultat, et depuis T5.6
- * une courbe par indicateur. Aucune d'elles ne demande de lecture neuve à ce
- * module hors les repères : `listProductProjects`, `listProductIndicators` et
- * `listProductReadings` rendent déjà tout le reste pour les blocs de la page, et
- * la frise reçoit ce que la page a lu. Ce module porte donc les **repères**, et
- * les **échelles** — celle du temps, partagée par les trois couches, et celle
+ * **Deux blocs le consomment**, et c'est le seul endroit où leurs positions se
+ * calculent : la **roadmap** (`components/products/roadmap.tsx`) — une bande par
+ * accompagnement, un repère par activité porteuse d'un résultat — et les
+ * **courbes d'indicateurs** (`components/products/indicator-curves.tsx`), une
+ * bande de courbe par indicateur. Les deux ont porté le même axe jusqu'au
+ * 17/08/2026 ; ils en portent désormais un chacun, et seule la roadmap est
+ * filtrable. L'écart à l'arbitrage (d) de `tickets-C5.md` est consigné dans
+ * `JOURNAL-TECHNIQUE.md`.
+ *
+ * Aucune couche ne demande de lecture neuve à ce module hors les repères :
+ * `listProductProjects`, `listProductIndicators` et `listProductReadings`
+ * rendent déjà tout le reste pour les blocs de la page. Ce module porte donc les
+ * **repères**, et les **échelles** — celle du temps, avec sa fenêtre, et celle
  * des valeurs, propre à chaque courbe.
  *
  * **Ce module ne calcule aucun indice.** Il rend des faits datés — un résultat
@@ -294,37 +300,192 @@ export function monthMark(scale: TimelineScale, day: string): Percent {
   return round(((clampIndex(scale, day) - first + 0.5) / scale.monthCount) * 100);
 }
 
-/** Une graduation d'année sur l'axe : son millésime, et sa position. */
-export type TimelineYearTick = { year: number; left: Percent };
+/** Une graduation de l'axe : son mois, sa position, et son calage. */
+export type TimelineTick = {
+  /** Le mois gradué, « YYYY-MM ». La mise en forme appartient à `lib/format`. */
+  month: string;
+  left: Percent;
+  /**
+   * De quel côté le libellé se cale sur sa position.
+   *
+   * Sans lui, les libellés des deux bouts débordent de la boîte : centré sur 0 %,
+   * « mars 2024 » sort à gauche de la moitié de sa largeur. Le calage est
+   * **positionnel et non métrique** — le premier au début, le dernier à la fin,
+   * les autres centrés —, ce qui le rend vrai quelle que soit la largeur rendue,
+   * là où un seuil en pourcentage ne vaudrait que pour une largeur donnée.
+   */
+  anchor: "start" | "middle" | "end";
+};
 
 /**
- * Les graduations d'année — un janvier, un millésime.
+ * Les graduations de l'axe — un mois, un libellé, à pas adaptatif.
  *
- * Pas un mois de graduation : vingt-huit libellés ne se lisent pas, et l'axe
- * porte déjà son premier et son dernier mois écrits à ses deux bouts. L'année
- * suffit à situer ce qu'il y a entre les deux.
+ * Le pas suit la largeur de la fenêtre plutôt qu'une règle fixe : sur trois ans
+ * un libellé par semestre suffit, sur six mois il n'en resterait qu'un. Les
+ * trois paliers sont ceux de la maquette (`docs/design/maquettes/blocs/roadmap`).
  *
- * Le janvier du premier mois de l'axe n'en produit pas : sa graduation
- * tomberait sur le libellé de la borne, et redirait ce qui est déjà écrit.
+ * **Le dernier mois est toujours gradué**, même quand le pas ne tombe pas
+ * dessus : c'est la borne haute de l'axe, et une fenêtre dont la fin n'est pas
+ * écrite ne se lit pas. Le premier l'est par construction.
+ *
+ * La position se compte en **tranches de mois**, comme `monthBand` et
+ * `monthMark` : la graduation d'un mois tombe au bord gauche de sa tranche, donc
+ * exactement là où commence la bande d'un accompagnement qui démarre ce mois-là.
+ * Les filets verticaux et les barres s'alignent, ce qui est tout l'intérêt.
  */
-export function yearTicks(scale: TimelineScale): TimelineYearTick[] {
+export function monthTicks(scale: TimelineScale): TimelineTick[] {
   const first = monthIndex(`${scale.firstMonth}-01`);
   const last = first + scale.monthCount - 1;
-  const ticks: TimelineYearTick[] = [];
+  const step = scale.monthCount <= 8 ? 2 : scale.monthCount <= 16 ? 3 : 6;
 
+  const indexes: number[] = [];
+  for (let index = first; index <= last; index += step) indexes.push(index);
+  if (indexes[indexes.length - 1] !== last) indexes.push(last);
+
+  return indexes.map((index, order) => ({
+    month: monthKey(index),
+    left: round(((index - first) / scale.monthCount) * 100),
+    anchor:
+      order === 0
+        ? ("start" as const)
+        : order === indexes.length - 1
+          ? ("end" as const)
+          : ("middle" as const),
+  }));
+}
+
+/* ==========================================================================
+   La fenêtre affichée — le filtre de période de la roadmap
+
+   La roadmap déduit son axe des données, puis le **restreint** à ce que l'URL
+   demande. Les deux temps sont distincts et le second ne peut pas élargir le
+   premier : on ne montre pas un axe qui va au-delà de ce que le produit porte.
+
+   Tout ce qui vient de l'URL entre par ici, et par nulle part ailleurs. C'est
+   ce qui permet de l'éprouver par un test plutôt que de le croire sur un écran.
+   ========================================================================== */
+
+/** « YYYY-MM », et rien d'autre — un mois d'URL est accepté ou ignoré. */
+const MONTH_PARAM = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+/**
+ * La fenêtre demandée par l'URL, ramenée dans ce que les données portent.
+ *
+ * **Les deux bornes ou aucune.** Un seul paramètre est une URL incomplète, et
+ * deviner l'autre reviendrait à afficher une fenêtre que personne n'a demandée :
+ * on retombe alors sur l'axe entier, qui est l'état sans filtre. Idem pour un
+ * mois malformé — « 2026-13 » n'est pas un mois, et le lire comme janvier 2027
+ * serait une invention.
+ *
+ * **Deux bornes à l'envers se remettent à l'endroit.** Les deux sélecteurs sont
+ * indépendants et sans JavaScript pour les contraindre l'un à l'autre : choisir
+ * la fin avant le début est un geste courant, pas une URL malveillante. L'ordre
+ * dans lequel on a désigné deux mois ne porte aucune information — l'intervalle
+ * entre eux, si.
+ *
+ * **Rien n'élargit l'axe** : une borne au-delà des données est ramenée sur la
+ * borne des données, jamais l'inverse.
+ */
+export function timelineWindow(
+  scale: TimelineScale,
+  de: string | null | undefined,
+  a: string | null | undefined,
+): TimelineScale {
+  const first = monthIndex(`${scale.firstMonth}-01`);
+  const last = first + scale.monthCount - 1;
+
+  const read = (value: string | null | undefined): number | null => {
+    if (!value || !MONTH_PARAM.test(value)) return null;
+    const index = monthIndex(`${value}-01`);
+    if (!Number.isFinite(index)) return null;
+    return Math.min(Math.max(index, first), last);
+  };
+
+  const from = read(de);
+  const to = read(a);
+  if (from === null || to === null) return scale;
+
+  const start = Math.min(from, to);
+  const end = Math.max(from, to);
+
+  return {
+    firstMonth: monthKey(start),
+    lastMonth: monthKey(end),
+    monthCount: end - start + 1,
+  };
+}
+
+/**
+ * Une période coupe-t-elle la fenêtre ? Bornes comprises des deux côtés.
+ *
+ * **Sans ce test, rien ne disparaîtrait.** `monthBand` ramène toute borne dans
+ * la fenêtre (`clampIndex`), si bien qu'un accompagnement de 2024 regardé à
+ * travers une fenêtre 2026 rendrait une barre écrasée contre le bord gauche —
+ * une bande qui affirme une présence que la période dément. Ce prédicat est ce
+ * qui l'écarte, et le décompte des écartés est ce qui l'annonce à l'écran.
+ *
+ * Une période ouverte court jusqu'au bout du temps, et non jusqu'au bout de
+ * l'axe : elle coupe toute fenêtre qui commence après son début, y compris une
+ * fenêtre entièrement postérieure aux données connues.
+ */
+export function withinWindow(
+  scale: TimelineScale,
+  from: string,
+  to: string | null,
+): boolean {
+  const first = monthIndex(`${scale.firstMonth}-01`);
+  const last = first + scale.monthCount - 1;
+
+  const start = monthIndex(from);
+  if (!Number.isFinite(start)) return false;
+
+  /* Une fin antérieure au début — que rien n'interdit en base — se lit comme le
+     seul mois de début, exactement comme `monthBand` la lit. */
+  const end = to ? Math.max(monthIndex(to), start) : Number.POSITIVE_INFINITY;
+
+  return start <= last && end >= first;
+}
+
+/**
+ * Les millésimes que les préréglages du filtre proposent.
+ *
+ * Déduits des données, jamais écrits en dur : la maquette liste 2024 à 2027
+ * parce que ses trois accompagnements factices tiennent là-dedans. Un préréglage
+ * pour une année où le produit n'a rien serait un bouton qui ne mène qu'au vide.
+ *
+ * Reçoit l'axe **entier**, et non la fenêtre courante : les préréglages ne se
+ * réduisent pas à mesure qu'on filtre, sans quoi on ne pourrait plus revenir.
+ */
+export function windowYears(scale: TimelineScale): number[] {
   const firstYear = Number(scale.firstMonth.slice(0, 4));
   const lastYear = Number(scale.lastMonth.slice(0, 4));
+  const years: number[] = [];
 
-  for (let year = firstYear; year <= lastYear; year += 1) {
-    const january = year * 12;
-    if (january <= first || january > last) continue;
-    ticks.push({
-      year,
-      left: round(((january - first) / scale.monthCount) * 100),
-    });
+  for (let year = firstYear; year <= lastYear; year += 1) years.push(year);
+
+  return years;
+}
+
+/** Les douze mois d'un millésime, bornés à l'axe — la cible d'un préréglage. */
+export function yearWindow(scale: TimelineScale, year: number): TimelineScale {
+  return timelineWindow(scale, `${year}-01`, `${year}-12`);
+}
+
+/**
+ * Tous les mois de l'axe, du premier au dernier — les options des sélecteurs.
+ *
+ * Reçoit l'axe entier pour la raison de `windowYears` : une fenêtre resserrée ne
+ * doit pas retirer des sélecteurs les mois qui permettraient de l'élargir.
+ */
+export function windowMonths(scale: TimelineScale): string[] {
+  const first = monthIndex(`${scale.firstMonth}-01`);
+  const months: string[] = [];
+
+  for (let index = 0; index < scale.monthCount; index += 1) {
+    months.push(monthKey(first + index));
   }
 
-  return ticks;
+  return months;
 }
 
 /* ==========================================================================

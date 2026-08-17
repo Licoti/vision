@@ -79,6 +79,31 @@ export function formatDateMonth(value: string): string {
 }
 
 /**
+ * Le mois abrégé d'une graduation d'axe : « mars '24 ».
+ *
+ * Reçoit « YYYY-MM » — la clé de mois de `lib/queries/timeline`, et non une
+ * colonne `date` : une graduation situe un mois, elle ne date aucun fait.
+ *
+ * **Abrégé parce qu'il se répète.** Une graduation vit dans la largeur d'une
+ * tranche d'axe, et « septembre 2026 » écrit huit fois de suite se chevauche là
+ * où « sept. '26 » tient. C'est le seul endroit où le millésime se coupe à deux
+ * chiffres : partout ailleurs, `formatMonth` l'écrit en entier.
+ *
+ * Le jour est forcé au premier et le fuseau reste UTC, pour la raison de
+ * `MONTH` — sans quoi un serveur à l'ouest reculerait d'un mois toute
+ * graduation, c'est-à-dire toutes.
+ */
+const MONTH_SHORT = new Intl.DateTimeFormat("fr-FR", {
+  month: "short",
+  timeZone: "UTC",
+});
+
+export function formatMonthTick(month: string): string {
+  const date = parseDay(`${month}-01`);
+  return `${MONTH_SHORT.format(date)} '${month.slice(2, 4)}`;
+}
+
+/**
  * La période d'un accompagnement, au mois (D13).
  *
  * « mars 2024 → septembre 2024 » · « depuis février 2026 » ·
@@ -93,6 +118,44 @@ export function formatPeriod(
 ): string {
   const start = startedOn ? formatMonth(parseDay(startedOn)) : null;
   const end = expectedEndOn ? formatMonth(parseDay(expectedEndOn)) : null;
+
+  if (start && end) return `${start} → ${end}`;
+  if (start) return `depuis ${start}`;
+  if (end) return `jusqu'à ${end}`;
+  return "Période non renseignée";
+}
+
+/**
+ * La même période, **le mois abrégé** : « mars 2024 → sept. 2024 ».
+ *
+ * Pour les colonnes étroites, où `formatPeriod` et son « septembre » au long
+ * poussent la période sur une deuxième ligne — la colonne de 280 px de la
+ * roadmap, où la période partage sa ligne avec la pastille de statut.
+ *
+ * **Le millésime reste entier**, à la différence de `formatMonthTick` : une
+ * graduation se répète le long d'un axe et se lit dans son voisinage, une
+ * période se lit seule et doit se suffire. C'est le mois seul qu'on abrège.
+ *
+ * Les quatre cas de `formatPeriod`, à l'identique : une période ouverte se dit
+ * « depuis » et non « mars 2024 → ? ». Un accompagnement en cours n'a pas une
+ * fin manquante, il n'en a pas encore.
+ */
+const MONTH_SHORT_YEAR = new Intl.DateTimeFormat("fr-FR", {
+  month: "short",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+export function formatPeriodShort(
+  startedOn: string | null,
+  expectedEndOn: string | null,
+): string {
+  const start = startedOn
+    ? MONTH_SHORT_YEAR.format(parseDay(startedOn))
+    : null;
+  const end = expectedEndOn
+    ? MONTH_SHORT_YEAR.format(parseDay(expectedEndOn))
+    : null;
 
   if (start && end) return `${start} → ${end}`;
   if (start) return `depuis ${start}`;

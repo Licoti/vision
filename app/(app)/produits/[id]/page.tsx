@@ -77,6 +77,7 @@ import {
   archiveReading,
   createIndicator,
   createReading,
+  setNorthStar,
   updateIndicator,
   updateReading,
 } from "./actions";
@@ -84,7 +85,8 @@ import { archiveProduct, restoreProduct } from "../actions";
 import { IndicatorPanel } from "@/components/products/indicator-panel";
 import { Indicators } from "@/components/products/indicators";
 import { ReadingPanel } from "@/components/products/reading-panel";
-import { Timeline } from "@/components/products/timeline";
+import { ReadingsPanel } from "@/components/products/readings-panel";
+import { Roadmap } from "@/components/products/roadmap";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
 import { AvatarGroup } from "@/components/ui/avatar";
 import { ConfirmPanel } from "@/components/ui/confirm-panel";
@@ -104,9 +106,9 @@ import {
   ROUTES,
 } from "@/lib/navigation";
 import {
+  listProductAdoptions,
   listProductIndicators,
   listProductReadings,
-  listProductTargets,
 } from "@/lib/queries/indicators";
 import { findProductDetail, listProductProjects } from "@/lib/queries/products";
 import { listProductMilestones } from "@/lib/queries/timeline";
@@ -125,6 +127,15 @@ export default async function ProductPage({
     archiver?: string;
     indicateur?: string;
     releve?: string;
+    /** L'indicateur dont on déplie la série — panneau « Gérer les relevés ». */
+    releves?: string;
+    /**
+     * Les deux bornes de la fenêtre de la roadmap. **Elles ne rejoignent pas le
+     * décompte d'exclusivité** des trois clés au-dessus : elles n'ouvrent aucun
+     * panneau, et leur absence est l'état sans filtre plutôt qu'une fermeture.
+     */
+    de?: string;
+    a?: string;
   }>;
 }) {
   const { id } = await params;
@@ -136,26 +147,26 @@ export default async function ProductPage({
   if (!product) notFound();
 
   /* Cinq lectures indépendantes, un seul temps d'attente — la discipline de
-     T4.1 sur la page projet. Aucune ne dépend du droit : la frise, le bloc
-     « Indicateurs » et la série de chaque indicateur se lisent par tout le
-     domaine (D9), sur un produit vivant comme archivé (règle 4).
+     T4.1 sur la page projet. Aucune ne dépend du droit : la roadmap, les
+     courbes, le bloc « Indicateurs » et la série de chaque indicateur se lisent
+     par tout le domaine (D9), sur un produit vivant comme archivé (règle 4).
 
      La série arrive **plate**, une seule requête pour tout le bloc : le
      regroupement par indicateur appartient au composant, et une lecture par
      indicateur serait exactement ce que T5.1 s'est interdit.
 
-     **La frise n'ajoute qu'une lecture par couche, jamais une par objet** : ses
-     bandes sont les accompagnements que `listProductProjects` rend déjà pour la
-     liste (T5.5), et ses courbes sont les indicateurs et les relevés que les
-     deux lectures du bloc rendent déjà (T5.6). Seuls ses repères et ses cibles
-     demandent une lecture neuve — une chacun. */
-  const [projects, productIndicators, productReadings, milestones, targets] =
+     **Aucun bloc n'ajoute une lecture par objet** : les barres de la roadmap
+     sont les accompagnements que `listProductProjects` rend déjà pour la liste
+     (T5.5), et les courbes sont les indicateurs et les relevés que les deux
+     lectures du bloc rendent déjà (T5.6). Seuls les repères de la roadmap et
+     les cibles des courbes demandent une lecture neuve — une chacun. */
+  const [projects, productIndicators, productReadings, milestones, adoptions] =
     await Promise.all([
       listProductProjects(session.db, product.id),
       listProductIndicators(session.db, product.id),
       listProductReadings(session.db, product.id),
       listProductMilestones(session.db, product.id),
-      listProductTargets(session.db, product.id),
+      listProductAdoptions(session.db, product.id),
     ]);
 
   const archived = product.archivedAt !== null;
@@ -175,7 +186,7 @@ export default async function ProductPage({
     (session.can.manageDomain ||
       projects.some((project) => session.can.writeProject(project.id)));
 
-  const { archiver, indicateur, releve } = await searchParams;
+  const { archiver, indicateur, releve, releves, de, a } = await searchParams;
 
   /* L'exclusivité, avant tout le reste : plusieurs clés d'ouverture
      concurrentes n'en ouvrent aucune. Tout ce qui suit lit `asked`, pas les
@@ -185,8 +196,14 @@ export default async function ProductPage({
      La forme est celle de la page projet (T4.4, T4bis.3) : un **décompte**, et
      non une comparaison binaire. T5.3 y a ajouté `releve` sans que l'énoncé
      change d'un caractère — c'est très exactement ce pour quoi il avait été
-     écrit ainsi. */
-  const keys = { archiver, indicateur, releve };
+     écrit ainsi.
+
+     **`de` et `a` n'y entrent pas**, et le décompte reste donc sur trois clés :
+     ce ne sont pas des clés d'ouverture. Une fenêtre de roadmap ne dispute
+     l'écran à aucun panneau — elle ne pose ni `role="dialog"` ni `inert` —, et
+     les faire compter fermerait un panneau chaque fois que la roadmap est
+     filtrée. */
+  const keys = { archiver, indicateur, releve, releves };
   const conflict =
     Object.values(keys).filter((value) => value !== undefined).length > 1;
   const asked: Partial<typeof keys> = conflict ? {} : keys;
@@ -278,8 +295,34 @@ export default async function ProductPage({
       ? { indicator: editedReadingIndicator, reading: editedReading }
       : null;
 
+  /* La septième clé, et la plus simple : sa valeur est **toujours** un
+     identifiant d'indicateur, jamais polymorphe. La forme est vérifiée avant la
+     base, comme partout sur cette page — une colonne `uuid` interrogée avec
+     n'importe quoi rend une erreur PostgreSQL, donc un 500, là où l'on attend
+     une page nue.
+
+     **Elle ne dépend d'aucun droit** : lire la série d'un indicateur se fait par
+     tout le domaine (D9), comme le bloc lui-même. Ce sont les gestes *dans* le
+     panneau qui tombent avec `canWriteIndicators`. */
+  const readingsTarget =
+    asked.releves && isUuid(asked.releves) ? asked.releves : null;
+
+  const readingsIndicatorRow = readingsTarget
+    ? await session.db.find(indicators, readingsTarget)
+    : undefined;
+
+  const readingsIndicator =
+    readingsIndicatorRow &&
+    readingsIndicatorRow.productId === product.id &&
+    readingsIndicatorRow.archivedAt === null
+      ? productIndicators.find((row) => row.id === readingsIndicatorRow.id)
+      : undefined;
+
   const panelOpen =
-    archivePanelOpen || indicatorPanelOpen || readingPanel !== null;
+    archivePanelOpen ||
+    indicatorPanelOpen ||
+    readingPanel !== null ||
+    readingsIndicator !== undefined;
 
   return (
     <>
@@ -381,6 +424,35 @@ export default async function ProductPage({
         />
       ) : null}
 
+      {/* Le panneau de série (hors ticket, 17/08/2026) : il **se lit par tout le
+          domaine**, à la différence des six autres, et c'est pourquoi son
+          ouverture ne passe pas par `canWriteIndicators`. Ce sont ses trois
+          gestes qui tombent avec le droit, chacun à `null`. */}
+      {readingsIndicator ? (
+        <ReadingsPanel
+          productName={product.name}
+          indicator={readingsIndicator}
+          readings={productReadings.filter(
+            (reading) => reading.indicatorId === readingsIndicator.id,
+          )}
+          closeHref={ROUTES.product(product.id)}
+          addReadingHref={
+            canWriteIndicators
+              ? ROUTES.productReadingNew(product.id, readingsIndicator.id)
+              : null
+          }
+          editReadingHref={
+            canWriteIndicators
+              ? (readingId) =>
+                  ROUTES.productReadingEdit(product.id, readingId)
+              : null
+          }
+          archiveReading={
+            canWriteIndicators ? archiveReading.bind(null, product.id) : null
+          }
+        />
+      ) : null}
+
       {/* `inert` est un attribut HTML, pas un script : le contenu reste lu et
           affiché derrière le voile, mais ne prend plus ni focus ni clic tant
           que le panneau est ouvert. */}
@@ -445,25 +517,56 @@ export default async function ProductPage({
             }
           />
 
-          {/* La frise, **au-dessus de la liste et sans la déplacer**
-              (docs/06 §6) : la liste reste ce qu'elle est depuis T2.2, et
-              devient l'équivalent textuel de la frise. Elle ne connaît aucun
-              droit — la frise se lit par tout le domaine (D9), sur un produit
-              vivant comme archivé — et n'ouvre aucun point d'entrée
-              d'écriture.
+          {/* **Le premier bloc de la page** depuis le 17/08/2026 : la North
+              Star porte l'objectif du produit, et c'est ce qu'on lit d'abord.
+              Le bloc est en pleine largeur, comme la liste — la page produit ne
+              porte aucune grille de blocs de référence, à la différence de la
+              page projet.
 
-              Les indicateurs et les relevés qu'elle reçoit sont **ceux du bloc
-              plus bas** : T5.6 empile ses courbes sans une lecture de plus, et
-              la série écrite sous chaque indicateur reste leur équivalent
-              textuel. */}
-          <Timeline
-            projects={projects}
-            milestones={milestones}
+              **Un seul bloc** : les courbes de T5.6 y ont été fusionnées, avec
+              la North Star en tête. Il reçoit les mêmes tableaux qu'avant —
+              aucune lecture de plus —, plus les adoptions, qui remplacent les
+              seules cibles.
+
+              Les points d'entrée tombent tous avec le même `canWriteIndicators` :
+              le droit dérivé (arbitrage (b)) et la lecture seule d'un produit
+              archivé. `setNorthStar` les rejoint sans qu'une condition s'écrive
+              — c'est la propriété que ce `&&` cherchait. Les actions sont liées
+              au produit **côté serveur** ; le bloc y ajoute l'indicateur au
+              rendu, et chacune redérive le droit sur l'identifiant reçu. */}
+          <Indicators
             indicators={productIndicators}
             readings={productReadings}
-            targets={targets}
+            adoptions={adoptions}
+            addHref={
+              canWriteIndicators ? ROUTES.productIndicatorNew(product.id) : null
+            }
+            editHref={
+              canWriteIndicators
+                ? (indicatorId) =>
+                    ROUTES.productIndicatorEdit(product.id, indicatorId)
+                : null
+            }
+            archiveIndicator={
+              canWriteIndicators
+                ? archiveIndicator.bind(null, product.id)
+                : null
+            }
+            addReadingHref={
+              canWriteIndicators
+                ? (indicatorId) =>
+                    ROUTES.productReadingNew(product.id, indicatorId)
+                : null
+            }
+            /* La série se lit par tout le domaine (D9), comme le bloc : ce
+               point d'entrée n'est pas conditionné par le droit d'écrire. */
+            readingsHref={(indicatorId) =>
+              ROUTES.productReadings(product.id, indicatorId)
+            }
+            setNorthStar={
+              canWriteIndicators ? setNorthStar.bind(null, product.id) : null
+            }
           />
-
           <section className="flex flex-col gap-4">
             <SectionHeader
               title="Accompagnements"
@@ -520,53 +623,26 @@ export default async function ProductPage({
             )}
           </section>
 
-          {/* Sous la liste, jamais au-dessus : la frise de T5.5 a pris la place
-              au-dessus d'elle, sans la déplacer (docs/06 §6). Le bloc est
-              en pleine largeur, comme la liste — la page produit ne porte
-              aucune grille de blocs de référence, à la différence de la page
-              projet.
+          {/* **La roadmap ferme la page** (demande du 17/08/2026), alors que
+              `docs/06` §6 la veut « au-dessus de la liste, sans la déplacer ».
+              L'écart à la documentation est assumé et consigné : la North Star
+              ouvre désormais l'écran, parce qu'elle porte la question à laquelle
+              le produit répond ; la roadmap détaille le comment, et le détail
+              vient après. La liste reste l'équivalent textuel de la roadmap,
+              juste au-dessus d'elle.
 
-              Les **six** points d'entrée tombent avec le même
-              `canWriteIndicators` : le droit dérivé (arbitrage (b)) et la
-              lecture seule d'un produit archivé. Les trois gestes des relevés
-              s'y sont ajoutés en T5.3 sans qu'une condition s'écrive — c'est la
-              propriété que ce `&&` cherchait, celle du `canWrite` de la page
-              projet. `archiveIndicator` et `archiveReading` sont liées au
-              produit **côté serveur** ; le bloc y ajoute l'indicateur ou le
-              relevé au rendu. */}
-          <Indicators
-            indicators={productIndicators}
-            readings={productReadings}
-            addHref={
-              canWriteIndicators ? ROUTES.productIndicatorNew(product.id) : null
-            }
-            editHref={
-              canWriteIndicators
-                ? (indicatorId) =>
-                    ROUTES.productIndicatorEdit(product.id, indicatorId)
-                : null
-            }
-            archiveIndicator={
-              canWriteIndicators
-                ? archiveIndicator.bind(null, product.id)
-                : null
-            }
-            addReadingHref={
-              canWriteIndicators
-                ? (indicatorId) =>
-                    ROUTES.productReadingNew(product.id, indicatorId)
-                : null
-            }
-            editReadingHref={
-              canWriteIndicators
-                ? (readingId) =>
-                    ROUTES.productReadingEdit(product.id, readingId)
-                : null
-            }
-            archiveReading={
-              canWriteIndicators ? archiveReading.bind(null, product.id) : null
-            }
+              Elle ne connaît aucun droit — elle se lit par tout le domaine (D9),
+              sur un produit vivant comme archivé — et n'ouvre aucun point
+              d'entrée d'écriture. `de` et `a` sont des paramètres de **lecture**,
+              et `timelineWindow` est la seule porte par où ils entrent. */}
+          <Roadmap
+            productId={product.id}
+            projects={projects}
+            milestones={milestones}
+            from={de}
+            to={a}
           />
+
         </Page>
       </div>
     </>

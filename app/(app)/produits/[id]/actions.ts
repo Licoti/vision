@@ -70,7 +70,7 @@
  * et ce fichier ne lui en demande pas. Ce qui se retire s'archive.
  */
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -480,6 +480,78 @@ export async function archiveIndicator(
   if (adopted > 0) return;
 
   await session.db.archive(indicators, indicatorId);
+
+  revalidatePath(ROUTES.product(productId));
+}
+
+/**
+ * Désigner la **North Star** d'un produit, ou n'en désigner aucune.
+ *
+ * Concept ajouté hors ticket le 17/08/2026, absent de `docs/02` et de `docs/04`.
+ * Consigné dans `JOURNAL-TECHNIQUE.md`.
+ *
+ * **Un geste à part, et non un champ du formulaire d'indicateur.** Désigner une
+ * North Star en éteint une autre : c'est une écriture sur **deux** lignes, que
+ * le formulaire d'un seul indicateur ne saurait pas décrire. Une case à cocher
+ * y aurait posé la question « et l'ancienne ? » sans y répondre — et l'index
+ * unique partiel aurait répondu par une violation, donc un 500.
+ *
+ * **Éteindre d'abord, allumer ensuite**, et l'ordre n'est pas indifférent :
+ * `indicators_north_star_unique` refuse deux North Star vivantes sur un produit,
+ * et `neon-http` n'a pas de transaction interactive (dette consignée depuis
+ * T3.6). L'ordre inverse lèverait la violation d'unicité une fois sur deux.
+ * C'est le miroir de T3.6, qui ordonnait les ajouts **avant** les retraits pour
+ * la raison symétrique : là c'est le retrait qui cassait, ici c'est l'ajout.
+ *
+ * La fenêtre qui s'ouvre entre les deux écritures laisse le produit **sans**
+ * North Star, jamais avec deux : c'est l'état dégradé qu'on préfère — il est
+ * lisible à l'écran, et le geste se rejoue.
+ *
+ * `indicatorId` à `null` retire la désignation sans en poser d'autre.
+ */
+export async function setNorthStar(
+  productId: string,
+  indicatorId: string | null,
+): Promise<void> {
+  const session = await requireSession();
+
+  const refused =
+    "La désignation de la North Star est réservée au responsable de domaine et aux contributeurs désignés d'un accompagnement de ce produit.";
+
+  /* Le droit se redérive sur les identifiants **reçus**, jamais sur ce que
+     l'écran affichait : un menu absent du rendu n'a jamais protégé un point
+     d'entrée HTTP. Quand un indicateur est visé, `openIndicator` vérifie en
+     outre qu'il appartient à ce produit et qu'il n'est pas archivé — sans quoi
+     une soumission forgée désignerait l'indicateur d'un autre produit. */
+  const gate = indicatorId
+    ? await openIndicator(session, productId, indicatorId, refused)
+    : await openProductWrite(session, productId, refused);
+  if ("message" in gate) return;
+
+  /* La North Star en place, s'il y en a une. `list` et non un `find` : c'est le
+     produit qu'on interroge, pas une ligne connue — et `scoped.ts` n'a pas
+     d'`updateMany` qui les éteindrait d'un geste. L'index garantit qu'il y en a
+     au plus une, mais la boucle ne le suppose pas : elle éteint ce qu'elle
+     trouve, ce qui rattraperait une base entrée en désordre avant l'index. */
+  const current = await session.db.list(indicators, {
+    where: and(
+      eq(indicators.productId, productId),
+      eq(indicators.isNorthStar, true),
+    ),
+  });
+
+  /* Le `continue` est une **économie d'écriture, pas une garantie** : sans lui,
+     redésigner la North Star en place l'éteindrait puis la rallumerait, et
+     l'état final serait le même. La mise en défaut du 17/08/2026 l'a montré —
+     le retirer ne fait tomber aucun test, et c'est exact. Consigné. */
+  for (const previous of current) {
+    if (previous.id === indicatorId) continue;
+    await session.db.update(indicators, previous.id, { isNorthStar: false });
+  }
+
+  if (indicatorId) {
+    await session.db.update(indicators, indicatorId, { isNorthStar: true });
+  }
 
   revalidatePath(ROUTES.product(productId));
 }

@@ -1,434 +1,788 @@
 /**
- * Le bloc « Indicateurs » — ce que le produit mesure, et depuis quand.
+ * Le bloc « Indicateurs » de la page produit — **North Star en tête, les autres
+ * en dessous.**
  *
- * `docs/06` §6 réserve à C5 la couche « temps long » de la page produit. Ce bloc
- * en est la part lisible sans frise : les indicateurs du produit, chacun avec
- * son **dernier relevé** daté et le nombre de relevés qui le précèdent. Il porte
- * **la section entière**, son en-tête compris — la forme de `Resources` depuis
- * T4.1 — et se place **sous la liste des accompagnements** : la frise de T5.5
- * viendra au-dessus d'elle, ce bloc reste en dessous.
+ * Récrit hors ticket le 17/08/2026 d'après
+ * `docs/design/maquettes/blocs/northstar/NorthStar.dc.html`. Il **fusionne** deux
+ * blocs qui lisaient les mêmes tableaux : la liste textuelle de T5.1-T5.3 et les
+ * courbes de T5.6 (`indicator-curves.tsx`, supprimé). Un seul bloc, une
+ * hiérarchie explicite :
  *
- * **Trois gestes depuis T5.2**, et la promesse écrite ici par T5.1 est tenue :
- * `addHref`, `editHref` et `archiveIndicator` sont exactement les props que
- * `Resources` porte depuis T4bis.5. **T5.3 en a ajouté trois pour les relevés**,
- * sur la même forme et sans qu'une condition s'ajoute chez l'appelant. Le
- * composant, lui, ne connaît **aucun droit** : à `null`, une prop retire son
- * point d'entrée, et c'est l'appelant qui lit la session — la règle de
- * `Roadmap`, de `Resources` et de `PageHeader`.
+ *   1. la **North Star** — l'indicateur qui porte l'objectif global du produit,
+ *      tous accompagnements confondus. Sa courbe, sa cible, son dernier relevé.
+ *   2. les **autres indicateurs**, en cartes, sous un séparateur nommé.
  *
- * **La série se lit sous son indicateur, du plus récent au plus ancien** (T5.3).
- * Elle n'est pas triée ici : `listProductReadings` la rend déjà ordonnée
- * `read_on desc, id desc`, le **même** couple que l'agrégat qui donne le
- * « dernier relevé » deux lignes plus haut. C'est ce qui fait que la première
- * ligne de la série et la valeur en tête de l'entrée sont le même relevé, par
- * construction et non par coïncidence.
+ * **La North Star est un concept ajouté hors ticket**, absent de `docs/02` et de
+ * `docs/04`. Elle vit sur `indicators.is_north_star`, avec un index unique
+ * partiel qui en garantit une au plus par produit — la garantie est en base, pas
+ * à l'écran. Un produit peut n'en avoir aucune : c'est un état normal.
  *
- * **Vision juxtapose, elle ne prouve pas.** Chaque entrée n'affiche que des
- * valeurs reportées : la dernière mesure, sa date, le décompte. Aucun écart à
- * une cible, aucune évolution entre deux relevés, aucune flèche de tendance,
- * aucun pourcentage de progression — D39 pose la frontière, et `docs/03` §7
- * nomme le « +12 % depuis l'accompagnement » comme le point de bascule.
+ * ⚠ **L'écart à la cible que ce bloc affiche est interdit par quatre textes**
+ * — D39, `docs/06` §6, l'arbitrage (g) de `tickets-C5.md`, `brief-design.md`
+ * §4.3 — qui refusent en propres termes « tout indice calculé par Vision » et
+ * « tout calcul d'écart ». Arbitré par l'humain le 17/08/2026, consigné dans
+ * `JOURNAL-TECHNIQUE.md` comme le prévoit la règle 6. Le calcul lui-même vit
+ * dans `targetGap` (`lib/queries/indicators.ts`), où il s'éprouve par un test et
+ * où la dérogation est expliquée. **La jauge est rétablie le 17/08/2026**, sur
+ * le même arbitrage : elle est la forme visuelle du même indice, et tombe sous
+ * les mêmes interdits d'interface. Elle se borne à `axisScale`, qui part de
+ * zéro — le schéma ne porte aucune échelle, et 0-100 ne se code pas en dur.
  *
- * **La direction ne qualifie jamais une valeur.** Elle est écrite en toutes
- * lettres — « Plus haut vaut mieux » — parce qu'elle dit dans quel sens la série
- * se lit ; elle ne colore rien, ne décore rien, et ne juge aucun chiffre.
+ * **Deux cibles cohabitent.** `indicators.target_value` est la cible **du
+ * produit** — celle que porte la jauge et le trait ★ ; `project_indicators
+ * .target_value` est celle qu'un **accompagnement** s'est donnée (`docs/02` §4),
+ * tracée en trait discret avec sa seule valeur.
  *
- * **Un indicateur sans relevé le dit, et ne porte aucune date** : « un
- * indicateur sans date de relevé n'est pas affichable sur la frise et doit être
- * signalé comme tel plutôt que positionné arbitrairement à aujourd'hui »
- * (`docs/03` §7).
+ * **Le rattachement aux accompagnements ne se lit plus ici** (arbitrage du
+ * 17/08/2026, « strictement la maquette ») : il vit sur la page projet, bloc
+ * « Indicateurs adoptés ». C'est ce qui a raccourci le bloc, avec la ligne
+ * « Cible du produit » que la jauge a absorbée.
  *
- * L'état vide est un paragraphe et non un `EmptyState` — la règle de
- * `Resources`, et pour sa raison de fond : le cadre tireté d'un état vide plein
- * écran ne se pose pas dans un bloc de référence. Le doublon de `h2` qui
- * s'ajoutait à cette raison n'en est plus une, `EmptyState` prenant un `level`
- * depuis TD.1. Il dit ce que le bloc contiendra, et porte le geste depuis T5.2,
- * comme celui de `Resources` depuis T4.2.
+ * **Des marges par élément, jamais un `gap` uniforme.** Un `gap` met la même
+ * valeur partout ; la maquette rythme 18/24/30/34/22/12/14. C'était la cause
+ * directe du « trop d'espacements ».
  *
- * Le composant ne lit aucune base : `indicators` et `readings` sont ce que
- * `listProductIndicators` et `listProductReadings` ont déjà lu, filtré et trié.
+ * **Le tracé est en `path`, et c'est neuf.** La contrainte de T5.6 — pas de
+ * `viewBox`, donc pas de `path` — tenait à ce que le SVG portait du texte. Ici
+ * il n'en porte aucun : les valeurs, les graduations et les points sont des
+ * éléments HTML posés en pourcentage par-dessus. `curvePath` rend le `d`, et
+ * s'éprouve par un test.
+ *
+ * **Le composant ne connaît aucun droit.** Chaque point d'entrée arrive en prop
+ * et vaut `null` quand il est fermé — la règle depuis T5.1. Ce n'est pas ce
+ * rendu qui protège : les actions redérivent le droit sur l'identifiant reçu.
  */
 
 import Link from "next/link";
 
-import { ACTION_LINK } from "@/components/ui/action-link";
-import { Section, SectionHeader } from "@/components/ui/section";
+import {
+  IndicatorMenu,
+  MENU_ITEM,
+  MENU_ITEM_DANGER,
+} from "@/components/products/indicator-menu";
 import {
   formatDateMonth,
   formatIndicatorDirection,
+  formatMonthTick,
   formatReadings,
   formatResultValue,
 } from "@/lib/format";
 import {
+  axisScale,
+  curvePath,
   groupByIndicator,
+  targetGap,
+  type ProductAdoption,
   type ProductIndicator,
   type ProductReading,
 } from "@/lib/queries/indicators";
+import {
+  monthMark,
+  monthTicks,
+  timelineScale,
+  valueOffset,
+  valueScale,
+  type ValueScale,
+} from "@/lib/queries/timeline";
 
 /**
- * Ce qui remplace « Archiver » quand l'indicateur est adopté — le refus (e) de
- * `tickets-C5.md`, dit **avant** le clic.
+ * La phrase d'écart à la cible du produit.
  *
- * **Deux phrases entières, choisies par le décompte**, et non une phrase à
- * suffixes. C'est la leçon du refus (e) d'`archiveProduct`, relevée en T5.1 :
- * un `plural` gouverne le nom et le premier pronom, jamais les suivants, et la
- * phrase se lit faux au singulier sans que personne ne s'en aperçoive pendant
- * trois chantiers. Deux phrases coûtent une ligne et ne peuvent pas se
- * désaccorder.
+ * ⚠ Voir l'avertissement de l'en-tête : ce que cette fonction met en mots est
+ * l'indice calculé que D39 interdit. Elle respecte au moins `direction`, ce que
+ * la maquette ne faisait pas — « Encore 3 points » sur un taux d'abandon à 8 %
+ * pour une cible à 5 % se lisait à l'envers.
  */
-function adoptionNotice(count: number): string {
-  return count > 1
-    ? `Adopté par ${count} accompagnements — retirez ces adoptions pour pouvoir le ranger.`
-    : "Adopté par 1 accompagnement — retirez cette adoption pour pouvoir le ranger.";
-}
+function gapSentence(
+  indicator: ProductIndicator,
+  lastValue: string | null,
+): string | null {
+  const gap = targetGap(indicator.targetValue, lastValue, indicator.direction);
+  if (!gap) return null;
 
-/**
- * Une ligne de série : sa valeur, son mois, sa note, et ses deux gestes.
- *
- * **Le mois, et non le jour** (D13) : c'est la règle unique du bloc, celle que
- * `formatDateMonth` porte depuis T5.1 pour le « dernier relevé » deux lignes
- * plus haut. Deux granularités dans un même bloc feraient croire à deux natures
- * de date, là où c'est la même colonne.
- *
- * **Rien n'est calculé d'une ligne à l'autre** : ni écart, ni évolution, ni
- * cumul, ni moyenne. On liste la série, on ne la résume pas — D39 pose la
- * frontière, et `docs/03` §7 nomme le « +12 % depuis l'accompagnement » comme le
- * point de bascule. La série est **reçue triée** ; aucun tri ne se rejoue ici.
- */
-function Reading({
-  reading,
-  unit,
-  indicatorLabel,
-  editReadingHref,
-  archiveReading,
-}: {
-  reading: ProductReading;
-  unit: string | null;
-  /** Pour nommer les gestes : « Modifier » seul ne dit pas lequel. */
-  indicatorLabel: string;
-  editReadingHref: ((readingId: string) => string) | null;
-  archiveReading: ((readingId: string) => Promise<void>) | null;
-}) {
-  const value = formatResultValue(reading.value, unit);
-  const month = formatDateMonth(reading.readOn);
+  if (gap.reached) return "Cible atteinte.";
 
-  return (
-    <li className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-      <span className="text-xs text-content-neutral-base">
-        <span className="font-semibold text-content-neutral-dark">{value}</span>
-        <span aria-hidden="true">{" · "}</span>
-        <span className="sr-only">relevé en </span>
-        {month}
-        {reading.sourceNote ? (
-          <>
-            <span aria-hidden="true">{" · "}</span>
-            <span className="sr-only">Source : </span>
-            {reading.sourceNote}
-          </>
-        ) : null}
-      </span>
-
-      {/* Un `div` et non un `span` : `<form>` est du contenu de flux, et un
-          élément de phrasé ne l'accepte pas — le balisage servi serait réécrit
-          par le navigateur, et l'hydratation divergerait. */}
-      {editReadingHref || archiveReading ? (
-        <div className="flex flex-wrap items-center gap-4">
-          {editReadingHref ? (
-            <Link
-              href={editReadingHref(reading.id)}
-              aria-label={`Modifier le relevé de ${value} en ${month} — ${indicatorLabel}`}
-              className={ACTION_LINK}
-            >
-              Modifier
-            </Link>
-          ) : null}
-          {archiveReading ? (
-            /* Un formulaire nu : ni confirmation (arbitrage (c) de
-               `tickets-C4bis.md` — un relevé se retape), ni motif. « Archiver »
-               est le mot de l'arbitrage (d), jamais « Supprimer » : rien n'est
-               supprimé (règle 4), et c'est le geste que la migration de ce
-               ticket autorise. */
-            <form action={archiveReading.bind(null, reading.id)}>
-              <button
-                type="submit"
-                aria-label={`Archiver le relevé de ${value} en ${month} — ${indicatorLabel}`}
-                className={ACTION_LINK}
-              >
-                Archiver
-              </button>
-            </form>
-          ) : null}
-        </div>
-      ) : null}
-    </li>
-  );
+  const remaining = formatResultValue(String(gap.distance), indicator.unit);
+  return `Encore ${remaining} pour atteindre la cible.`;
 }
 
 export function Indicators({
   indicators,
   readings,
+  adoptions,
   addHref,
   editHref,
   archiveIndicator,
   addReadingHref,
-  editReadingHref,
-  archiveReading,
+  readingsHref,
+  setNorthStar,
 }: {
+  /** Les indicateurs vivants, **North Star d'abord** (le tri de la lecture). */
   indicators: ProductIndicator[];
-  /** Tous les relevés vivants du produit, plats et déjà ordonnés (T5.3). */
+  /** Tous les relevés vivants du produit, plats et ordonnés (T5.3). */
   readings: ProductReading[];
-  /**
-   * L'ouverture du panneau, ou `null` pour qui ne peut pas écrire — et sur un
-   * produit archivé (T5.2). Le droit se lit chez l'appelant, jamais ici.
-   */
+  /** Ce que les accompagnements vivants ont adopté, cible ou non. */
+  adoptions: ProductAdoption[];
   addHref: string | null;
-  /** L'ouverture du panneau sur un indicateur donné. Même règle de droit. */
   editHref: ((indicatorId: string) => string) | null;
-  /**
-   * Le rangement d'un indicateur — l'action serveur **déjà liée au produit**
-   * côté serveur, à lier à l'indicateur au moment du rendu. Même règle de droit.
-   */
   archiveIndicator: ((indicatorId: string) => Promise<void>) | null;
-  /** L'ouverture du panneau de relevé sur un indicateur. Même règle de droit. */
   addReadingHref: ((indicatorId: string) => string) | null;
-  /** Le même panneau, sur un relevé à corriger. Même règle de droit. */
-  editReadingHref: ((readingId: string) => string) | null;
-  /**
-   * Le retrait d'un relevé — l'action serveur **déjà liée au produit** côté
-   * serveur, à lier au relevé au moment du rendu. Même règle de droit.
-   */
-  archiveReading: ((readingId: string) => Promise<void>) | null;
+  readingsHref: ((indicatorId: string) => string) | null;
+  /** `null` sur un indicateur désigne « aucune North Star ». */
+  setNorthStar: ((indicatorId: string | null) => Promise<void>) | null;
 }) {
   const series = groupByIndicator(readings);
 
+  /* Les adoptions rangées sous leur indicateur, en une passe — la forme de
+     `groupByIndicator`, pour la même raison : un `filter` par indicateur
+     parcourrait la liste entière autant de fois qu'il y a d'indicateurs. */
+  const adopted = new Map<string, ProductAdoption[]>();
+  for (const adoption of adoptions) {
+    const list = adopted.get(adoption.indicatorId);
+    if (list) list.push(adoption);
+    else adopted.set(adoption.indicatorId, [adoption]);
+  }
+
+  /* La lecture trie North Star d'abord ; le composant ne retrie pas, il sépare.
+     `find` plutôt qu'un `[0]` : un produit sans North Star a bien un premier
+     indicateur, et le prendre pour tel serait en désigner une au hasard. */
+  const northStar = indicators.find((indicator) => indicator.isNorthStar);
+  const others = indicators.filter((indicator) => !indicator.isNorthStar);
+
   return (
-    <Section>
-      <SectionHeader
-        title="Indicateurs"
-        note="Ce que ce produit mesure, dans le temps."
-        {...(addHref
-          ? {
-              action: (
-                <AddIndicator
-                  href={addHref}
-                  className="border border-content-neutral-normal bg-surface-neutral-pale text-content-primary-dark"
-                />
-              ),
-            }
-          : {})}
-      />
-
-      {indicators.length > 0 ? (
-        <ul role="list" className="flex flex-col">
-          {indicators.map((indicator) => (
-            <li
-              key={indicator.id}
-              className="border-t border-surface-neutral-lighter py-3 first:border-t-0 first:pt-0 last:pb-0"
-            >
-              <p className="text-sm font-medium text-content-neutral-darkest">
-                {indicator.label}
-              </p>
-
-              {/* Le dernier relevé, en tête de l'entrée : c'est la valeur qu'on
-                  vient chercher. La valeur passe par `formatResultValue` — la
-                  colonne est un `numeric(18,4)` que le pilote rend « 71.0000 »,
-                  et l'unité se colle ou se sépare selon sa forme. La date se lit
-                  au mois (D13).
-
-                  Les deux parts sont nommées pour l'assistance : hors du
-                  contexte visuel, « 71 % · juin 2026 » ne dit pas laquelle est
-                  la mesure et laquelle la date. Le `·` est décoratif, et garde
-                  la couleur du texte qu'il sépare — la règle de `Resources`, où
-                  un séparateur mesuré à 2,22:1 entre deux textes de même graisse
-                  laisserait lire les deux d'un trait. */}
-              <p className="mt-1 text-sm text-content-neutral-dark">
-                {indicator.lastReadOn ? (
-                  <>
-                    <span className="sr-only">Dernier relevé : </span>
-                    <span className="font-semibold">
-                      {formatResultValue(indicator.lastValue, indicator.unit)}
-                    </span>
-                    <span aria-hidden="true">{" · "}</span>
-                    <span className="sr-only">relevé en </span>
-                    {formatDateMonth(indicator.lastReadOn)}
-                  </>
-                ) : (
-                  /* Aucune date, et aucune valeur inventée. La phrase dit
-                     l'attente, pas le défaut : un indicateur qu'on n'a pas
-                     encore mesuré est un indicateur normal. */
-                  "Aucun relevé pour l'instant."
-                )}
-              </p>
-
-              <p className="mt-1 text-xs text-content-neutral-base">
-                <span className="sr-only">Relevés : </span>
-                {formatReadings(indicator.readingCount)}
-                <span aria-hidden="true">{" · "}</span>
-                <span className="sr-only">Sens de lecture : </span>
-                {formatIndicatorDirection(indicator.direction)}
-                {indicator.source ? (
-                  <>
-                    <span aria-hidden="true">{" · "}</span>
-                    <span className="sr-only">Source : </span>
-                    {indicator.source}
-                  </>
-                ) : null}
-              </p>
-
-              {/* La série, sous son indicateur et du plus récent au plus ancien
-                  (T5.3). Le retrait et le filet la rattachent visuellement à
-                  l'indicateur qu'elle mesure, sans qu'un jeton neuf apparaisse :
-                  `surface-neutral-lighter` est déjà le séparateur des entrées de
-                  ce bloc.
-
-                  Elle n'est pas repliée derrière un geste d'ouverture : elle se
-                  lit d'un trait dans le HTML servi, comme la roadmap. */}
-              {(series.get(indicator.id) ?? []).length > 0 ? (
-                <ul
-                  role="list"
-                  className="mt-2 flex flex-col gap-1 border-l border-surface-neutral-lighter pl-4"
-                >
-                  {(series.get(indicator.id) ?? []).map((reading) => (
-                    <Reading
-                      key={reading.id}
-                      reading={reading}
-                      unit={indicator.unit}
-                      indicatorLabel={indicator.label}
-                      editReadingHref={editReadingHref}
-                      archiveReading={archiveReading}
-                    />
-                  ))}
-                </ul>
-              ) : null}
-
-              {/* Les gestes de l'entrée, sous la série et jamais à droite : le
-                  bloc porte des entrées à plusieurs lignes, et une colonne
-                  d'actions y écraserait le libellé.
-
-                  « Ajouter un relevé » vient en tête des trois — c'est le geste
-                  le plus courant du bloc depuis T5.3, et sur un indicateur sans
-                  relevé il paraît juste sous la phrase qui dit l'absence, soit
-                  exactement là où on le cherche.
-
-                  Le nom accessible porte le libellé de l'indicateur, comme celui
-                  de « Modifier » dans `Resources` : « Modifier » répété dix fois
-                  dans une liste de liens ne dit pas lequel. Le mot reste écrit à
-                  l'écran — l'`aria-label` complète, il ne remplace pas.
-
-                  « Archiver » est un formulaire nu : ni confirmation
-                  (arbitrage (c) de `tickets-C4bis.md` — un indicateur se
-                  retape), ni motif. Le mot est celui de l'arbitrage (d), jamais
-                  « Supprimer » : rien n'est supprimé (règle 4). */}
-              {/* Un `div` et non un `p` : `<form>` est du contenu de flux, et
-                  un paragraphe n'accepte que du phrasé — le balisage servi
-                  serait réécrit par le navigateur, et l'hydratation
-                  divergerait. */}
-              {addReadingHref || editHref || archiveIndicator ? (
-                <div className="mt-1.5 flex flex-wrap items-center gap-4">
-                  {addReadingHref ? (
-                    <Link
-                      href={addReadingHref(indicator.id)}
-                      aria-label={`Ajouter un relevé à l'indicateur ${indicator.label}`}
-                      className={ACTION_LINK}
-                    >
-                      Ajouter un relevé
-                    </Link>
-                  ) : null}
-                  {editHref ? (
-                    <Link
-                      href={editHref(indicator.id)}
-                      aria-label={`Modifier l'indicateur ${indicator.label}`}
-                      className={ACTION_LINK}
-                    >
-                      Modifier
-                    </Link>
-                  ) : null}
-                  {/* **Le refus (e) de T5.4, dit avant le clic.** Un indicateur
-                      encore adopté ne s'archive pas : l'action le refuse, et
-                      comme son formulaire est nu, elle refuserait **en
-                      silence** — le geste paraîtrait ne rien faire. Le point
-                      d'entrée cède donc la place à la mention qui dit combien,
-                      et ce qu'il faut faire d'abord.
-
-                      Ce n'est pas le verrou : `archiveIndicator` recompte les
-                      adoptions sur l'identifiant **reçu**. Un point d'entrée
-                      absent du rendu n'a jamais protégé le point d'entrée HTTP
-                      qui l'accompagne.
-
-                      La mention n'est **pas un jugement** : c'est un décompte de
-                      lignes, comme « 2 accompagnements » sur la liste des
-                      produits depuis T2.2. Aucun couple neuf par la position —
-                      `content-neutral-base` sur `surface-neutral-pale`, à
-                      4,98:1, est déjà celui de la ligne de description
-                      au-dessus. */}
-                  {archiveIndicator ? (
-                    indicator.adoptionCount > 0 ? (
-                      <span className="text-xs text-content-neutral-base">
-                        {adoptionNotice(indicator.adoptionCount)}
-                      </span>
-                    ) : (
-                      <form action={archiveIndicator.bind(null, indicator.id)}>
-                        <button
-                          type="submit"
-                          aria-label={`Archiver l'indicateur ${indicator.label}`}
-                          className={ACTION_LINK}
-                        >
-                          Archiver
-                        </button>
-                      </form>
-                    )
-                  ) : null}
-                </div>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <div className="flex flex-col items-start gap-4">
-          <p className="text-sm leading-175 text-content-neutral-base">
-            Les mesures suivies sur ce produit s&apos;afficheront ici, chacune
-            avec son dernier relevé daté et le nombre de relevés qui le
-            précèdent. Un indicateur appartient au produit et se poursuit d&apos;un
-            accompagnement à l&apos;autre : c&apos;est ce qui permet de lire son
-            évolution dans le temps long.
+    <section className="rounded-3xl border border-border-primary-lighter bg-surface-primary-lighter p-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="flex items-center gap-2 text-xs font-bold uppercase text-content-primary-dark">
+            {/* L'étoile est décorative : le titre est écrit juste à côté, et la
+                couleur ne porte jamais seule (docs/06 §11). */}
+            <span aria-hidden="true" className="text-content-warning-darker">
+              ★
+            </span>
+            North Star produit
+          </h2>
+          <p className="mt-1 max-w-160 text-sm leading-175 text-content-neutral-dark">
+            L&apos;objectif global du produit, tous accompagnements confondus.
+            Les accompagnements sont les moyens d&apos;y arriver.
           </p>
-          {addHref ? (
-            <AddIndicator
-              href={addHref}
-              className="bg-surface-primary-base text-content-neutral-pale"
-            />
-          ) : null}
         </div>
-      )}
-    </Section>
+
+        {setNorthStar ? (
+          <IndicatorMenu label="Options du bloc des indicateurs">
+            {indicators.map((indicator) => (
+              <form
+                key={indicator.id}
+                action={setNorthStar.bind(null, indicator.id)}
+              >
+                <button
+                  type="submit"
+                  role="menuitem"
+                  disabled={indicator.isNorthStar}
+                  className={`${MENU_ITEM} disabled:text-content-neutral-light`}
+                >
+                  {indicator.isNorthStar
+                    ? `★ ${indicator.label}`
+                    : `Désigner ${indicator.label}`}
+                </button>
+              </form>
+            ))}
+            {northStar ? (
+              <form action={setNorthStar.bind(null, null)}>
+                <button
+                  type="submit"
+                  role="menuitem"
+                  className={MENU_ITEM_DANGER}
+                >
+                  Retirer la North Star
+                </button>
+              </form>
+            ) : null}
+          </IndicatorMenu>
+        ) : null}
+      </div>
+
+      <div className="mt-3">
+        {northStar ? (
+          <NorthStar
+            indicator={northStar}
+            series={series.get(northStar.id) ?? []}
+            adoptions={adopted.get(northStar.id) ?? []}
+          />
+        ) : (
+          /* Un paragraphe et non un `EmptyState` — la règle de `Resources` et
+             d'`Indicators` : **deux phrases distinctes**, là où `EmptyState` n'a
+             qu'un `description`. N'avoir aucun indicateur et n'en avoir désigné
+             aucun ne sont pas la même chose, et l'écran ne les confond pas. */
+          <p className="text-sm leading-175 text-content-neutral-dark">
+            {indicators.length === 0
+              ? "Aucun indicateur pour l'instant. Le premier que ce produit portera pourra être désigné North Star : celui qui dit où le produit veut aller."
+              : "Aucune North Star désignée. Le menu de ce bloc permet de choisir lequel de ces indicateurs porte l'objectif global du produit."}
+          </p>
+        )}
+      </div>
+
+      {/* Le séparateur de la maquette : `34px` au-dessus, `22px` en dessous.
+          L'interlettrage de `.14em` n'est pas rendu — aucun jeton, dette n°4. */}
+      <div className="mt-4 mb-2 flex items-center gap-3">
+        <h3 className="text-xs font-bold uppercase text-content-neutral-dark">
+          Autres indicateurs
+        </h3>
+        <span
+          aria-hidden="true"
+          className="h-px flex-1 bg-border-primary-lighter"
+        />
+      </div>
+
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
+        {others.map((indicator) => (
+          <IndicatorCard
+            key={indicator.id}
+            indicator={indicator}
+            series={series.get(indicator.id) ?? []}
+            editHref={editHref}
+            archiveIndicator={archiveIndicator}
+            addReadingHref={addReadingHref}
+            readingsHref={readingsHref}
+            setNorthStar={setNorthStar}
+          />
+        ))}
+
+        {addHref ? (
+          <Link
+            href={addHref}
+            className="flex min-h-43 items-center justify-center gap-2 rounded-2xl border border-dashed border-border-primary-light text-sm font-semibold text-content-primary-dark"
+          >
+            <span aria-hidden="true" className="text-lg leading-none">
+              +
+            </span>
+            Ajouter un indicateur
+          </Link>
+        ) : null}
+
+        {others.length === 0 && !addHref ? (
+          <p className="text-sm leading-175 text-content-neutral-dark">
+            Aucun autre indicateur sur ce produit.
+          </p>
+        ) : null}
+      </div>
+    </section>
   );
 }
 
 /**
- * L'action d'ouverture du panneau, aux deux emplacements — la forme de
- * `LinkResource` dans `resources.tsx`, et pour la même raison.
+ * La North Star : son identité et ses chiffres à gauche, son tracé à droite.
  *
- * C'est un lien et non un bouton, parce que c'en est un : il mène à une URL,
- * celle de la page du produit portant `?indicateur=nouvel`. Il se copie, se
- * partage, s'ouvre dans un onglet — ce qu'un bouton d'ouverture piloté par du
- * JavaScript n'aurait fait dans aucun des trois cas.
+ * **`items-center`**, comme la maquette : les deux colonnes se centrent l'une
+ * sur l'autre au lieu de s'aligner en haut, ce qui évite la colonne de gauche
+ * flottant dans le vide sous une courbe plus haute qu'elle.
  *
- * Le `+` est décoratif : « Ajouter un indicateur » se lit seul.
+ * Quatre éléments à gauche, et pas un de plus — c'est ce qui a raccourci le
+ * bloc : la ligne « Cible du produit » a disparu (la jauge la porte) et la
+ * ligne « Adopté par… » aussi (arbitrage du 17/08/2026, « strictement la
+ * maquette »). Le rattachement aux accompagnements se lit sur la page projet,
+ * bloc « Indicateurs adoptés ».
  */
-function AddIndicator({
-  href,
-  className,
+function NorthStar({
+  indicator,
+  series,
+  adoptions,
 }: {
-  href: string;
-  className: string;
+  indicator: ProductIndicator;
+  /** Du plus récent au plus ancien — l'ordre de la lecture. */
+  series: ProductReading[];
+  adoptions: ProductAdoption[];
 }) {
+  /* La courbe se lit du plus ancien au plus récent, l'inverse de la série
+     écrite. **Une copie est inversée**, jamais le tableau du groupement : il est
+     partagé, et le retourner sur place ferait dépendre l'ordre d'un autre
+     composant de l'ordre de rendu. */
+  const ordered = [...series].reverse();
+
+  /* **Une seule échelle pour la jauge et la courbe** : la jauge est la
+     projection du dernier point sur l'axe du tracé. */
+  const scale = axisScale(
+    [
+      ...ordered.map((reading) => reading.value),
+      ...adoptions.map((adoption) => adoption.targetValue),
+      indicator.targetValue,
+    ],
+    indicator.unit,
+  );
+
+  const lastValue = formatResultValue(indicator.lastValue, indicator.unit);
+  const gap = gapSentence(indicator, indicator.lastValue);
+
   return (
-    <Link
-      href={href}
-      className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold ${className}`}
-    >
-      <span aria-hidden="true">+</span>
-      Ajouter un indicateur
-    </Link>
+    <div className="grid gap-y-6 lg:grid-cols-[20rem_1fr] lg:items-center lg:gap-x-11">
+      <div>
+        <p className="text-lg font-semibold leading-125 text-content-neutral-darkest">
+          {indicator.label}
+        </p>
+
+        {lastValue && indicator.lastReadOn ? (
+          <p className="mt-4 flex flex-wrap items-baseline gap-2.5">
+            <span className="text-4xl font-bold leading-none text-content-neutral-darkest">
+              {lastValue}
+            </span>
+            {/* **La date écrite, et non « aujourd'hui »** : la maquette écrit
+                « aujourd'hui » sous le dernier relevé, ce qui serait faux d'un
+                relevé de 2024 — et `docs/03` §7 interdit de poser à aujourd'hui
+                ce qui porte sa propre date. Même place, un mot juste. */}
+            <span className="text-sm text-content-neutral-dark">
+              {formatDateMonth(indicator.lastReadOn)}
+            </span>
+          </p>
+        ) : (
+          <p className="mt-4 text-sm leading-175 text-content-neutral-dark">
+            Aucun relevé pour l&apos;instant : cette mesure n&apos;est pas encore
+            située dans le temps.
+          </p>
+        )}
+
+        {scale ? (
+          <Gauge
+            scale={scale}
+            current={indicator.lastValue}
+            target={indicator.targetValue}
+            unit={indicator.unit}
+          />
+        ) : null}
+
+        {/* ⚠ L'indice calculé, arbitré le 17/08/2026. Voir l'en-tête. */}
+        {gap ? (
+          <p className="text-sm leading-175 text-content-neutral-dark">
+            {gap}
+          </p>
+        ) : null}
+
+        {indicator.targetValue === null ? (
+          <p className="text-sm leading-175 text-content-neutral-dark">
+            Aucune cible de produit. Le panneau de correction de
+            l&apos;indicateur permet d&apos;en poser une.
+          </p>
+        ) : null}
+      </div>
+
+      {scale && ordered.length > 0 ? (
+        <Curve
+          scale={scale}
+          unit={indicator.unit}
+          series={ordered}
+          productTarget={indicator.targetValue}
+          adoptions={adoptions}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * La jauge — où en est le dernier relevé sur l'axe du produit.
+ *
+ * ⚠ **C'est la « jauge de compl��tion » que les interdits d'interface refusent**
+ * (`CLAUDE.md`, `docs/06` §10, `brief-design.md` §6). Rétablie sur arbitrage du
+ * 17/08/2026, consignée dans `JOURNAL-TECHNIQUE.md` avec l'écart à la cible,
+ * dont elle est la forme visuelle.
+ *
+ * **Elle ne se rend qu'avec ses deux termes** : sans cible ou sans relevé, il
+ * n'y a rien à situer, et une piste vide vaut moins que rien.
+ *
+ * `lower_is_better` ne retourne pas le remplissage : il montre **où l'on est**,
+ * pas ce qui reste. Le sens de lecture est porté par la phrase d'écart, qui, elle,
+ * le respecte. Le **dégradé de la maquette n'est pas repris** : `tokens.css` §9
+ * nomme ses gradients sans leur donner de valeur, et rien ne s'invente.
+ */
+function Gauge({
+  scale,
+  current,
+  target,
+  unit,
+}: {
+  scale: ValueScale;
+  current: string | null;
+  target: string | null;
+  unit: string | null;
+}) {
+  if (current === null || target === null) return null;
+
+  const fill = valueOffset(scale, current);
+  const mark = valueOffset(scale, target);
+
+  return (
+    <div className="mt-2">
+      {/* `overflow-visible` : le marqueur déborde de 7 px en haut et en bas, et
+          son libellé de 30 px au-dessus. */}
+      <div className="relative h-3 rounded-md bg-surface-primary-soft">
+        <div
+          aria-hidden="true"
+          className="absolute inset-y-0 left-0 rounded-md bg-surface-primary-dark"
+          style={{ width: `${fill}%` }}
+        />
+        <div
+          aria-hidden="true"
+          className="absolute -inset-y-1.75 w-0.5 bg-content-warning-darker"
+          style={{ left: `${mark}%` }}
+        />
+        <span
+          className="absolute -top-7.5 -translate-x-1/2 whitespace-nowrap text-xs font-bold text-content-warning-darker"
+          style={{ left: `${mark}%` }}
+        >
+          <span aria-hidden="true">★ </span>
+          Cible {formatResultValue(target, unit)}
+        </span>
+      </div>
+
+      {/* Les deux bornes écrites : sans repère chiffré, la piste serait le
+          graphique décoratif que `docs/06` §10 interdit. */}
+      <p className="mt-2 flex justify-between text-2xs text-content-neutral-dark">
+        <span>{formatResultValue(String(scale.min), unit)}</span>
+        <span>{formatResultValue(String(scale.max), unit)}</span>
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Le tracé — un `path` dans un `viewBox`, et **aucun texte dans le SVG**.
+ *
+ * C'est cette séparation qui lève la contrainte de T5.6 : le SVG ne porte que la
+ * ligne, tout le reste est du HTML posé par-dessus. Il garde donc la taille de
+ * texte de la page, et `path` redevient possible.
+ *
+ * **Rien ici n'est décoratif** (`docs/06` §10, D41) : les trois graduations sont
+ * chiffrées, chaque point écrit sa valeur, la cible écrit la sienne. Ce sont des
+ * valeurs reportées, jamais un indice — à la seule exception du crochet d'écart,
+ * arbitré le 17/08/2026 et signalé sur place.
+ */
+function Curve({
+  scale,
+  unit,
+  series,
+  productTarget,
+  adoptions,
+}: {
+  scale: ValueScale;
+  unit: string | null;
+  /** Du plus ancien au plus récent. Au moins un élément. */
+  series: readonly ProductReading[];
+  productTarget: string | null;
+  adoptions: readonly ProductAdoption[];
+}) {
+  const timeline = timelineScale(series.map((reading) => reading.readOn));
+  const ticks = timeline ? monthTicks(timeline) : [];
+
+  /** L'ordonnée d'une valeur, en pourcentage **depuis le haut**. */
+  const topOf = (value: string) => 100 - valueOffset(scale, value);
+
+  const points = series.map((reading) => ({
+    id: reading.id,
+    x: timeline ? monthMark(timeline, reading.readOn) : 50,
+    y: valueOffset(scale, reading.value),
+    label: formatResultValue(reading.value, unit),
+  }));
+
+  const last = points[points.length - 1];
+  const targetTop = productTarget === null ? null : topOf(productTarget);
+
+  /* ⚠ Le crochet d'écart : la seconde forme visuelle de l'indice calculé que
+     D39 interdit, arbitré le 17/08/2026. Il ne se trace qu'entre deux valeurs
+     connues, et seulement quand elles diffèrent — un crochet de hauteur nulle
+     n'aurait rien à dire. */
+  const bracket =
+    targetTop !== null && last && Math.abs(targetTop - (100 - last.y)) > 0.5
+      ? { top: Math.min(targetTop, 100 - last.y), height: Math.abs(targetTop - (100 - last.y)), x: last.x }
+      : null;
+
+  return (
+    <div>
+      {/* La boîte du tracé : 170 px de haut, 44 px réservés à gauche pour les
+          trois libellés d'axe. */}
+      <div className="relative h-42.5 pl-11">
+        <span className="absolute left-0 -top-1.5 text-xs text-content-neutral-dark">
+          {formatResultValue(String(scale.max), unit)}
+        </span>
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 text-xs text-content-neutral-dark">
+          {formatResultValue(String((scale.min + scale.max) / 2), unit)}
+        </span>
+        <span className="absolute left-0 -bottom-1.5 text-xs text-content-neutral-dark">
+          {formatResultValue(String(scale.min), unit)}
+        </span>
+
+        <div className="relative h-full">
+          {/* Trois filets : haut, milieu, bas. Décoratifs — les trois valeurs
+              sont écrites juste à gauche. */}
+          {[0, 50, 100].map((at) => (
+            <div
+              key={at}
+              aria-hidden="true"
+              className="absolute inset-x-0 h-px bg-surface-neutral-opacity-faint"
+              style={{ top: `${at}%` }}
+            />
+          ))}
+
+          {/* La cible du produit : un trait tireté et sa pastille, posée sur le
+              fond du bloc pour rester lisible par-dessus les filets. */}
+          {targetTop !== null ? (
+            <>
+              <div
+                aria-hidden="true"
+                className="absolute inset-x-0 border-t-[length:var(--border-width-1)] border-dashed border-content-warning-darker"
+                style={{ top: `${targetTop}%` }}
+              />
+              <span
+                className="absolute right-0.5 -translate-y-1/2 bg-surface-primary-lighter px-1.5 text-xs font-bold text-content-warning-darker"
+                style={{ top: `${targetTop}%` }}
+              >
+                <span aria-hidden="true">★ </span>
+                Cible {formatResultValue(productTarget, unit)}
+              </span>
+            </>
+          ) : null}
+
+          {/* Les cibles d'accompagnement : la valeur seule (demande du
+              17/08/2026). Un trait plus discret que celui du produit — sans
+              quoi rien ne dirait laquelle est l'objectif global. */}
+          {adoptions.map((adoption) =>
+            adoption.targetValue === null ? null : (
+              <div
+                key={adoption.projectId}
+                className="absolute inset-x-0 border-t border-dashed border-content-neutral-normal"
+                style={{ top: `${topOf(adoption.targetValue)}%` }}
+              >
+                <span className="absolute right-0.5 -translate-y-1/2 bg-surface-primary-lighter px-1.5 text-2xs text-content-neutral-dark">
+                  Cible {formatResultValue(adoption.targetValue, unit)}
+                </span>
+              </div>
+            ),
+          )}
+
+          {bracket ? (
+            <div
+              aria-hidden="true"
+              className="absolute w-0 border-l-[length:var(--border-width-1)] border-dotted border-content-warning-darker"
+              style={{
+                left: `${bracket.x}%`,
+                top: `${bracket.top}%`,
+                height: `${bracket.height}%`,
+              }}
+            />
+          ) : null}
+
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            className="absolute inset-0 h-full w-full overflow-visible"
+          >
+            <path
+              d={curvePath(points)}
+              fill="none"
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+              className="stroke-content-primary-dark"
+            />
+          </svg>
+
+          {points.map((point) => (
+            <div
+              key={point.id}
+              className="absolute -translate-x-1/2 -translate-y-1/2"
+              style={{ left: `${point.x}%`, top: `${100 - point.y}%` }}
+            >
+              {/* L'anneau est une **bordure** de la couleur du fond, et non
+                  l'ombre de la maquette : le design system nomme ses trois
+                  élévations sans leur donner de valeur (`tokens.css` §8). */}
+              <span
+                aria-hidden="true"
+                className="block h-2.75 w-2.75 rounded-full border-[length:var(--border-width-1)] border-surface-primary-lighter bg-surface-primary-dark"
+              />
+              {/* La valeur écrite : c'est elle qui empêche la courbe d'être un
+                  graphique décoratif. */}
+              <span className="absolute bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs font-semibold text-content-primary-dark">
+                {point.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Les graduations de temps, alignées sur la zone de tracé. */}
+      <div className="relative ml-11 mt-2 h-4.5">
+        {ticks.map((tick) => (
+          <span
+            key={tick.month}
+            className={`absolute whitespace-nowrap text-xs text-content-neutral-dark ${
+              tick.anchor === "start"
+                ? ""
+                : tick.anchor === "end"
+                  ? "-translate-x-full"
+                  : "-translate-x-1/2"
+            }`}
+            style={{ left: `${tick.left}%` }}
+          >
+            {formatMonthTick(tick.month)}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Une carte d'indicateur secondaire.
+ *
+ * La sparkline **ne porte pas seule** : la dernière valeur, sa date et le
+ * décompte de relevés sont écrits à côté. Une courbe sans chiffre serait le
+ * graphique décoratif que `docs/06` §10 interdit.
+ *
+ * **Des marges par élément, jamais un `gap` uniforme** : c'est ce qui rendait
+ * les cartes trop aérées. La maquette rythme 12/14/12, un `gap` mettait 12
+ * partout, y compris là où elle n'en met aucun.
+ */
+function IndicatorCard({
+  indicator,
+  series,
+  editHref,
+  archiveIndicator,
+  addReadingHref,
+  readingsHref,
+  setNorthStar,
+}: {
+  indicator: ProductIndicator;
+  series: ProductReading[];
+  editHref: ((indicatorId: string) => string) | null;
+  archiveIndicator: ((indicatorId: string) => Promise<void>) | null;
+  addReadingHref: ((indicatorId: string) => string) | null;
+  readingsHref: ((indicatorId: string) => string) | null;
+  setNorthStar: ((indicatorId: string | null) => Promise<void>) | null;
+}) {
+  const ordered = [...series].reverse();
+  /* **`valueScale` et non `axisScale`** : une sparkline montre une **forme**, et
+     c'est ce que fait le `spark()` de la maquette — il borne sur min et max de
+     la série. Partir de zéro l'aplatirait jusqu'à l'illisible, et la carte
+     écrit de toute façon la valeur, sa date et le décompte à côté : rien n'est
+     porté par le seul dessin. Le grand tracé, lui, a un axe chiffré et part de
+     zéro. */
+  const scale = valueScale(ordered.map((reading) => reading.value));
+  const timeline = timelineScale(ordered.map((reading) => reading.readOn));
+  const lastValue = formatResultValue(indicator.lastValue, indicator.unit);
+
+  /* La sparkline dans sa boîte de 34 : `curvePath` rend des pourcentages, le
+     `viewBox` les étire. Un seul calcul à corriger le jour où le tracé change. */
+  const spark =
+    scale && timeline
+      ? curvePath(
+          ordered.map((reading) => ({
+            x: monthMark(timeline, reading.readOn),
+            y: valueOffset(scale, reading.value) * 0.34,
+          })),
+        )
+      : null;
+
+  return (
+    <div className="relative rounded-2xl border border-surface-neutral-lighter bg-surface-neutral-pale p-4">
+      {editHref || addReadingHref || readingsHref || setNorthStar ? (
+        <IndicatorMenu
+          label={`Options de l'indicateur ${indicator.label}`}
+          className="absolute right-3 top-3"
+        >
+          {editHref ? (
+            <Link
+              href={editHref(indicator.id)}
+              role="menuitem"
+              className={MENU_ITEM}
+            >
+              Modifier l&apos;indicateur
+            </Link>
+          ) : null}
+          {addReadingHref ? (
+            <Link
+              href={addReadingHref(indicator.id)}
+              role="menuitem"
+              className={MENU_ITEM}
+            >
+              Ajouter un relevé
+            </Link>
+          ) : null}
+          {readingsHref ? (
+            <Link
+              href={readingsHref(indicator.id)}
+              role="menuitem"
+              className={MENU_ITEM}
+            >
+              Gérer les relevés
+            </Link>
+          ) : null}
+          {setNorthStar ? (
+            <form action={setNorthStar.bind(null, indicator.id)}>
+              <button type="submit" role="menuitem" className={MENU_ITEM}>
+                Définir comme North Star
+              </button>
+            </form>
+          ) : null}
+          {/* **Le geste disparaît quand l'indicateur est adopté** — l'arbitrage
+              (e) de `tickets-C5.md`, inchangé. */}
+          {archiveIndicator && indicator.adoptionCount === 0 ? (
+            <form action={archiveIndicator.bind(null, indicator.id)}>
+              <button
+                type="submit"
+                role="menuitem"
+                className={MENU_ITEM_DANGER}
+              >
+                Archiver
+              </button>
+            </form>
+          ) : null}
+        </IndicatorMenu>
+      ) : null}
+
+      <p className="min-h-9 pr-9 text-sm font-semibold leading-125 text-content-neutral-darkest">
+        {indicator.label}
+      </p>
+
+      {lastValue && indicator.lastReadOn ? (
+        <p className="mt-3 flex flex-wrap items-baseline gap-2">
+          <span className="text-3xl font-bold leading-none text-content-neutral-darkest">
+            {lastValue}
+          </span>
+          <span className="text-xs text-content-neutral-base">
+            <span aria-hidden="true">· </span>
+            {formatDateMonth(indicator.lastReadOn)}
+          </span>
+        </p>
+      ) : (
+        <p className="mt-3 text-xs text-content-neutral-base">
+          Aucun relevé pour l&apos;instant.
+        </p>
+      )}
+
+      {spark ? (
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 100 34"
+          preserveAspectRatio="none"
+          className="mt-3.5 h-8.5 w-full overflow-visible"
+        >
+          <path
+            d={spark}
+            fill="none"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+            className="stroke-content-primary-normal"
+          />
+        </svg>
+      ) : null}
+
+      <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-content-neutral-base">
+        <span className="rounded-full bg-surface-neutral-lightest px-2.25 py-0.5 text-2xs font-semibold text-content-neutral-dark">
+          {formatIndicatorDirection(indicator.direction)}
+        </span>
+        {formatReadings(indicator.readingCount)}
+      </p>
+    </div>
   );
 }

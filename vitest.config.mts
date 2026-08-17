@@ -35,7 +35,13 @@ export default defineConfig({
     alias: { "@": fileURLToPath(new URL(".", import.meta.url)) },
   },
   test: {
-    include: ["lib/**/*.test.ts"],
+    /* `app/**` s'ajoute le 17/08/2026, avec le premier fichier de tests
+       d'**action serveur** du projet. La discipline du `CLAUDE.md` — « le droit
+       s'éprouve par l'action, jamais par l'écran » — demandait jusque-là de
+       croire sur parole les portes d'`actions.ts`, faute d'un chemin pour les
+       interroger : elles vivent dans `app/`, que cette ligne n'atteignait pas.
+       Le motif reste borné aux fichiers de test ; aucun composant n'entre. */
+    include: ["lib/**/*.test.ts", "app/**/*.test.ts"],
     environment: "node",
     env: { ...parsed, DATABASE_URL: testUrl },
     // Les tests partagent une base réelle : pas d'exécution concurrente.

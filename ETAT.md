@@ -2,7 +2,7 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 17/08/2026 — session de découpage de C5bis : sept fiches écrites, C5 et TD repliés.
+**Dernière mise à jour :** 17/08/2026 — hors ticket : roadmap en HTML filtrable, bloc North Star fusionné (migration 0003), page réordonnée.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
 **Ticket suivant :** **T5bis.1** — le schéma : compétences, niveaux, profil (`tickets-C5bis.md`)
 
@@ -54,7 +54,13 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   l'accompagnement, puis les deux couches de la frise du temps long. Le chantier qui répond à la
   question de l'effet dans le temps. Sa propriété la plus payante n'est pas un écran :
   **`timelineScale` recevait une liste de dates depuis T5.5**, si bien que T5.6 y a versé les relevés
-  sans qu'un calcul de borne change.
+  sans qu'un calcul de borne change. **Tout a depuis été refait hors ticket** (17/08/2026) :
+  `roadmap.tsx` en HTML avec un filtre de période porté par l'URL ; les courbes fusionnées dans
+  `indicators.tsx` avec une **North Star** (migration 0003 : `is_north_star`, `target_value`, index
+  unique partiel) ; la page réordonnée North Star / liste / roadmap. `timeline.tsx` et
+  `indicator-curves.tsx` n'existent plus. **Neuf dérogations documentaires sont consignées dans
+  `JOURNAL-TECHNIQUE.md`**, dont D39 enfreinte sciemment (écart à la cible et jauge) et `docs/06` §6
+  (roadmap passée sous la liste).
 - **TD — Dette technique — TD.1, le 17/08/2026.** Ticket **hors chantier**, dans la seule fenêtre où
   les fiches n'interdisent plus rien. Huit copies du composant de champ, six coquilles de panneau et
   quatre `ACTION_LINK` deviennent trois fichiers de `components/ui/` : **−644 lignes nettes**, à HTML

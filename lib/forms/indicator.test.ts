@@ -38,6 +38,7 @@ function values(overrides: Partial<IndicatorFormValues> = {}): IndicatorFormValu
     unit: "%",
     direction: "higher_is_better",
     source: "Portail analytics",
+    targetValue: "85",
     ...overrides,
   };
 }
@@ -56,7 +57,7 @@ function formOf(overrides: Partial<IndicatorFormValues> = {}): FormData {
    ========================================================================== */
 
 describe("readIndicatorForm", () => {
-  test("lit les quatre champs et les rogne", () => {
+  test("lit les cinq champs et les rogne", () => {
     const data = formOf({ label: "  Autonomie  ", source: "  Analytics " });
 
     expect(readIndicatorForm(data)).toEqual({
@@ -64,6 +65,7 @@ describe("readIndicatorForm", () => {
       unit: "%",
       direction: "higher_is_better",
       source: "Analytics",
+      targetValue: "85",
     });
   });
 
@@ -80,10 +82,13 @@ describe("readIndicatorForm", () => {
     data.set("productId", "3f2504e0-4f89-11d3-9a0c-0305e82c3311");
     data.set("archivedAt", "2026-01-01");
 
+    data.set("isNorthStar", "true");
+
     expect(Object.keys(readIndicatorForm(data)).sort()).toEqual([
       "direction",
       "label",
       "source",
+      "targetValue",
       "unit",
     ]);
   });
@@ -178,7 +183,7 @@ describe("validateIndicatorForm — l'unité et la source", () => {
    ========================================================================== */
 
 describe("parseIndicatorForm", () => {
-  test("une saisie valide rend les quatre colonnes, et pas une de plus", () => {
+  test("une saisie valide rend les cinq colonnes, et pas une de plus", () => {
     const { errors, input } = parseIndicatorForm(formOf());
 
     expect(errors).toEqual({});
@@ -187,6 +192,34 @@ describe("parseIndicatorForm", () => {
       unit: "%",
       direction: "higher_is_better",
       source: "Portail analytics",
+      targetValue: "85",
+    });
+  });
+
+  test("`is_north_star` n'est jamais écrit par ce formulaire", () => {
+    /* La désignation est un geste à part : elle doit éteindre la North Star
+       précédente dans le même mouvement, ce qu'un champ caché ne ferait pas —
+       et l'index unique partiel refuserait alors l'écriture par un 500. */
+    const data = formOf();
+    data.set("isNorthStar", "true");
+
+    expect(parseIndicatorForm(data).input).not.toHaveProperty("isNorthStar");
+  });
+
+  test("une cible vide part à `null`, une cible non numérique est refusée", () => {
+    expect(parseIndicatorForm(formOf({ targetValue: "" })).input).toMatchObject({
+      targetValue: null,
+    });
+
+    const refused = parseIndicatorForm(formOf({ targetValue: "bientôt" }));
+    expect(refused.input).toBeNull();
+    expect(refused.errors.targetValue).toBeDefined();
+  });
+
+  test("la virgule décimale est acceptée et normalisée au point", () => {
+    // La règle de `results.value` et des trois valeurs de l'adoption.
+    expect(parseIndicatorForm(formOf({ targetValue: "1,4" })).input).toMatchObject({
+      targetValue: "1.4",
     });
   });
 
@@ -224,12 +257,14 @@ describe("toIndicatorFormValues", () => {
         unit: null,
         direction: "lower_is_better",
         source: null,
+        targetValue: null,
       }),
     ).toEqual({
       label: "Autonomie",
       unit: "",
       direction: "lower_is_better",
       source: "",
+      targetValue: "",
     });
   });
 
@@ -242,6 +277,9 @@ describe("toIndicatorFormValues", () => {
       unit: "s",
       direction: "lower_is_better" as const,
       source: null,
+      /* La colonne rend ses zéros de queue ; le tour doit les rendre aussi,
+         `normalizeDecimal` réécrivant « 1.4 » et non « 1.4000 ». */
+      targetValue: "1.4",
     };
 
     const data = new FormData();

@@ -14,7 +14,7 @@
  * sous test, qui est précisément ce que l'écran appelle.
  */
 
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { db } from "@/lib/db/client";
@@ -31,12 +31,16 @@ import {
 } from "@/lib/db/schema";
 
 import {
+  axisScale,
+  curvePath,
   groupByIndicator,
   listAdoptableIndicators,
+  listProductAdoptions,
   listProductIndicators,
   listProductReadings,
-  listProductTargets,
   listProjectAdoptions,
+  targetGap,
+  unitCeiling,
   type ProductIndicator,
   type ProductReading,
 } from "./indicators";
@@ -926,9 +930,9 @@ describe("listAdoptableIndicators", () => {
    ceux-ci soient en cause.
    ========================================================================== */
 
-describe("listProductTargets", () => {
+describe("listProductAdoptions", () => {
   test("une cible se lit avec l'accompagnement qui la porte", async () => {
-    const rows = await listProductTargets(a.scope, a.fullId);
+    const rows = await listProductAdoptions(a.scope, a.fullId);
     const autonomy = rows.find((row) => row.indicatorId === a.autonomyId);
 
     expect(autonomy).toMatchObject({
@@ -939,12 +943,26 @@ describe("listProductTargets", () => {
     });
   });
 
-  test("une adoption sans cible n'a pas de repère", async () => {
-    /* « Doublon » est adopté sans cible : les colonnes sont nullables
-       (`docs/04` §3), et une adoption qui n'en fixe aucune n'a rien à tracer. */
-    const rows = await listProductTargets(a.scope, a.fullId);
+  test("une adoption sans cible se lit quand même, cible à `null`", async () => {
+    /* **C'est ce qui change avec `listProductTargets`**, qui filtrait sur
+       `isNotNull(targetValue)`. Le bloc fusionné nomme sous chaque indicateur
+       les accompagnements qui l'ont adopté, cible ou non : une adoption sans
+       cible n'a pas de repère à tracer, mais elle a un nom à écrire. */
+    const rows = await listProductAdoptions(a.scope, a.fullId);
+    const tie = rows.find((row) => row.indicatorId === a.tieId);
 
-    expect(rows.map((row) => row.indicatorId)).not.toContain(a.tieId);
+    expect(tie).toBeDefined();
+    expect(tie?.targetValue).toBeNull();
+  });
+
+  test("la référence et la valeur finale sont rendues avec la cible", async () => {
+    /* Les trois colonnes de l'adoption voyagent ensemble : elles sont posées
+       côte à côte à l'écran, jamais soustraites l'une de l'autre. */
+    const rows = await listProductAdoptions(a.scope, a.fullId);
+    const autonomy = rows.find((row) => row.indicatorId === a.autonomyId);
+
+    expect(autonomy).toHaveProperty("baselineValue");
+    expect(autonomy).toHaveProperty("finalValue");
   });
 
   test("la cible d'un accompagnement archivé n'est pas rendue", async () => {
@@ -965,7 +983,7 @@ describe("listProductTargets", () => {
     await a.scope.archive(projects, archivedProject.id);
 
     try {
-      const rows = await listProductTargets(a.scope, a.fullId);
+      const rows = await listProductAdoptions(a.scope, a.fullId);
 
       expect(rows.map((row) => row.targetValue)).not.toContain("90.0000");
       expect(rows.map((row) => row.projectId)).not.toContain(
@@ -983,34 +1001,37 @@ describe("listProductTargets", () => {
        seconde jointure ne changerait rien à l'écran et coûterait une table de
        plus à filtrer. Le test dit ce que la lecture rend vraiment, plutôt que
        de laisser croire à un filtre qui n'existe pas. */
-    const rows = await listProductTargets(a.scope, a.fullId);
+    const rows = await listProductAdoptions(a.scope, a.fullId);
 
     expect(rows.map((row) => row.indicatorId)).toContain(
       a.archivedIndicatorId,
     );
   });
 
-  test("les cibles d'un autre produit ne débordent pas", async () => {
-    const full = await listProductTargets(a.scope, a.fullId);
-    const neighbour = await listProductTargets(a.scope, a.otherId);
+  test("les adoptions d'un autre produit ne débordent pas", async () => {
+    const full = await listProductAdoptions(a.scope, a.fullId);
+    const neighbour = await listProductAdoptions(a.scope, a.otherId);
 
-    // Le voisin adopte son indicateur sans cible : il n'a rien à tracer.
-    expect(neighbour).toEqual([]);
+    /* Le voisin adopte son indicateur **sans cible** : là où
+       `listProductTargets` ne rendait rien, cette lecture rend l'adoption. */
+    expect(neighbour.map((row) => row.indicatorId)).toEqual([
+      a.otherIndicatorId,
+    ]);
     expect(full.map((row) => row.indicatorId)).not.toContain(
       a.otherIndicatorId,
     );
   });
 
   test("un produit sans adoption rend un tableau vide", async () => {
-    expect(await listProductTargets(a.scope, a.emptyId)).toEqual([]);
+    expect(await listProductAdoptions(a.scope, a.emptyId)).toEqual([]);
   });
 
   test("les cibles d'un produit d'un autre domaine ne se lisent pas", async () => {
     /* L'étanchéité par l'adoption : les identifiants sont réels, les lectures
        sont faites sous l'autre domaine. Sans `filter(projectIndicators)`, la
        cible de 85 du domaine voisin se lirait ici. */
-    expect(await listProductTargets(a.scope, b.fullId)).toEqual([]);
-    expect(await listProductTargets(b.scope, a.fullId)).toEqual([]);
+    expect(await listProductAdoptions(a.scope, b.fullId)).toEqual([]);
+    expect(await listProductAdoptions(b.scope, a.fullId)).toEqual([]);
   });
 
   test("une cible portée par un accompagnement d'un autre domaine ne se lit pas", async () => {
@@ -1034,7 +1055,321 @@ describe("listProductTargets", () => {
       targetValue: "77",
     });
 
-    expect(await listProductTargets(a.scope, b.fullId)).toEqual([]);
+    expect(await listProductAdoptions(a.scope, b.fullId)).toEqual([]);
+  });
+});
+
+/* ==========================================================================
+   La North Star — hors ticket, 17/08/2026
+
+   Deux colonnes et un index unique partiel. **L'index s'éprouve par l'écriture,
+   jamais par l'écran** : c'est lui qui garantit qu'un produit n'a qu'une North
+   Star, et un test qui se contenterait de lire le tri ne dirait rien de la
+   garantie.
+
+   Les écritures sont défaites en `finally` : la fixture est partagée entre les
+   `describe`, et une North Star laissée allumée changerait l'ordre lu ailleurs.
+   ========================================================================== */
+
+describe("la North Star — le drapeau et son unicité", () => {
+  test("la lecture rend le drapeau et la cible du produit", async () => {
+    try {
+      await a.scope.update(indicators, a.autonomyId, {
+        isNorthStar: true,
+        targetValue: "85",
+      });
+
+      const rows = await listProductIndicators(a.scope, a.fullId);
+      const autonomy = rows.find((row) => row.id === a.autonomyId);
+
+      expect(autonomy).toMatchObject({ isNorthStar: true });
+      // `numeric(18,4)` revient en chaîne : la mise en forme est à l'écran.
+      expect(autonomy?.targetValue).toBe("85.0000");
+    } finally {
+      await a.scope.update(indicators, a.autonomyId, {
+        isNorthStar: false,
+        targetValue: null,
+      });
+    }
+  });
+
+  test("la North Star sort **en tête**, avant l'ordre alphabétique", async () => {
+    /* Le tri est dans la lecture et non à l'écran : un composant qui retrierait
+       un tableau déjà trié ferait dépendre l'ordre de deux endroits. */
+    const before = await listProductIndicators(a.scope, a.fullId);
+    const last = before[before.length - 1];
+    expect(last).toBeDefined();
+    if (!last) return;
+
+    try {
+      await a.scope.update(indicators, last.id, { isNorthStar: true });
+
+      const after = await listProductIndicators(a.scope, a.fullId);
+
+      expect(after[0]?.id).toBe(last.id);
+      // Les autres gardent leur ordre alphabétique entre eux.
+      expect(after.slice(1).map((row) => row.label)).toEqual(
+        before.filter((row) => row.id !== last.id).map((row) => row.label),
+      );
+    } finally {
+      await a.scope.update(indicators, last.id, { isNorthStar: false });
+    }
+  });
+
+  test("deux North Star sur le même produit sont refusées **par la base**", async () => {
+    /* **Le test qui isole `indicators_north_star_unique`.** Sans lui, rien ne
+       garantirait l'unicité : l'action éteint l'ancienne avant d'allumer la
+       nouvelle, mais deux requêtes concurrentes — ou une écriture directe —
+       passeraient. C'est la garantie, pas la politesse de l'action, qu'on
+       éprouve ici. */
+    await a.scope.update(indicators, a.autonomyId, { isNorthStar: true });
+
+    try {
+      /* `toThrow()` seul passerait sur **n'importe quelle** erreur — un nom de
+         colonne fautif, une panne réseau. C'est l'index nommé qu'on veut voir
+         refuser, et rien d'autre. Le nom vit dans la `cause` : Drizzle enveloppe
+         l'erreur du pilote dans un message générique. */
+      const refused = await a.scope
+        .update(indicators, a.tieId, { isNorthStar: true })
+        .then(() => null)
+        .catch((error: unknown) => error);
+
+      expect(refused).not.toBeNull();
+      const cause = (refused as { cause?: { constraint?: string } }).cause;
+      expect(cause?.constraint).toBe("indicators_north_star_unique");
+    } finally {
+      await a.scope.update(indicators, a.autonomyId, { isNorthStar: false });
+    }
+  });
+
+  test("l'unicité est **par produit** : deux produits peuvent en porter chacun une", async () => {
+    try {
+      await a.scope.update(indicators, a.autonomyId, { isNorthStar: true });
+      await a.scope.update(indicators, a.otherIndicatorId, {
+        isNorthStar: true,
+      });
+
+      const full = await listProductIndicators(a.scope, a.fullId);
+      const other = await listProductIndicators(a.scope, a.otherId);
+
+      expect(full.filter((row) => row.isNorthStar)).toHaveLength(1);
+      expect(other.filter((row) => row.isNorthStar)).toHaveLength(1);
+    } finally {
+      await a.scope.update(indicators, a.autonomyId, { isNorthStar: false });
+      await a.scope.update(indicators, a.otherIndicatorId, {
+        isNorthStar: false,
+      });
+    }
+  });
+
+  test("un indicateur **archivé** ne retient pas la place", async () => {
+    /* La leçon de `results_activity_unique` (T4bis.6) : une unicité totale
+       ferait qu'un indicateur rangé occupe toujours la place, et désigner son
+       successeur lèverait une violation — un 500 là où l'on attend un écran.
+       L'index porte donc `archived_at is null`. */
+    await db
+      .update(indicators)
+      .set({ isNorthStar: true })
+      .where(eq(indicators.id, a.archivedIndicatorId));
+
+    try {
+      await expect(
+        a.scope.update(indicators, a.autonomyId, { isNorthStar: true }),
+      ).resolves.toBeDefined();
+    } finally {
+      await a.scope.update(indicators, a.autonomyId, { isNorthStar: false });
+      await db
+        .update(indicators)
+        .set({ isNorthStar: false })
+        .where(eq(indicators.id, a.archivedIndicatorId));
+    }
+  });
+});
+
+/* ==========================================================================
+   L'écart à la cible — hors ticket, 17/08/2026
+
+   ⚠ Ces tests éprouvent un calcul que quatre textes du projet interdisent
+   (D39, `docs/06` §6, arbitrage (g), `brief-design.md` §4.3). Arbitré par
+   l'humain, consigné dans `JOURNAL-TECHNIQUE.md`. Ils sont ici parce qu'un
+   calcul qu'on assume se teste comme les autres — et celui-ci a un piège que la
+   maquette n'avait pas vu : le sens de lecture.
+
+   Fonction pure : aucune base.
+   ========================================================================== */
+
+describe("targetGap — l'écart, selon le sens de lecture", () => {
+  test("`higher_is_better` : la cible est atteinte quand on la dépasse", () => {
+    expect(targetGap("85", "90", "higher_is_better")).toEqual({
+      reached: true,
+      distance: 5,
+    });
+    expect(targetGap("85", "60", "higher_is_better")).toEqual({
+      reached: false,
+      distance: 25,
+    });
+  });
+
+  test("`lower_is_better` : la cible est atteinte quand on descend dessous", () => {
+    /* **Le piège de la maquette.** Elle fait `target - current` et annonce
+       « Encore X pts » : un taux d'abandon à 8 % pour une cible à 5 % y serait
+       donné pour atteint, la différence étant négative. */
+    expect(targetGap("5", "8", "lower_is_better")).toEqual({
+      reached: false,
+      distance: 3,
+    });
+    expect(targetGap("5", "3", "lower_is_better")).toEqual({
+      reached: true,
+      distance: 2,
+    });
+  });
+
+  test("l'égalité stricte est une cible atteinte, dans les deux sens", () => {
+    expect(targetGap("85", "85", "higher_is_better")?.reached).toBe(true);
+    expect(targetGap("85", "85", "lower_is_better")?.reached).toBe(true);
+    expect(targetGap("85", "85", "higher_is_better")?.distance).toBe(0);
+  });
+
+  test("la distance n'est **jamais signée** : le sens est porté par `reached`", () => {
+    expect(targetGap("85", "60", "higher_is_better")?.distance).toBeGreaterThan(0);
+    expect(targetGap("5", "8", "lower_is_better")?.distance).toBeGreaterThan(0);
+  });
+
+  test("sans ses deux termes, il n'y a pas de comparaison", () => {
+    // Une comparaison sans ses deux termes ne s'invente pas : l'écran se tait.
+    expect(targetGap(null, "60", "higher_is_better")).toBeNull();
+    expect(targetGap("85", null, "higher_is_better")).toBeNull();
+    expect(targetGap("", "60", "higher_is_better")).toBeNull();
+    expect(targetGap("indisponible", "60", "higher_is_better")).toBeNull();
+  });
+
+  test("les zéros de queue de `numeric(18,4)` ne changent rien", () => {
+    expect(targetGap("85.0000", "90.0000", "higher_is_better")).toEqual({
+      reached: true,
+      distance: 5,
+    });
+  });
+});
+
+/* ==========================================================================
+   Le tracé — hors ticket, 17/08/2026
+
+   `curvePath` rend l'attribut `d` d'un `path` dans un `viewBox="0 0 100 100"`.
+   Une position ne s'écrit pas dans un JSX : elle s'éprouve ici.
+
+   Fonction pure : aucune base.
+   ========================================================================== */
+
+describe("unitCeiling — le plafond que l'unité déclare", () => {
+  test("le pourcentage plafonne à 100", () => {
+    expect(unitCeiling("%")).toBe(100);
+    expect(unitCeiling(" % ")).toBe(100);
+  });
+
+  test("une note sur N plafonne à N", () => {
+    expect(unitCeiling("/100")).toBe(100);
+    expect(unitCeiling("/5")).toBe(5);
+    expect(unitCeiling("/ 20")).toBe(20);
+  });
+
+  test("toute autre unité n'a aucun plafond naturel", () => {
+    /* On n'en invente pas : « jours », « s », « € » n'ont pas de maximum, et
+       en supposer un fausserait l'échelle. */
+    for (const unit of ["jours", "s", "€", "pts", "", null, undefined]) {
+      expect(unitCeiling(unit)).toBeNull();
+    }
+  });
+
+  test("une notation malformée ne provoque rien", () => {
+    for (const unit of ["/", "/abc", "/0", "/-5", "100"]) {
+      expect(unitCeiling(unit)).toBeNull();
+    }
+  });
+});
+
+describe("axisScale — l'échelle qui part de zéro", () => {
+  test("le plafond de l'unité **fixe le maximum**, cible comprise", () => {
+    /* Le défaut du 17/08/2026 : sans le plafond, une cible à 85 plus haute que
+       tous les relevés devenait le maximum, et le marqueur de la jauge se
+       collait au bout de la piste. */
+    expect(axisScale(["54", "60", "85"], "%")).toEqual({ min: 0, max: 100 });
+  });
+
+  test("le plafond ne rogne jamais une donnée qui le dépasse", () => {
+    // Un 120 % saisi par erreur reste visible plutôt qu'écrêté hors de la boîte.
+    expect(axisScale(["54", "120"], "%")).toEqual({ min: 0, max: 120 });
+  });
+
+  test("sans plafond d'unité, l'échelle se borne sur les données", () => {
+    expect(axisScale(["1.4", "2.1"], "jours")).toEqual({ min: 0, max: 2.1 });
+  });
+
+  test("une grandeur signée ignore le plafond d'unité", () => {
+    // Une variation en points de pourcentage n'est pas un pourcentage.
+    expect(axisScale(["-12", "8"], "%")).toEqual({ min: -12, max: 8 });
+  });
+
+  test("des valeurs positives donnent un axe qui part de zéro", () => {
+    /* C'est ce qui rend l'amplitude vraie : `valueScale` bornerait à 54-60 et
+       ferait d'une hausse de six points une envolée pleine hauteur. */
+    expect(axisScale(["54", "57", "60"])).toEqual({ min: 0, max: 60 });
+  });
+
+  test("la cible entre dans le maximum quand elle dépasse les relevés", () => {
+    expect(axisScale(["54", "60", "85"])).toEqual({ min: 0, max: 85 });
+  });
+
+  test("un zéro exact reste un plancher, pas un cas limite", () => {
+    expect(axisScale(["0", "40"])).toEqual({ min: 0, max: 40 });
+  });
+
+  test("une valeur négative fait retomber sur `min → max`", () => {
+    /* Une mesure qui descend sous zéro n'a pas de plancher naturel à zéro : l'y
+       forcer sortirait ses relevés de la boîte. */
+    expect(axisScale(["-12", "8"])).toEqual({ min: -12, max: 8 });
+  });
+
+  test("sans valeur exploitable, il n'y a pas d'axe", () => {
+    expect(axisScale([])).toBeNull();
+    expect(axisScale([null, "", "indisponible"])).toBeNull();
+  });
+});
+
+describe("curvePath — l'attribut `d`", () => {
+  test("les ordonnées sont **retournées** : `y` compte depuis le bas", () => {
+    /* Le retournement vit dans la fonction et pas dans l'appelant, pour qu'il
+       n'ait à se faire qu'une fois et qu'un test le tienne. */
+    expect(curvePath([{ x: 0, y: 0 }, { x: 100, y: 100 }])).toBe(
+      "M0,100 L100,0",
+    );
+  });
+
+  test("un point isolé rend un **segment nul**, jamais une chaîne vide", () => {
+    /* Un `path` sans `d` valide est ignoré par le navigateur : le point seul
+       disparaîtrait au lieu de se marquer. */
+    expect(curvePath([{ x: 50, y: 40 }])).toBe("M50,60 L50,60");
+  });
+
+  test("une série vide ne trace rien", () => {
+    expect(curvePath([])).toBe("");
+  });
+
+  test("les coordonnées sont arrondies à quatre décimales", () => {
+    /* Le HTML servi doit être **stable d'un rendu à l'autre** pour se relire et
+       se tester : un tiers non arrondi rendrait dix-sept chiffres. */
+    expect(curvePath([{ x: 100 / 3, y: 0 }])).toBe("M33.3333,100 L33.3333,100");
+  });
+
+  test("aucun lissage : les points sont joints par des segments droits", () => {
+    // Le segment joint deux faits, il n'en invente pas un troisième.
+    const d = curvePath([
+      { x: 0, y: 10 },
+      { x: 50, y: 60 },
+      { x: 100, y: 30 },
+    ]);
+
+    expect(d).toBe("M0,90 L50,40 L100,70");
+    expect(d).not.toMatch(/[CQSTA]/u);
   });
 });
 
