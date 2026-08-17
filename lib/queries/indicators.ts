@@ -22,7 +22,7 @@
  * courant. Règle 1.
  */
 
-import { and, asc, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 import type { ScopedDb } from "@/lib/db/scoped";
 import {
@@ -30,6 +30,7 @@ import {
   indicatorReadings,
   indicators,
   projectIndicators,
+  projects,
 } from "@/lib/db/schema";
 
 /**
@@ -397,5 +398,93 @@ export function listAdoptableIndicators(
         ),
       )
       .orderBy(asc(indicators.label), asc(indicators.id));
+  });
+}
+
+/* ==========================================================================
+   Les cibles — T5.6
+
+   La cible d'une bande de courbe. Elle appartient à une **adoption**, jamais au
+   produit : c'est un accompagnement qui se donne un repère, et la même mesure
+   peut en porter deux si deux accompagnements l'ont adoptée.
+
+   **La cible est un repère, jamais un état** (arbitrage (g), D39) : ce module
+   rend la valeur saisie, brute, avec l'accompagnement qui la porte. Ni écart au
+   dernier relevé, ni « atteinte », ni pourcentage de progression — `docs/03` §7
+   nomme le « +12 % depuis l'accompagnement » comme le point de bascule.
+   ========================================================================== */
+
+/** Une cible portée par une adoption : de quoi tracer un repère et le nommer. */
+export type IndicatorTarget = {
+  /** L'indicateur visé — la clé du regroupement par bande. */
+  indicatorId: string;
+  projectId: string;
+  /**
+   * Le nom de l'accompagnement. Une bande peut porter deux cibles ; sans lui,
+   * rien ne dirait laquelle vient d'où.
+   */
+  projectName: string;
+  /** Brute — « 85.0000 ». La mise en forme appartient à l'écran. */
+  targetValue: string;
+};
+
+/**
+ * Les cibles que les accompagnements **vivants** d'un produit se sont données.
+ *
+ * **Une seule lecture pour toute la couche**, quel que soit le nombre
+ * d'indicateurs : la frise ne descend pas indicateur par indicateur — la règle
+ * de T5.1, tenue par les quatre lectures de cette page.
+ *
+ * `innerJoin` sur `projects` : la jointure **est** la question. Elle porte le
+ * rattachement au produit, le nom de l'accompagnement, et son archivage. **Les
+ * accompagnements archivés sont écartés parce que la frise les écarte déjà** —
+ * `listProductProjects` pour les bandes, `listProductMilestones` pour les
+ * repères : une cible sans bande sous laquelle se lire serait un repère
+ * orphelin sur un axe qui ne porte plus son accompagnement.
+ *
+ * **Aucune jointure sur `indicators`**, et c'est délibéré : le composant range
+ * chaque cible sous la bande de son indicateur, et une cible dont l'indicateur
+ * ne se lit pas — archivé, ou d'un autre produit — n'a aucune bande où se poser.
+ * Elle est ignorée à l'écran sans qu'une seconde jointure la filtre ici.
+ *
+ * `isNotNull(targetValue)` plutôt qu'un tri des nulles à l'écran : une adoption
+ * sans cible n'a pas de repère à tracer, et la lecture rend ce qui se dessine.
+ *
+ * Le tri est par nom d'accompagnement, `id` départageant deux homonymes : un
+ * ordre qui varierait d'un affichage à l'autre serait un défaut — la règle de
+ * tri de `listProjectResources`.
+ */
+export function listProductTargets(
+  scope: ScopedDb,
+  productId: string,
+): Promise<IndicatorTarget[]> {
+  return scope.joinedRead(async (database, { filter }) => {
+    return database
+      .select({
+        indicatorId: projectIndicators.indicatorId,
+        projectId: projects.id,
+        projectName: projects.name,
+        /* La colonne est `numeric` **nullable** : le `isNotNull` du `where` la
+           rend non nulle en fait, et ce `sql` le dit au type — sans quoi
+           l'écran porterait un `string | null` qu'il ne peut plus rencontrer. */
+        targetValue: sql<string>`${projectIndicators.targetValue}`,
+      })
+      .from(projectIndicators)
+      .innerJoin(
+        projects,
+        and(
+          eq(projects.id, projectIndicators.projectId),
+          filter(projects),
+          eq(projects.productId, productId),
+          isNull(projects.archivedAt),
+        ),
+      )
+      .where(
+        and(
+          filter(projectIndicators),
+          isNotNull(projectIndicators.targetValue),
+        ),
+      )
+      .orderBy(asc(projects.name), asc(projectIndicators.id));
   });
 }

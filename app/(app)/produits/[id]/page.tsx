@@ -3,13 +3,17 @@
  *
  * Elle répond à « qu'avons-nous fait sur ce produit dans le temps » : un
  * en-tête d'identité, puis, depuis T5.5, la **frise du temps long** — les
- * accompagnements en bandes et les activités porteuses d'un résultat en
- * repères, sur un axe commun (docs/06 §6, D26) —, puis les accompagnements du
- * plus récent au plus ancien, que la frise n'a **pas déplacés** et qui restent
- * son équivalent textuel, et depuis T5.1 le bloc « Indicateurs » — ce que le
- * produit mesure — **sous** cette liste, chaque indicateur portant sa série
- * datée depuis T5.3. Les courbes d'indicateurs viendront s'empiler sur la même
- * frise en T5.6 : aucune ici.
+ * accompagnements en bandes, les activités porteuses d'un résultat en repères
+ * et, depuis T5.6, une courbe par indicateur, sur un axe commun (docs/06 §6,
+ * D26, D41) —, puis les accompagnements du plus récent au plus ancien, que la
+ * frise n'a **pas déplacés** et qui restent son équivalent textuel, et depuis
+ * T5.1 le bloc « Indicateurs » — ce que le produit mesure — **sous** cette
+ * liste, chaque indicateur portant sa série datée depuis T5.3.
+ *
+ * **La juxtaposition de `docs/03` §7 est complète, et elle ne conclut rien** :
+ * les relevés se lisent sur le même axe que les accompagnements qui les
+ * entourent, sans qu'un écart, une flèche de causalité ou un « +12 % depuis
+ * l'accompagnement » ne s'écrive nulle part.
  *
  * L'identifiant vient de l'URL : sa forme est vérifiée avant la base, faute de
  * quoi un paramètre fantaisiste ne produit pas un 404 mais une erreur
@@ -102,6 +106,7 @@ import {
 import {
   listProductIndicators,
   listProductReadings,
+  listProductTargets,
 } from "@/lib/queries/indicators";
 import { findProductDetail, listProductProjects } from "@/lib/queries/products";
 import { listProductMilestones } from "@/lib/queries/timeline";
@@ -130,7 +135,7 @@ export default async function ProductPage({
   const product = await findProductDetail(session.db, id);
   if (!product) notFound();
 
-  /* Quatre lectures indépendantes, un seul temps d'attente — la discipline de
+  /* Cinq lectures indépendantes, un seul temps d'attente — la discipline de
      T4.1 sur la page projet. Aucune ne dépend du droit : la frise, le bloc
      « Indicateurs » et la série de chaque indicateur se lisent par tout le
      domaine (D9), sur un produit vivant comme archivé (règle 4).
@@ -139,16 +144,18 @@ export default async function ProductPage({
      regroupement par indicateur appartient au composant, et une lecture par
      indicateur serait exactement ce que T5.1 s'est interdit.
 
-     **La frise n'ajoute qu'une lecture, pas deux** (T5.5) : ses bandes sont les
-     accompagnements que `listProductProjects` rend déjà pour la liste, et seuls
-     ses repères — les activités porteuses d'un résultat — demandent une lecture
-     neuve. */
-  const [projects, productIndicators, productReadings, milestones] =
+     **La frise n'ajoute qu'une lecture par couche, jamais une par objet** : ses
+     bandes sont les accompagnements que `listProductProjects` rend déjà pour la
+     liste (T5.5), et ses courbes sont les indicateurs et les relevés que les
+     deux lectures du bloc rendent déjà (T5.6). Seuls ses repères et ses cibles
+     demandent une lecture neuve — une chacun. */
+  const [projects, productIndicators, productReadings, milestones, targets] =
     await Promise.all([
       listProductProjects(session.db, product.id),
       listProductIndicators(session.db, product.id),
       listProductReadings(session.db, product.id),
       listProductMilestones(session.db, product.id),
+      listProductTargets(session.db, product.id),
     ]);
 
   const archived = product.archivedAt !== null;
@@ -443,8 +450,19 @@ export default async function ProductPage({
               devient l'équivalent textuel de la frise. Elle ne connaît aucun
               droit — la frise se lit par tout le domaine (D9), sur un produit
               vivant comme archivé — et n'ouvre aucun point d'entrée
-              d'écriture. */}
-          <Timeline projects={projects} milestones={milestones} />
+              d'écriture.
+
+              Les indicateurs et les relevés qu'elle reçoit sont **ceux du bloc
+              plus bas** : T5.6 empile ses courbes sans une lecture de plus, et
+              la série écrite sous chaque indicateur reste leur équivalent
+              textuel. */}
+          <Timeline
+            projects={projects}
+            milestones={milestones}
+            indicators={productIndicators}
+            readings={productReadings}
+            targets={targets}
+          />
 
           <section className="flex flex-col gap-4">
             <SectionHeader

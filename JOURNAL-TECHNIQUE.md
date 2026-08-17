@@ -2807,3 +2807,51 @@ de la cinquième discipline, le relevé des modèles — sont partis dans la sec
 `HISTORIQUE-TICKETS.md` ; et la ligne du ticket a été resserrée. Résultat : **250 lignes exactement.**
 Le repliage de C5 en une ligne reste dû à la session de découpage de C6, et c'est lui qui rendra de la
 marge — d'ici là, **T5.6 franchira le seuil à son tour.**
+
+**T5.6 — `polyline` et `path` n'acceptent pas de pourcentage, et c'est structurel.** Le réflexe pour
+une courbe est `<polyline points="17.5676%,292 …">` ; l'attribut `points`, comme le `d` de `<path>`,
+n'admet **que des nombres** en unités utilisateur — un pourcentage y est ignoré, silencieusement, et
+la courbe se dessine dans les quelques pixels du coin haut-gauche. Or la frise n'a **pas de
+`viewBox`** (T5.5, pour que son texte garde la taille du reste de la page), donc ses abscisses *sont*
+des pourcentages. Un segment est par conséquent une `<line x1="…%" x2="…%">`, qui, elle, accepte les
+pourcentages comme le filet de l'axe et les graduations d'année. **À retenir : le choix « pas de
+`viewBox` » de T5.5 se paie en géométrie primitive** — tant qu'il tient, aucune primitive à liste de
+points n'est utilisable, et une aire remplie sous la courbe (`path`) serait impossible sans le
+rouvrir.
+
+**T5.6 — les fonctions d'échelle verticale sont hors du périmètre de fichiers de la fiche.** Elle
+donnait `components/products/timeline.tsx`, `lib/queries/indicators.ts` et la page ; elle exigeait
+aussi qu'une neutralisation du calcul de position verticale fasse tomber des tests, donc du pur et du
+testé. `valueScale` et `valueOffset` vivent dans `lib/queries/timeline.ts`, à côté de `monthBand` et
+`monthMark` : séparer la verticale de l'horizontale ferait chercher la moitié d'un dessin dans un
+module de lecture. Écart d'un fichier, de la même nature que celui de T5.4 (`adoption-panel.tsx`), et
+tranché avant écriture.
+
+**T5.6 — une bande plate écrit deux fois la même borne.** Un indicateur à un seul relevé, ou dont
+tous les relevés valent la même chose, a `min === max` : `valueOffset` pose tout à 50 — une droite au
+milieu, ce que ces relevés disent —, et les deux bornes de la bande affichent le même chiffre, en
+haut et en bas. C'est exact et c'est redondant. Écarter la borne haute dans ce cas demanderait une
+condition d'affichage que la fiche ne réclame pas (règle 3). **Dette assumée, sans échéance.**
+
+**T5.6 — le regroupement des relevés par indicateur est redit une seconde fois.** `indicators.tsx`
+porte `groupByIndicator` depuis T5.3, non exporté, et pour un tri inverse (la série se lit du plus
+récent au plus ancien, la courbe du plus ancien au plus récent). `timeline.tsx` refait le sien dans
+`curvesOf`. Troisième dette de recopie du chantier, après `ACTION_LINK` (T5.1) et la table
+`nature → couleur` (T5.5). Elles ont toutes la même issue : **le ticket qui pourra ouvrir les
+fichiers concernés ensemble extrait, ou la dette cesse d'être bornée par la phrase qui la reporte.**
+
+**T5.6 — le test d'étanchéité des cibles était vert au retrait de sa règle.** Les deux lectures
+croisées — `listProductTargets(a.scope, b.fullId)` et sa symétrique — ne couvraient **pas**
+`filter(projects)` : `filter(projectIndicators)` limite déjà la lecture aux adoptions du domaine
+courant, et celles-ci ne pointent, en fonctionnement normal, que vers des accompagnements du même
+domaine. Il a fallu forger par `db.insert` une adoption du domaine `a` sur un accompagnement du
+domaine `b`, portant une cible, pour que le filtre ait quelque chose à écarter. **Troisième
+manifestation de la même loi** — T4bis.5 (« un test vert au retrait d'une règle est un test qui ne la
+couvre pas »), T5.5 (« les filtres de domaine se rattrapent ») : sur une lecture jointe, un filtre de
+domaine ne s'éprouve que par une ligne que l'application ne sait pas écrire.
+
+**T5.6 — `ETAT.md` dépasse le seuil, et T5.5 l'avait annoncé.** 263 lignes, contre 250 tenues à la
+ligne près par le balayage de T5.5, qui écrivait « T5.6 franchira le seuil à son tour ». Les six
+lignes de ticket de C5 se replient en une seule au **repliage**, geste 1 de la session de découpage
+de C6 et seul moment où `ETAT.md` se balaie : c'est lui qui rendra la marge, et le dépassement est
+précisément ce qui l'appelle.

@@ -1,7 +1,7 @@
 /**
  * Les tests des lectures d'indicateurs : les indicateurs d'un produit avec leur
- * dernier relevé (T5.1), leur série datée (T5.3), et l'adoption par un
- * accompagnement (T5.4).
+ * dernier relevé (T5.1), leur série datée (T5.3), l'adoption par un
+ * accompagnement (T5.4) et les cibles de la frise (T5.6).
  *
  * Ils tournent sur la branche Neon dédiée — `vitest.config.mts` remappe
  * `DATABASE_URL` sur `TEST_DATABASE_URL` — et écrivent réellement : un
@@ -34,6 +34,7 @@ import {
   listAdoptableIndicators,
   listProductIndicators,
   listProductReadings,
+  listProductTargets,
   listProjectAdoptions,
   type ProductIndicator,
 } from "./indicators";
@@ -81,6 +82,11 @@ type Fixture = {
   autonomyAdoptionId: string;
   /** L'adoption de l'indicateur **archivé** : elle ne doit pas se lire. */
   archivedAdoptionId: string;
+
+  /* --- T5.6 : les cibles --------------------------------------------------- */
+
+  /** Le statut du domaine, pour les accompagnements écrits dans un test. */
+  statusId: string;
 };
 
 const suffix = Math.random().toString(36).slice(2, 10);
@@ -273,6 +279,7 @@ async function seedDomain(label: string): Promise<Fixture> {
     otherProjectId: otherProject.id,
     autonomyAdoptionId: autonomyAdoption.id,
     archivedAdoptionId: archivedAdoption.id,
+    statusId: active.id,
   };
 }
 
@@ -900,5 +907,131 @@ describe("listAdoptableIndicators", () => {
 
     const rows = await listAdoptableIndicators(b.scope, b.looseId, b.fullId);
     expect(rows.map((row) => row.id)).toContain(b.tieId);
+  });
+});
+
+/* ==========================================================================
+   Les cibles de la frise — T5.6
+
+   Ce que ces tests épinglent : la cible rendue avec l'accompagnement qui la
+   porte, l'adoption sans cible qui n'a rien à tracer, et l'accompagnement
+   archivé écarté — la cohérence des trois couches de la frise, qui n'en porte
+   aucune.
+
+   **Les écritures sont faites dans le test et défaites en `finally`**, comme
+   celle de la seconde adoption plus haut : la fixture est partagée, et un
+   décompte d'adoptions qui changerait ferait tomber les tests de T5.4 sans que
+   ceux-ci soient en cause.
+   ========================================================================== */
+
+describe("listProductTargets", () => {
+  test("une cible se lit avec l'accompagnement qui la porte", async () => {
+    const rows = await listProductTargets(a.scope, a.fullId);
+    const autonomy = rows.find((row) => row.indicatorId === a.autonomyId);
+
+    expect(autonomy).toMatchObject({
+      projectId: a.adopterId,
+      projectName: "Adoptant a",
+      // `numeric(18,4)` revient en chaîne : la mise en forme est à l'écran.
+      targetValue: "85.0000",
+    });
+  });
+
+  test("une adoption sans cible n'a pas de repère", async () => {
+    /* « Doublon » est adopté sans cible : les colonnes sont nullables
+       (`docs/04` §3), et une adoption qui n'en fixe aucune n'a rien à tracer. */
+    const rows = await listProductTargets(a.scope, a.fullId);
+
+    expect(rows.map((row) => row.indicatorId)).not.toContain(a.tieId);
+  });
+
+  test("la cible d'un accompagnement archivé n'est pas rendue", async () => {
+    /* **Le test qui isole `isNull(projects.archivedAt)`.** La frise écarte déjà
+       les accompagnements rangés de ses bandes et de ses repères : une cible
+       qui survivrait serait un repère orphelin sur un axe qui ne porte plus
+       l'accompagnement qui se l'était donnée. */
+    const archivedProject = await a.scope.insert(projects, {
+      name: `Range ${suffix}`,
+      productId: a.fullId,
+      statusId: a.statusId,
+    });
+    const adoption = await a.scope.insert(projectIndicators, {
+      projectId: archivedProject.id,
+      indicatorId: a.autonomyId,
+      targetValue: "90",
+    });
+    await a.scope.archive(projects, archivedProject.id);
+
+    try {
+      const rows = await listProductTargets(a.scope, a.fullId);
+
+      expect(rows.map((row) => row.targetValue)).not.toContain("90.0000");
+      expect(rows.map((row) => row.projectId)).not.toContain(
+        archivedProject.id,
+      );
+    } finally {
+      await a.scope.unlink(projectIndicators, adoption.id);
+    }
+  });
+
+  test("la cible d'un indicateur archivé se lit encore, et l'écran l'ignore", async () => {
+    /* La lecture ne joint pas `indicators`, et c'est délibéré : le composant
+       range chaque cible sous la bande de son indicateur, et un indicateur
+       archivé n'a **aucune bande** — la cible n'a nulle part où se poser. Une
+       seconde jointure ne changerait rien à l'écran et coûterait une table de
+       plus à filtrer. Le test dit ce que la lecture rend vraiment, plutôt que
+       de laisser croire à un filtre qui n'existe pas. */
+    const rows = await listProductTargets(a.scope, a.fullId);
+
+    expect(rows.map((row) => row.indicatorId)).toContain(
+      a.archivedIndicatorId,
+    );
+  });
+
+  test("les cibles d'un autre produit ne débordent pas", async () => {
+    const full = await listProductTargets(a.scope, a.fullId);
+    const neighbour = await listProductTargets(a.scope, a.otherId);
+
+    // Le voisin adopte son indicateur sans cible : il n'a rien à tracer.
+    expect(neighbour).toEqual([]);
+    expect(full.map((row) => row.indicatorId)).not.toContain(
+      a.otherIndicatorId,
+    );
+  });
+
+  test("un produit sans adoption rend un tableau vide", async () => {
+    expect(await listProductTargets(a.scope, a.emptyId)).toEqual([]);
+  });
+
+  test("les cibles d'un produit d'un autre domaine ne se lisent pas", async () => {
+    /* L'étanchéité par l'adoption : les identifiants sont réels, les lectures
+       sont faites sous l'autre domaine. Sans `filter(projectIndicators)`, la
+       cible de 85 du domaine voisin se lirait ici. */
+    expect(await listProductTargets(a.scope, b.fullId)).toEqual([]);
+    expect(await listProductTargets(b.scope, a.fullId)).toEqual([]);
+  });
+
+  test("une cible portée par un accompagnement d'un autre domaine ne se lit pas", async () => {
+    /* **Le test qui isole `filter(projects)`**, et il a dû être écrit : le
+       premier jet — les deux lectures croisées ci-dessus — restait vert au
+       retrait du filtre, l'adoption du domaine `a` ne pointant jamais, en
+       fonctionnement normal, vers un accompagnement du domaine `b`. La leçon de
+       T4bis.5, reprise de T5.5 : « un test vert au retrait d'une règle est un
+       test qui ne la couvre pas, même s'il porte son nom », et « les filtres de
+       domaine se rattrapent ».
+
+       La ligne forgée est la seule qui puisse encore l'éprouver : une adoption
+       du domaine `a`, portant une cible, sur un accompagnement du domaine `b`.
+       Aucune écriture de l'application ne la produit — la couche scopée la
+       refuserait. Sans `filter(projects)`, elle sortirait de la lecture faite
+       sous `a` sur le produit voisin. */
+    await db.insert(projectIndicators).values({
+      domainId: a.domainId,
+      projectId: b.looseId,
+      indicatorId: b.autonomyId,
+      targetValue: "77",
+    });
+
+    expect(await listProductTargets(a.scope, b.fullId)).toEqual([]);
   });
 });

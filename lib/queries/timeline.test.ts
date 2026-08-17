@@ -36,8 +36,11 @@ import {
   monthBand,
   monthMark,
   timelineScale,
+  valueOffset,
+  valueScale,
   yearTicks,
   type TimelineScale,
+  type ValueScale,
 } from "./timeline";
 
 /* ==========================================================================
@@ -180,6 +183,90 @@ describe("yearTicks — les graduations d'année", () => {
     const scale = timelineScale(["2026-01-01", "2026-12-01"]) as TimelineScale;
 
     expect(yearTicks(scale)).toEqual([]);
+  });
+});
+
+/* ==========================================================================
+   L'échelle verticale d'une bande de courbe — T5.6
+
+   Ce que ces tests épinglent : la cible comprise dans les bornes, la bande
+   plate qui ne divise pas par zéro, et le fait que **rien ne déborde** de la
+   bande. Neutraliser le calcul de position verticale doit les faire tomber, eux
+   et rien d'autre.
+   ========================================================================== */
+
+describe("valueScale — les bornes d'une bande", () => {
+  test("les bornes sont la plus petite et la plus grande des valeurs", () => {
+    /* Les trois relevés du brief §7, écrits dans le désordre : c'est la
+       fonction qui borne, pas l'ordre de la série. */
+    expect(valueScale(["63.0000", "54.0000", "71.0000"])).toEqual<ValueScale>({
+      min: 54,
+      max: 71,
+    });
+  });
+
+  test("la cible entre dans les bornes quand elle les dépasse", () => {
+    /* Sans elle, le trait de cible tomberait hors de la bande — et une cible
+       qu'on ne voit pas n'est pas un repère. */
+    expect(valueScale(["54", "63", "71", "85"])).toEqual<ValueScale>({
+      min: 54,
+      max: 85,
+    });
+  });
+
+  test("une seule valeur borne la bande sur elle-même", () => {
+    expect(valueScale(["71.0000"])).toEqual<ValueScale>({ min: 71, max: 71 });
+  });
+
+  test("les valeurs illisibles sont ignorées, jamais comptées pour zéro", () => {
+    /* `Number("")` vaut 0 : sans le rejet explicite, une valeur absente
+       tirerait la borne basse à zéro et écraserait toute la courbe. */
+    expect(valueScale([null, "54", undefined, "", "71", "  "])).toEqual({
+      min: 54,
+      max: 71,
+    });
+  });
+
+  test("sans aucune valeur, il n'y a pas de bande", () => {
+    expect(valueScale([])).toBeNull();
+    expect(valueScale([null, undefined, ""])).toBeNull();
+  });
+});
+
+describe("valueOffset — la hauteur d'une valeur dans sa bande", () => {
+  const scale = valueScale(["54", "71", "85"]) as ValueScale;
+
+  test("la borne basse est à 0, la borne haute à 100", () => {
+    expect(valueOffset(scale, "54")).toBe(0);
+    expect(valueOffset(scale, "85")).toBe(100);
+  });
+
+  test("une valeur au milieu est à mi-hauteur", () => {
+    const middle = valueScale(["0", "100"]) as ValueScale;
+
+    expect(valueOffset(middle, "50")).toBe(50);
+    expect(valueOffset(middle, "25")).toBe(25);
+  });
+
+  test("une valeur intermédiaire se lit en pourcentage de l'écart des bornes", () => {
+    // 63 entre 54 et 85 : neuf trente-et-unièmes de la hauteur.
+    expect(valueOffset(scale, "63.0000")).toBe(round((9 * 100) / 31));
+  });
+
+  test("une bande plate pose tout au milieu, sans diviser par zéro", () => {
+    const flat = valueScale(["71", "71"]) as ValueScale;
+
+    expect(valueOffset(flat, "71")).toBe(50);
+    expect(Number.isFinite(valueOffset(flat, "71"))).toBe(true);
+  });
+
+  test("une valeur hors bornes est ramenée dans la bande", () => {
+    expect(valueOffset(scale, "0")).toBe(0);
+    expect(valueOffset(scale, "1000")).toBe(100);
+  });
+
+  test("une valeur illisible se pose au milieu plutôt que nulle part", () => {
+    expect(valueOffset(scale, "")).toBe(50);
   });
 });
 

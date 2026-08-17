@@ -3,11 +3,14 @@
  * l'échelle sur laquelle elle se dessine (`docs/06` §6, D26 — « la couche temps
  * long attend C5 »).
  *
- * **Deux couches sur l'axe, et pas une de plus** (`docs/03` §7) : une bande par
- * accompagnement, un repère par activité porteuse d'un résultat. Les bandes ne
- * demandent **aucune lecture neuve** — `listProductProjects` les rend déjà pour
- * la liste juste en dessous, et la frise reçoit ce que la page a lu. Ce module ne
- * porte donc que les **repères**, et l'échelle que les deux partagent.
+ * **Trois couches sur l'axe, et pas une de plus** (`docs/03` §7) : une bande par
+ * accompagnement, un repère par activité porteuse d'un résultat, et depuis T5.6
+ * une courbe par indicateur. Aucune d'elles ne demande de lecture neuve à ce
+ * module hors les repères : `listProductProjects`, `listProductIndicators` et
+ * `listProductReadings` rendent déjà tout le reste pour les blocs de la page, et
+ * la frise reçoit ce que la page a lu. Ce module porte donc les **repères**, et
+ * les **échelles** — celle du temps, partagée par les trois couches, et celle
+ * des valeurs, propre à chaque courbe.
  *
  * **Ce module ne calcule aucun indice.** Il rend des faits datés — un résultat
  * reporté d'un outil externe, avec sa date — et des **positions** sur un axe.
@@ -322,4 +325,105 @@ export function yearTicks(scale: TimelineScale): TimelineYearTick[] {
   }
 
   return ticks;
+}
+
+/* ==========================================================================
+   L'échelle verticale d'une bande de courbe — T5.6
+
+   **Une échelle par bande, jamais une pour toutes** (arbitrage (d) de
+   `tickets-C5.md`) : superposer un pourcentage et des secondes sur un même axe
+   vertical fabriquerait une comparaison que personne n'a demandée. C'est l'axe
+   **temporel** qui est partagé — celui de T5.5, juste au-dessus —, jamais
+   l'échelle des valeurs.
+
+   Ces deux fonctions vivent ici et non dans `lib/queries/indicators.ts` : la
+   position verticale est la sœur de `monthBand` et de `monthMark`, et les
+   séparer ferait chercher la moitié d'un dessin dans un module de lecture.
+   Écart d'un fichier au périmètre de la fiche, consigné dans
+   `JOURNAL-TECHNIQUE.md`.
+
+   **Une position n'est pas un indice** (D39), pas plus verticalement
+   qu'horizontalement : elle situe une valeur entre deux bornes qui sont
+   elles-mêmes des valeurs reportées. Aucun écart, aucune tendance, aucune
+   moyenne — le segment entre deux relevés joint deux faits, il n'en invente pas
+   un troisième.
+   ========================================================================== */
+
+/** Les deux bornes verticales d'une bande de courbe. */
+export type ValueScale = {
+  /** La plus basse des valeurs de la bande. */
+  min: number;
+  /** La plus haute. Jamais inférieure à `min`. */
+  max: number;
+};
+
+/**
+ * Ce qu'une valeur brute vaut en nombre, ou `null` si elle ne vaut rien.
+ *
+ * `numeric(18,4)` revient **en chaîne** du pilote — « 71.0000 » —, et la
+ * conversion appartient à ce module plutôt qu'au composant : c'est ici qu'elle
+ * s'éprouve par un test, et un `Number()` égrené dans un JSX ne s'éprouve pas.
+ * `Number("")` valant 0, la chaîne vide est écartée avant tout — une valeur
+ * absente n'est pas une valeur nulle.
+ */
+function toNumber(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string" && value.trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * Les bornes d'une bande, déduites de ses **propres** valeurs : ses relevés, et
+ * ses cibles quand une adoption en porte (fiche T5.6).
+ *
+ * La cible entre dans les bornes parce qu'un trait de cible hors de la bande ne
+ * se verrait pas — et une cible qu'on ne voit pas n'est pas un repère. Ce n'est
+ * pas un calcul porté sur la valeur : la cible reste un chiffre saisi, affiché
+ * tel quel, jamais comparé au dernier relevé (arbitrage (g)).
+ *
+ * Rend `null` quand aucune valeur n'est exploitable : il n'y a alors pas de
+ * bande, et l'écran le dit plutôt que de tracer une courbe vide.
+ */
+export function valueScale(
+  values: readonly (string | number | null | undefined)[],
+): ValueScale | null {
+  let min: number | null = null;
+  let max: number | null = null;
+
+  for (const value of values) {
+    const parsed = toNumber(value);
+    if (parsed === null) continue;
+    if (min === null || parsed < min) min = parsed;
+    if (max === null || parsed > max) max = parsed;
+  }
+
+  if (min === null || max === null) return null;
+
+  return { min, max };
+}
+
+/**
+ * La hauteur d'une valeur dans sa bande, en pourcentage **depuis le bas**.
+ *
+ * Depuis le bas parce que c'est le sens d'une lecture de courbe ; c'est le
+ * composant qui retourne l'ordonnée, le SVG comptant ses pixels vers le bas.
+ *
+ * **Une bande plate pose tout à 50** : deux relevés de même valeur, ou un relevé
+ * seul, donnent `min === max`, et la division serait par zéro. Une droite au
+ * milieu est ce que ces relevés disent — ni une montée, ni une chute.
+ *
+ * Toute valeur hors bornes est ramenée dedans : rien ne déborde de la bande,
+ * comme rien ne déborde de l'axe (`clampIndex`).
+ */
+export function valueOffset(
+  scale: ValueScale,
+  value: string | number,
+): Percent {
+  const parsed = toNumber(value);
+  if (parsed === null) return 50;
+  if (scale.max <= scale.min) return 50;
+
+  const clamped = Math.min(Math.max(parsed, scale.min), scale.max);
+  return round(((clamped - scale.min) / (scale.max - scale.min)) * 100);
 }

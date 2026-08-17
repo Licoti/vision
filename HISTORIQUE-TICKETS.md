@@ -1522,6 +1522,101 @@ trois produits de sonde et leurs accompagnements ont été retirés après lectu
 
 ---
 
+### T5.6 — les courbes d'indicateurs sur la même frise — 17/08/2026
+
+**Ce que le ticket livre.** La troisième couche de `docs/03` §7, et la clôture de C5 : une bande de
+courbe par indicateur portant au moins un relevé, empilée sous les repères, sur l'axe temporel de
+T5.5. Un point par relevé, un segment entre deux relevés consécutifs, un relevé isolé qui reste un
+point. La cible s'affiche en repère horizontal tireté, avec sa valeur écrite. Les indicateurs sans
+relevé sont **nommés sous la frise**, jamais posés à aujourd'hui. C'est la juxtaposition qui répond
+« en donnant à lire, pas en concluant » : aucun écart, aucune tendance, aucun lissage, aucune
+annotation de causalité.
+
+**L'axe n'a pas bougé d'une ligne, et c'était écrit d'avance.** `timelineScale` recevait `(string |
+null)[]` depuis T5.5 précisément pour ce jour : les dates de relevé se versent dans la liste, un
+`...readings.map(r => r.readOn)` et rien d'autre. C'est la **quatrième** généralisation de C5 payée
+au ticket suivant, après le décompte d'exclusivité, l'emplacement du filtre d'archivage et la liste
+de dates elle-même.
+
+**Une seule lecture neuve pour toute la couche.** Les courbes se tracent sur `listProductIndicators`
+et `listProductReadings`, que la page lit **déjà** pour le bloc de T5.1 — la page les passe au
+composant. Seules les cibles demandent `listProductTargets`, cinquième lecture du `Promise.all`.
+
+**Le piège du dessin : `polyline` et `path` n'acceptent pas de pourcentage.** Leur `points` et leur
+`d` ne prennent que des nombres — un `17.5676%` y est ignoré, et la courbe se dessinerait dans le
+coin haut-gauche. La frise n'ayant pas de `viewBox` (choix de T5.5, pour que son texte garde la
+taille du reste de la page), un segment est donc une `<line x1="…%" x2="…%">`, qui, elle, accepte les
+pourcentages comme le filet de l'axe. Consigné au journal.
+
+**Cinq arbitrages rendus avant écriture, et posés à l'humain.**
+
+1. **Les fonctions pures d'échelle verticale vivent dans `lib/queries/timeline.ts`**, à côté de
+   `monthBand` et de `monthMark`, et non dans `lib/queries/indicators.ts` que la fiche nommait :
+   séparer la moitié d'un dessin d'avec l'autre ferait chercher la position verticale dans un module
+   de lecture. Écart d'un fichier au périmètre, comme `adoption-panel.tsx` en T5.4.
+2. **Un repère horizontal par adoption portant une cible**, et l'accompagnement nommé dès qu'une
+   bande en porte plusieurs. Retenir « la cible du plus récent » aurait été un choix fait par
+   Vision ; juxtaposer n'en fait aucun.
+3. **Les deux bornes de chaque bande sont écrites.** Sans repère chiffré, l'échelle verticale d'une
+   bande est invisible et la courbe s'approche du graphique décoratif que `docs/06` §10 interdit et
+   que D41 refuse pour celle-ci. Ce sont des **valeurs reportées** — la plus basse et la plus haute
+   de ce que la bande porte —, jamais un indice calculé (D39).
+4. **Une seule couleur pour toutes les courbes** (`content-primary-dark`). L'arbitrage (d) donne à
+   chaque indicateur **sa** bande : rien n'a besoin d'être distingué par la couleur, et une palette
+   catégorielle absente du design system aurait été le septième substitut que la règle 2 interdit.
+5. **La frise s'affiche dès qu'une couche est situable.** L'état vide de T5.5 tombait sur
+   `bands.length === 0` ; il tombe désormais sur `bands.length === 0 && curves.length === 0`. Sans
+   ce changement, un produit sans accompagnement daté mais portant des relevés aurait affiché « il
+   n'y a rien à situer sur un axe » — une phrase fausse.
+
+**La cible entre dans l'échelle de la bande, et cela se lit.** Hors des bornes, son trait ne se
+verrait pas. Sur la fixture, l'échelle va donc de 54 à **85** — la cible — et non de 54 à 71 : le
+dernier relevé se pose à 265,68 px et non au plafond de la bande. Deux valeurs reportées côte à
+côte, jamais soustraites.
+
+**Comment le critère a été relevé.** Dans le HTML servi, jamais affirmé. Sur « Espace client web »,
+axe de mars 2024 à mars 2027 — **37 mois, la même fenêtre que les bandes**, les relevés n'ayant pas
+déplacé les bornes : trois `<circle>` à 17,5676 / 33,7838 / 74,3243 % (septembre 2024, mars 2025,
+juin 2026, au milieu de leur mois) et **deux** `<line>` de segment, ordonnées 292 / 278,0645 /
+265,6774 recalculées à la main sur `plotBottom - offset × 48` ; le trait de cible à 244, soit le
+plafond exact de la bande, et son texte « Cible 85 % ». Puis un indicateur **sans relevé** ajouté à
+la main : nommé sous la frise, aucune bande — et un indicateur à **un seul relevé** : un `<circle>`
+à mi-hauteur, **zéro** segment, ses deux bornes écrites « 12,5 s ». Enfin un produit **archivé sans
+aucun accompagnement mais portant deux relevés** : frise servie entière, « aucun accompagnement daté
+… 1 courbe d'indicateur » dans l'`aria-label`, **aucun geste d'écriture** — l'arbitrage (5) et la
+règle 4 dans le même rendu. Un produit nu rend l'état vide, sans `<svg>`. Les trois sondes ont été
+retirées après lecture.
+
+**Le droit, éprouvé par ce qu'il y avait à éprouver.** Ce ticket **n'ouvre aucun point d'entrée** :
+rien à reposter, et le rapporter autrement serait feindre une épreuve. Ce qui a été joué : la page
+lue sous le cookie de deux membres **non contributeurs** — frise et courbes complètes, `0` geste
+d'écriture (D9) — et le produit archivé ci-dessus.
+
+**Quatre neutralisations, et la quatrième a resservi la leçon de T4bis.5.** `valueOffset` rendu
+constant fait tomber **4 tests de position et rien d'autre** — les deux tests dont l'attente *est* 50
+restent verts, ce qui est la bonne réponse et non un manque. `isNull(projects.archivedAt)` retiré fait
+tomber le seul test de l'adoption sur accompagnement archivé ; `isNotNull(targetValue)` retiré fait
+tomber les deux tests qui reposent sur l'absence de cible. Mais `filter(projects)` retiré ne faisait
+tomber **aucun test** : les deux lectures croisées d'étanchéité restaient vertes, une adoption du
+domaine `a` ne pointant jamais, en fonctionnement normal, vers un accompagnement du domaine `b`. Le
+test qui l'isole a donc été écrit — une ligne forgée par `db.insert`, seule capable de l'éprouver —,
+puis la neutralisation rejouée : il tombe, et lui seul.
+
+**Contrastes mesurés, quatre couples neufs par la position.** Trait et points de courbe à
+**15,72:1** (`content-primary-dark`), trait de cible et graduations de borne à **3,88:1**
+(`content-neutral-normal`, le substitut de bordure de contrôle en vigueur depuis T2.3), textes de
+cible et de bornes à **4,98:1**, libellé de bande à **17,87:1**. Seuil de 3:1 pour une limite de
+composant, 4,5:1 pour un texte : tenus. Courbe contre trait de cible : 4,05:1, et le **tireté** les
+distingue de toute façon — la couleur ne porte pas seule. **Aucun septième substitut inventé.**
+
+**Ce que le ticket laisse derrière lui.** Une bande plate — un seul relevé, ou deux relevés égaux —
+écrit **deux fois la même borne**, en haut et en bas : c'est exact, et redondant. Le regroupement des
+relevés par indicateur est **redit** dans `timeline.tsx` alors qu'`indicators.tsx` en porte un depuis
+T5.3, sous une autre forme et pour un autre tri : troisième dette de recopie du chantier, après
+`ACTION_LINK` et la table `nature → couleur`.
+
+---
+
 ## Points ouverts refermés
 
 *(archivés depuis `ETAT.md` le 14/08/2026 — ils étaient barrés dans la section « Points ouverts »,

@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 16/08/2026 — T5.5 livré : la frise du temps long, l'axe et ses deux couches.
-**Chantier en cours :** C5 — indicateurs et lecture dans le temps, cinq tickets sur six livrés
-**Ticket suivant :** T5.6 — les courbes d'indicateurs sur la même frise
+**Dernière mise à jour :** 17/08/2026 — T5.6 livré : les courbes d'indicateurs sur la même frise. C5 est clos.
+**Chantier en cours :** aucun — C5 terminé, C6 à découper
+**Ticket suivant :** aucun — **session de découpage de C6** (liens et journal), protocole « Session de découpage »
 
 ---
 
@@ -17,7 +17,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C3 — Activités et roadmap | T3.1 → T3.6 | **terminé** |
 | C4 — Ressources et résultats | T4.1 → T4.4 | **terminé** |
 | C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **terminé** |
-| C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **en cours** — T5.1 → T5.5 livrés |
+| C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **terminé** |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
@@ -55,7 +55,9 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   du chantier — l'unicité partielle du résultat, qui fait de « retirer puis ressaisir » un chemin
   réel.
 
-**C5 — en cours** *(une ligne par ticket jusqu'au repliage du chantier)*
+**C5 — clos** *(ses six lignes partent dans `HISTORIQUE-TICKETS.md` au **repliage**, geste de la
+session de découpage de C6 — le seul moment où `ETAT.md` se balaie. D'ici là le fichier dépasse les
+250 lignes, et c'est ce dépassement qui appelle le balayage.)*
 
 - **T5.1 — le bloc « Indicateurs » de la page produit, en lecture, le 16/08/2026.** Première
   lecture des trois tables dormantes depuis T1.2 : `listProductIndicators` rend en **une** requête
@@ -95,6 +97,16 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   `measured_on`, seule date qu'un résultat porte toujours ; une période ouverte qui court jusqu'à la
   borne, jamais au-delà ; le `role="img"` de la fiche devenu **`role="group"`**. Et la mise en défaut
   a rappelé ce qu'`activities.ts` écrit depuis T2.2 : **les filtres de domaine se rattrapent.**
+- **T5.6 — les courbes d'indicateurs sur la même frise, le 17/08/2026.** La troisième couche de
+  `docs/03` §7, et la clôture de C5. **L'axe n'a pas bougé d'une ligne** — `timelineScale` recevait
+  une liste de dates depuis T5.5, écrit pour ce jour-là — et une seule lecture est neuve, celle des
+  cibles : les courbes se tracent sur les indicateurs et les relevés déjà lus par le bloc de T5.1.
+  Le piège du dessin : **`polyline` et `path` n'acceptent pas de pourcentage**, et la frise n'a pas
+  de `viewBox` — un segment est donc une `<line>`. Cinq arbitrages, dont **les deux bornes de chaque
+  bande écrites** (sans repère chiffré, une courbe devient le graphique décoratif que D41 refuse) et
+  **une seule couleur pour toutes**, chaque indicateur ayant déjà sa bande. La mise en défaut a
+  resservi la leçon de T4bis.5 : le test d'étanchéité des cibles restait **vert** au retrait de
+  `filter(projects)` ; il a fallu forger l'adoption qui l'isole.
 
 ---
 
@@ -176,7 +188,8 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   (T3.3), quatre transitions non revenues en arrière (T3.5), deux ressources (T4.2), deux indicateurs
   archivés dont un sous le cookie d'une contributrice (T5.2) ; l'adoption de la fixture porte un
   **identifiant neuf** depuis T5.4, `unlink` ne rendant pas sa ligne. T5.5 n'a rien laissé : ses trois
-  produits de sonde ont été retirés après lecture.
+  produits de sonde ont été retirés après lecture, et T5.6 non plus — deux produits et trois
+  indicateurs de sonde, retirés de même.
   **Règle posée le 14/08/2026 : la base de développement est jetable** — la règle 4 protège la donnée
   métier, pas une fixture locale. Deux conséquences : un critère de ticket passé ne s'y relit pas
   nécessairement (T2.1 à T2.4 se lisaient sur « 2 accompagnements », il y en a 3) et ce n'est pas un
