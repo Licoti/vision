@@ -128,6 +128,11 @@ portaient en plus vivent dans le récit ci-dessous, ticket par ticket.)*
   « combien » du refus (e) passe par l'écran et non par un message d'action ; le pluriel du refus (e)
   d'`archiveProduct` se corrige avant d'être recopié ; `project_indicators.note` reste sans écrivain.
   Premier retrait par `unlink` d'un objet que l'écran offre, et premier verbe neuf depuis T3.5.
+- **T5.5 — 16/08/2026 — la frise du temps long : l'axe, les accompagnements, les repères.** Quatre
+  fichiers, ceux de la fiche, `lib/format.ts` restant fermé faute d'un format qui manque. Quatre
+  arbitrages tranchés avant écriture, dont un **écart assumé à la fiche** : `role="group"` au lieu du
+  `role="img"` qu'elle demandait, les deux exigences de la fiche s'excluant. Premier SVG du projet,
+  rendu sur le serveur et sans `viewBox`.
 
 ---
 
@@ -1431,6 +1436,90 @@ côtés ayant la même graisse : la règle de T4bis.5, retrouvée à la mesure e
 de développement garde une adoption au **même contenu mais à l'identifiant neuf**, `unlink` ne rendant
 pas sa ligne.
 
+### T5.5 — la frise du temps long : l'axe, les accompagnements, les repères — 16/08/2026
+
+**Ce que le ticket livre.** La couche que D26 réservait à C5, et que `docs/06` §6 place « au-dessus de
+la liste, sans la déplacer » : un axe temporel commun au **mois** (D13), deux couches dessus et pas une
+de plus — une bande par accompagnement daté, un repère par activité porteuse d'un résultat. La liste
+des accompagnements n'a pas bougé d'une ligne et devient l'équivalent textuel de la frise. Le bloc
+« Indicateurs » de T5.1 reste sous elle. Trois sections, dans l'ordre annoncé depuis T5.1 : frise,
+accompagnements, indicateurs.
+
+**Le premier dessin du projet, et il tient sans `viewBox`.** Le réflexe aurait été
+`viewBox="0 0 720 H"` : à la largeur réelle de la page — 1 112 px de contenu sous `max-w-310` —, le
+facteur d'échelle vaut 1,54, et un `text-xs` de 12 px se serait affiché à 18,5 px, plus gros que les
+titres de section qui l'entourent. Retenu : **aucun `viewBox`**. Les abscisses sont des pourcentages
+(`x="62.1622%"`), les ordonnées des pixels, et le texte de la frise a exactement la taille du reste de
+la page à toute largeur d'écran. C'est aussi ce qui rend le critère lisible : `left + width` se relit
+en pour cent dans le balisage servi, sans conversion.
+
+**Quatre arbitrages rendus avant écriture, et posés à l'humain.**
+
+1. **`role="group"`, et non le `role="img"` de la fiche.** La fiche demandait les deux : un
+   `role="img"` **et** des bandes focusables menant à leur page projet. Les deux s'excluent — le
+   contenu d'un `role="img"` est retiré de l'arbre d'accessibilité, et un `<a href>` qui y reste
+   focalisable est un défaut WCAG 4.1.2, dans un produit dont le centre fait métier d'audits
+   d'accessibilité. Retenu : `role="group"` porteur de l'`aria-label`, bandes focusables et nommées.
+   Écart d'un mot, consigné au journal.
+2. **Une seule lecture neuve.** Les bandes sont les accompagnements que `listProductProjects` rend
+   **déjà** pour la liste juste en dessous : la page les passe au composant. Seuls les repères
+   demandent `listProductMilestones`. C'est la discipline de l'arbitrage (b) de C5 — « aucune requête
+   neuve » — tenue une seconde fois.
+3. **Un repère se pose sur `results.measured_on`**, et non sur la période de son activité. La colonne
+   est **non nulle en base** : aucun repère n'est écarté faute de date, là où une activité peut
+   n'avoir aucune période — et `docs/03` §7 interdit de positionner arbitrairement ce qui n'a pas de
+   date. C'est en outre la valeur que D39 autorise à reporter « avec sa date ».
+4. **Une période ouverte court jusqu'à la borne de l'axe**, et sa période reste écrite « depuis
+   février 2026 » à côté d'elle. Ce n'est pas une fin inventée : c'est l'axe qui l'arrête. Lu dans le
+   balisage servi — `x="62.1622%"` + `width="37.8378%"` = 100 % exactement, jamais 100,0001.
+
+**L'échelle est pure, et reçoit une liste de dates.** `timelineScale` ne prend ni projets ni repères
+mais `(string | null)[]` : c'est ce qui permettra à T5.6 d'y verser les dates de relevé sans qu'un
+calcul de borne change d'un caractère — la troisième fois qu'une généralisation s'écrit d'avance dans
+C5, après le décompte d'exclusivité et l'emplacement du filtre d'archivage. Les indices de mois se
+lisent **sur la chaîne** (`day.slice(0,4)`, `day.slice(5,7)`) et jamais par un `Date` : c'est
+exactement le fuseau que `lib/format.ts` documente depuis T2.2, et une position n'a besoin d'aucun
+objet temps.
+
+**« Du premier début connu au dernier terme connu » ne pouvait pas se lire à la lettre.** Sur la
+fixture, le dernier *terme* d'accompagnement est septembre 2024 — l'accompagnement en cours depuis
+février 2026 n'a pas de fin — et le résultat le plus récent est mesuré en juin 2026. Une borne haute
+posée sur les seules fins aurait laissé les deux hors de l'axe. Les bornes sont donc le min et le max
+de **toutes** les dates connues des couches affichées, et la fiche se lit ainsi.
+
+**Comment le critère a été relevé.** Dans le HTML servi, jamais affirmé. Sur « Espace client web » :
+trois bandes et deux repères comptés un par un, l'axe de mars 2024 à mars 2027 — 37 mois, donc
+2,7027 % par mois —, les trois graduations d'année à 27,027 / 59,4595 / 91,8919 % (10, 22 et 34 mois),
+la bande terminée à 0 % sur 18,9189 % (7 mois, bornes comprises), la bande ouverte à 62,1622 % +
+37,8378 % = 100 %, et les deux repères au **milieu** de leur mois — 6,7568 % pour mai 2024,
+74,3243 % pour juin 2026. Puis un produit à un seul accompagnement, un produit dont la fenêtre tient
+en **un seul mois** (bande pleine largeur, repère à 50 %), un produit **sans aucun accompagnement** et
+un produit dont l'unique accompagnement **n'a aucune date** : deux états vides au texte distinct.
+Enfin un produit **archivé** portant un accompagnement daté — page servie entière, frise comprise
+(règle 4) — et la page lue sous le cookie d'une **membre non contributrice** : frise complète, trois
+bandes, deux repères, **aucun geste d'écriture** (D9).
+
+**Cinq neutralisations jouées, et chacune a dit quelque chose.** La borne haute figée fait tomber
+**9 tests d'échelle et rien d'autre** ; chacun des trois filtres d'archivage retiré seul fait tomber
+son propre test **et celui de l'ordre**, qui énumère la liste attendue. Le cinquième a mis au jour
+autre chose : retirer `filter(results)` seul ne fait tomber **aucun test**, ni `filter(activities)`
+seul — les quatre filtres de domaine se rattrapent l'un l'autre, comme `lib/queries/activities.ts`
+l'écrit depuis T2.2. C'est leur retrait **ensemble** qui fait tomber le test d'étanchéité, seul.
+
+**Contrastes mesurés, neuf couples, tous neufs par la position.** Les quatre remplissages de bande sur
+`surface-neutral-pale` — 13,65:1 (`active`), 6,41:1 (`framing`), 4,98:1 (`paused`), 4,53:1 (`done`) —,
+le filet d'axe et ses graduations à **3,88:1** (`content-neutral-normal`, le substitut de bordure de
+contrôle en vigueur depuis T2.3), le repère à **4,43:1** (`surface-secondary-dark`), le contour de
+focus à 4,76:1, et les deux textes à 17,87:1 et 4,98:1. Seuil de 3:1 pour une limite de composant,
+4,5:1 pour un texte : tenus. **Aucun septième substitut inventé.**
+
+**Ce que le ticket laisse derrière lui.** Une table `nature → couleur` **redite** en `fill-*` plutôt
+qu'importée de `status-dot.tsx`, qui porte des `bg-*` et ne les exporte pas — la dette d'`ACTION_LINK`
+sous une autre forme. Le contour de focus sur un `<a>` SVG n'a pas été **observé dans un navigateur** :
+la règle `*:focus-visible` et l'ancre focalisable sont lues dans le CSS et le HTML servis, ce qui n'est
+pas la même chose que de l'avoir vu. Et la base de développement est rendue telle qu'elle était : les
+trois produits de sonde et leurs accompagnements ont été retirés après lecture.
+
 ---
 
 ## Points ouverts refermés
@@ -1606,3 +1695,16 @@ une forme courte ; le raisonnement complet est ici.)*
   si elle n'en relève pas, si elle est archivée ou si elle est annulée. Les deux premiers cas ont été
   forgés et refusés, la ligne relue intacte en base ; le troisième a demandé de rendre une activité
   annulée à la main, la fixture n'en portant aucune.
+
+*(deux entrées de plus, versées ici au balayage d'`ETAT.md` de T5.5 : elles n'étaient plus des
+rappels utiles à une session, mais des faits datés.)*
+
+- **La cinquième discipline de vérification a été retirée le 14/08/2026, et le retrait est
+  confirmé.** L'étape 4 du protocole en compte **quatre**. Aucune fiche de C4bis n'a exigé que le
+  parcours se joue sans une ligne de JavaScript, aucune de C5 non plus — la frise de T5.5 s'en passe
+  parce que sa fiche l'interdit nommément, pas parce qu'une discipline générale l'imposerait.
+
+- **Modèle par ticket.** Le plan écrit disait Opus pour C1, Sonnet à partir de C2 ; en pratique C2,
+  T3.1, T3.2 et tout C4 sauf T4.1 et T4.2 ont été menés sur Opus, T4.1 sur Antigravity, et C4bis
+  comme C5 sur Opus. **Le levier n'est pas le modèle mais les quatre disciplines de vérification** —
+  c'est cette phrase que `ETAT.md` garde, le relevé restant ici.

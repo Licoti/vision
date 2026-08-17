@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 16/08/2026 — T5.4 livré : adopter un indicateur depuis l'accompagnement.
-**Chantier en cours :** C5 — indicateurs et lecture dans le temps, quatre tickets sur six livrés
-**Ticket suivant :** T5.5 — la frise du temps long : l'axe, les accompagnements, les repères
+**Dernière mise à jour :** 16/08/2026 — T5.5 livré : la frise du temps long, l'axe et ses deux couches.
+**Chantier en cours :** C5 — indicateurs et lecture dans le temps, cinq tickets sur six livrés
+**Ticket suivant :** T5.6 — les courbes d'indicateurs sur la même frise
 
 ---
 
@@ -17,16 +17,15 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C3 — Activités et roadmap | T3.1 → T3.6 | **terminé** |
 | C4 — Ressources et résultats | T4.1 → T4.4 | **terminé** |
 | C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **terminé** |
-| C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **en cours** — T5.1 → T5.4 livrés |
+| C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **en cours** — T5.1 → T5.5 livrés |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
 **Point de bascule atteint :** C1 à C3 constituent le POC minimal démontrable ; C4 y ajoute la
 boucle complète de `docs/05` §2 — saisir, attacher le lien, reporter le résultat.
 
-**Sur C4bis, désormais clos.** `docs/05` §5 n'avait prévu ni l'archivage ni la correction ; le
-chantier s'est intercalé **sans décaler les autres** — C5, C6 et C7 gardent le sens que `docs/05`
-leur donne, « C7 » étant écrit dans D25, D28 et D37 que la règle 6 interdit de rouvrir.
+**Sur C4bis, désormais clos.** Intercalé **sans décaler les autres** : C5, C6 et C7 gardent le sens
+que `docs/05` leur donne, « C7 » étant écrit dans D25, D28 et D37 que la règle 6 interdit de rouvrir.
 
 **Sur C5, ouvert le 15/08/2026.** Six tickets, sept arbitrages rendus avant écriture, dans
 `tickets-C5.md`. Sa leçon reprise de C4bis : **chaque objet arrive avec ses trois gestes — créer,
@@ -87,6 +86,15 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   afficher un ; le pluriel du refus (e) d'`archiveProduct`, dû depuis T5.1, est corrigé avant d'être
   recopié ; `project_indicators.note` reste sans écrivain. Un fichier hors fiche, `adoption-panel.tsx`,
   la fiche demandant un panneau sans nommer où le mettre.
+- **T5.5 — la frise du temps long : l'axe, les accompagnements, les repères, le 16/08/2026.** Le
+  **premier dessin** du projet : un SVG serveur, sans dépendance, sans JavaScript et **sans
+  `viewBox`** — les abscisses sont des pourcentages, si bien que son texte garde la taille du reste
+  de la page. Les positions sont pures et testées, et `timelineScale` reçoit **une liste de dates** et
+  non des projets : T5.6 y ajoutera les relevés sans qu'un calcul de borne change. Quatre arbitrages :
+  **une seule lecture neuve**, les bandes étant les accompagnements déjà lus ; un repère posé sur
+  `measured_on`, seule date qu'un résultat porte toujours ; une période ouverte qui court jusqu'à la
+  borne, jamais au-delà ; le `role="img"` de la fiche devenu **`role="group"`**. Et la mise en défaut
+  a rappelé ce qu'`activities.ts` écrit depuis T2.2 : **les filtres de domaine se rattrapent.**
 
 ---
 
@@ -161,23 +169,20 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
 
 ### c. Dettes assumées, sans échéance
 
-- **La base de développement a dérivé de la fixture, et c'est acté.** Inventaire au 15/08/2026 :
-  un accompagnement de plus — « Refonte de l'espace documents » sur « Espace client web », créé en
-  vérification de T2.6, avec un commanditaire renseigné et une personne `source = manual` (Nadia
-  Berthier) ; six activités archivées depuis T3.3 ; quatre transitions non revenues en arrière depuis
-  T3.5 ; deux ressources de plus depuis T4.2 ; un « Test projet » et un produit « test » d'une session
-  antérieure, dont l'audit porte depuis T4bis.6 **deux résultats, un rangé et un vivant** — l'état que
-  seule l'unicité partielle autorise ; deux indicateurs archivés depuis T5.2, dont un saisi sous le
-  cookie d'une contributrice ; l'**adoption de la fixture porte un identifiant neuf** depuis T5.4 —
-  retirée puis réadoptée pour éprouver le refus (e), avec les mêmes valeurs, `unlink` ne rendant pas
-  sa ligne. La dérive a servi T4.4 : elle avait déjà mis un Audit UX en
-  « terminée » sans résultat, soit le cas exact que la fixture ne porte pas.
-  **Règle posée le 14/08/2026 : la base de développement est jetable.** La règle 4 protège la donnée
-  métier, pas une fixture locale. Conséquence : un critère de ticket passé ne s'y relit pas
-  nécessairement — T2.1 à T2.4 se lisaient sur « 2 accompagnements », il y en a 3 — et ce n'est pas un
-  défaut. C'est aussi ce qui autorise T4bis.1 à archiver des lignes à la main pour éprouver son
-  critère. Il n'existe **pas de `db:reset`**, `db:seed` ignorant ce qu'il n'a pas semé. → **sans
-  échéance ; un ticket d'outillage si le besoin devient réel.**
+- **La base de développement a dérivé de la fixture, et c'est acté.** Inventaire au 16/08/2026 :
+  un accompagnement de plus (« Refonte de l'espace documents », T2.6, avec commanditaire et une
+  personne `source = manual`) ; un « Test projet » et un produit « test » d'une session antérieure,
+  dont l'audit porte **deux résultats, un rangé et un vivant** (T4bis.6) ; six activités archivées
+  (T3.3), quatre transitions non revenues en arrière (T3.5), deux ressources (T4.2), deux indicateurs
+  archivés dont un sous le cookie d'une contributrice (T5.2) ; l'adoption de la fixture porte un
+  **identifiant neuf** depuis T5.4, `unlink` ne rendant pas sa ligne. T5.5 n'a rien laissé : ses trois
+  produits de sonde ont été retirés après lecture.
+  **Règle posée le 14/08/2026 : la base de développement est jetable** — la règle 4 protège la donnée
+  métier, pas une fixture locale. Deux conséquences : un critère de ticket passé ne s'y relit pas
+  nécessairement (T2.1 à T2.4 se lisaient sur « 2 accompagnements », il y en a 3) et ce n'est pas un
+  défaut ; et c'est ce qui autorise à écrire des lignes à la main pour éprouver un critère. Il
+  n'existe **pas de `db:reset`**, `db:seed` ignorant ce qu'il n'a pas semé. → **sans échéance ; un
+  ticket d'outillage si le besoin devient réel.**
 - **Le design system a six manques, et aucun n'a été inventé.** (1) Les trois **élévations** et les
   deux **gradients** sont nommés sans valeur. (2) Aucun jeton de **bordure de contrôle** : le plus
   sombre des `border-*` ne dépasse pas 1,2:1 là où la limite d'un composant se mesure à 3:1.
@@ -233,9 +238,6 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   de faire revenir une saisie refusée avec ses valeurs. Ce qui n'a pas bougé : l'ouverture reste une
   URL, les sorties restent des liens, `inert` et `autofocus` restent des attributs HTML. C'est la
   frontière du bundle qui a bougé, pas la nature du socle.
-- **La cinquième discipline de vérification a été retirée le 14/08/2026**, et le retrait est
-  confirmé : l'étape 4 du protocole en compte **quatre**. Aucune fiche de C4bis n'exige que le
-  parcours se joue sans une ligne de JavaScript.
 - **Le domaine courant est le premier domaine actif trouvé en base.** Pas de variable
   d'environnement : `docs/05` §3 pose un domaine unique. Le jour où un second existe, le choix
   revient au fournisseur d'identité.
@@ -244,6 +246,5 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
 - **L'authentification est un stub jusqu'en C7**, mais le contexte de session a sa forme finale.
   `lib/auth/provider.ts` est le seul fichier que C7 réécrit.
 - **Les maquettes `docs/design/maquettes/` sont une référence visuelle**, jamais branchées.
-- **Modèle par ticket.** Le plan écrit disait Opus pour C1, Sonnet à partir de C2 ; en pratique C2,
-  T3.1, T3.2 et tout C4 sauf T4.1 et T4.2 ont été menés sur Opus, T4.1 sur Antigravity. **Le levier
-  n'est pas le modèle mais les quatre disciplines de vérification.**
+- **Le levier n'est pas le modèle mais les quatre disciplines de vérification** — le relevé des
+  modèles employés ticket par ticket est dans `HISTORIQUE-TICKETS.md`.

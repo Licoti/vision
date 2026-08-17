@@ -2,11 +2,14 @@
  * Produit — la page de détail, conteneur des accompagnements successifs.
  *
  * Elle répond à « qu'avons-nous fait sur ce produit dans le temps » : un
- * en-tête d'identité, puis les accompagnements du plus récent au plus ancien
- * (docs/06 §6), et depuis T5.1 le bloc « Indicateurs » — ce que le produit
- * mesure — **sous** cette liste, chaque indicateur portant sa série datée depuis
- * T5.3. La frise du temps long viendra **au-dessus** d'elle en T5.5, sans la
- * déplacer, et les courbes en T5.6 : aucune ici.
+ * en-tête d'identité, puis, depuis T5.5, la **frise du temps long** — les
+ * accompagnements en bandes et les activités porteuses d'un résultat en
+ * repères, sur un axe commun (docs/06 §6, D26) —, puis les accompagnements du
+ * plus récent au plus ancien, que la frise n'a **pas déplacés** et qui restent
+ * son équivalent textuel, et depuis T5.1 le bloc « Indicateurs » — ce que le
+ * produit mesure — **sous** cette liste, chaque indicateur portant sa série
+ * datée depuis T5.3. Les courbes d'indicateurs viendront s'empiler sur la même
+ * frise en T5.6 : aucune ici.
  *
  * L'identifiant vient de l'URL : sa forme est vérifiée avant la base, faute de
  * quoi un paramètre fantaisiste ne produit pas un 404 mais une erreur
@@ -77,6 +80,7 @@ import { archiveProduct, restoreProduct } from "../actions";
 import { IndicatorPanel } from "@/components/products/indicator-panel";
 import { Indicators } from "@/components/products/indicators";
 import { ReadingPanel } from "@/components/products/reading-panel";
+import { Timeline } from "@/components/products/timeline";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
 import { AvatarGroup } from "@/components/ui/avatar";
 import { ConfirmPanel } from "@/components/ui/confirm-panel";
@@ -100,6 +104,7 @@ import {
   listProductReadings,
 } from "@/lib/queries/indicators";
 import { findProductDetail, listProductProjects } from "@/lib/queries/products";
+import { listProductMilestones } from "@/lib/queries/timeline";
 import { isUuid } from "@/lib/uuid";
 
 export const metadata = {
@@ -125,19 +130,26 @@ export default async function ProductPage({
   const product = await findProductDetail(session.db, id);
   if (!product) notFound();
 
-  /* Trois lectures indépendantes, un seul temps d'attente — la discipline de
-     T4.1 sur la page projet. Aucune ne dépend du droit : le bloc
+  /* Quatre lectures indépendantes, un seul temps d'attente — la discipline de
+     T4.1 sur la page projet. Aucune ne dépend du droit : la frise, le bloc
      « Indicateurs » et la série de chaque indicateur se lisent par tout le
      domaine (D9), sur un produit vivant comme archivé (règle 4).
 
      La série arrive **plate**, une seule requête pour tout le bloc : le
      regroupement par indicateur appartient au composant, et une lecture par
-     indicateur serait exactement ce que T5.1 s'est interdit. */
-  const [projects, productIndicators, productReadings] = await Promise.all([
-    listProductProjects(session.db, product.id),
-    listProductIndicators(session.db, product.id),
-    listProductReadings(session.db, product.id),
-  ]);
+     indicateur serait exactement ce que T5.1 s'est interdit.
+
+     **La frise n'ajoute qu'une lecture, pas deux** (T5.5) : ses bandes sont les
+     accompagnements que `listProductProjects` rend déjà pour la liste, et seuls
+     ses repères — les activités porteuses d'un résultat — demandent une lecture
+     neuve. */
+  const [projects, productIndicators, productReadings, milestones] =
+    await Promise.all([
+      listProductProjects(session.db, product.id),
+      listProductIndicators(session.db, product.id),
+      listProductReadings(session.db, product.id),
+      listProductMilestones(session.db, product.id),
+    ]);
 
   const archived = product.archivedAt !== null;
 
@@ -426,6 +438,14 @@ export default async function ProductPage({
             }
           />
 
+          {/* La frise, **au-dessus de la liste et sans la déplacer**
+              (docs/06 §6) : la liste reste ce qu'elle est depuis T2.2, et
+              devient l'équivalent textuel de la frise. Elle ne connaît aucun
+              droit — la frise se lit par tout le domaine (D9), sur un produit
+              vivant comme archivé — et n'ouvre aucun point d'entrée
+              d'écriture. */}
+          <Timeline projects={projects} milestones={milestones} />
+
           <section className="flex flex-col gap-4">
             <SectionHeader
               title="Accompagnements"
@@ -481,8 +501,8 @@ export default async function ProductPage({
             )}
           </section>
 
-          {/* Sous la liste, jamais au-dessus : la frise de T5.5 prendra la
-              place au-dessus d'elle, sans la déplacer (docs/06 §6). Le bloc est
+          {/* Sous la liste, jamais au-dessus : la frise de T5.5 a pris la place
+              au-dessus d'elle, sans la déplacer (docs/06 §6). Le bloc est
               en pleine largeur, comme la liste — la page produit ne porte
               aucune grille de blocs de référence, à la différence de la page
               projet.

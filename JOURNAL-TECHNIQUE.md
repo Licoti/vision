@@ -2740,3 +2740,70 @@ ticket, un point ouvert neuf, un point refermé parti dans `HISTORIQUE-TICKETS.m
 dérive augmenté d'une phrase. Le protocole fixe 250. **T5.5 le franchira**, et son étape 5 devra
 balayer avant d'écrire — ou la session de découpage de C6 le fera, mais elle vient après deux tickets.
 À traiter au plus tard à l'ouverture de T5.6.
+
+**T5.5 — la fiche demandait `role="img"` *et* des bandes focusables ; les deux ne tiennent pas
+ensemble.** Le contenu d'un élément `role="img"` est retiré de l'arbre d'accessibilité : un `<a href>`
+qui y vit reste dans le cycle de tabulation tout en étant invisible à l'assistance — un focus qui se
+pose sur rien, soit WCAG 4.1.2. Trois issues : renoncer aux liens (la fiche demande la descente de
+`docs/06` §7 et la navigation clavier), superposer un calque HTML de liens sur un SVG décoratif (la
+géométrie s'écrirait deux fois, et les deux dériveraient), ou changer le rôle. Retenu, **posé à
+l'humain et tranché** : `role="group"` porteur de l'`aria-label`, bandes `<a>` focusables et nommées,
+le détail restant lisible dans la liste juste en dessous. **À retenir : une fiche qui demande à la
+fois une image et des cibles focalisables demande deux choses qui s'excluent ; c'est le rôle qui
+cède, jamais l'accès.**
+
+**T5.5 — un `viewBox` aurait mis le texte de la frise à l'échelle, et personne ne l'aurait vu venir.**
+`viewBox="0 0 720 H"` avec `width="100%"` paraît le réflexe. Sous `max-w-310`, la largeur réelle du
+contenu est de 1 112 px : le facteur vaut 1,54, et un `text-xs` de 12 px se serait affiché à 18,5 px —
+plus gros que le `text-md` des titres de section qui l'encadrent, et variable avec la largeur de la
+fenêtre. Retenu : **aucun `viewBox`**, abscisses en pourcentages et ordonnées en pixels. Le texte garde
+alors la taille du reste de la page à toute largeur, et le critère se relit en pour cent dans le
+balisage — `left + width` doit valoir 100 et non 719,9998. **À retenir : dans un SVG qui porte du
+texte de contenu, la mise à l'échelle du `viewBox` est un choix typographique, pas un détail de
+gabarit.**
+
+**T5.5 — les quatre filtres de domaine se rattrapent l'un l'autre, et aucun test ne peut en isoler
+un.** La mise en défaut de `listProductMilestones` a d'abord semblé rater : retirer `filter(results)`
+ne fait tomber **aucun test**, et retirer `filter(activities)` non plus. La raison est structurelle —
+la lecture joint quatre tables sur leurs clés étrangères, si bien qu'un seul filtre survivant suffit à
+ramener toute la chaîne dans le domaine. C'est mot pour mot ce que l'en-tête de
+`lib/queries/activities.ts` écrit depuis T2.2 : « les filtres de domaine se rattrapent l'un l'autre —
+ne dispense d'aucun d'eux ». Les quatre restent donc écrits, et la mise en défaut se joue sur **la
+règle** et non sur sa quatrième ligne : retirés ensemble, le seul test d'étanchéité tombe, seul. **À
+retenir : sur une lecture jointe, ce qui se met en défaut est le filtrage de domaine dans son
+entier ; un test qui prétendrait épingler un `filter()` nommé mentirait.**
+
+**T5.5 — le contour de focus d'un `<a>` SVG n'a pas été observé dans un navigateur.** La règle
+`*:focus-visible` d'`app/globals.css` est lue dans la feuille servie, l'ancre est un `<a href>` donc
+focalisable par construction, et `outline` s'applique aux éléments SVG dans les moteurs courants.
+Cela reste une **déduction**, là où la fiche demande une navigation clavier vérifiée. Ce qui manquait
+est l'outil : aucun pilotage de navigateur n'est installé, et en ajouter un pour une vérification
+sortait du périmètre. **Dette bornée et nommée : à regarder à l'œil au premier passage manuel sur la
+page produit, ou le jour où le projet se dote d'un pilotage de navigateur.**
+
+**T5.5 — les constantes de tracé d'un SVG ne sont pas des valeurs visuelles en dur, et il fallait le
+dire dans le fichier.** La règle 2 interdit couleurs, tailles, espacements et rayons hors thème. Un
+SVG ne peut pas ne pas porter d'ordonnées : hauteur de ligne, hauteur de barre, rayon d'un repère.
+Elles sont groupées dans un `GEOMETRY` en tête de `timeline.tsx`, commenté comme **système de
+coordonnées du dessin** — tandis que tout ce qui est couleur ou taille de texte passe par les classes
+du thème (`fill-*`, `stroke-*`, `text-xs`), vérifiées dans la feuille servie : chacune émet
+`fill: var(--surface-…)`, jamais une couleur littérale. Le seul attribut de peinture écrit à la main
+est `fill="none"` sur la cible de clic, qui n'est pas une couleur mais l'absence de peinture. **À
+retenir : la règle 2 se tient par ce que la feuille de style servie contient, pas par ce que le JSX
+promet.**
+
+**T5.5 — la table `nature → couleur` est redite une troisième fois.** `status-dot.tsx` porte des
+`bg-*` et ne les exporte pas ; la frise a besoin des mêmes natures en `fill-*`. Le fichier n'était pas
+au périmètre, la table est donc **redite**, comme `ACTION_LINK` l'a été en T5.1. Deux dettes de même
+forme cohabitent désormais — un jeton de geste texte à quatre copies, une table de statut à deux —,
+et elles ont la même issue : **le ticket qui pourra ouvrir les fichiers concernés ensemble extrait, ou
+la dette cesse d'être bornée par la phrase qui la reporte.**
+
+**T5.5 — `ETAT.md` a été balayé à l'étape 5, et le seuil de 250 lignes est tenu à la ligne près.**
+T5.4 l'avait annoncé — « T5.5 le franchira ». Écrit tel quel, le fichier montait à 263. Trois gestes,
+tous prévus par le protocole et aucun réservé à la session de découpage : l'inventaire de dérive de la
+base, devenu une pile d'addenda, a été **récrit** ; deux rappels devenus des faits datés — le retrait
+de la cinquième discipline, le relevé des modèles — sont partis dans la section « Faits acquis » de
+`HISTORIQUE-TICKETS.md` ; et la ligne du ticket a été resserrée. Résultat : **250 lignes exactement.**
+Le repliage de C5 en une ligne reste dû à la session de découpage de C6, et c'est lui qui rendra de la
+marge — d'ici là, **T5.6 franchira le seuil à son tour.**
