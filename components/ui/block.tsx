@@ -38,7 +38,7 @@ import type { ReactNode } from "react";
  */
 const TONE = {
   neutral: "border-surface-neutral-lighter bg-surface-neutral-pale",
-  primary: "border-border-primary-lighter bg-surface-primary-lighter",
+  primary: "border-border-primary-lighter bg-surface-primary-lightest",
 } as const;
 
 export function Block({

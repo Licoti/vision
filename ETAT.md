@@ -2,7 +2,7 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 17/08/2026 — hors ticket : roadmap en HTML filtrable, bloc North Star fusionné (migration 0003), page réordonnée, puis ses trois blocs mis sous une coquille et un en-tête communs (`components/ui/block.tsx`).
+**Dernière mise à jour :** 17/08/2026 — hors ticket : les gestes des cartes de roadmap passent sous un menu « … » partagé (`components/ui/action-menu.tsx`), « Annuler » sort en panneau de confirmation.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
 **Ticket suivant :** **T5bis.1** — le schéma : compétences, niveaux, profil (`tickets-C5bis.md`)
 
@@ -67,6 +67,13 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   constant sur 26 rendus capturés. Quatre correctifs joints. Sa leçon la plus transportable n'est pas
   dans le code : **un harnais qui poste en urlencoded là où React rend du multipart obtient un 200
   muet**, indiscernable d'un refus sans étape témoin.
+- **Menu « … » sur les cartes de roadmap — hors ticket, le 17/08/2026.** Les sept gestes empilés en
+  texte souligné dans la colonne droite d'une entrée passent sous un bouton unique. `indicator-menu.tsx`
+  est promu en `components/ui/action-menu.tsx` — un seul menu dans l'application, aux mesures demandées
+  (32×32, bordure `border-primary-base`, rayon `lg`), ce qui **corrige au passage un contraste de
+  bordure à 1,33:1** porté depuis le 17/08 par les deux menus North Star. « Annuler » quitte l'entrée
+  pour un `ConfirmPanel` ouvert par `?annuler=<id>` : son motif est obligatoire, et un champ de saisie
+  n'a pas sa place dans une entrée de menu — `cancelActivity` passe donc du refus muet au `ConfirmState`.
 
 ---
 
@@ -150,6 +157,18 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   qui n'existe plus n'a plus d'objet. → **T5bis.7.**
 
 ### c. Dettes assumées, sans échéance
+
+- **Sans JavaScript, les gestes d'une carte de roadmap ne sont plus atteignables.** Le menu « … »
+  décide lui-même de son ouverture (`useState`), seule exception arbitrée à D30 — élargie le
+  17/08/2026 du bloc North Star aux cartes d'activité, où elle coûte plus cher : là, chaque geste
+  gardait son URL ; ici « Modifier », « Saisir un résultat » et « Annuler l'activité » en ont une, mais
+  les **quatre actions serveur** — les deux « Marquer », les deux « Archiver » — n'ont aucun repli,
+  leurs formulaires n'étant pas dans le HTML servi mais seulement dans la charge RSC. Refermer le
+  point demanderait un menu `<details>` natif — qui perdrait `Échap`, le clic extérieur et
+  `role="menu"` — ou une URL par geste. Ni l'un ni l'autre ne se décide en cours de travail. Même
+  endroit, même famille : `role="menuitem"` est porté par un bouton qu'un `<form>` sépare de son
+  `role="menu"`, dette reprise d'`indicators.tsx` plutôt que d'inventer une seconde manière de
+  soumettre. → **sans échéance.**
 
 - **La base de développement a dérivé de la fixture, et c'est acté.** **Règle du 14/08/2026 : elle
   est jetable** — la règle 4 protège la donnée métier, pas une fixture locale. Trois conséquences :

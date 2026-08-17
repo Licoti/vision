@@ -1964,3 +1964,48 @@ rappels utiles à une session, mais des faits datés.)*
   T3.1, T3.2 et tout C4 sauf T4.1 et T4.2 ont été menés sur Opus, T4.1 sur Antigravity, et C4bis
   comme C5 sur Opus. **Le levier n'est pas le modèle mais les quatre disciplines de vérification** —
   c'est cette phrase que `ETAT.md` garde, le relevé restant ici.
+
+---
+
+## Hors ticket — menu « … » sur les cartes de roadmap, 17/08/2026
+
+**La demande.** Les cartes de la roadmap des activités devaient porter un bouton « … » à leur
+extrémité droite, ouvrant un menu qui réunit les gestes jusque-là posés en toutes lettres à côté
+d'elles. Le bouton devait être un composant réutilisable à l'échelle de l'application — 32×32, fond
+blanc, bordure de 1px en `#24226a`, rayon de 8px, trois points verticaux centrés.
+
+**Écart de périmètre, assumé et daté.** Le chantier en cours est C5bis — Équipe, et
+`components/projects/roadmap.tsx` n'appartient au périmètre d'aucune de ses sept fiches. Le travail
+est donc hors ticket, comme celui de la page produit le même jour.
+
+**Ce que la lecture a changé au plan.** Le composant existait : `indicator-menu.tsx`, écrit la
+veille pour le bloc North Star, portait déjà `Échap` avec retour du focus, le clic extérieur en
+`pointerdown`, `aria-haspopup` / `aria-expanded` / `aria-controls` / `role="menu"`, et l'absence
+délibérée de prop `className` qu'un correctif de positionnement avait imposée. Il a été promu en
+`components/ui/action-menu.tsx` et son unique appelant suivi. Écrire un second menu aurait laissé
+deux boutons « … » aux mesures différentes dans la même application.
+
+**Quatre décisions prises avant d'écrire.** Promouvoir plutôt que doubler. Appliquer les nouvelles
+mesures **aux trois emplacements**, y compris les deux menus North Star déjà en place. Sortir
+« Annuler » vers un panneau plutôt que replier son champ dans le menu. Accepter la régression sans
+JavaScript et la consigner.
+
+**Ce que l'implémentation a appris.** Trois choses qui n'étaient pas dans le plan. La bordure
+demandée **corrige un contraste de 1,33:1 à 13,65:1** — l'ancienne était sous le seuil de 3:1 de
+WCAG 1.4.11 depuis la veille, sur les deux menus North Star ; la demande n'était pas cosmétique.
+`ConfirmPanel`, dont l'en-tête se décrit comme « un panneau qui ne saisit rien », rend ses
+`children` à l'intérieur de son formulaire et a donc accueilli le champ « Motif » sans qu'une de ses
+lignes change — aucune sixième coquille. Et `cancelActivity` a dû cesser de refuser en silence : sa
+note le justifiait par l'absence d'écran, et le geste venait d'en recevoir un.
+
+**Vérification.** Le HTML servi porte un `<button aria-haspopup="menu" aria-expanded="false">` par
+carte, aux classes `h-8 w-8 rounded-lg border border-border-primary-base`, et **aucun** `role="menu"`,
+`role="menuitem"` ni champ `$ACTION_` de roadmap — les entrées ne vivent que dans la charge RSC, ce
+qui est la régression sans JavaScript, lue plutôt qu'affirmée. Trois sessions sans droit d'écriture
+ne reçoivent aucun bouton. Le droit a été éprouvé par l'action : quatre POST multipart forgés sur
+`cancelActivity` — motif vide, activité `done` d'un autre projet, identifiant inexistant, session
+sans `writeProject` — rendent chacun un message et n'écrivent rien, la roadmap relue après coup ne
+montrant ni groupe « Annulé » ni motif forgé. Le chemin nominal a été joué une fois sur la base de
+développement : 303, panneau refermé, groupe « Annulé » replié portant son motif. Le contraste a été
+mesuré, pas supposé. La mise en défaut de `validateCancellationReason` fait tomber **un** test et
+rien d'autre — après une première exécution trompeuse dont dix échecs venaient du réseau.

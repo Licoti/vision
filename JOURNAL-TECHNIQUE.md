@@ -3374,3 +3374,71 @@ page produit. → **ETAT.md, point ouvert.**
 **Une incohérence documentaire relevée en passant, non corrigée** : l'en-tête de `roadmap.tsx`
 renvoie encore à `indicator-curves.tsx`, supprimé le 17/08/2026 et fusionné dans `indicators.tsx`.
 Règle 3 — le fichier n'était ouvert que pour sa coquille.
+
+---
+
+## Menu « … » sur les cartes de roadmap — hors ticket, 17/08/2026
+
+**Le composant demandé existait déjà, au mauvais endroit.** La demande décrivait un bouton « … »
+réutilisable ouvrant un menu contextuel ; `components/products/indicator-menu.tsx` en était un,
+écrit la veille pour le bloc North Star, avec `Échap`, le clic extérieur en `pointerdown` et les
+attributs ARIA déjà arbitrés. Il a été **promu** en `components/ui/action-menu.tsx` plutôt que
+doublé. Un second menu aux mesures différentes aurait été exactement ce qu'un composant partagé
+existe pour empêcher.
+
+**La mesure demandée corrige un défaut d'accessibilité, elle ne fait pas que changer un style.**
+La bordure passait de `border-primary-lighter` (`--midnight-200`, #d4def2) à `border-primary-base`
+(`--midnight-500`, #24226a). Mesuré sur `surface-neutral-pale` (#fdfdfd) : **1,33:1 avant, 13,65:1
+après**, là où WCAG 1.4.11 demande 3:1 pour la limite d'un composant d'interface. L'ancienne
+bordure était donc invisible au sens de la norme, sur les deux menus North Star, depuis la veille.
+Les trois points (`surface-primary-dark`) donnent 15,72:1 et ne bougent pas.
+
+Le fond reste `surface-neutral-pale` (#fdfdfd) et non le `#ffffff` de la demande : `--greyscale-0`
+n'a **pas** de jeton sémantique de surface dans ce thème, et la règle « aucun septième substitut »
+interdit de lui en inventer un. 32×32 s'obtient par `h-8 w-8`, 8px par `rounded-lg`, 1px par
+`border` — aucune valeur en dur (règle 2).
+
+**Un champ obligatoire ne tient pas dans une entrée de menu, et c'est ce qui a déplacé « Annuler ».**
+Les six autres gestes sont des liens ou des formulaires nus, qui entrent tels quels. L'annulation
+porte un motif `required` (`activities_cancelled_requires_reason`) que l'entrée dépliait sous un
+`<details>`. Dans un menu, ce repli aurait doublé la hauteur du panneau pour un geste rare. Le geste
+part donc en `ConfirmPanel` sur `?annuler=<id>`, sixième clé de la page.
+
+**Conséquence non anticipée : `cancelActivity` a dû cesser de refuser en silence.** Sa note disait
+« un refus est muet : ni saisie à préserver ni message à afficher ». C'était vrai tant que le geste
+n'avait pas d'écran ; un panneau muet devant un refus n'apprend rien. Elle prend la signature
+d'`archiveProject` — `(id, ConfirmState, FormData) => Promise<ConfirmState>` — et `transitionActivity`
+reste seule à refuser sans mot, n'ayant toujours pas d'écran. **Une note qui devient fausse se
+récrit** : les deux JSDoc qui l'affirmaient ont été corrigés, dans le fichier d'actions et dans
+`roadmap.tsx`.
+
+**`ConfirmPanel` a accueilli un champ sans qu'une ligne change**, ce qui n'était pas acquis : ses
+`children` sont rendus **à l'intérieur** de son `<form action={submit}>` (l. 119 → 133). Un panneau
+« qui ne saisit rien », selon son propre en-tête, saisit donc très bien quand on lui en donne
+l'occasion. Aucune sixième coquille n'a été écrite.
+
+**Ce que le HTML servi dit de la régression sans JavaScript.** Sur `/projets/<id>`, trois
+`<button aria-haspopup="menu" aria-expanded="false">` sont rendus, et **zéro** `role="menu"`,
+**zéro** `role="menuitem"`, **zéro** champ `$ACTION_` de roadmap. Les formulaires n'existent que
+dans la charge RSC, où l'on lit en clair `"name":"bound archiveActivity"` et ses arguments liés —
+confirmation que l'argument lié n'est pas un secret, et que le verrou reste dans l'action.
+
+**Le droit a été éprouvé par l'action, pas par l'écran.** Quatre POST multipart forgés sur
+`cancelActivity`, avec l'identifiant d'action et les arguments relus dans le HTML : motif vide,
+activité d'un autre projet en état `done`, identifiant inexistant, et session sans `writeProject`.
+Les quatre rendent un message et **n'écrivent rien** — vérifié après coup sur la roadmap, qui ne
+montre ni groupe « Annulé » ni motif forgé. Trois sessions sans droit d'écriture ne reçoivent
+**aucun** bouton « … », `hasGestures` tombant en entier.
+
+**Un piège de mesure, pas de code : la base de développement rend des échecs transitoires.** Une
+première mise en défaut de `validateCancellationReason` a fait tomber **onze** tests, dont dix sur
+`setNorthStar` — sans rapport avec un motif d'annulation. Rejouée, elle n'en fait tomber qu'un,
+`validateCancellationReason > un motif vide est refusé`, et rien d'autre. Les dix autres étaient des
+requêtes Neon en échec, visibles dans `.next/dev/logs/next-development.log`. **Une neutralisation ne
+se lit pas sur une seule exécution quand la suite touche le réseau.**
+
+**Une modification étrangère au travail, laissée en place.** `components/products/roadmap.tsx` porte
+une neutralisation non défaite du 17/08/2026 : `Header` ignore son argument `filterable` et la note
+a perdu sa phrase « Filtrez la période affichée. » — précisément la neutralisation que l'entrée
+précédente de ce journal déclarait défaite avant vérification finale. Elle produit le seul
+avertissement d'ESLint du dépôt. Hors périmètre (règle 3) : signalée, pas corrigée.

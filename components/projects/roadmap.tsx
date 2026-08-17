@@ -13,17 +13,20 @@
  * `addHref` à `null` retire les deux : l'action n'existe que pour qui peut
  * écrire dans ce projet (D9). Le composant, lui, ne connaît aucun droit — c'est
  * l'appelant qui les lit, comme pour `PageHeader` depuis T1.6. `editHref`,
- * `transitionActivity` et `cancelActivity` suivent la même règle pour les
- * gestes de chaque entrée (T3.4, T3.5) : chez qui ne peut pas écrire, la
- * roadmap se lit et ne s'ouvre, ni ne se corrige, nulle part.
+ * `cancelHref` et `transitionActivity` suivent la même règle pour les gestes de
+ * chaque entrée (T3.4, T3.5) : chez qui ne peut pas écrire, la roadmap se lit et
+ * ne s'ouvre, ni ne se corrige, nulle part — et depuis que les gestes vivent
+ * dans un menu, l'entrée ne porte alors même plus de bouton pour l'ouvrir.
  *
  * **Cinq groupes** (`docs/03` §6) depuis T3.5, qui peuple le dernier — annulé,
  * en retrait, replié par défaut. Les quatre premiers restent ceux de T3.1.
  *
- * `transitionActivity` et `cancelActivity` sont les actions serveur de
- * `projets/[id]/actions.ts`, **non liées** : c'est ici, à l'intérieur de la
- * boucle sur les entrées, qu'elles sont liées à l'activité concernée — le
+ * `transitionActivity`, `archiveActivity` et `archiveResult` sont les actions
+ * serveur de `projets/[id]/actions.ts`, **non liées** : c'est ici, à l'intérieur
+ * de la boucle sur les entrées, qu'elles sont liées à l'activité concernée — le
  * composant reçoit ce qu'il faut pour agir, jamais un droit à interpréter.
+ * `cancelActivity` a quitté cette liste : son motif obligatoire l'a envoyée dans
+ * un `ConfirmPanel`, et l'entrée n'en garde qu'une adresse.
  *
  * Le reste ne lit toujours aucune base : `groups` est ce que
  * `listProjectRoadmap` a déjà groupé et trié.
@@ -31,7 +34,11 @@
 
 import Link from "next/link";
 
-import { ACTION_LINK } from "@/components/ui/action-link";
+import {
+  ActionMenu,
+  MENU_ITEM,
+  MENU_ITEM_DANGER,
+} from "@/components/ui/action-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ExternalLink } from "@/components/ui/external-link";
 import { SectionHeader } from "@/components/ui/section";
@@ -75,10 +82,9 @@ const GROUP_TONE: Record<RoadmapGroupKey, { dot: string; edge: string }> = {
   },
 };
 
-/** Les deux actions du cycle de vie, gatées à `null` comme `editHref`. */
+/** L'action du cycle de vie, gatée à `null` comme `editHref`. */
 type TransitionAction =
   ((activityId: string, target: "in_progress" | "done") => Promise<void>) | null;
-type CancelAction = ((activityId: string, formData: FormData) => Promise<void>) | null;
 
 /**
  * L'archivage d'une saisie erronée (T4bis.4), gaté à `null` comme les deux
@@ -101,8 +107,8 @@ export function Roadmap({
   addHref,
   editHref,
   resultHref,
+  cancelHref,
   transitionActivity,
-  cancelActivity,
   archiveActivity,
   archiveResult,
 }: {
@@ -127,13 +133,20 @@ export function Roadmap({
    */
   resultHref: ((activityId: string) => string) | null;
   /**
+   * L'ouverture du panneau d'annulation sur une activité donnée. **C'est une
+   * adresse et non une action serveur depuis que le menu contextuel est arrivé
+   * sur les entrées** : le champ « Motif » ne tient pas dans une entrée de menu,
+   * il vit désormais dans un `ConfirmPanel` ouvert par `?annuler=<id>`. Même
+   * règle de droit qu'`editHref` ; la condition d'état se lit dans la donnée, et
+   * l'entrée la tient elle-même.
+   */
+  cancelHref: ((activityId: string) => string) | null;
+  /**
    * « Marquer en cours », « Marquer terminée » (T3.5) — l'action serveur non
    * liée, à lier par activité au moment du rendu. `null` pour qui ne peut pas
    * écrire, la même règle que `editHref`.
    */
   transitionActivity: TransitionAction;
-  /** Annuler, motif à l'appui (T3.5). Même règle. */
-  cancelActivity: CancelAction;
   /**
    * Archiver une saisie erronée (T4bis.4). Même règle de droit que les deux
    * précédentes ; la **cinquième** condition — aucun résultat vivant sur
@@ -173,8 +186,8 @@ export function Roadmap({
               group={group}
               editHref={editHref}
               resultHref={resultHref}
+              cancelHref={cancelHref}
               transitionActivity={transitionActivity}
-              cancelActivity={cancelActivity}
               archiveActivity={archiveActivity}
               archiveResult={archiveResult}
             />
@@ -253,21 +266,31 @@ function RoadmapSection({
   group,
   editHref,
   resultHref,
+  cancelHref,
   transitionActivity,
-  cancelActivity,
   archiveActivity,
   archiveResult,
 }: {
   group: RoadmapGroup;
   editHref: ((activityId: string) => string) | null;
   resultHref: ((activityId: string) => string) | null;
+  cancelHref: ((activityId: string) => string) | null;
   transitionActivity: TransitionAction;
-  cancelActivity: CancelAction;
   archiveActivity: ArchiveAction;
   archiveResult: ArchiveResultAction;
 }) {
   const tone = GROUP_TONE[group.key];
   const cancelled = group.key === "cancelled";
+
+  /* Les trois groupes d'où l'on peut encore annuler. La condition vivait dans
+     l'entrée tant que « Annuler » y était un formulaire ; elle rejoint celles
+     d'`editHref` et de `resultHref` maintenant que c'est une adresse — les
+     points d'entrée se décident tous au même endroit. `cancelActivity` refuse
+     de toute façon l'activité reçue qui n'est plus dans un état annulable. */
+  const cancellable =
+    group.key === "planned" ||
+    group.key === "unscheduled" ||
+    group.key === "in_progress";
 
   /* Les enfants seuls, sans conteneur : `<summary>` n'accepte que du contenu
      de phrasé (et, en premier enfant, un titre) — un `<div>` autour n'y est
@@ -305,10 +328,12 @@ function RoadmapSection({
           edge={tone.edge}
           groupKey={group.key}
           transitionActivity={transitionActivity}
-          cancelActivity={cancelActivity}
           archiveActivity={archiveActivity}
           archiveResult={archiveResult}
           {...(editHref && !cancelled ? { editHref: editHref(activity.id) } : {})}
+          {...(cancelHref && cancellable
+            ? { cancelHref: cancelHref(activity.id) }
+            : {})}
           /* **Les deux gestes du résultat suivent le résultat, pas le groupe**
              (T4bis.6, arbitrage du 15/08/2026). La **saisie** garde les quatre
              conditions de T4.4 — le droit, l'état terminé, un type qui produit,
@@ -422,26 +447,49 @@ function Result({ result }: { result: ActivityResult }) {
  * porte déjà un texte long, l'objectif, qu'un lien engloberait sans rien y
  * gagner.
  *
- * Le nom accessible du lien « Modifier » porte l'activité qu'il ouvre : «
- * Modifier » répété quinze fois dans une liste de liens ne dit rien à qui les
- * parcourt sans le contexte visuel. Le mot reste écrit à l'écran — l'`aria-label`
- * complète, il ne remplace pas.
+ * **Les gestes vivent désormais dans un menu contextuel**, et c'est tout l'objet
+ * du changement. Ils s'empilaient jusqu'ici en texte souligné dans la colonne
+ * droite : jusqu'à sept par entrée, tous du même poids visuel, quinze entrées
+ * par roadmap — une centaine de liens sur un écran dont le sujet est le récit de
+ * l'accompagnement, pas la liste de ce qu'on peut lui faire. Un bouton « … »
+ * (`components/ui/action-menu.tsx`) les réunit et rend la carte à sa lecture.
  *
- * **Les gestes du cycle de vie sont des formulaires nus**, sans panneau ni
- * confirmation intermédiaire (`docs/03` §4) : « Marquer en cours » depuis
+ * **Le bouton ne paraît pas quand il n'ouvrirait rien.** `hasGestures` est la
+ * disjonction des sept conditions : chez qui ne peut pas écrire, ou sur un
+ * accompagnement archivé, elles tombent toutes ensemble — le `&&` unique de la
+ * page reste le seul point de bascule — et l'entrée se lit sans porter un menu
+ * vide. Ce n'est toujours pas ce rendu qui protège : chaque action redérive le
+ * droit sur l'identifiant reçu.
+ *
+ * Le nom accessible du bouton porte l'activité qu'il commande, comme celui du
+ * lien « Modifier » avant lui : trois points ne se lisent pas, et « Options »
+ * répété quinze fois dans une liste ne dit pas de quoi.
+ *
+ * **L'ordre des entrées ne change pas** — du plus courant au plus rare, l'ordre
+ * qu'avait la colonne. Le menu range les gestes, il ne rejuge pas lesquels
+ * viennent d'abord.
+ *
+ * **Les gestes du cycle de vie restent des formulaires nus**, sans confirmation
+ * intermédiaire (`docs/03` §4) : « Marquer en cours » depuis
  * `planned`/`unscheduled`, « Marquer terminée » depuis `in_progress` — affiché
  * seulement si une fin de période est déjà écrite, faute de quoi le geste
- * serait refusé sans pouvoir l'expliquer ici. « Annuler » se replie derrière un
- * `<details>` natif, le motif étant le seul champ que ce ticket introduit ; il
- * est `required`, ce qui suffit à empêcher une soumission vide sans aller-retour
- * serveur. Une activité `cancelled` n'offre plus aucun de ces gestes — le
- * schéma d'états ne lui en laisse aucun — et affiche son motif à leur place.
+ * serait refusé sans pouvoir l'expliquer ici. Une activité `cancelled` n'offre
+ * plus aucun de ces gestes — le schéma d'états ne lui en laisse aucun — et
+ * affiche son motif à leur place.
+ *
+ * **« Annuler » est le seul qui ait quitté l'entrée.** Son motif est un champ
+ * obligatoire, et un champ de saisie n'a pas sa place dans une entrée de menu :
+ * le geste est devenu un lien vers `?annuler=<id>`, où un `ConfirmPanel` porte
+ * le champ et le message d'un refus. Le `<details>` qui le repliait ici a
+ * disparu avec lui ; celui du groupe « Annulé » reste, il n'a rien à voir.
  *
  * **« Archiver la saisie » (T4bis.4) est le seul geste qui retire.** Son
- * libellé ne se réduit pas à « Archiver » : empilé sous « Annuler » dans la
- * même colonne, le verbe seul se confondrait avec lui, et la fiche demande que
+ * libellé ne se réduit pas à « Archiver » : voisin d'« Annuler l'activité » dans
+ * le même menu, le verbe seul se confondrait avec lui, et la fiche demande que
  * l'écran distingue les deux gestes **par ses libellés**. C'est la saisie qu'on
- * retire, pas l'activité qu'on annule.
+ * retire, pas l'activité qu'on annule. `MENU_ITEM_DANGER` les colore tous les
+ * deux, mais la couleur ne porte pas seule (`docs/06` §11) : ce sont les mots
+ * qui disent le geste.
  *
  * **Il disparaît de lui-même quand un résultat est posé** : le résultat se
  * retire d'abord, sans quoi il resterait accroché à une activité sortie du
@@ -458,8 +506,8 @@ function RoadmapEntry({
   groupKey,
   editHref,
   resultHref,
+  cancelHref,
   transitionActivity,
-  cancelActivity,
   archiveActivity,
   archiveResult,
 }: {
@@ -468,8 +516,8 @@ function RoadmapEntry({
   groupKey: RoadmapGroupKey;
   editHref?: string;
   resultHref?: string;
+  cancelHref?: string;
   transitionActivity: TransitionAction;
-  cancelActivity: CancelAction;
   archiveActivity: ArchiveAction;
   archiveResult: ArchiveResultAction;
 }) {
@@ -483,9 +531,21 @@ function RoadmapEntry({
     transitionActivity && (groupKey === "planned" || groupKey === "unscheduled");
   const canMarkDone =
     transitionActivity && groupKey === "in_progress" && activity.periodEnd !== null;
-  const canCancel =
-    cancelActivity &&
-    (groupKey === "planned" || groupKey === "unscheduled" || groupKey === "in_progress");
+  const canArchiveResult = archiveResult !== null && activity.result !== null;
+  const canArchiveActivity = archiveActivity !== null && activity.result === null;
+
+  /* Sept conditions, une disjonction : elle décide du **bouton**, là où chacune
+     décide de son entrée. Sans elle, une entrée sans aucun geste porterait un
+     « … » qui n'ouvre rien — ce qui arrive à toute la roadmap dès que
+     l'accompagnement est archivé. */
+  const hasGestures =
+    Boolean(editHref) ||
+    Boolean(resultHref) ||
+    Boolean(cancelHref) ||
+    Boolean(canMarkInProgress) ||
+    Boolean(canMarkDone) ||
+    canArchiveResult ||
+    canArchiveActivity;
 
   return (
     <li
@@ -541,117 +601,101 @@ function RoadmapEntry({
         <span className="text-xs whitespace-nowrap text-content-neutral-base">
           {period}
         </span>
-        {editHref ? (
-          <Link
-            href={editHref}
-            aria-label={`Modifier l'activité ${activity.typeLabel} — ${period}`}
-            className={ACTION_LINK}
+        {hasGestures ? (
+          <ActionMenu
+            label={`Options de l'activité ${activity.typeLabel} — ${period}`}
           >
-            Modifier
-          </Link>
-        ) : null}
-        {/* Le point d'entrée de T4.4, **et sa correction depuis T4bis.6** : une
-            seule adresse, un seul panneau, deux gestes. Ce n'est pas le lien
-            qui change, c'est son libellé — la même donnée qui décidait de
-            l'afficher décide désormais de ce qu'il dit. Les conditions vivent
-            dans `RoadmapSection` ; ici ne reste que le mot.
+            {editHref ? (
+              <Link href={editHref} role="menuitem" className={MENU_ITEM}>
+                Modifier
+              </Link>
+            ) : null}
+            {/* Le point d'entrée de T4.4, **et sa correction depuis T4bis.6** :
+                une seule adresse, un seul panneau, deux gestes. Ce n'est pas le
+                lien qui change, c'est son libellé — la même donnée qui décidait
+                de l'afficher décide désormais de ce qu'il dit. Les conditions
+                vivent dans `RoadmapSection` ; ici ne reste que le mot.
 
-            « Corriger le résultat » et non « Modifier » : la fiche le nomme
-            ainsi, et le verbe dit que la valeur reportée était fausse — non que
-            la mesure a bougé, ce qui serait un second relevé et appartient aux
-            indicateurs (C5). */}
-        {resultHref ? (
-          <Link
-            href={resultHref}
-            aria-label={`${
-              activity.result ? "Corriger le résultat" : "Saisir un résultat"
-            } de l'activité ${activity.typeLabel} — ${period}`}
-            className={ACTION_LINK}
-          >
-            {activity.result ? "Corriger le résultat" : "Saisir un résultat"}
-          </Link>
-        ) : null}
-        {/* Le retrait de T4bis.6, juste sous le geste qui corrige : l'ordre va
-            du plus courant au plus rare, comme le reste de la colonne. Un
-            formulaire nu, sans confirmation (arbitrage (c)) ni motif, et
-            `ACTION_LINK` repris tel quel — aucun couple de couleurs neuf par la
-            position.
+                « Corriger le résultat » et non « Modifier » : la fiche le nomme
+                ainsi, et le verbe dit que la valeur reportée était fausse — non
+                que la mesure a bougé, ce qui serait un second relevé et
+                appartient aux indicateurs (C5). */}
+            {resultHref ? (
+              <Link href={resultHref} role="menuitem" className={MENU_ITEM}>
+                {activity.result ? "Corriger le résultat" : "Saisir un résultat"}
+              </Link>
+            ) : null}
+            {/* Le retrait de T4bis.6, juste sous le geste qui corrige : l'ordre
+                va du plus courant au plus rare, celui qu'avait la colonne.
 
-            « Archiver le résultat » : le mot de l'arbitrage (d), jamais
-            « Supprimer » — rien n'est supprimé (règle 4). Il ne se confond pas
-            avec « Archiver la saisie » plus bas, et **ne peut pas s'y trouver
-            côte à côte** : celui-là ne paraît que si l'entrée n'a pas de
-            résultat, celui-ci que si elle en a un. La même donnée les exclut
-            l'un l'autre. */}
-        {archiveResult && activity.result ? (
-          <form action={archiveResult.bind(null, activity.id, activity.result.id)}>
-            <button
-              type="submit"
-              aria-label={`Archiver le résultat de l'activité ${activity.typeLabel} — ${period}`}
-              className={ACTION_LINK}
-            >
-              Archiver le résultat
-            </button>
-          </form>
-        ) : null}
-        {canMarkInProgress ? (
-          <form action={transitionActivity.bind(null, activity.id, "in_progress")}>
-            <button type="submit" className={ACTION_LINK}>
-              Marquer en cours
-            </button>
-          </form>
-        ) : null}
-        {canMarkDone ? (
-          <form action={transitionActivity.bind(null, activity.id, "done")}>
-            <button type="submit" className={ACTION_LINK}>
-              Marquer terminée
-            </button>
-          </form>
-        ) : null}
-        {/* Le geste de T4bis.4, après ce qui fait avancer et avant ce qui
-            annule : l'ordre de la colonne va du plus courant au plus rare.
-            Un formulaire nu, sans confirmation ni motif (arbitrage (c)) — et
-            `ACTION_LINK` repris tel quel, donc aucun couple de couleurs neuf
-            par la position. Le nom accessible porte l'activité, comme celui de
-            « Modifier » : « Archiver la saisie » répété quinze fois dans une
-            liste de gestes ne dit pas laquelle. */}
-        {archiveActivity && activity.result === null ? (
-          <form action={archiveActivity.bind(null, activity.id)}>
-            <button
-              type="submit"
-              aria-label={`Archiver l'activité ${activity.typeLabel} — ${period}`}
-              className={ACTION_LINK}
-            >
-              Archiver la saisie
-            </button>
-          </form>
-        ) : null}
-        {canCancel ? (
-          <details className="text-right">
-            <summary className={`cursor-pointer ${ACTION_LINK}`}>Annuler</summary>
-            <form
-              action={cancelActivity.bind(null, activity.id)}
-              className="mt-1.5 flex w-56 flex-col items-end gap-1.5"
-            >
-              <label className="w-full text-left">
-                <span className="text-2xs font-semibold text-content-neutral-dark uppercase">
-                  Motif
-                </span>
-                <input
-                  name="cancellationReason"
-                  type="text"
-                  required
-                  className="mt-1 w-full rounded-lg border border-content-neutral-normal bg-surface-neutral-pale px-3 py-2 text-xs text-content-neutral-darkest"
-                />
-              </label>
-              <button
-                type="submit"
-                className="rounded-lg border border-content-neutral-normal px-3 py-1.5 text-xs font-semibold text-content-neutral-dark"
+                « Archiver le résultat » : le mot de l'arbitrage (d), jamais
+                « Supprimer » — rien n'est supprimé (règle 4). Il ne se confond
+                pas avec « Archiver la saisie » plus bas, et **ne peut pas s'y
+                trouver côte à côte** : celui-là ne paraît que si l'entrée n'a
+                pas de résultat, celui-ci que si elle en a un. La même donnée les
+                exclut l'un l'autre. */}
+            {archiveResult && activity.result ? (
+              <form
+                action={archiveResult.bind(null, activity.id, activity.result.id)}
               >
-                Confirmer l&apos;annulation
-              </button>
-            </form>
-          </details>
+                <button type="submit" role="menuitem" className={MENU_ITEM}>
+                  Archiver le résultat
+                </button>
+              </form>
+            ) : null}
+            {canMarkInProgress ? (
+              <form
+                action={transitionActivity.bind(null, activity.id, "in_progress")}
+              >
+                <button type="submit" role="menuitem" className={MENU_ITEM}>
+                  Marquer en cours
+                </button>
+              </form>
+            ) : null}
+            {canMarkDone ? (
+              <form action={transitionActivity.bind(null, activity.id, "done")}>
+                <button type="submit" role="menuitem" className={MENU_ITEM}>
+                  Marquer terminée
+                </button>
+              </form>
+            ) : null}
+            {/* Le geste de T4bis.4, après ce qui fait avancer et avant ce qui
+                annule : l'ordre va toujours du plus courant au plus rare. Un
+                formulaire nu, sans confirmation ni motif (arbitrage (c)) — à la
+                différence d'« Annuler l'activité » juste dessous, dont le motif
+                est obligatoire et qui a donc dû quitter le menu pour un
+                panneau. */}
+            {archiveActivity && activity.result === null ? (
+              <form action={archiveActivity.bind(null, activity.id)}>
+                <button
+                  type="submit"
+                  role="menuitem"
+                  className={MENU_ITEM_DANGER}
+                >
+                  Archiver la saisie
+                </button>
+              </form>
+            ) : null}
+            {/* Un lien, et non plus un `<details>` portant son champ : le motif
+                est obligatoire (`activities_cancelled_requires_reason`) et un
+                champ de saisie n'a pas sa place dans une entrée de menu. Il mène
+                à `?annuler=<id>`, où le `ConfirmPanel` porte le champ et le
+                message d'un refus — ce que le `<details>` n'a jamais su faire.
+
+                « Annuler l'activité » et non « Annuler » : dans un menu, le
+                verbe seul se lit comme le renoncement à ce qu'on est en train de
+                faire, et c'est même le mot que porte la sortie du panneau vers
+                lequel il conduit. */}
+            {cancelHref ? (
+              <Link
+                href={cancelHref}
+                role="menuitem"
+                className={MENU_ITEM_DANGER}
+              >
+                Annuler l&apos;activité
+              </Link>
+            ) : null}
+          </ActionMenu>
         ) : null}
       </div>
     </li>

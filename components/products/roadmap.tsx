@@ -530,9 +530,7 @@ function Header({ filterable }: { filterable: boolean }) {
   return (
     <BlockHeader
       title="Roadmap"
-      note={`Les accompagnements et les activités porteuses d'un résultat, sur un axe commun.${
-        filterable ? " Filtrez la période affichée." : ""
-      }`}
+      note={`Les accompagnements et les activités porteuses d'un résultat, sur un axe commun.`}
     />
   );
 }

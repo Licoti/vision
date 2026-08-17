@@ -76,10 +76,16 @@
  * passent pas par ce formulaire complet — un geste depuis la roadmap, sans
  * champ pour la première, un motif court pour la seconde — mais retrouvent
  * eux-mêmes le projet à partir de l'activité **reçue**, faute d'un
- * `projectId` lié : `writeProject` s'y vérifie de la même façon, et un refus
- * n'écrit rien, silencieusement — ces deux gestes n'ont aucune saisie à
- * rendre, contrairement au formulaire complet, et rien ne justifie de leur
- * inventer un message d'erreur que l'écran n'atteint jamais en usage normal.
+ * `projectId` lié : `writeProject` s'y vérifie de la même façon.
+ *
+ * **Leurs refus ont cessé de se ressembler le jour où le menu contextuel est
+ * arrivé sur les cartes de roadmap.** `transitionActivity` refuse toujours en
+ * silence : c'est un geste sans écran, qui n'a aucune saisie à rendre, et rien
+ * ne justifie de lui inventer un message qu'aucune vue n'atteint.
+ * `cancelActivity`, elle, a désormais un écran — le `ConfirmPanel` ouvert par
+ * `?annuler=<id>`, qui a sorti son champ « Motif » de la pile des gestes —, et
+ * un panneau muet devant un refus n'apprend rien à personne. Elle rend donc un
+ * `ConfirmState`, comme `archiveProject`.
  *
  * **Les participants (T3.6)** suivent le même principe que le reste : aucune
  * création de personne à la volée — c'est le formulaire de projet qui la
@@ -119,6 +125,7 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import type { ConfirmState } from "@/components/ui/confirm-panel";
 import { requireSession } from "@/lib/auth/provider";
 import type { Session } from "@/lib/auth/session";
 import {
@@ -601,28 +608,53 @@ export async function transitionActivity(
 
 /**
  * Annuler une activité — la seule transition qui exige une saisie, un motif
- * court (`docs/03` §4). Le champ est `required` en HTML ; la vérification
- * ci-dessous n'est qu'un second filet, pour la requête qui l'aurait
- * contourné.
+ * court (`docs/03` §4). Le champ reste `required` en HTML ; les vérifications
+ * ci-dessous sont un second filet, pour la requête qui l'aurait contourné.
  *
- * Comme `transitionActivity`, un refus est muet : ni saisie à préserver ni
- * message à afficher, le formulaire n'ayant qu'un champ dont l'absence est
- * déjà empêchée côté client.
+ * **Son refus n'est plus muet, et c'est le geste qui a changé de place.** Tant
+ * que le motif se saisissait dans un `<details>` au milieu de la pile des autres
+ * gestes de l'entrée de roadmap, il n'y avait ni saisie à rendre ni endroit où
+ * dire quoi que ce soit : ne rien faire était la seule réponse possible. Le
+ * geste vit désormais dans un `ConfirmPanel` — un panneau ouvert par
+ * `?annuler=<id>`, qui **a** un endroit pour un message et dont c'est la raison
+ * d'être d'être client (`useActionState`). Un panneau qui se contenterait de ne
+ * rien faire laisserait quelqu'un devant un écran muet.
+ *
+ * Elle rejoint donc `archiveProject` dans sa forme — `(id, état, saisie)` vers
+ * un `ConfirmState` — et quitte `transitionActivity` et `archiveActivity`, qui
+ * restent des gestes sans écran et donc sans message.
+ *
+ * Les messages sont des constats, jamais des reproches. Ils ne distinguent pas
+ * le droit manquant de la ligne absente : cette distinction renseignerait sur ce
+ * qui existe hors du domaine.
+ *
+ * En succès, `redirect` referme le panneau en ramenant à la page nue — la
+ * mécanique d'`archiveProject`, à ceci près que la roadmap a bougé et que
+ * `refresh` l'a déjà revalidée.
  */
 export async function cancelActivity(
   activityId: string,
+  _previous: ConfirmState,
   formData: FormData,
-): Promise<void> {
+): Promise<ConfirmState> {
   const session = await requireSession();
 
   const gate = await openActivity(session, activityId);
-  if (!gate) return;
+  if (!gate) {
+    return { message: "Cette activité ne peut pas être annulée." };
+  }
   const { activity, project } = gate;
 
-  if (!canTransitionActivity(activity.state, "cancelled")) return;
+  if (!canTransitionActivity(activity.state, "cancelled")) {
+    return {
+      message:
+        "Seule une activité prévue, à planifier ou en cours peut être annulée.",
+    };
+  }
 
   const reason = readCancellationReason(formData);
-  if (validateCancellationReason(reason)) return;
+  const invalid = validateCancellationReason(reason);
+  if (invalid) return { message: invalid };
 
   await session.db.update(activities, activityId, {
     state: "cancelled",
@@ -630,6 +662,7 @@ export async function cancelActivity(
   });
 
   refresh(activity.projectId, project.productId);
+  redirect(ROUTES.project(activity.projectId));
 }
 
 /* ==========================================================================

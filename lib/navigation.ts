@@ -106,6 +106,27 @@ export const ARCHIVE_PANEL_PARAM = "archiver";
 export const ARCHIVE_PANEL_CONFIRM = "confirmation";
 
 /**
+ * Le panneau de **confirmation d'annulation d'une activité**, sur la page du
+ * projet. Le geste vivait jusqu'ici dans l'entrée de roadmap, sous un
+ * `<details>` qui dépliait son champ « Motif » au milieu de la pile des autres
+ * gestes ; le menu contextuel de la carte l'en sort.
+ *
+ * **La valeur porte l'identifiant de l'activité**, comme `resultat` et à la
+ * différence d'`archiver` : l'objet visé n'est pas celui de la page — une page
+ * de projet porte quinze activités, et le panneau doit savoir laquelle. C'est
+ * la règle tenue depuis T3.4.
+ *
+ * **Une clé à elle**, et pour la raison qui sépare déjà les cinq autres : annuler
+ * n'est pas une forme d'archiver. L'annulation dit « cette activité ne se fera
+ * pas » et la garde au récit ; l'archivage dit « elle n'aurait pas dû être
+ * saisie » et l'en sort.
+ *
+ * Sixième clé de la page du projet — le décompte d'exclusivité l'absorbe sans
+ * changer d'énoncé, ce pour quoi il avait été écrit ainsi.
+ */
+export const CANCEL_PANEL_PARAM = "annuler";
+
+/**
  * Le panneau de saisie d'un **indicateur** (T5.2), sur la page du **produit** —
  * la première clé d'ouverture de cette page qui ne soit pas une confirmation.
  * Même mécanique que les quatre précédentes : une URL, pas un état.
@@ -333,6 +354,14 @@ export const ROUTES = {
    */
   projectResultNew: (id: string, activityId: string) =>
     `/projets/${id}?${RESULT_PANEL_PARAM}=${activityId}`,
+  /**
+   * La page du projet, panneau d'annulation ouvert sur une activité donnée. Le
+   * geste part du menu de l'entrée de roadmap — jamais d'ailleurs. La fermeture
+   * reste `project(id)` : annuler une activité ne fait pas quitter la page de
+   * l'accompagnement, pas plus qu'en saisir une.
+   */
+  projectActivityCancel: (id: string, activityId: string) =>
+    `/projets/${id}?${CANCEL_PANEL_PARAM}=${activityId}`,
   /**
    * La page du projet, panneau d'adoption ouvert (T5.4). **La même clé que la
    * page produit**, comme la note d'`INDICATOR_PANEL_PARAM` l'annonçait : ce

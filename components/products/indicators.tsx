@@ -67,10 +67,10 @@
 import Link from "next/link";
 
 import {
-  IndicatorMenu,
+  ActionMenu,
   MENU_ITEM,
   MENU_ITEM_DANGER,
-} from "@/components/products/indicator-menu";
+} from "@/components/ui/action-menu";
 import { Block, BlockDivider, BlockHeader } from "@/components/ui/block";
 import {
   formatDateMonth,
@@ -170,7 +170,7 @@ export function Indicators({
         note="L'objectif global du produit, tous accompagnements confondus."
         action={
           setNorthStar ? (
-            <IndicatorMenu label="Options du bloc des indicateurs">
+            <ActionMenu label="Options du bloc des indicateurs">
               {indicators.map((indicator) => (
                 <form
                   key={indicator.id}
@@ -199,7 +199,7 @@ export function Indicators({
                   </button>
                 </form>
               ) : null}
-            </IndicatorMenu>
+            </ActionMenu>
           ) : null
         }
       />
@@ -682,7 +682,7 @@ function IndicatorCard({
         /* **Le conteneur porte le positionnement, jamais le menu** : sa racine
            est `relative`, dont son déroulant a besoin pour s'ancrer. */
         <div className="absolute right-3 top-3">
-        <IndicatorMenu label={`Options de l'indicateur ${indicator.label}`}>
+        <ActionMenu label={`Options de l'indicateur ${indicator.label}`}>
           {editHref ? (
             <Link
               href={editHref(indicator.id)}
@@ -730,7 +730,7 @@ function IndicatorCard({
               </button>
             </form>
           ) : null}
-        </IndicatorMenu>
+        </ActionMenu>
         </div>
       ) : null}
 

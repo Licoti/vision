@@ -1,12 +1,26 @@
 "use client";
 
 /**
- * Le menu « … » du bloc des indicateurs — la seule affordance de la maquette
- * `docs/design/maquettes/blocs/northstar` qui ne se rende pas en HTML nu.
+ * Le menu contextuel « … » de l'application — un bouton, une liste de gestes.
  *
- * **C'est le premier état d'ouverture porté côté client**, et il faut le dire.
- * Le projet a déjà des composants clients — `panel.tsx`, `indicator-panel.tsx`,
- * `reading-panel.tsx` —, mais aucun ne décide *lui-même* de ce qui est visible :
+ * **Il vient de `components/products/indicator-menu.tsx`**, écrit le 17/08/2026
+ * pour la seule affordance de `docs/design/maquettes/blocs/northstar` qui ne se
+ * rende pas en HTML nu. Il en sort le jour où les cartes d'activité de la
+ * roadmap ont eu le même besoin : deux menus « … » aux mesures différentes dans
+ * la même application, c'est exactement ce qu'un composant partagé existe pour
+ * empêcher. Un seul menu, un seul langage visuel.
+ *
+ * **Ses mesures sont celles de la demande** : 32×32, fond de surface, bordure de
+ * 1px en couleur primaire, rayon de 8px. Elles s'obtiennent toutes par des
+ * jetons existants — `h-8 w-8`, `bg-surface-neutral-pale`,
+ * `border-border-primary-base`, `rounded-lg` —, donc aucune valeur visuelle
+ * n'est écrite en dur (règle 2) et aucun septième substitut n'est inventé.
+ * `#ffffff` n'a pas de jeton de surface dans ce thème ; le blanc des cartes est
+ * `surface-neutral-pale`, et c'est lui que le bouton reprend.
+ *
+ * **C'est le seul état d'ouverture porté côté client**, et il faut le redire.
+ * Le projet a d'autres composants clients — `panel.tsx`, `confirm-panel.tsx`,
+ * `activity-panel.tsx` —, mais aucun ne décide *lui-même* de ce qui est visible :
  * un panneau s'ouvre par un paramètre d'URL et la page le rend (D30, tenu depuis
  * T3.2). Ici l'ouverture est un `useState`. Arbitré le 17/08/2026, consigné dans
  * `JOURNAL-TECHNIQUE.md`.
@@ -18,9 +32,13 @@
  * n'est de toute façon pas ce rendu qui protège — les actions redérivent le
  * droit sur l'identifiant reçu.
  *
- * **Sans JavaScript, le menu ne s'ouvre pas** — et c'est la seule régression du
- * bloc. Les gestes restent atteignables par leur URL (`?indicateur=`,
- * `?releve=`, `?releves=`), mais plus par l'écran. C'est le prix de l'arbitrage.
+ * **Sans JavaScript, le menu ne s'ouvre pas**, et la régression s'est élargie
+ * en passant aux cartes d'activité. Sur le bloc des indicateurs, les gestes
+ * restaient atteignables par leur URL (`?indicateur=`, `?releve=`, `?releves=`).
+ * Sur une carte d'activité, seuls « Modifier », « Saisir un résultat » et
+ * « Annuler l'activité » en ont une : les quatre actions serveur — les deux
+ * « Marquer », les deux « Archiver » — **n'ont aucun repli**. C'est le prix de
+ * l'arbitrage, et il est plus élevé qu'au premier jour.
  *
  * Trois comportements que le clavier exige, et qu'un `onClick` seul n'aurait pas
  * donnés : `Échap` referme, un clic hors du menu referme, et le focus revient au
@@ -43,15 +61,16 @@ import {
   type ReactNode,
 } from "react";
 
-export function IndicatorMenu({
+export function ActionMenu({
   label,
   children,
 }: {
   /**
    * Ce que le bouton dit à l'assistance : « Options du bloc », « Options de
-   * l'indicateur Autonomie ». Trois points ne se lisent pas — la maquette pose
-   * un `aria-label`, et il doit **nommer sa cible** quand la page en porte
-   * plusieurs.
+   * l'indicateur Autonomie », « Options de l'activité Atelier de cadrage —
+   * mars 2026 ». Trois points ne se lisent pas — la maquette pose un
+   * `aria-label`, et il doit **nommer sa cible** quand la page en porte
+   * plusieurs. Une roadmap en porte quinze.
    */
   label: string;
   /** Les gestes, décidés par le serveur : des liens et des formulaires. */
@@ -105,7 +124,7 @@ export function IndicatorMenu({
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen((was) => !was)}
-        className="flex h-9 w-9 items-center justify-center rounded-lg border border-border-primary-lighter bg-surface-neutral-pale"
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-border-primary-base bg-surface-neutral-pale"
       >
         {/* Les trois points sont **décoratifs** : le bouton est nommé par son
             `aria-label`, et la couleur ne porte jamais seule (docs/06 §11). */}

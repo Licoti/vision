@@ -99,6 +99,7 @@ import { Breadcrumb } from "@/components/shell/breadcrumb";
 import { Avatar } from "@/components/ui/avatar";
 import { ConfirmPanel } from "@/components/ui/confirm-panel";
 import { Field, FieldRow } from "@/components/ui/field";
+import { borderOf, CONTROL, FormField } from "@/components/ui/form-field";
 import { Page, PageHeader } from "@/components/ui/page";
 import { Section, SectionHeader } from "@/components/ui/section";
 import { StatusDot } from "@/components/ui/status-dot";
@@ -178,6 +179,7 @@ export default async function ProjectPage({
     activite?: string;
     ressource?: string;
     resultat?: string;
+    annuler?: string;
     archiver?: string;
     indicateur?: string;
   }>;
@@ -204,7 +206,7 @@ export default async function ProjectPage({
      que ce `&&` cherchait. Le rendu n'est pas le verrou pour autant : les deux
      portes de `./actions` refusent le projet archivé reçu. */
   const canWrite = session.can.writeProject(project.id) && !archived;
-  const { activite, ressource, resultat, archiver, indicateur } =
+  const { activite, ressource, resultat, annuler, archiver, indicateur } =
     await searchParams;
 
   /* L'exclusivité, avant tout le reste : plusieurs clés d'ouverture
@@ -217,8 +219,10 @@ export default async function ProjectPage({
      la même chose pour trois — et T4bis.3 y a ajouté `archiver` sans toucher à
      l'énoncé, ce qui était précisément la propriété cherchée. **T5.4 y ajoute
      `indicateur` de la même façon** : cinq clés, le même énoncé, et c'est la
-     seconde fois que la généralisation est payée par un ticket ultérieur. */
-  const keys = { activite, ressource, resultat, archiver, indicateur };
+     seconde fois que la généralisation est payée par un ticket ultérieur. **Le
+     menu contextuel des cartes y ajoute `annuler`** sans plus la toucher :
+     sixième clé, même énoncé, troisième fois. */
+  const keys = { activite, ressource, resultat, annuler, archiver, indicateur };
   const conflict =
     Object.values(keys).filter((value) => value !== undefined).length > 1;
   const asked: Partial<typeof keys> = conflict ? {} : keys;
@@ -320,6 +324,34 @@ export default async function ProjectPage({
 
   const resultPanelOpen = resultTarget !== null;
 
+  /* La confirmation d'annulation. Le geste vivait dans l'entrée de roadmap, sous
+     un `<details>` qui dépliait son champ « Motif » au milieu des autres gestes ;
+     le menu contextuel des cartes l'en a sorti, un champ de saisie n'ayant pas sa
+     place dans une entrée de menu.
+
+     **La cible se lit dans la roadmap déjà chargée**, sur la forme exacte de
+     `resultTarget` : aucune lecture en base ne s'ajoute, et la même donnée décide
+     du lien dans la carte et de l'ouverture du panneau — une URL tapée à la main
+     n'ouvre jamais rien de plus que ce que l'écran propose. La roadmap est scopée
+     à ce projet et exclut déjà les activités archivées ; les trois groupes
+     retenus sont ceux d'où `canTransitionActivity` autorise encore l'annulation.
+
+     La forme est vérifiée avant la base, comme partout. */
+  const cancelTarget =
+    canWrite && asked.annuler && isUuid(asked.annuler)
+      ? (roadmap
+          .filter(
+            (group) =>
+              group.key === "planned" ||
+              group.key === "unscheduled" ||
+              group.key === "in_progress",
+          )
+          .flatMap((group) => group.activities)
+          .find((entry) => entry.id === asked.annuler) ?? null)
+      : null;
+
+  const cancelPanelOpen = cancelTarget !== null;
+
   /* La confirmation d'archivage (T4bis.3). Le droit décide de tout ce qui suit,
      et l'archivage avec lui : on ne confirme pas l'archivage de ce qui est déjà
      rangé. Un membre qui tape l'URL d'ouverture obtient la page nue — pas un
@@ -362,6 +394,7 @@ export default async function ProjectPage({
     activityPanelOpen ||
     resourcePanelOpen ||
     resultPanelOpen ||
+    cancelPanelOpen ||
     archivePanelOpen ||
     adoptionPanelOpen;
 
@@ -538,6 +571,69 @@ export default async function ProjectPage({
             </p>
             <p>Le geste se défait : « Rétablir » ramène l&apos;accompagnement.</p>
           </div>
+        </ConfirmPanel>
+      ) : null}
+
+      {cancelTarget ? (
+        /* Le même panneau que l'archivage, repris tel quel — et c'est ce qui
+           rend le geste déplaçable : le `<details>` de l'entrée de roadmap
+           n'avait ni endroit pour un message de refus, ni place pour un champ
+           dans un menu. `ConfirmPanel` rend ses `children` **à l'intérieur** de
+           son formulaire, si bien que le motif y prend sa place sans qu'une
+           ligne du composant change.
+
+           L'identifiant de l'activité est lié **côté serveur**. Ce n'est pas un
+           verrou — Next le sérialise dans un champ `$ACTION_…` réécrivable ; le
+           verrou est dans l'action, qui interroge `writeProject` sur le projet
+           retrouvé depuis l'activité reçue, puis vérifie que son état autorise
+           encore l'annulation. */
+        <ConfirmPanel
+          title="Annuler cette activité"
+          context={`${cancelTarget.typeLabel} · ${formatActivityPeriod(
+            cancelTarget.periodStart,
+            cancelTarget.periodEnd,
+            cancelTarget.isUnscheduled,
+          )}`}
+          closeHref={ROUTES.project(project.id)}
+          action={cancelActivity.bind(null, cancelTarget.id)}
+          submitLabel="Confirmer l'annulation"
+          pendingLabel="Annulation…"
+        >
+          {/* Ce que le geste fait, et ce qu'il ne fait pas. Le texte est rendu
+              sur le serveur et traverse en `children`. */}
+          <div className="flex flex-col gap-3 text-sm text-content-neutral-dark">
+            <p>
+              Cette activité passe au groupe « Annulé » de la roadmap, replié en
+              bas du bloc. Elle reste lisible : annuler dit qu&apos;elle ne se
+              fera pas, pas qu&apos;elle n&apos;a jamais été prévue.
+            </p>
+            <p>
+              Le geste ne se défait pas — une activité annulée ne revient à aucun
+              état antérieur. Une saisie faite par erreur s&apos;archive plutôt
+              qu&apos;elle ne s&apos;annule.
+            </p>
+          </div>
+
+          {/* Le motif est la seule saisie de ce panneau, et il est obligatoire :
+              `activities_cancelled_requires_reason` le pose en base, `required`
+              l'empêche côté écran, et l'action le revérifie sur ce qu'elle
+              reçoit. C'est lui que la roadmap affiche ensuite à la place des
+              gestes. */}
+          <FormField
+            label="Motif"
+            htmlFor="motif-annulation"
+            note="Ce que la roadmap affichera à la place des gestes de l'activité."
+            errorId="motif-annulation-erreur"
+            required
+          >
+            <input
+              id="motif-annulation"
+              name="cancellationReason"
+              type="text"
+              required
+              className={`${CONTROL} ${borderOf(undefined)}`}
+            />
+          </FormField>
         </ConfirmPanel>
       ) : null}
 
@@ -853,8 +949,13 @@ export default async function ProjectPage({
                     ROUTES.projectResultNew(project.id, activityId)
                 : null
             }
+            cancelHref={
+              canWrite
+                ? (activityId) =>
+                    ROUTES.projectActivityCancel(project.id, activityId)
+                : null
+            }
             transitionActivity={canWrite ? transitionActivity : null}
-            cancelActivity={canWrite ? cancelActivity : null}
             archiveActivity={canWrite ? archiveActivity : null}
             /* `archiveResult` est liée au projet **côté serveur** ; l'entrée y
                ajoute l'activité et le résultat au rendu. Le même `canWrite` que
