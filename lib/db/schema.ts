@@ -10,7 +10,7 @@
  *   — created_at, updated_at, created_by partout ;
  *   — les périodes sont des `date`, jamais des horodatages.
  *
- * Le domain_id est présent sur les 23 tables métier, y compris les tables
+ * Le domain_id est présent sur les 26 tables métier, y compris les tables
  * de liaison que le document ne détaille pas. C'est lui qui permettra à la
  * couche d'accès de T1.3 d'exiger un domaine sur toute requête, sans avoir
  * à remonter par jointure.
@@ -26,6 +26,7 @@ import {
   numeric,
   pgEnum,
   pgTable,
+  smallint,
   text,
   timestamp,
   unique,
@@ -49,6 +50,23 @@ export const domainStatus = pgEnum("domain_status", ["active", "suspended"]);
 export const personSource = pgEnum("person_source", ["directory", "manual"]);
 
 export const personKind = pgEnum("person_kind", ["center", "stakeholder"]);
+
+/**
+ * La disponibilité d'une personne du centre.
+ *
+ * Arbitrage (b) de C5bis — l'échelle de maîtrise doit pouvoir évoluer, elle est
+ * donc un référentiel (`skill_levels`) ; la disponibilité est une liste fermée
+ * de trois valeurs dont la logique dépendra directement le jour où elle se
+ * dérivera des accompagnements. C'est le cas de D43 : un énuméré.
+ *
+ * Arbitrage (d) — elle est une propriété du centre : la colonne est nullable, et
+ * un `CHECK` la refuse à un intervenant côté entité.
+ */
+export const personAvailability = pgEnum("person_availability", [
+  "available",
+  "partial",
+  "unavailable",
+]);
 
 export const domainRole = pgEnum("domain_role", ["domain_manager", "member"]);
 
@@ -209,6 +227,55 @@ export const jobs = pgTable(
   (t) => [index("jobs_domain_id_idx").on(t.domainId)],
 );
 
+/**
+ * Référentiel des compétences portées par les personnes du centre.
+ *
+ * **La forme exacte de `jobs`**, et ce n'est pas une coïncidence : les deux sont
+ * des référentiels du domaine, amorcés par script, sans écran de gestion avant
+ * C7 (D25). Un métier qualifie une personne ; une compétence dit ce qu'elle sait
+ * faire, et plusieurs par personne.
+ */
+export const skills = pgTable(
+  "skills",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    domainId: domainRef(),
+    label: text("label").notNull(),
+    position: numeric("position", { precision: 10, scale: 2 })
+      .notNull()
+      .default("0"),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    ...stamps,
+  },
+  (t) => [index("skills_domain_id_idx").on(t.domainId)],
+);
+
+/**
+ * L'échelle de maîtrise — la forme de `jobs`, plus un `rank`.
+ *
+ * C'est le `rank` qui ordonne l'échelle : il donnera au radar sa seule grandeur
+ * et au filtre « au moins ce niveau » son `rank >= n`. Le `label` reste libre —
+ * un domaine renomme « Avancé » sans renommer le rang 3.
+ *
+ * Aucune unicité sur `rank` : le référentiel est amorcé par script, et une
+ * contrainte non demandée contraindrait l'écran de gestion dû à C7 (D25).
+ */
+export const skillLevels = pgTable(
+  "skill_levels",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    domainId: domainRef(),
+    label: text("label").notNull(),
+    rank: smallint("rank").notNull(),
+    position: numeric("position", { precision: 10, scale: 2 })
+      .notNull()
+      .default("0"),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    ...stamps,
+  },
+  (t) => [index("skill_levels_domain_id_idx").on(t.domainId)],
+);
+
 /** Référentiel des approches : Research, Design Thinking, Lean, Audit UX… */
 export const approaches = pgTable(
   "approaches",
@@ -312,6 +379,19 @@ export const persons = pgTable(
     /** Facultatif : une personne hors centre n'a pas de métier design. */
     jobId: uuid("job_id").references(() => jobs.id, { onDelete: "set null" }),
     kind: personKind("kind").notNull(),
+    /** Courte présentation, saisie. Lue par la fiche de personne (C5bis). */
+    bio: text("bio"),
+    /**
+     * Arbitrage (d) de C5bis — nulle pour un intervenant côté entité, et le
+     * `CHECK` ci-dessous le tient : ce n'est pas une convention d'écran.
+     *
+     * Stockée, quand D40 posait un précédent de calcul pour le statut
+     * d'accompagnement d'un produit. La dérivation depuis les accompagnements
+     * en cours exigerait de trancher ce qui rend une personne partiellement
+     * disponible — un nombre ? une charge ? une période ? — et aucune de ces
+     * réponses n'existe dans le modèle. Dette nommée au journal.
+     */
+    availability: personAvailability("availability"),
     hasAccess: boolean("has_access").notNull().default(false),
     /** Nul si `has_access` est faux. */
     domainRole: domainRole("domain_role"),
@@ -331,6 +411,54 @@ export const persons = pgTable(
       "persons_role_requires_access",
       sql`(${t.hasAccess} and ${t.domainRole} is not null) or (not ${t.hasAccess} and ${t.domainRole} is null)`,
     ),
+    /* Arbitrage (d) de C5bis, sur la forme du `CHECK` ci-dessus : la
+       disponibilité est une propriété du centre. Un intervenant côté entité
+       n'en porte pas, et le refus est en base — pas seulement dans l'action. */
+    check(
+      "persons_availability_requires_center",
+      sql`${t.availability} is null or ${t.kind} = 'center'`,
+    ),
+  ],
+);
+
+/**
+ * Les compétences portées par une personne, avec leur niveau.
+ *
+ * **Table de liaison, donc sans `archived_at`** — et c'est structurel, pas
+ * décoratif : son absence range la table dans `LinkTable` (`lib/db/scoped.ts`)
+ * et rend `unlink` disponible **à la compilation**, quand `archive` y devient
+ * un refus de typage. C'est la propriété éprouvée en T5.4 : retirer une
+ * compétence est un retrait, jamais un archivage, et le verbe à l'écran sera
+ * « Retirer ».
+ *
+ * Le niveau est **déclaré** par la personne et recueilli par le responsable de
+ * domaine : aucune date de validation, aucun historique de progression, aucun
+ * score. Vision ne le mesure pas.
+ *
+ * L'unicité `(person_id, skill_id)` est ce qui fera d'une compétence déjà
+ * portée une erreur de champ, et non une trace serveur.
+ */
+export const personSkills = pgTable(
+  "person_skills",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    domainId: domainRef(),
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => persons.id, { onDelete: "cascade" }),
+    skillId: uuid("skill_id")
+      .notNull()
+      .references(() => skills.id, { onDelete: "restrict" }),
+    levelId: uuid("level_id")
+      .notNull()
+      .references(() => skillLevels.id, { onDelete: "restrict" }),
+    ...stamps,
+  },
+  (t) => [
+    index("person_skills_domain_id_idx").on(t.domainId),
+    index("person_skills_person_id_idx").on(t.personId),
+    index("person_skills_skill_id_idx").on(t.skillId),
+    unique("person_skills_person_skill_unique").on(t.personId, t.skillId),
   ],
 );
 

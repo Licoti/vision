@@ -48,6 +48,8 @@ import {
   indicatorReadings,
   indicators,
   jobs,
+  personAvailability,
+  personSkills,
   persons,
   projectApproaches,
   projectIndicators,
@@ -59,6 +61,8 @@ import {
   projects,
   resources,
   results,
+  skillLevels,
+  skills,
   toolKind,
   tools,
 } from "../lib/db/schema";
@@ -90,6 +94,37 @@ const JOBS = [
   "Design System",
   "UX Writing",
   "Accessibilité",
+];
+
+/**
+ * Les onze compétences de la demande du 17/08/2026.
+ *
+ * Elles ne se confondent pas avec `JOBS` : le métier qualifie la personne, la
+ * compétence dit ce qu'elle sait faire, et une personne en porte plusieurs.
+ */
+const SKILLS = [
+  "UI Design",
+  "UX Design",
+  "User Research",
+  "Architecture de l'information",
+  "Facilitation",
+  "Prototypage",
+  "UX Audit",
+  "Accessibilité",
+  "Design System",
+  "Design Strategy",
+  "Service Design",
+];
+
+/**
+ * L'échelle de maîtrise. Le `rank` porte l'ordre, le `label` se renomme.
+ * Garde-fou 1 — le niveau est **déclaré**, jamais mesuré par Vision.
+ */
+const SKILL_LEVELS: { label: string; rank: number }[] = [
+  { label: "Débutant", rank: 1 },
+  { label: "Intermédiaire", rank: 2 },
+  { label: "Avancé", rank: 3 },
+  { label: "Expert", rank: 4 },
 ];
 
 /** Brief §3 et `docs/02` §4 — la manière d'accompagner. */
@@ -201,20 +236,132 @@ const ACTIVITY_TYPES: {
  *
  * Les métiers sont attribués, non documentés : arbitrage rendu avec l'humain
  * pour que le filtre métier de T2.3 ait de quoi filtrer. Consigné au journal.
+ *
+ * **Présentations, disponibilités et compétences sont inventées** (17/08/2026).
+ * C'est une entorse assumée à la règle de tête de ce fichier — « un champ que le
+ * brief ne donne pas reste nul » : le brief ne connaît ni les unes ni les
+ * autres, mais la fiche T5bis.1 les exige nommément, et six écrans en vivent.
+ * Consigné au journal.
+ *
+ * Trois propriétés de la répartition sont **construites**, et se casseraient si
+ * on la « nettoyait » :
+ *   — Inès Kaddour n'a que **deux** compétences : c'est elle qui éprouvera
+ *     l'absence de radar (moins de trois axes, pas de polygone) ;
+ *   — Léa Fontaine porte **User Research et Accessibilité**, quand Sofia et Awa
+ *     n'ont que la première et Inès et Yanis que la seconde : sans ce jeu, le
+ *     critère conjonctif du filtre par compétences se lirait sur un résultat
+ *     vide, qui ne prouve rien ;
+ *   — les **trois** valeurs de disponibilité sont représentées, sans quoi la
+ *     pastille n'aurait que deux de ses trois couleurs à montrer.
+ *
+ * Arbitrage (d) — Marc Tellier, côté entité, n'a ni présentation, ni
+ * disponibilité, ni compétence : elles sont propriété du centre.
  */
 const PERSONS: {
   fullName: string;
   kind: "center" | "stakeholder";
   job?: string;
   role?: DomainRole;
+  bio?: string;
+  availability?: Availability;
+  skills?: { skill: string; level: string }[];
 }[] = [
-  { fullName: "Camille Roux", kind: "center", job: "Product Design", role: "domain_manager" },
-  { fullName: "Sofia Marchand", kind: "center", job: "UX Research", role: "member" },
-  { fullName: "Yanis Bertin", kind: "center", job: "UI Design", role: "member" },
-  { fullName: "Inès Kaddour", kind: "center", job: "Accessibilité", role: "member" },
-  { fullName: "Léa Fontaine", kind: "center", job: "UX Research", role: "member" },
-  { fullName: "Thomas Lemaire", kind: "center", job: "Product Design", role: "member" },
-  { fullName: "Awa Diallo", kind: "center", job: "UX Research", role: "member" },
+  {
+    fullName: "Camille Roux",
+    kind: "center",
+    job: "Product Design",
+    role: "domain_manager",
+    bio: "Product designer, accompagne les équipes du cadrage à la mise en service.",
+    availability: "partial",
+    skills: [
+      { skill: "Design Strategy", level: "Expert" },
+      { skill: "UX Design", level: "Avancé" },
+      { skill: "Facilitation", level: "Avancé" },
+      { skill: "Prototypage", level: "Intermédiaire" },
+    ],
+  },
+  {
+    fullName: "Sofia Marchand",
+    kind: "center",
+    job: "UX Research",
+    role: "member",
+    bio: "Chercheuse, mène les entretiens et les campagnes de tests utilisateurs.",
+    availability: "available",
+    skills: [
+      { skill: "User Research", level: "Expert" },
+      { skill: "Facilitation", level: "Avancé" },
+      { skill: "UX Audit", level: "Intermédiaire" },
+    ],
+  },
+  {
+    fullName: "Yanis Bertin",
+    kind: "center",
+    job: "UI Design",
+    role: "member",
+    bio: "Designer d'interface, tient le design system et les parcours à l'écran.",
+    availability: "available",
+    skills: [
+      { skill: "UI Design", level: "Expert" },
+      { skill: "Design System", level: "Avancé" },
+      { skill: "Prototypage", level: "Avancé" },
+      { skill: "UX Design", level: "Intermédiaire" },
+      { skill: "Accessibilité", level: "Intermédiaire" },
+    ],
+  },
+  {
+    fullName: "Inès Kaddour",
+    kind: "center",
+    job: "Accessibilité",
+    role: "member",
+    bio: "Référente accessibilité, conduit les audits de conformité et les mises en conformité.",
+    availability: "partial",
+    skills: [
+      { skill: "Accessibilité", level: "Expert" },
+      { skill: "UX Audit", level: "Avancé" },
+    ],
+  },
+  {
+    fullName: "Léa Fontaine",
+    kind: "center",
+    job: "UX Research",
+    role: "member",
+    bio: "Chercheuse, travaille l'observation terrain et la structure de l'information.",
+    availability: "available",
+    skills: [
+      { skill: "User Research", level: "Avancé" },
+      { skill: "Architecture de l'information", level: "Avancé" },
+      { skill: "Accessibilité", level: "Intermédiaire" },
+    ],
+  },
+  {
+    fullName: "Thomas Lemaire",
+    kind: "center",
+    job: "Product Design",
+    role: "member",
+    bio: "Product designer, intervient sur le cadrage et la conception de services.",
+    availability: "unavailable",
+    skills: [
+      { skill: "UX Design", level: "Avancé" },
+      { skill: "Facilitation", level: "Avancé" },
+      { skill: "Architecture de l'information", level: "Intermédiaire" },
+      { skill: "Design Strategy", level: "Intermédiaire" },
+    ],
+  },
+  {
+    fullName: "Awa Diallo",
+    kind: "center",
+    job: "UX Research",
+    role: "member",
+    bio: "Chercheuse, relie les usages mesurés aux constats d'audit.",
+    availability: "partial",
+    skills: [
+      { skill: "User Research", level: "Avancé" },
+      { skill: "UX Audit", level: "Avancé" },
+      { skill: "Prototypage", level: "Intermédiaire" },
+      { skill: "UI Design", level: "Intermédiaire" },
+      { skill: "Service Design", level: "Débutant" },
+    ],
+  },
   { fullName: "Marc Tellier", kind: "stakeholder" },
 ];
 
@@ -499,6 +646,7 @@ type ToolKind = (typeof toolKind.enumValues)[number];
 type Family = (typeof activityFamily.enumValues)[number];
 type ActivityState = (typeof activityState.enumValues)[number];
 type DomainRole = (typeof domainRole.enumValues)[number];
+type Availability = (typeof personAvailability.enumValues)[number];
 
 /* ==========================================================================
    Le rapprochement
@@ -678,6 +826,32 @@ async function seed(): Promise<void> {
     })),
   );
 
+  const skillIndex = await ensureAll(
+    scope,
+    skills,
+    "skills",
+    (row) => row.label,
+    SKILLS.map((label, index) => ({
+      key: label,
+      values: { label, position: positionOf(index) },
+    })),
+  );
+
+  const levelIndex = await ensureAll(
+    scope,
+    skillLevels,
+    "skill_levels",
+    (row) => row.label,
+    SKILL_LEVELS.map((level, index) => ({
+      key: level.label,
+      values: {
+        label: level.label,
+        rank: level.rank,
+        position: positionOf(index),
+      },
+    })),
+  );
+
   const approachIndex = await ensureAll(
     scope,
     approaches,
@@ -749,11 +923,36 @@ async function seed(): Promise<void> {
         source: "manual",
         kind: person.kind,
         jobId: person.job ? idOf(jobIndex, person.job, "Métier") : null,
+        bio: person.bio ?? null,
+        availability: person.availability ?? null,
         hasAccess: person.role !== undefined,
         domainRole: person.role ?? null,
         isActive: true,
       },
     })),
+  );
+
+  // Les compétences portées. Table de liaison : elle se retire, elle ne
+  // s'archive pas — d'où l'absence d'`archived_at` dans le schéma.
+  await ensureAll(
+    scope,
+    personSkills,
+    "person_skills",
+    (row) => `${row.personId}·${row.skillId}`,
+    PERSONS.flatMap((person) =>
+      (person.skills ?? []).map((held) => {
+        const personId = idOf(personIndex, person.fullName, "Personne");
+        const skillId = idOf(skillIndex, held.skill, "Compétence");
+        return {
+          key: `${personId}·${skillId}`,
+          values: {
+            personId,
+            skillId,
+            levelId: idOf(levelIndex, held.level, "Niveau"),
+          },
+        };
+      }),
+    ),
   );
 
   /* --- Produits et projets ----------------------------------------------- */

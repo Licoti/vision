@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 17/08/2026 — hors ticket : les gestes des cartes de roadmap passent sous un menu « … » partagé (`components/ui/action-menu.tsx`), « Annuler » sort en panneau de confirmation.
+**Dernière mise à jour :** 17/08/2026 — T5bis.1 terminé : trois tables, deux colonnes, la migration `0004` et l'amorçage des compétences.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
-**Ticket suivant :** **T5bis.1** — le schéma : compétences, niveaux, profil (`tickets-C5bis.md`)
+**Ticket suivant :** **T5bis.2** — l'entrée « Équipe » et la liste (`tickets-C5bis.md`)
 
 ---
 
@@ -19,7 +19,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **terminé** |
 | C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **terminé** |
 | TD — Dette technique | TD.1 | **terminé** |
-| C5bis — Équipe | T5bis.1 → T5bis.7 | **en cours** |
+| C5bis — Équipe | T5bis.1 → T5bis.7 | **en cours** — T5bis.1 terminé |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
@@ -55,25 +55,26 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   question de l'effet dans le temps. Sa propriété la plus payante n'est pas un écran :
   **`timelineScale` recevait une liste de dates depuis T5.5**, si bien que T5.6 y a versé les relevés
   sans qu'un calcul de borne change. **Tout a depuis été refait hors ticket** (17/08/2026) :
-  `roadmap.tsx` en HTML avec un filtre de période porté par l'URL ; les courbes fusionnées dans
-  `indicators.tsx` avec une **North Star** (migration 0003 : `is_north_star`, `target_value`, index
-  unique partiel) ; la page réordonnée North Star / liste / roadmap. `timeline.tsx` et
-  `indicator-curves.tsx` n'existent plus. **Neuf dérogations documentaires sont consignées dans
-  `JOURNAL-TECHNIQUE.md`**, dont D39 enfreinte sciemment (écart à la cible et jauge) et `docs/06` §6
-  (roadmap passée sous la liste).
+  `roadmap.tsx` en HTML filtré par l'URL ; les courbes fusionnées dans `indicators.tsx` avec une
+  **North Star** (migration 0003) ; la page réordonnée. `timeline.tsx` et `indicator-curves.tsx`
+  n'existent plus. **Neuf dérogations documentaires sont consignées dans `JOURNAL-TECHNIQUE.md`**,
+  dont D39 enfreinte sciemment et `docs/06` §6. Récit complet dans `HISTORIQUE-TICKETS.md`.
 - **TD — Dette technique — TD.1, le 17/08/2026.** Ticket **hors chantier**, dans la seule fenêtre où
   les fiches n'interdisent plus rien. Huit copies du composant de champ, six coquilles de panneau et
   quatre `ACTION_LINK` deviennent trois fichiers de `components/ui/` : **−644 lignes nettes**, à HTML
   constant sur 26 rendus capturés. Quatre correctifs joints. Sa leçon la plus transportable n'est pas
   dans le code : **un harnais qui poste en urlencoded là où React rend du multipart obtient un 200
   muet**, indiscernable d'un refus sans étape témoin.
-- **Menu « … » sur les cartes de roadmap — hors ticket, le 17/08/2026.** Les sept gestes empilés en
-  texte souligné dans la colonne droite d'une entrée passent sous un bouton unique. `indicator-menu.tsx`
-  est promu en `components/ui/action-menu.tsx` — un seul menu dans l'application, aux mesures demandées
-  (32×32, bordure `border-primary-base`, rayon `lg`), ce qui **corrige au passage un contraste de
-  bordure à 1,33:1** porté depuis le 17/08 par les deux menus North Star. « Annuler » quitte l'entrée
-  pour un `ConfirmPanel` ouvert par `?annuler=<id>` : son motif est obligatoire, et un champ de saisie
-  n'a pas sa place dans une entrée de menu — `cancelActivity` passe donc du refus muet au `ConfirmState`.
+- **T5bis.1 — 17/08/2026 — le schéma : compétences, niveaux, profil.** Trois tables, deux colonnes et
+  leur `CHECK`, migration **`0004`** — la fiche annonçait `0003`, déjà pris. Écarts : présentations et
+  disponibilités **inventées** contre la règle de tête de `seed.ts` ; mise en défaut de la fiche
+  corrigée, la sienne ne compilant pas.
+- **Menu « … » sur les cartes de roadmap — hors ticket, le 17/08/2026.** Les sept gestes empilés à
+  droite d'une entrée passent sous un bouton unique : `indicator-menu.tsx` promu en
+  `components/ui/action-menu.tsx`, seul menu de l'application — ce qui **corrige au passage un
+  contraste de bordure à 1,33:1** porté par les deux menus North Star. « Annuler » sort en
+  `ConfirmPanel` (`?annuler=<id>`), son motif étant obligatoire : `cancelActivity` passe du refus
+  muet au `ConfirmState`.
 
 ---
 
@@ -105,12 +106,11 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
 
 - **`project_indicators.note` n'a ni écrivain ni lecteur.** La colonne existe depuis T1.2, `docs/04`
   §3 la décrit « texte court », et le panneau d'adoption de T5.4 ne la saisit pas : sa fiche énumère
-  ce qu'une ligne du bloc dit — libellé, référence, cible, dernière valeur, valeur finale — et n'en
-  parle nulle part. Arbitrage tranché avant écriture le 16/08/2026 : **quatre champs, pas un
-  cinquième**, règle 3 et leçon de T5.2 — une colonne écrite sans lecteur est une colonne qu'on relit
-  un jour sans savoir pourquoi. Le geste manquant est donc **une phrase sur le pourquoi d'une
-  cible**, et il se juge à l'usage, pas au schéma. → **ticket propre, C7 au plus tard ; ou jamais, si
-  personne ne la réclame.**
+  ce qu'une ligne du bloc dit et n'en parle nulle part. Arbitrage tranché avant écriture le
+  16/08/2026 : **quatre champs, pas un cinquième**, règle 3 et leçon de T5.2 — une colonne écrite
+  sans lecteur est une colonne qu'on relit un jour sans savoir pourquoi. Le geste manquant est donc
+  **une phrase sur le pourquoi d'une cible**, et il se juge à l'usage, pas au schéma.
+  → **ticket propre, C7 au plus tard ; ou jamais, si personne ne la réclame.**
 - **L'outil par défaut d'un type d'activité ne présélectionne rien.** `activity_types.default_tool_id`
   existe depuis T1.2, `docs/04` §2 le dit « habituellement associé », et la fixture le pose sur les
   deux types d'audit du brief. Le panneau de T4.4 ne l'a pas lu — la fiche ne le demandait pas,

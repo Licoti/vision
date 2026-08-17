@@ -1749,6 +1749,76 @@ et c'est la règle 4 tenue par le compilateur.
 
 ---
 
+### T5bis.1 — le schéma : compétences, niveaux, profil — 17/08/2026
+
+**Ce que le ticket livre.** Trois tables et deux colonnes, rien de visible — le rôle qu'avait T1.2
+pour C1. `skills` et `skill_levels` sont deux référentiels du domaine ; `person_skills` est la
+liaison qui dit qui porte quoi, et à quel niveau. Sur `persons`, `bio` et `availability`, cette
+dernière tenue par un `CHECK` neuf. L'amorçage pose les onze compétences, les quatre niveaux, sept
+présentations, sept disponibilités et **vingt-six** compétences portées.
+
+**La propriété qui décide de tout le chantier tient à une colonne absente.** `person_skills` ne
+porte pas d'`archived_at`, et ce n'est pas une économie : c'est ce qui la range dans `LinkTable`
+(`lib/db/scoped.ts`) et rend `unlink` disponible **à la compilation**, quand `archive` y devient une
+erreur de typage. T5bis.6 écrira « Retirer » et non « Archiver » parce que le compilateur ne lui
+laissera pas le choix. La mise en défaut l'a prouvée dans le bon sens : ajouter `archived_at` à la
+table fait refuser par `tsc` les **trois** appels à `scope.unlink(personSkills, …)`, dont celui du
+bloc de garde-fous de typage.
+
+**Deux écarts à la fiche, tous deux tranchés avant écriture.** Le premier est arithmétique : la
+fiche annonce `drizzle/0003_*.sql`, mais la North Star a consommé ce numéro hors ticket le matin
+même ; la migration est `0004_lethal_millenium_guard.sql`. Le second porte sur la **mise en
+défaut** : la fiche demande de « retirer `domainRef()` de `person_skills` », geste qui ne compile
+pas — sans `domainId`, la table cesse d'être une `ScopedTable` et le fichier entier casse. La
+variante retenue retire le `.references()` de `skillId`, ce qui prive `parentChecksOf` de la clé et
+isole exactement le mécanisme testé.
+
+**Le point de vigilance annoncé au plan ne s'est pas réalisé.** L'ajout d'un `CHECK` sur une table
+**existante** était un chemin que le dépôt n'avait jamais emprunté — drizzle-kit ne l'avait émis
+qu'à l'intérieur d'un `CREATE TABLE`. Il est bien généré, en dernière instruction du fichier :
+`ALTER TABLE "persons" ADD CONSTRAINT "persons_availability_requires_center" CHECK (…)`. Aucune
+ligne n'a été écrite à la main dans un fichier généré.
+
+**Une fixture construite, et qui ne doit pas être « nettoyée ».** Trois propriétés de la répartition
+des compétences sont des instruments de vérification pour les tickets suivants, pas des choix
+esthétiques. Inès Kaddour n'a que **deux** compétences : c'est elle qui éprouvera l'absence de radar
+en T5bis.5, où trois axes sont le minimum d'un polygone. Léa Fontaine porte **User Research et
+Accessibilité**, quand Sofia et Awa n'ont que la première et Inès et Yanis que la seconde : sans ce
+jeu, le critère conjonctif de T5bis.3 se lirait sur un résultat vide, qui ne prouve rien. Et les
+**trois** valeurs de disponibilité sont représentées, sans quoi la pastille de T5bis.2 n'aurait que
+deux de ses trois couleurs à montrer et à mesurer.
+
+**Vérification — deux disciplines sur quatre sont sans objet, et il fallait le dire.** Le ticket ne
+rend aucun écran : le critère ne se lit pas dans le HTML servi mais dans le SQL généré, lu avant
+d'être appliqué, et dans la sortie des commandes. Aucun couple de couleurs neuf, donc aucun
+contraste à mesurer. Aucune action serveur, donc aucun point d'entrée à éprouver. Les affirmer
+vertes aurait été plus grave que de les déclarer sans objet.
+
+Ce qui restait a été éprouvé. `db:generate` puis `db:migrate` sur la base de développement **et sur
+la branche de test** — sans cette seconde application, les cas neufs échouent. `db:seed` joué deux
+fois : la première crée 11 compétences, 4 niveaux et 26 liaisons et **met à jour** les sept
+personnes du centre (les deux colonnes neuves), la seconde affiche « Rien à faire : le domaine était
+déjà à jour », décomptes identiques avant et après — 11 / 4 / 26. `npm test` : 639 cas verts,
+`tsc --noEmit` propre, `lint` sans erreur (deux avertissements hérités, hors périmètre).
+
+**Trois mises en défaut, chacune isolant un mécanisme.** Retirer le `.references()` de
+`person_skills.skillId` fait tomber « une compétence d'un autre domaine est refusée », **et ce cas
+seul** — 1 échec sur 29. `ALTER TABLE persons DROP CONSTRAINT persons_availability_requires_center`
+sur la seule branche de test fait tomber « un intervenant côté entité ne porte pas de
+disponibilité », **et ce cas seul** ; la contrainte a été remise et la suite est revenue à 29 verts.
+Ajouter `archived_at` à `person_skills` fait refuser `unlink` par `tsc`.
+
+**Ce que la mise en défaut a changé au code.** Les trois clés étrangères de `person_skills` étaient
+d'abord vérifiées dans **un seul** cas de test à trois assertions. Neutraliser l'une d'elles faisait
+alors tomber le même test que neutraliser les deux autres : la mise en défaut ne désignait plus
+rien. Le cas a été scindé en trois avant d'être cru. **Un test qui ne distingue pas ce qu'il prouve
+n'est pas un test, c'est une case cochée.**
+
+**Sondes.** Deux fichiers temporaires — un décompte par `scope.count()` et une bascule du `CHECK`
+sur la branche de test — écrits dans `scripts/`, joués, puis **supprimés** avant le commit.
+
+---
+
 ## Points ouverts refermés
 
 *(archivés depuis `ETAT.md` le 14/08/2026 — ils étaient barrés dans la section « Points ouverts »,

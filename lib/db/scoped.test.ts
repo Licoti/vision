@@ -37,6 +37,7 @@ import {
   indicatorReadings,
   indicators,
   jobs,
+  personSkills,
   persons,
   products,
   projectApproaches,
@@ -48,6 +49,8 @@ import {
   projects,
   resources,
   results,
+  skillLevels,
+  skills,
   tools,
 } from "./schema";
 
@@ -72,7 +75,10 @@ const teardownOrder: ScopedTable[] = [
   projectJobs,
   projects,
   products,
+  personSkills,
   persons,
+  skills,
+  skillLevels,
   projectStatuses,
   activityTypes,
   tools,
@@ -89,6 +95,9 @@ type Fixture = {
   activityTypeId: string;
   productId: string;
   projectId: string;
+  personId: string;
+  skillId: string;
+  levelId: string;
 };
 
 const suffix = Math.random().toString(36).slice(2, 10);
@@ -121,6 +130,19 @@ async function seedDomain(label: string): Promise<Fixture> {
     statusId: status.id,
   });
 
+  // Une personne, une compétence et un niveau **par domaine** : sans un second
+  // jeu, aucun cas d'étanchéité de `person_skills` ne prouverait quoi que ce soit.
+  const person = await scope.insert(persons, {
+    fullName: `Personne ${label}`,
+    source: "manual",
+    kind: "center",
+  });
+  const skill = await scope.insert(skills, { label: `Compétence ${label}` });
+  const level = await scope.insert(skillLevels, {
+    label: `Niveau ${label}`,
+    rank: 1,
+  });
+
   return {
     domainId: domain.id,
     scope,
@@ -129,6 +151,9 @@ async function seedDomain(label: string): Promise<Fixture> {
     activityTypeId: activityType.id,
     productId: product.id,
     projectId: project.id,
+    personId: person.id,
+    skillId: skill.id,
+    levelId: level.id,
   };
 }
 
@@ -549,6 +574,144 @@ describe("l'archivage", () => {
 });
 
 /* ==========================================================================
+   Les compétences portées — T5bis.1
+
+   Trois propriétés dont les six tickets suivants vivent, et qu'aucun d'eux ne
+   revérifiera : la liaison se retire, ses trois parents sont confrontés au
+   domaine avant d'être crus, et la disponibilité est refusée à qui n'est pas
+   du centre.
+   ========================================================================== */
+
+describe("les compétences portées", () => {
+  test("`unlink` défait une compétence, et le domaine borne le geste", async () => {
+    const held = await a.scope.insert(personSkills, {
+      personId: a.personId,
+      skillId: a.skillId,
+      levelId: a.levelId,
+    });
+
+    // Depuis B, le geste ne trouve rien : la ligne est toujours là, constatée
+    // par le client brut et non par la couche qu'on teste.
+    expect(await b.scope.unlink(personSkills, held.id)).toBe(0);
+    const stillThere = await db
+      .select()
+      .from(personSkills)
+      .where(eq(personSkills.id, held.id));
+    expect(stillThere).toHaveLength(1);
+
+    expect(await a.scope.unlink(personSkills, held.id)).toBe(1);
+    expect(await a.scope.find(personSkills, held.id)).toBeUndefined();
+  });
+
+  /**
+   * Les trois clés étrangères sont dérivées du schéma par `parentChecksOf` :
+   * aucune liste n'est écrite à la main. **Un cas par clé, et non trois
+   * assertions dans un cas** — sinon neutraliser l'une d'elles ferait tomber le
+   * même test que neutraliser les deux autres, et la mise en défaut ne
+   * désignerait plus rien.
+   */
+  test("une compétence d'un autre domaine est refusée", async () => {
+    const before = await db.select().from(personSkills);
+
+    await expect(
+      a.scope.insert(personSkills, {
+        personId: a.personId,
+        skillId: b.skillId,
+        levelId: a.levelId,
+      }),
+    ).rejects.toThrow(DomainScopeError);
+
+    // La base l'aurait acceptée : sa clé étrangère ignore le domaine.
+    expect(await db.select().from(personSkills)).toHaveLength(before.length);
+  });
+
+  test("un niveau d'un autre domaine est refusé", async () => {
+    const before = await db.select().from(personSkills);
+
+    await expect(
+      a.scope.insert(personSkills, {
+        personId: a.personId,
+        skillId: a.skillId,
+        levelId: b.levelId,
+      }),
+    ).rejects.toThrow(DomainScopeError);
+
+    expect(await db.select().from(personSkills)).toHaveLength(before.length);
+  });
+
+  test("une personne d'un autre domaine est refusée", async () => {
+    const before = await db.select().from(personSkills);
+
+    await expect(
+      a.scope.insert(personSkills, {
+        personId: b.personId,
+        skillId: a.skillId,
+        levelId: a.levelId,
+      }),
+    ).rejects.toThrow(DomainScopeError);
+
+    expect(await db.select().from(personSkills)).toHaveLength(before.length);
+  });
+
+  test("le cas normal passe, et la liaison porte le domaine", async () => {
+    const held = await a.scope.insert(personSkills, {
+      personId: a.personId,
+      skillId: a.skillId,
+      levelId: a.levelId,
+    });
+    expect(held.domainId).toBe(a.domainId);
+
+    // La fixture est rendue à son état : les tests suivants la partagent.
+    await a.scope.unlink(personSkills, held.id);
+  });
+
+  /* Arbitrage (d) — la disponibilité est une propriété du centre, et le refus
+     est en base. Deux témoins l'encadrent : sans eux, un `CHECK` qui refuserait
+     *tout* passerait pour un `CHECK` juste. */
+
+  test("un intervenant côté entité ne porte pas de disponibilité", async () => {
+    await expect(
+      a.scope.insert(persons, {
+        fullName: "Intervenant disponible",
+        source: "manual",
+        kind: "stakeholder",
+        availability: "available",
+      }),
+    ).rejects.toThrow();
+
+    const rows = await db
+      .select()
+      .from(persons)
+      .where(
+        and(
+          eq(persons.domainId, a.domainId),
+          eq(persons.fullName, "Intervenant disponible"),
+        ),
+      );
+    expect(rows).toHaveLength(0);
+  });
+
+  test("une personne du centre la porte, un intervenant sans elle passe", async () => {
+    const member = await a.scope.insert(persons, {
+      fullName: "Membre partiellement disponible",
+      source: "manual",
+      kind: "center",
+      availability: "partial",
+      bio: "Une phrase de présentation.",
+    });
+    expect(member.availability).toBe("partial");
+    expect(member.bio).toBe("Une phrase de présentation.");
+
+    const stakeholder = await a.scope.insert(persons, {
+      fullName: "Intervenant sans disponibilité",
+      source: "manual",
+      kind: "stakeholder",
+    });
+    expect(stakeholder.availability).toBeNull();
+  });
+});
+
+/* ==========================================================================
    Contraintes de typage — vérifiées par `tsc --noEmit`, jamais exécutées
    ========================================================================== */
 
@@ -559,6 +722,10 @@ describe("les garde-fous de typage", () => {
       await scope.unlink(entities, "…");
       // @ts-expect-error `project_jobs` n'a pas `archived_at` : rien à archiver.
       await scope.archive(projectJobs, "…");
+      // @ts-expect-error `persons` porte `archived_at` : elle s'archive, elle ne se retire pas.
+      await scope.unlink(persons, "…");
+      // `person_skills` n'en porte pas : `unlink` y est disponible, sans cast.
+      await scope.unlink(personSkills, "…");
       // @ts-expect-error `domains` n'a pas de `domain_id` : elle n'est pas scopable.
       await scope.list(domains);
       // @ts-expect-error `domainId` n'appartient pas à l'appelant.

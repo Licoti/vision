@@ -3442,3 +3442,57 @@ une neutralisation non défaite du 17/08/2026 : `Header` ignore son argument `fi
 a perdu sa phrase « Filtrez la période affichée. » — précisément la neutralisation que l'entrée
 précédente de ce journal déclarait défaite avant vérification finale. Elle produit le seul
 avertissement d'ESLint du dépôt. Hors périmètre (règle 3) : signalée, pas corrigée.
+
+
+**T5bis.1 — la fiche annonçait `0003`, la migration est `0004`, et ce n'est pas une coquille
+isolée.** Le numéro a été consommé le matin même par la North Star, hors ticket, entre le découpage
+de C5bis et son premier ticket. Sans conséquence ici — le fichier est généré, son nom ne se choisit
+pas — mais la leçon vaut pour les six fiches restantes : **une fiche écrite au découpage vieillit dès
+qu'un travail hors ticket touche au même dépôt.** Les fiches suivantes nomment des numéros de
+migration ; aucun ne se croira sur parole.
+
+**T5bis.1 — la recette de mise en défaut de la fiche ne compile pas, et la variante n'est pas
+équivalente.** La fiche demande de « retirer `domainRef()` de `person_skills` » pour voir tomber les
+cas d'étanchéité. Le geste est impossible : sans `domainId`, la table cesse de satisfaire
+`ScopedTable`, et ce sont **tous** les appels du fichier qui cassent, pas un test qui tombe. Une
+mise en défaut qui empêche la compilation ne prouve rien — elle ne distingue pas le mécanisme visé
+du reste. Variante retenue : retirer le `.references()` de `skillId`, qui prive `parentChecksOf` de
+la clé sans toucher au typage, et fait tomber **un** cas. **Une recette de vérification écrite au
+découpage se relit à l'exécution, comme le reste de la fiche.**
+
+**T5bis.1 — un test à trois assertions n'est pas trois tests, et la mise en défaut le révèle.** Les
+trois clés étrangères de `person_skills` étaient d'abord éprouvées dans un cas unique. La
+neutralisation de l'une faisait tomber le même nom de test que la neutralisation des deux autres :
+le témoin ne désignait plus rien, et « exactement les tests attendus » devenait invérifiable. Scindé
+en trois avant d'être cru. **La granularité d'un test se juge à ce que sa chute apprend, jamais à ce
+qu'il couvre.**
+
+**T5bis.1 — sept présentations et sept disponibilités inventées, contre la règle de tête de
+`seed.ts`.** Le fichier promet que « les données factices viennent de `docs/design/brief-design.md`
+§7, et de nulle part ailleurs. Un champ que le brief ne donne pas reste nul » — règle qui a fait
+laisser nuls `external_url`, `tools.base_url` et les courriels. Le brief ne connaît ni présentation,
+ni disponibilité, ni compétence, et la fiche T5bis.1 les exige nommément parce que six écrans en
+vivent. L'invention est donc assumée et **écrite dans le fichier**, à l'endroit où elle se lit. La
+dérogation est bornée à ces trois champs : `email` et `external_id` restent nuls.
+
+**T5bis.1 — la répartition des compétences de la fixture est un instrument de vérification, pas une
+donnée d'agrément.** Trois de ses propriétés seront des critères de tickets à venir : une personne à
+**deux** compétences (l'absence de radar, T5bis.5), une personne qui porte **User Research et
+Accessibilité** quand quatre autres n'en portent qu'une (la conjonction du filtre, T5bis.3), et les
+**trois** valeurs de disponibilité représentées (les trois couleurs de pastille à mesurer, T5bis.2).
+Une fixture « rangée » plus tard casserait trois critères sans qu'aucun test ne s'en plaigne : le
+seul rempart est la phrase qui l'explique, dans `seed.ts` et ici.
+
+**T5bis.1 — le compte de tables de `lib/db/scoped.ts` est devenu faux, et n'a pas été corrigé.**
+L'en-tête de `schema.ts` disait « les 23 tables métier » et dit désormais 26 ; la phrase jumelle de
+`scoped.ts:71`, « Les 22 sauf `domains` », en dénombre maintenant 25 et n'a pas été touchée : le
+fichier est hors du périmètre de la fiche (règle 3). Un commentaire faux dans un fichier qu'on
+n'ouvre pas est le prix d'un périmètre tenu ; il se corrigera au premier ticket qui ouvrira
+`scoped.ts` — C6 en aura l'occasion.
+
+**T5bis.1 — un `CHECK` sur une table existante était un chemin non éprouvé, et drizzle-kit le
+génère.** Les quatre `CHECK` du dépôt étaient nés à l'intérieur d'un `CREATE TABLE` (migration
+`0000`) ; rien ne disait que l'outil savait en ajouter un par `ALTER TABLE`. Il le fait, en dernière
+instruction du fichier généré. Le risque était réel — la fiche interdit d'écrire à la main dans un
+fichier généré, et l'alternative aurait été d'arrêter le ticket — et il est désormais levé pour les
+`CHECK` à venir.
