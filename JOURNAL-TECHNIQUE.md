@@ -2973,3 +2973,51 @@ point du design system resserré autour du fait neuf (les substituts ont désorm
 deux notes de chantier devenues des faits datés versées aux « Faits acquis » de
 `HISTORIQUE-TICKETS.md`. Résultat : **263 lignes**. La marge reste due au repliage.
 
+
+**C5bis — une dérogation demandée, accordée, et bornée par six garde-fous.** `CLAUDE.md` écrit que
+Vision n'est pas **un outil d'évaluation des personnes** ; `docs/06` §10 interdit le classement de
+personnes ; D39 interdit tout indice **calculé par Vision** pour qualifier une personne. La demande
+du 17/08/2026 — un niveau de maîtrise par compétence, et un radar par personne — est, à la lettre,
+une évaluation de personne. **Le désaccord a été porté avant d'écrire une ligne**, comme la règle 6
+l'exige, et l'humain a tranché : dérogation accordée, sous garde-fous. Ils sont six, et ils sont
+recopiés en tête de `tickets-C5bis.md` parce qu'un garde-fou qui ne vit que dans un journal n'est
+pas opposable : niveau **déclaré** et jamais mesuré ; aucune moyenne ni score ni total ; aucun tri
+des personnes par niveau ; un radar, une personne ; des axes qui sont **les seules compétences de la
+personne**, ce qui rend la superposition impossible ; et la valeur écrite en toutes lettres à côté du
+dessin. `CLAUDE.md`, `docs/02`, `docs/06` et `docs/07` restent à amender **par l'humain** — la règle
+7 vaut aussi le jour où c'est lui qui demande le changement.
+
+**C5bis — D29 n'est pas rouverte, et c'est ce qui a décidé de la forme.** « Pas de page personne au
+POC » aurait été le point de friction le plus coûteux du chantier : une fiche est exactement ce que
+la décision refuse. La fiche est donc un **panneau** sur `/equipe`, sur la mécanique des six
+existants — une URL, pas un état. Ce que D29 économisait était un écran de navigation de plus ; il
+n'y en a pas un de plus. **Une décision peut se satisfaire sans se rouvrir, et c'est presque toujours
+moins cher que de la rouvrir.**
+
+**C5bis — cinquième entrée de navigation, contre la lettre de `docs/06` §8.** Le document écrit
+« Navigation principale, quatre entrées, dans cet ordre ». Équipe en fait une cinquième, placée après
+Projets et avant À propos : le chemin canonique reste Produits › Projets, et Équipe n'est pas un
+chemin vers un accompagnement. L'écart est consigné, il ne se discute pas — et il rappelle que
+l'entrée Administration attend toujours son ticket, ce qui en fera une sixième.
+
+**C5bis — la disponibilité est stockée là où D40 posait un précédent de calcul.** D40 pose que le
+statut d'accompagnement d'un produit est **calculé** à partir de ses projets, jamais stocké. La
+disponibilité d'une personne se dériverait de la même façon de ses accompagnements en cours, et la
+demande dit explicitement qu'elle « pourra ensuite être automatisée ». Elle est pourtant **une
+colonne** au POC : la dérivation exigerait de trancher ce qui rend une personne partiellement
+disponible — un nombre d'accompagnements ? une charge ? une période ? — et aucune de ces réponses
+n'existe dans le modèle. Une colonne saisie aujourd'hui, une dérivation le jour où la règle sera
+connue. **La dette est nommée ici pour qu'elle ne se redécouvre pas comme une incohérence.**
+
+**C5bis — le nom `bis` désigne l'intercalation, pas la correction.** C4bis rattrapait des manques ;
+C5bis ajoute un objet que `docs/05` §5 n'avait pas prévu. Le point commun, et la raison du nom, est
+qu'aucun des deux ne décale C6 ni C7, qui gardent leur contenu et leur rang. Le numéro dit **où le
+chantier s'insère**, jamais ce qu'il vaut.
+
+**C5bis — `filter()` ne porte que le domaine, et c'est ce qui rend l'archivage d'une personne sûr.**
+`lib/db/scoped.ts:266` — `filter` est un `eq(table.domainId, domainId)`, sans condition d'archivage,
+là où `list()` ajoute `isNull(archivedAt)`. Conséquence pour l'arbitrage (e) du chantier : archiver
+une personne la retire du référentiel et des choix du formulaire de projet, mais **pas de l'équipe
+des accompagnements passés**, que `findProjectDetail` lit par `joinedRead` et `filter(persons)`.
+C'est la règle 4 tenue — une donnée ne disparaît pas d'un écran qui la racontait. **Propriété à
+vérifier au ticket, jamais à supposer** : elle tient à une ligne de la couche d'accès.

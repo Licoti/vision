@@ -133,6 +133,23 @@ portaient en plus vivent dans le récit ci-dessous, ticket par ticket.)*
   arbitrages tranchés avant écriture, dont un **écart assumé à la fiche** : `role="group"` au lieu du
   `role="img"` qu'elle demandait, les deux exigences de la fiche s'excluant. Premier SVG du projet,
   rendu sur le serveur et sans `viewBox`.
+- **T5.6 — 17/08/2026 — les courbes d'indicateurs sur la même frise.** Clôt C5. **L'axe n'a pas bougé
+  d'une ligne** : `timelineScale` recevait une liste de dates depuis T5.5, écrit pour ce jour-là. Une
+  seule lecture neuve, celle des cibles. Cinq arbitrages tranchés avant écriture, dont les deux
+  bornes de chaque bande écrites — sans repère chiffré, une courbe devient le graphique décoratif que
+  D41 refuse — et une seule couleur pour toutes.
+
+**TD — Dette technique** *(hors chantier)*
+
+- **TD.1 — 17/08/2026 — le socle des panneaux, et quatre correctifs de dette.** Ticket **hors
+  chantier**, dans la seule fenêtre où les fiches n'interdisent plus rien. **−644 lignes nettes** :
+  huit copies du composant de champ, six coquilles de panneau et quatre `ACTION_LINK` deviennent
+  trois fichiers de `components/ui/`. Le critère était que rien ne change, et il s'est lu — 26 rendus
+  capturés avant et après, à données constantes. Quatre correctifs joints, dont le produit archivé
+  refusé par `createProject` **et** par le déplacement d'`updateProject`.
+
+*(les deux lignes ci-dessus repliées d'`ETAT.md` le 17/08/2026, geste 1 de la session de découpage de
+C5bis. T5.1 à T5.5 y étaient déjà, versées au balayage de T5.5.)*
 
 ---
 

@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 17/08/2026 — TD.1 livré : le socle des panneaux, et quatre correctifs de dette.
-**Chantier en cours :** aucun — C5 terminé, C6 à découper
-**Ticket suivant :** aucun — **session de découpage de C6** (liens et journal), protocole « Session de découpage »
+**Dernière mise à jour :** 17/08/2026 — session de découpage de C5bis : sept fiches écrites, C5 et TD repliés.
+**Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
+**Ticket suivant :** **T5bis.1** — le schéma : compétences, niveaux, profil (`tickets-C5bis.md`)
 
 ---
 
@@ -19,6 +19,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **terminé** |
 | C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **terminé** |
 | TD — Dette technique | TD.1 | **terminé** |
+| C5bis — Équipe | T5bis.1 → T5bis.7 | **en cours** |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
@@ -48,74 +49,18 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   de la page projet, et un seul `canWrite` fait tomber sept gestes ensemble. Porte la seule migration
   du chantier — l'unicité partielle du résultat, qui fait de « retirer puis ressaisir » un chemin
   réel.
-
-**C5 — clos** *(ses six lignes partent dans `HISTORIQUE-TICKETS.md` au **repliage**, geste de la
-session de découpage de C6 — le seul moment où `ETAT.md` se balaie. D'ici là le fichier dépasse les
-250 lignes, et c'est ce dépassement qui appelle le balayage.)*
-
-- **T5.1 — le bloc « Indicateurs » de la page produit, en lecture, le 16/08/2026.** Première
-  lecture des trois tables dormantes depuis T1.2 : `listProductIndicators` rend en **une** requête
-  jointe le dernier relevé, sa date et le décompte — l'agrégat ordonné `(array_agg(… order by
-  read_on desc, id desc))[1]`, qu'un `max()` n'aurait pas donné. Le parcours d'archivage produit,
-  dû depuis T4bis.2, a été joué : ses six points tiennent, et il a mis en défaut le **pluriel du
-  refus (e)**.
-- **T5.2 — créer, corriger et archiver un indicateur, le 16/08/2026.** Premier écran d'écriture de
-  la page produit depuis T2.5, premier objet de C5 livré **avec ses trois gestes**. Le droit de
-  l'arbitrage (b) se dérive des accompagnements sans une requête neuve, et se redérive sur
-  l'identifiant **reçu** par `openProductWrite` — la porte lit le produit **avant** le droit,
-  l'inverse d'`openProduct`, un droit dérivé ne s'énonçant pas avant ce dont il dérive. La page
-  prend la règle d'exclusivité **par décompte** de la page projet, juste d'avance pour T5.3.
-- **T5.3 — saisir, corriger et retirer un relevé, et sa migration, le 16/08/2026.** La seule
-  migration de C5, et la **première épreuve d'`hasArchivedAt`** : `archived_at` ajoutée à
-  `indicator_readings`, et `archive`, `restore` et le filtre des vivants couvrent la table sans
-  qu'une ligne de `lib/db/scoped.ts` change — la propriété que T1.3 cherchait. Le filtre des
-  relevés retirés se pose **dans le `on`** de la jointure, à l'emplacement que T5.1 avait écrit
-  d'avance. Le décompte d'exclusivité de T5.2 a absorbé une troisième clé sans changer d'énoncé,
-  et les six points d'entrée du bloc tombent avec le même `canWriteIndicators`.
-- **T5.4 — adopter un indicateur depuis l'accompagnement, le 16/08/2026.** Le deuxième bloc de
-  référence de la page projet, et le **premier retrait par `unlink`** d'un objet que l'écran offre :
-  une adoption est une liaison, `LinkTable` l'impose à la compilation, et le verbe à l'écran est
-  « Retirer », jamais « Archiver ». Le décompte d'exclusivité passe de quatre clés à cinq sans
-  changer d'énoncé — la deuxième fois qu'une généralisation écrite d'avance est payée. **Trois
-  arbitrages tranchés avant écriture** : le « combien » du refus (e) atteint l'écran par le bloc
-  produit (`adoptionCount`) et non par un message d'action, un geste nu n'ayant nulle part où en
-  afficher un ; le pluriel du refus (e) d'`archiveProduct`, dû depuis T5.1, est corrigé avant d'être
-  recopié ; `project_indicators.note` reste sans écrivain. Un fichier hors fiche, `adoption-panel.tsx`,
-  la fiche demandant un panneau sans nommer où le mettre.
-- **T5.5 — la frise du temps long : l'axe, les accompagnements, les repères, le 16/08/2026.** Le
-  **premier dessin** du projet : un SVG serveur, sans dépendance, sans JavaScript et **sans
-  `viewBox`** — les abscisses sont des pourcentages, si bien que son texte garde la taille du reste
-  de la page. Les positions sont pures et testées, et `timelineScale` reçoit **une liste de dates** et
-  non des projets : T5.6 y ajoutera les relevés sans qu'un calcul de borne change. Quatre arbitrages :
-  **une seule lecture neuve**, les bandes étant les accompagnements déjà lus ; un repère posé sur
-  `measured_on`, seule date qu'un résultat porte toujours ; une période ouverte qui court jusqu'à la
-  borne, jamais au-delà ; le `role="img"` de la fiche devenu **`role="group"`**. Et la mise en défaut
-  a rappelé ce qu'`activities.ts` écrit depuis T2.2 : **les filtres de domaine se rattrapent.**
-- **T5.6 — les courbes d'indicateurs sur la même frise, le 17/08/2026.** La troisième couche de
-  `docs/03` §7, et la clôture de C5. **L'axe n'a pas bougé d'une ligne** — `timelineScale` recevait
-  une liste de dates depuis T5.5, écrit pour ce jour-là — et une seule lecture est neuve, celle des
-  cibles : les courbes se tracent sur les indicateurs et les relevés déjà lus par le bloc de T5.1.
-  Le piège du dessin : **`polyline` et `path` n'acceptent pas de pourcentage**, et la frise n'a pas
-  de `viewBox` — un segment est donc une `<line>`. Cinq arbitrages, dont **les deux bornes de chaque
-  bande écrites** (sans repère chiffré, une courbe devient le graphique décoratif que D41 refuse) et
-  **une seule couleur pour toutes**, chaque indicateur ayant déjà sa bande. La mise en défaut a
-  resservi la leçon de T4bis.5 : le test d'étanchéité des cibles restait **vert** au retrait de
-  `filter(projects)` ; il a fallu forger l'adoption qui l'isole.
-
-- **TD.1 — le socle des panneaux, et quatre correctifs de dette, le 17/08/2026.** Ticket **hors
-  chantier**, dans la seule fenêtre où les fiches n'interdisent plus rien : C5 clos, C6 non découpé.
-  La dette de recopie que quatre entrées du journal reportaient est refermée — **huit** copies du
-  composant de champ, **six** coquilles de panneau et **quatre** `ACTION_LINK` deviennent trois
-  fichiers de `components/ui/`, soit **−644 lignes nettes**. Le critère était que rien ne change, et il
-  se lit : 26 écrans et rendus de panneaux capturés servis avant et après, **à données constantes**,
-  pour 18 espaces finaux dans un `class` et 2 jetons de couleur de différence. Quatre correctifs
-  l'accompagnent : le **produit archivé** refusé par `createProject` **et** par le déplacement
-  d'`updateProject` — jumeau que le journal ne consignait pas —, avec l'exception nominative de
-  T4bis.1 et six temps d'épreuve par l'action ; le **niveau de titre** d'`EmptyState` ; les **cinq**
-  textes sous-contrastés de `/dev/session`, dont la pastille « non » qui a demandé un jeton plus
-  sombre que les autres parce que son fond est un voile ; et trois recopies mineures. La leçon la plus
-  transportable n'est pas dans le code : **un harnais qui poste en urlencoded là où React rend du
-  multipart obtient un 200 muet**, indiscernable d'un refus sans étape témoin.
+- **C5 — Indicateurs et lecture dans le temps — T5.1 → T5.6, du 16 au 17/08/2026.** Le bloc en
+  lecture, les trois gestes de l'indicateur, ceux du relevé et sa migration, l'adoption depuis
+  l'accompagnement, puis les deux couches de la frise du temps long. Le chantier qui répond à la
+  question de l'effet dans le temps. Sa propriété la plus payante n'est pas un écran :
+  **`timelineScale` recevait une liste de dates depuis T5.5**, si bien que T5.6 y a versé les relevés
+  sans qu'un calcul de borne change.
+- **TD — Dette technique — TD.1, le 17/08/2026.** Ticket **hors chantier**, dans la seule fenêtre où
+  les fiches n'interdisent plus rien. Huit copies du composant de champ, six coquilles de panneau et
+  quatre `ACTION_LINK` deviennent trois fichiers de `components/ui/` : **−644 lignes nettes**, à HTML
+  constant sur 26 rendus capturés. Quatre correctifs joints. Sa leçon la plus transportable n'est pas
+  dans le code : **un harnais qui poste en urlencoded là où React rend du multipart obtient un 200
+  muet**, indiscernable d'un refus sans étape témoin.
 
 ---
 
@@ -128,7 +73,9 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
 
 - **Les secrets Neon n'ont jamais été tournés.** Deux chaînes de connexion ont transité en clair
   dans la conversation le 12/08/2026 — la base de développement, puis la branche de test. Elles ne
-  sont que dans `.env.local`, hors dépôt, mais restent valides. → **action humaine.**
+  sont que dans `.env.local`, hors dépôt, mais restent valides. **Reporté au découpage de C5bis, et
+  la raison est qu'il ne dépend pas de nous** : rien dans les sept fiches ne change selon que les
+  chaînes sont tournées ou non. → **action humaine.**
 
 - **Rétablir un accompagnement sous un produit archivé le laisse invisible.** L'arbitrage (e)
   n'autorise l'archivage d'un produit que si tous ses accompagnements sont archivés : « produit rangé,
@@ -137,8 +84,9 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   geste paraît ne rien faire. Arbitrage du 15/08/2026, tranché avant écriture : **aucun garde-fou**,
   l'arbitrage (f) posant qu'il n'y a pas de cascade et le chantier interdisant d'en ouvrir un
   septième en cours de ticket. Rien n'est perdu ; le geste est trompeur.
-  → **ticket propre, C7 au plus tard** — vérifié au découpage de C5 : aucune de ses six fiches
-  n'ouvre `archiveProject` ni `restoreProject`.
+  → **ticket propre, C7 au plus tard** — vérifié aux découpages de C5 puis de C5bis : aucune de leurs
+  fiches n'ouvre `archiveProject` ni `restoreProject`. T5bis.6 archive une **personne**, ce qui ne
+  cascade sur rien (arbitrage (e)) et laisse ce point où il est.
 
 ### b. Assignés à un ticket
 
@@ -171,15 +119,19 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   (2) `persons.kind` : un intervenant côté entité est marqué sur la page projet depuis T2.4 et dans
   le formulaire depuis T2.6 — pastille grise **et** mention « côté entité » —, mais la page produit et
   la liste transverse affichent tous les membres à l'identique, leurs lectures ne remontant pas la
-  colonne. → **ticket propre, C7** (destination posée le 14/08/2026, confirmée au découpage de C5 :
-  T5.1 et T5.5 ouvrent la page produit sans rouvrir `listProductProjects` ni la liste transverse).
+  colonne. **T5bis.2 en referme la moitié** : la liste Équipe porte la mention, et le point se réduit
+  alors à `products.kind` et aux deux lectures de projet qui ne remontent pas `persons.kind`.
+  → **ticket propre, C7** (destination posée le 14/08/2026, confirmée aux découpages de C5 et de
+  C5bis : aucune de leurs fiches n'ouvre `listProductProjects` ni la liste transverse).
 - **Le contenu rédigé d'`/a-propos` reste à écrire.** La page a son en-tête et son état vide. Son
   contenu — ce qu'est Vision, le vocabulaire, ce qu'elle ne fait pas, l'état daté — ne demande
   aucune lecture en base. → **ticket propre, C7 au plus tard.**
 - **On n'ajoute qu'une personne par enregistrement.** Le bloc d'ajout de T2.6 crée une personne, et
   pour en ajouter deux il faut enregistrer puis rouvrir le formulaire. La limite est écrite dans
   l'écran, et **sa raison a disparu le 14/08** : le champ répétable exigeait le JavaScript que la
-  cinquième discipline interdisait. Elle est levable. → **administration des personnes (D25, C7).**
+  cinquième discipline interdisait. Le découpage de C5bis la referme autrement qu'en la levant :
+  l'arbitrage (g) sort la création d'une personne du formulaire de projet, et une limite sur un bloc
+  qui n'existe plus n'a plus d'objet. → **T5bis.7.**
 
 ### c. Dettes assumées, sans échéance
 
