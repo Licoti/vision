@@ -3496,3 +3496,53 @@ génère.** Les quatre `CHECK` du dépôt étaient nés à l'intérieur d'un `CR
 instruction du fichier généré. Le risque était réel — la fiche interdit d'écrire à la main dans un
 fichier généré, et l'alternative aurait été d'arrêter le ticket — et il est désormais levé pour les
 `CHECK` à venir.
+
+**T5bis.2 — `docs/06` §8 écrit « Navigation principale, quatre entrées », il y en a cinq.** L'écart
+est décidé par la fiche du ticket, qui l'annonce et ordonne de le consigner sans le discuter. Il est
+donc **assumé et localisé** : `MAIN_NAV` porte la raison en commentaire — Équipe se range après
+« Projets » parce que le chemin canonique reste Produits › Projets, et qu'une personne n'est pas un
+chemin vers un accompagnement. `docs/` est figé ; c'est ici que la divergence se lit.
+
+**T5bis.2 — une jointure scopée ne se met en défaut que sur une ligne forgée, et forgée sur une
+seule colonne.** Retirer `filter(personSkills)`, `filter(skills)` ou `filter(skillLevels)` de
+`listTeam` ne faisait tomber **aucun** test tant que la fixture n'était écrite que par la couche
+scopée : la seconde lecture ne remonte que les personnes du domaine (`inArray`), et cet `inArray`
+masque à lui seul les trois fuites. La couche refusant par construction d'écrire une ligne
+transfrontalière (`assertPreconditions`), les quatre lignes témoins sont **forgées par le client
+brut `db`** dans la fixture. Deuxième moitié de la leçon, découverte en les écrivant : une ligne qui
+franchit la frontière sur **deux** colonnes à la fois — liaison d'un autre domaine *et* compétence
+d'un autre domaine — est rattrapée par le second filtre quand on neutralise le premier, si bien que
+le test reste vert et que la mise en défaut ne prouve rien. Chaque témoin ne traverse donc qu'une
+colonne. **Sept neutralisations jouées, sept fois exactement un test tombé** : les cinq `filter()`,
+le tri des personnes, celui des compétences.
+
+**T5bis.2 — la base de développement sert neuf personnes, la fixture en compte huit.** Le HTML de
+`/equipe` porte une « Nadia Berthier », intervenante côté entité qu'aucun `db:seed` ne connaît —
+créée au navigateur par un ticket passé, très probablement par le bloc « Ajouter une personne » du
+formulaire de projet que T5bis.7 doit retirer. C'est la dérive actée du 14/08/2026, et non un
+défaut : le critère de la fiche a été lu sur les **huit** personnes semées, toutes présentes et
+justes. La ligne surnuméraire se comporte d'ailleurs comme attendu — mention « côté entité »,
+métier « Non renseigné », aucune disponibilité.
+
+**T5bis.2 — le contraste le plus juste du dépôt, et ce sur quoi il a été mesuré.**
+`surface-warning-base` (`--orange-500`, #f26500) sur `surface-neutral-pale` (#fdfdfd) donne
+**3,11:1**, à onze centièmes du seuil de 3:1 d'un objet graphique. Retenu quand même, et sans
+inventer un septième substitut au design system : la pastille est `aria-hidden`, et
+`AvailabilityDot` **écrit le mot lui-même** au lieu de le laisser à son appelant — rien ne repose sur
+la couleur seule. C'est une divergence délibérée d'avec `StatusDot`, dont trois appelants viendront
+d'ici la fin du chantier. Faute de navigateur pilotable dans cette session, les couples ont été
+mesurés sur la **feuille de style servie** : les trois classes littérales sont bien émises par
+Tailwind, et la chaîne de jetons y résout `--surface-warning-base` → `--orange-500` → `#f26500`. Les
+deux autres pastilles : succès 4,53:1, neutre 4,98:1.
+
+**T5bis.2 — l'état vide de `/equipe` n'a pas été éprouvé au rendu.** Le vider demanderait d'archiver
+les neuf personnes de la base de développement, donc d'écrire pour vérifier une lecture. Le chemin
+est tenu par le typage et par le patron des quatre autres écrans, pas par une observation. À
+regarder au premier ticket qui écrira dans `persons` — T5bis.6, qui archive une personne.
+
+**T5bis.2 — `ETAT.md` est au seuil, et le seuil n'est pas tenable sans balayage.** Le fichier était à
+**251 lignes** en début de ticket, déjà au-dessus des 250 que `CLAUDE.md` fixe. Il en fait 250 après
+compression de l'entrée neuve et du point ouvert récrit — au prix d'une prose plus sèche, et sans
+marge pour les cinq tickets restants de C5bis. Un ticket ne peut pas balayer : `CLAUDE.md` réserve ce
+geste à la session de découpage. **Le prochain découpage héritera donc d'un fichier saturé**, et
+c'est là que ses sept lignes de C5bis se replieront en une.

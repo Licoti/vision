@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 17/08/2026 — T5bis.1 terminé : trois tables, deux colonnes, la migration `0004` et l'amorçage des compétences.
+**Dernière mise à jour :** 17/08/2026 — T5bis.2 terminé : la cinquième entrée de navigation, `listTeam` et l'écran Équipe en lecture.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
-**Ticket suivant :** **T5bis.2** — l'entrée « Équipe » et la liste (`tickets-C5bis.md`)
+**Ticket suivant :** **T5bis.3** — les filtres de la liste (`tickets-C5bis.md`)
 
 ---
 
@@ -19,7 +19,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **terminé** |
 | C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **terminé** |
 | TD — Dette technique | TD.1 | **terminé** |
-| C5bis — Équipe | T5bis.1 → T5bis.7 | **en cours** — T5bis.1 terminé |
+| C5bis — Équipe | T5bis.1 → T5bis.7 | **en cours** — T5bis.2 terminé |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
@@ -69,6 +69,10 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   leur `CHECK`, migration **`0004`** — la fiche annonçait `0003`, déjà pris. Écarts : présentations et
   disponibilités **inventées** contre la règle de tête de `seed.ts` ; mise en défaut de la fiche
   corrigée, la sienne ne compilant pas.
+- **T5bis.2 — 17/08/2026 — l'entrée « Équipe » et la liste.** Cinquième entrée contre les « quatre »
+  de `docs/06` §8, `listTeam` en deux lectures fixes portant cinq `filter()`, la pastille de
+  disponibilité. Sa leçon : **une jointure scopée ne se met en défaut que sur une ligne forgée**, et
+  forgée sur **une seule** colonne — sinon un autre filtre la rattrape et sa chute ne prouve rien.
 - **Menu « … » sur les cartes de roadmap — hors ticket, le 17/08/2026.** Les sept gestes empilés à
   droite d'une entrée passent sous un bouton unique : `indicator-menu.tsx` promu en
   `components/ui/action-menu.tsx`, seul menu de l'application — ce qui **corrige au passage un
@@ -127,15 +131,11 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   courante et entrée Administration, écartés en T1.6 faute de droit de lire la session. L'obstacle a
   disparu : les écrans lisent la session depuis T2.1 et `can.manageDomain` depuis T2.5. Ce qui manque
   n'est plus un droit, c'est un ticket. → **ticket barre latérale, C7 ou plus tôt.**
-- **Deux colonnes saisies ne s'affichent nulle part.** (1) `products.kind` — « Produit accompagné » ou
-  « Mission transverse » (D10) — se saisit depuis T2.5 et ne se voit sur aucun écran de lecture.
-  (2) `persons.kind` : un intervenant côté entité est marqué sur la page projet depuis T2.4 et dans
-  le formulaire depuis T2.6 — pastille grise **et** mention « côté entité » —, mais la page produit et
-  la liste transverse affichent tous les membres à l'identique, leurs lectures ne remontant pas la
-  colonne. **T5bis.2 en referme la moitié** : la liste Équipe porte la mention, et le point se réduit
-  alors à `products.kind` et aux deux lectures de projet qui ne remontent pas `persons.kind`.
-  → **ticket propre, C7** (destination posée le 14/08/2026, confirmée aux découpages de C5 et de
-  C5bis : aucune de leurs fiches n'ouvre `listProductProjects` ni la liste transverse).
+- **Deux colonnes saisies ne s'affichent nulle part** — moitié refermée par T5bis.2, dont la liste
+  Équipe porte la mention « côté entité ». Restent `products.kind` (D10), saisi depuis T2.5 et lu par
+  aucun écran ; et `persons.kind` sur les deux lectures de projet — `listProductProjects` et la liste
+  transverse — qui affichent tous les membres à l'identique faute de remonter la colonne.
+  → **ticket propre, C7** (destination du 14/08/2026, confirmée aux découpages de C5 et de C5bis).
 - **`Section` et `Block` cohabitent, et les deux pages de détail divergent.** La mise en cohérence
   de la page produit (hors ticket, 17/08/2026) a sorti la coquille et l'en-tête de ses trois blocs
   dans `components/ui/block.tsx` — rayon `3xl`, titre `xl`, note dessous, `gap-5` —, format que les

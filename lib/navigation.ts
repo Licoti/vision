@@ -221,7 +221,7 @@ export const ROADMAP_FROM_PARAM = "de";
 export const ROADMAP_TO_PARAM = "a";
 
 /**
- * Les adresses des six écrans, et des formulaires qui les alimentent. Les
+ * Les adresses des sept écrans, et des formulaires qui les alimentent. Les
  * pages de détail prennent un identifiant : le schéma en pose des UUID, et
  * rien ne promet encore de slug — ce choix revient à C2, avec l'écran qui
  * construit le lien.
@@ -384,14 +384,31 @@ export const ROUTES = {
    */
   projectIndicatorEdit: (id: string, adoptionId: string) =>
     `/projets/${id}?${INDICATOR_PANEL_PARAM}=${adoptionId}`,
+  /**
+   * Le référentiel des personnes (T5bis.2).
+   *
+   * **Une adresse, et aucune fonction de route à côté d'elle** : cet écran n'a
+   * pas de page de détail. D29 tient — la fiche d'une personne s'ouvrira en
+   * T5bis.4 par un paramètre sur cette même URL, jamais par `/equipe/<id>`.
+   */
+  team: "/equipe",
   about: "/a-propos",
 } as const;
 
-/** Navigation principale, dans l'ordre attendu par le ticket. */
+/**
+ * Navigation principale, dans l'ordre attendu par le ticket.
+ *
+ * **Cinq entrées depuis T5bis.2**, quand `docs/06` §8 en écrit quatre : l'écart
+ * est décidé par la fiche du ticket et consigné au journal technique. Équipe se
+ * place après « Projets » et avant « À propos » — le chemin canonique reste
+ * Produits › Projets, et une personne n'est pas un chemin vers un
+ * accompagnement.
+ */
 export const MAIN_NAV: readonly NavEntry[] = [
   { href: ROUTES.overview, label: "Vue d'ensemble" },
   { href: ROUTES.products, label: "Produits" },
   { href: ROUTES.projects, label: "Projets" },
+  { href: ROUTES.team, label: "Équipe" },
   { href: ROUTES.about, label: "À propos" },
 ];
 
