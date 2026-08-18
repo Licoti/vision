@@ -1,21 +1,31 @@
 /**
- * Le bloc « Indicateurs » de la page produit — **North Star en tête, les autres
- * en dessous.**
+ * Le bloc « Vision produit » de la page produit — **la question, puis la mesure
+ * de la question.**
  *
  * Récrit hors ticket le 17/08/2026 d'après
- * `docs/design/maquettes/blocs/northstar/NorthStar.dc.html`. Il **fusionne** deux
- * blocs qui lisaient les mêmes tableaux : la liste textuelle de T5.1-T5.3 et les
- * courbes de T5.6 (`indicator-curves.tsx`, supprimé). Un seul bloc, une
- * hiérarchie explicite :
+ * `docs/design/maquettes/blocs/northstar/NorthStar.dc.html`, puis **élargi le
+ * 18/08/2026** : il ne disait que comment le produit se mesure, jamais pourquoi
+ * il existe. Une North Star sans vision est une métrique posée sans l'intention
+ * qu'elle sert. Quatre rangs, dans l'ordre où la question se pose :
  *
- *   1. la **North Star** — l'indicateur qui porte l'objectif global du produit,
- *      tous accompagnements confondus. Sa courbe, sa cible, son dernier relevé.
- *   2. les **autres indicateurs**, en cartes, sous un séparateur nommé.
+ *   1. la **vision produit** — pourquoi ce produit existe, et où il veut aller ;
+ *   2. la **North Star** — l'indicateur qui dit si l'on avance dans cette
+ *      direction. Sa courbe, sa cible, son dernier relevé ;
+ *   3. les **indicateurs associés**, en cartes, sous un séparateur nommé ;
+ *   4. sous chacun, **l'accompagnement qui le porte**, en puce discrète.
  *
- * **La North Star est un concept ajouté hors ticket**, absent de `docs/02` et de
- * `docs/04`. Elle vit sur `indicators.is_north_star`, avec un index unique
- * partiel qui en garantit une au plus par produit — la garantie est en base, pas
- * à l'écran. Un produit peut n'en avoir aucune : c'est un état normal.
+ * **Vision et North Star sont deux concepts ajoutés hors des `docs/`**, absents
+ * de `docs/02` et de `docs/04` ; les deux écarts sont consignés dans
+ * `JOURNAL-TECHNIQUE.md`. La vision vit sur `products.vision`, nullable ; la
+ * North Star sur `indicators.is_north_star`, avec un index unique partiel qui en
+ * garantit une au plus par produit — la garantie est en base, pas à l'écran.
+ * N'avoir ni l'une ni l'autre est un état normal, et l'écran le dit.
+ *
+ * **Les deux ne portent pas le même droit, et le bloc ne les confond pas.** La
+ * vision est une propriété du produit : `manageDomain` seul (F1-D1, D9). Les
+ * indicateurs et la North Star relèvent du droit **dérivé des accompagnements**
+ * (arbitrage (b) de `tickets-C5.md`). Deux points d'entrée distincts arrivent
+ * donc en props, chacun `null` de son côté — le composant n'en sait pas plus.
  *
  * ⚠ **L'écart à la cible que ce bloc affiche est interdit par quatre textes**
  * — D39, `docs/06` §6, l'arbitrage (g) de `tickets-C5.md`, `brief-design.md`
@@ -33,10 +43,15 @@
  * .target_value` est celle qu'un **accompagnement** s'est donnée (`docs/02` §4),
  * tracée en trait discret avec sa seule valeur.
  *
- * **Le rattachement aux accompagnements ne se lit plus ici** (arbitrage du
- * 17/08/2026, « strictement la maquette ») : il vit sur la page projet, bloc
- * « Indicateurs adoptés ». C'est ce qui a raccourci le bloc, avec la ligne
- * « Cible du produit » que la jauge a absorbée.
+ * **Le rattachement aux accompagnements revient, sous une autre forme**
+ * (18/08/2026). L'arbitrage du 17/08/2026 — « strictement la maquette » —
+ * l'avait sorti d'ici avec la ligne « Adopté par… », et le renvoyait à la page
+ * projet. La demande le rétablit **sur les cartes seulement**, et **en puce** :
+ * ce qui alourdissait le bloc était la ligne, pas l'information. La North Star,
+ * elle, n'en porte aucune — elle est l'objectif du produit, tous
+ * accompagnements confondus, et lui coller une puce dirait le contraire. La
+ * page projet garde son bloc « Indicateurs adoptés », qui reste le lieu des
+ * quatre valeurs chiffrées ; ici, un nom, et c'est tout. L'écart est consigné.
  *
  * **Des marges par élément, jamais un `gap` uniforme — mais à l'intérieur des
  * sous-parties seulement.** Un `gap` met la même valeur partout ; la maquette
@@ -72,6 +87,8 @@ import {
   MENU_ITEM_DANGER,
 } from "@/components/ui/action-menu";
 import { Block, BlockDivider, BlockHeader } from "@/components/ui/block";
+import { Tag } from "@/components/ui/tag";
+import { ACTION_LINK } from "@/components/ui/action-link";
 import {
   formatDateMonth,
   formatIndicatorDirection,
@@ -118,6 +135,8 @@ function gapSentence(
 }
 
 export function Indicators({
+  vision,
+  visionHref,
   indicators,
   readings,
   adoptions,
@@ -128,6 +147,16 @@ export function Indicators({
   readingsHref,
   setNorthStar,
 }: {
+  /**
+   * La raison d'être du produit, telle qu'elle est écrite. `null` quand elle ne
+   * l'est pas encore — un état normal, que l'écran dit plutôt que de le blanchir.
+   */
+  vision: string | null;
+  /**
+   * Le panneau de la vision, ou `null` quand il est fermé. **Ce n'est pas le
+   * droit des indicateurs** : la vision demande `manageDomain`, eux non.
+   */
+  visionHref: string | null;
   /** Les indicateurs vivants, **North Star d'abord** (le tri de la lecture). */
   indicators: ProductIndicator[];
   /** Tous les relevés vivants du produit, plats et ordonnés (T5.3). */
@@ -146,7 +175,10 @@ export function Indicators({
 
   /* Les adoptions rangées sous leur indicateur, en une passe — la forme de
      `groupByIndicator`, pour la même raison : un `filter` par indicateur
-     parcourrait la liste entière autant de fois qu'il y a d'indicateurs. */
+     parcourrait la liste entière autant de fois qu'il y a d'indicateurs.
+     **Deux lecteurs depuis le 18/08/2026** : les traits de cible de la courbe
+     North Star, et la puce d'accompagnement de chaque carte. Le second est
+     précisément ce que le regroupement en une passe rendait gratuit. */
   const adopted = new Map<string, ProductAdoption[]>();
   for (const adoption of adoptions) {
     const list = adopted.get(adoption.indicatorId);
@@ -160,36 +192,52 @@ export function Indicators({
   const northStar = indicators.find((indicator) => indicator.isNorthStar);
   const others = indicators.filter((indicator) => !indicator.isNorthStar);
 
+  /* **Deux droits, un seul menu.** Ils tombent séparément — `visionHref` sur
+     `manageDomain`, `setNorthStar` sur le droit dérivé des accompagnements —,
+     et le menu se rend dès que l'un des deux est ouvert. Une personne peut donc
+     n'y voir qu'un geste, ou l'autre : c'est exact, et c'est ce que les deux
+     règles disent. Le composant ne les interroge pas, il les reçoit. */
+  const designate = setNorthStar;
+
   return (
     <Block tone="primary">
       <BlockHeader
-        /* L'étoile est décorative : le titre est écrit juste à côté, et la
-           couleur ne porte jamais seule (docs/06 §11). */
-        mark={<span className="text-content-warning-darker">★</span>}
-        title="North Star produit"
-        note="L'objectif global du produit, tous accompagnements confondus."
+        title="Vision produit"
+        note="La raison d'être de ce produit, et la direction qu'il se donne."
         action={
-          setNorthStar ? (
-            <ActionMenu label="Options du bloc des indicateurs">
-              {indicators.map((indicator) => (
-                <form
-                  key={indicator.id}
-                  action={setNorthStar.bind(null, indicator.id)}
-                >
-                  <button
-                    type="submit"
-                    role="menuitem"
-                    disabled={indicator.isNorthStar}
-                    className={`${MENU_ITEM} disabled:text-content-neutral-light`}
-                  >
-                    {indicator.isNorthStar
-                      ? `★ ${indicator.label}`
-                      : `Désigner ${indicator.label}`}
-                  </button>
-                </form>
-              ))}
-              {northStar ? (
-                <form action={setNorthStar.bind(null, null)}>
+          visionHref || designate ? (
+            <ActionMenu label="Options du bloc de la vision produit">
+              {/* **Le geste de la vision en tête**, avant les désignations :
+                  c'est l'ordre de lecture du bloc, et un menu qui rangerait le
+                  premier rang après le second se lirait à l'envers. */}
+              {visionHref ? (
+                <Link href={visionHref} role="menuitem" className={MENU_ITEM}>
+                  {vision
+                    ? "Modifier la vision produit"
+                    : "Ajouter la vision produit"}
+                </Link>
+              ) : null}
+              {designate
+                ? indicators.map((indicator) => (
+                    <form
+                      key={indicator.id}
+                      action={designate.bind(null, indicator.id)}
+                    >
+                      <button
+                        type="submit"
+                        role="menuitem"
+                        disabled={indicator.isNorthStar}
+                        className={`${MENU_ITEM} disabled:text-content-neutral-light`}
+                      >
+                        {indicator.isNorthStar
+                          ? `★ ${indicator.label}`
+                          : `Désigner ${indicator.label}`}
+                      </button>
+                    </form>
+                  ))
+                : null}
+              {designate && northStar ? (
+                <form action={designate.bind(null, null)}>
                   <button
                     type="submit"
                     role="menuitem"
@@ -202,6 +250,43 @@ export function Indicators({
             </ActionMenu>
           ) : null
         }
+      />
+
+      {/* **Le premier rang du bloc** : la question à laquelle le produit
+          répond. Elle est écrite, jamais déduite — Vision ne synthétise pas une
+          intention à partir des accompagnements qu'elle enregistre.
+
+          L'état vide est un **paragraphe et non un `EmptyState`**, la règle des
+          deux blocs voisins : deux phrases distinctes, là où `EmptyState` n'a
+          qu'un `description`. Le lien n'apparaît qu'au responsable de domaine —
+          et ce n'est pas ce rendu qui protège : `updateProductVision` redérive
+          le droit sur l'identifiant reçu. */}
+      {vision ? (
+        <p className="max-w-200 text-md leading-175 text-content-neutral-darkest">
+          {vision}
+        </p>
+      ) : (
+        <p className="text-sm leading-175 text-content-neutral-dark">
+          Aucune vision pour l&apos;instant. Ce bloc dira pourquoi ce produit
+          existe et vers quoi il va — la question que la North Star mesure.
+          {visionHref ? (
+            <>
+              {" "}
+              <Link href={visionHref} className={ACTION_LINK}>
+                Ajouter la vision produit
+              </Link>
+            </>
+          ) : null}
+        </p>
+      )}
+
+      {/* Le ★ suit la North Star : il titrait le bloc tant qu'elle le titrait,
+          il descend avec elle. Décoratif — le titre est écrit juste à côté, et
+          la couleur ne porte jamais seule (`docs/06` §11). */}
+      <BlockDivider
+        mark={<span className="text-content-warning-darker">★</span>}
+        title="North Star"
+        rule="bg-border-primary-lighter"
       />
 
       {northStar ? (
@@ -222,12 +307,18 @@ export function Indicators({
         </p>
       )}
 
-      {/* Le séparateur, désormais **espacé par le `gap-5` du bloc** comme tout
-          le reste : la maquette rythmait 34/22 de part et d'autre, et ce rythme
-          propre était l'un des trois que la page portait. L'interlettrage de
-          `.14em` n'est toujours pas rendu — aucun jeton, dette n°4. */}
+      {/* Le séparateur, **espacé par le `gap-5` du bloc** comme tout le reste :
+          la maquette rythmait 34/22 de part et d'autre, et ce rythme propre
+          était l'un des trois que la page portait. L'interlettrage de `.14em`
+          n'est toujours pas rendu — aucun jeton, dette n°4.
+
+          **« Indicateurs associés » et non plus « Autres indicateurs »**
+          (18/08/2026) : « autres » ne disait qu'une exclusion — ce qui n'est pas
+          la North Star. Le mot juste dit ce qu'ils sont : les mesures qui
+          accompagnent celle-là, chacune portée par un accompagnement nommé sous
+          son libellé. */}
       <BlockDivider
-        title="Autres indicateurs"
+        title="Indicateurs associés"
         rule="bg-border-primary-lighter"
       />
 
@@ -236,6 +327,7 @@ export function Indicators({
           <IndicatorCard
             key={indicator.id}
             indicator={indicator}
+            adoptions={adopted.get(indicator.id) ?? []}
             editHref={editHref}
             archiveIndicator={archiveIndicator}
             addReadingHref={addReadingHref}
@@ -258,7 +350,7 @@ export function Indicators({
 
         {others.length === 0 && !addHref ? (
           <p className="text-sm leading-175 text-content-neutral-dark">
-            Aucun autre indicateur sur ce produit.
+            Aucun indicateur associé sur ce produit.
           </p>
         ) : null}
       </div>
@@ -649,7 +741,28 @@ function Curve({
 }
 
 /**
- * Une carte d'indicateur secondaire.
+ * Ce que la puce d'accompagnement dit à l'assistance, en une phrase entière.
+ *
+ * **Deux phrases entières, choisies par le décompte**, et non une phrase à
+ * suffixes : c'est la règle du dépôt depuis T5.4, née d'un refus qui se lisait
+ * « ranger le produit **les** ferait disparaître » pour un seul accompagnement.
+ * Une phrase à trous ne se relit pas dans ses deux états.
+ *
+ * Elle nomme **tous** les accompagnements, là où l'écran n'en montre qu'un et
+ * compte les autres : le `+2` visible est un raccourci de place, pas une
+ * information retirée. Rien ne se perd pour qui écoute la page.
+ */
+function accompanimentSentence(adoptions: readonly ProductAdoption[]): string {
+  const names = adoptions.map((adoption) => adoption.projectName);
+
+  if (names.length === 1) {
+    return `Accompagnement qui porte cet indicateur : ${names[0]}.`;
+  }
+  return `Accompagnements qui portent cet indicateur : ${names.join(", ")}.`;
+}
+
+/**
+ * Une carte d'indicateur associé.
  *
  * La sparkline **ne porte pas seule** : la dernière valeur, sa date et le
  * décompte de relevés sont écrits à côté. Une courbe sans chiffre serait le
@@ -661,6 +774,7 @@ function Curve({
  */
 function IndicatorCard({
   indicator,
+  adoptions,
   editHref,
   archiveIndicator,
   addReadingHref,
@@ -668,6 +782,11 @@ function IndicatorCard({
   setNorthStar,
 }: {
   indicator: ProductIndicator;
+  /**
+   * Les accompagnements qui portent cet indicateur, **déjà triés par nom** par
+   * `listProductAdoptions`. Vide est une réponse : la carte ne dit rien.
+   */
+  adoptions: readonly ProductAdoption[];
   editHref: ((indicatorId: string) => string) | null;
   archiveIndicator: ((indicatorId: string) => Promise<void>) | null;
   addReadingHref: ((indicatorId: string) => string) | null;
@@ -737,6 +856,27 @@ function IndicatorCard({
       <p className="min-h-8 pr-9 text-sm font-semibold leading-125 text-content-neutral-darkest">
         {indicator.label}
       </p>
+
+      {/* **L'accompagnement qui porte la mesure**, sous son libellé et pas
+          ailleurs : c'est ce qui répond à « d'où vient ce chiffre » sans
+          déplacer le chiffre. La forme est celle d'`AvatarGroup` — une phrase
+          `sr-only` porte tout, les éléments visibles n'en portent rien : une
+          puce nue lue « Refonte 2026 » sous un libellé d'indicateur ne dit pas
+          ce que ce nom est. */}
+      {adoptions.length > 0 ? (
+        <p className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <span className="sr-only">{accompanimentSentence(adoptions)}</span>
+          <Tag label={adoptions[0]?.projectName ?? ""} />
+          {adoptions.length > 1 ? (
+            <span
+              aria-hidden="true"
+              className="text-2xs font-semibold text-content-neutral-dark"
+            >
+              {`+${adoptions.length - 1}`}
+            </span>
+          ) : null}
+        </p>
+      ) : null}
 
       {lastValue && indicator.lastReadOn ? (
         <p className="mt-2 flex flex-wrap items-baseline gap-2">

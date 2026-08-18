@@ -3546,3 +3546,56 @@ compression de l'entrée neuve et du point ouvert récrit — au prix d'une pros
 marge pour les cinq tickets restants de C5bis. Un ticket ne peut pas balayer : `CLAUDE.md` réserve ce
 geste à la session de découpage. **Le prochain découpage héritera donc d'un fichier saturé**, et
 c'est là que ses sept lignes de C5bis se replieront en une.
+
+---
+
+## Hors ticket — « Vision produit », 18/08/2026
+
+**« Vision Produit » est un concept ajouté hors des `docs/`.** Ni `docs/02` ni `docs/04` ne le
+nomment : `docs/02` §7 pose bien « la raison d'être du niveau produit » comme « la question à
+laquelle aucun outil du centre ne sait répondre », mais comme une question, jamais comme une
+colonne. `products.vision` (migration **0005**) est donc, comme `indicators.is_north_star` le
+17/08/2026, une **colonne que la documentation ne prévoit pas**. Les deux écarts sont de même
+nature et se relisent ensemble. Rien n'est contredit — aucun texte n'interdit une vision produit —
+mais quiconque compare `docs/04` §3 au schéma trouvera deux colonnes de plus, et c'est ici qu'elles
+s'expliquent.
+
+**L'arbitrage du 17/08/2026 sur le rattachement aux accompagnements est renversé, sous une autre
+forme.** `indicators.tsx` portait en tête : « Le rattachement aux accompagnements ne se lit plus
+ici (arbitrage du 17/08/2026, "strictement la maquette") : il vit sur la page projet ». La demande
+du 18/08 le rétablit **sur les cartes seulement, et en puce** — un nom, jamais la ligne « Adopté
+par… » qui avait été retirée. Ce qui alourdissait le bloc était la ligne, pas l'information. La
+North Star n'en porte aucune : elle est l'objectif du produit, tous accompagnements confondus, et
+lui coller une puce dirait le contraire. La page projet garde son bloc « Indicateurs adoptés »,
+seul lieu des quatre valeurs chiffrées. Le renversement est assumé et l'en-tête du fichier le dit à
+la place de l'ancien paragraphe, plutôt qu'à côté de lui.
+
+**Le domaine courant se trouve par ordre alphabétique, et un fichier de tests peut en hériter d'un
+autre.** `resolveDomainId` (`lib/auth/session.ts`) rend **le premier domaine actif *par nom***, le
+POC n'ayant aucun moyen de lui en désigner un. Un fichier de tests d'action crée son domaine, mais
+si un autre domaine actif trie avant lui, `requireSession` ouvre une session **dans cet autre
+domaine** — ou aucune, si celui-ci n'a pas de compte. Les huit tests d'`updateProductVision` ont
+échoué sur « Aucune personne courante : le domaine n'est pas amorcé », qui ne nomme pas la cause.
+
+Trois domaines d'exécutions interrompues subsistaient sur la branche de test —
+`__test__actions__ybwq1t44`, `__test__roadmap__a__5rtqoaa8`, `__test__roadmap__a__6j06n3um` — et le
+fichier voisin `app/(app)/produits/[id]/actions.test.ts` **ne passait que par chance alphabétique**,
+`__test__actions__` triant avant `__test__roadmap__`. Deux gestes : les trois domaines résiduels ont
+été supprimés, et le fichier neuf porte désormais un nom qui trie en tête (`__0__test__vision__`)
+**plus une garde** qui échoue en nommant la cause et en listant les domaines présents. La chance
+alphabétique du fichier voisin, elle, reste entière — hors périmètre, et rien ne l'a corrigée.
+
+**Une action serveur ne s'éprouve pas au `curl`, et c'est l'étape témoin qui l'a montré.** Le POST
+multipart d'`updateProductVision`, monté avec les trois champs cachés `$ACTION_…` du balisage servi
+et l'en-tête `Next-Action`, rend un **500 « Connection closed. »**. Le même harnais, pointé sur
+`updateIndicator` — en place et fonctionnelle depuis T5.2 —, rend **le même 500**. Le défaut est
+donc dans le harnais, pas dans l'action : sans ce témoin, on aurait cherché un bug qui n'existe pas,
+symétrique exact de la leçon de TD.1 où un harnais urlencoded obtenait un 200 muet. **Le chemin
+d'écriture se prouve par `app/(app)/produits/actions.test.ts`** — quatre cas, mis en défaut — et le
+**rendu** d'une vision écrite se lit dans le HTML servi après écriture par la couche d'accès.
+
+**`ETAT.md` dépasse le seuil, et le dépassement était annoncé.** T5bis.2 laissait le fichier à
+**250 lignes** exactement en écrivant que « le prochain découpage héritera d'un fichier saturé ». Il
+en fait **256** après cette entrée, compressée deux fois. Un ticket ne peut pas balayer —
+`CLAUDE.md` réserve ce geste à la session de découpage — et une entrée de moins d'une ligne n'existe
+pas. Le seuil est donc franchi sciemment, et il le restera jusqu'au découpage de C6.

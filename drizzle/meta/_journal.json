@@ -36,6 +36,13 @@
       "when": 1787001805698,
       "tag": "0004_lethal_millenium_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787040374653,
+      "tag": "0005_massive_microchip",
+      "breakpoints": true
     }
   ]
 }

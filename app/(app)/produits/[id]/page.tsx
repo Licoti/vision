@@ -43,18 +43,27 @@
  * deux gestes. `?releve=<identifiant>` ouvre le panneau de relevé (T5.3), et sa
  * valeur change de **table** plutôt que de nature : un identifiant
  * d'**indicateur** saisit un relevé sur cet indicateur, un identifiant de
- * **relevé** le corrige. La page reste rendue derrière eux, et porte alors
- * l'attribut HTML `inert`.
+ * **relevé** le corrige. `?vision=modifier` ouvre le panneau de la vision
+ * produit (18/08/2026) — une seule valeur d'ouverture, l'objet visé étant celui
+ * de la page, et **le seul panneau de cet écran qui demande `manageDomain`**
+ * plutôt que le droit dérivé des accompagnements. La page reste rendue derrière
+ * eux, et porte alors l'attribut HTML `inert`.
  *
- * **Les trois clés sont mutuellement exclusives, et le sont par une règle unique :
+ * **Les clés sont mutuellement exclusives, et le sont par une règle unique :
  * plusieurs présentes ensemble n'ouvrent rien** — la règle de la page projet
  * depuis T4.2, reprise ici sous sa forme par **décompte** (T4.4, T4bis.3). Deux
  * `role="dialog"` ou deux `inert` concurrents ne se rattrapent pas après coup, et
  * aucune préséance ne s'invente entre deux gestes de même rang. Un seul
  * `panelOpen`, un seul `inert`, un seul panneau monté : la propriété se lit dans
  * le code, elle ne se déduit pas de trois conditions éparses — et l'énoncé n'a
- * pas eu à changer quand T5.3 a ajouté sa clé, ce pour quoi il avait été écrit
- * en décompte.
+ * pas eu à changer quand T5.3 a ajouté sa clé, ni quand la vision a ajouté la
+ * sienne le 18/08/2026 : ce pour quoi il avait été écrit en décompte.
+ *
+ * **La vision produit ne suit pas ce droit** (18/08/2026) : elle demande
+ * `manageDomain`, comme les quatre autres colonnes de `products` (F1-D1, D9).
+ * La raison d'être d'un produit n'appartient pas à qui intervient dessus sur un
+ * trimestre. Les deux points d'entrée du bloc de tête tombent donc séparément,
+ * et le bloc ne sait rien d'autre de ces deux règles.
  *
  * **Le droit d'écrire un indicateur se dérive des accompagnements du produit**
  * (arbitrage (b) de `tickets-C5.md`) : `manageDomain`, ou contributeur désigné
@@ -81,12 +90,17 @@ import {
   updateIndicator,
   updateReading,
 } from "./actions";
-import { archiveProduct, restoreProduct } from "../actions";
+import {
+  archiveProduct,
+  restoreProduct,
+  updateProductVision,
+} from "../actions";
 import { IndicatorPanel } from "@/components/products/indicator-panel";
 import { Indicators } from "@/components/products/indicators";
 import { ReadingPanel } from "@/components/products/reading-panel";
 import { ReadingsPanel } from "@/components/products/readings-panel";
 import { Roadmap } from "@/components/products/roadmap";
+import { VisionPanel } from "@/components/products/vision-panel";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
 import { AvatarGroup } from "@/components/ui/avatar";
 import { Block, BlockHeader } from "@/components/ui/block";
@@ -99,11 +113,13 @@ import { requireSession } from "@/lib/auth/provider";
 import { indicatorReadings, indicators } from "@/lib/db/schema";
 import { toIndicatorFormValues } from "@/lib/forms/indicator";
 import { toReadingFormValues } from "@/lib/forms/reading";
+import { toVisionFormValues } from "@/lib/forms/vision";
 import { formatAccompaniments, formatMonth, formatPeriod } from "@/lib/format";
 import {
   ARCHIVE_PANEL_CONFIRM,
   INDICATOR_PANEL_NEW,
   ROUTES,
+  VISION_PANEL_EDIT,
 } from "@/lib/navigation";
 import {
   listProductAdoptions,
@@ -129,6 +145,13 @@ export default async function ProductPage({
     releve?: string;
     /** L'indicateur dont on déplie la série — panneau « Gérer les relevés ». */
     releves?: string;
+    /**
+     * Le panneau de la vision produit (18/08/2026). **Une seule valeur
+     * d'ouverture, `modifier`** : l'objet visé est le produit de la page, et
+     * écrire ou récrire une colonne nullable ne fait pas deux gestes à
+     * distinguer dans l'URL.
+     */
+    vision?: string;
     /**
      * Les deux bornes de la fenêtre de la roadmap. **Elles ne rejoignent pas le
      * décompte d'exclusivité** des trois clés au-dessus : elles n'ouvrent aucun
@@ -186,7 +209,8 @@ export default async function ProductPage({
     (session.can.manageDomain ||
       projects.some((project) => session.can.writeProject(project.id)));
 
-  const { archiver, indicateur, releve, releves, de, a } = await searchParams;
+  const { archiver, indicateur, releve, releves, vision, de, a } =
+    await searchParams;
 
   /* L'exclusivité, avant tout le reste : plusieurs clés d'ouverture
      concurrentes n'en ouvrent aucune. Tout ce qui suit lit `asked`, pas les
@@ -195,15 +219,15 @@ export default async function ProductPage({
 
      La forme est celle de la page projet (T4.4, T4bis.3) : un **décompte**, et
      non une comparaison binaire. T5.3 y a ajouté `releve` sans que l'énoncé
-     change d'un caractère — c'est très exactement ce pour quoi il avait été
-     écrit ainsi.
+     change d'un caractère, puis `releves`, puis `vision` le 18/08/2026 — c'est
+     très exactement ce pour quoi il avait été écrit ainsi.
 
      **`de` et `a` n'y entrent pas**, et le décompte reste donc sur trois clés :
      ce ne sont pas des clés d'ouverture. Une fenêtre de roadmap ne dispute
      l'écran à aucun panneau — elle ne pose ni `role="dialog"` ni `inert` —, et
      les faire compter fermerait un panneau chaque fois que la roadmap est
      filtrée. */
-  const keys = { archiver, indicateur, releve, releves };
+  const keys = { archiver, indicateur, releve, releves, vision };
   const conflict =
     Object.values(keys).filter((value) => value !== undefined).length > 1;
   const asked: Partial<typeof keys> = conflict ? {} : keys;
@@ -318,11 +342,24 @@ export default async function ProductPage({
       ? productIndicators.find((row) => row.id === readingsIndicatorRow.id)
       : undefined;
 
+  /* La huitième clé, et **la seule qui n'ouvre pas sur le droit dérivé** : la
+     vision est une propriété du produit, donc `manageDomain` seul (F1-D1, D9),
+     comme l'archivage juste au-dessus. Un contributeur désigné, qui écrit les
+     indicateurs de ce bloc, n'écrit pas sa vision — et le panneau lui est
+     simplement absent. Ce n'est pas ce rendu qui protège : `updateProductVision`
+     redérive le droit sur l'identifiant **reçu**.
+
+     Un produit archivé est en lecture seule (T4bis.2), et le `!archived` le dit
+     ici comme il le dit pour l'archivage. L'action le redit sur la ligne lue. */
+  const visionPanelOpen =
+    session.can.manageDomain && !archived && asked.vision === VISION_PANEL_EDIT;
+
   const panelOpen =
     archivePanelOpen ||
     indicatorPanelOpen ||
     readingPanel !== null ||
-    readingsIndicator !== undefined;
+    readingsIndicator !== undefined ||
+    visionPanelOpen;
 
   return (
     <>
@@ -453,6 +490,32 @@ export default async function ProductPage({
         />
       ) : null}
 
+      {visionPanelOpen ? (
+        /* L'action est liée **côté serveur** au produit courant : l'identifiant
+           sort de la saisie, et le panneau ne connaît pas ce qu'il écrit. Ce
+           n'est pas un verrou — Next sérialise les arguments liés dans un champ
+           `$ACTION_…`, réécrivable. Le verrou est dans l'action, qui interroge
+           `manageDomain` sur le produit **reçu** puis refuse le produit archivé
+           sur la ligne lue. */
+        <VisionPanel
+          /* La `key` change avec ce que le panneau édite — ici, avec l'état de
+             la colonne : `useActionState` ne relit son état initial qu'au
+             montage, et le panneau rouvert après écriture doit repartir de la
+             vision écrite, pas de celle d'avant. */
+          key={product.vision ?? "nouvelle"}
+          productName={product.name}
+          closeHref={ROUTES.product(product.id)}
+          action={updateProductVision.bind(null, product.id)}
+          {...(product.vision
+            ? {
+                title: "Modifier la vision produit",
+                submitLabel: "Enregistrer les modifications",
+                initial: toVisionFormValues(product),
+              }
+            : {})}
+        />
+      ) : null}
+
       {/* `inert` est un attribut HTML, pas un script : le contenu reste lu et
           affiché derrière le voile, mais ne prend plus ni focus ni clic tant
           que le panneau est ouvert. */}
@@ -517,8 +580,10 @@ export default async function ProductPage({
             }
           />
 
-          {/* **Le premier bloc de la page** depuis le 17/08/2026 : la North
-              Star porte l'objectif du produit, et c'est ce qu'on lit d'abord.
+          {/* **Le premier bloc de la page** depuis le 17/08/2026, et **« Vision
+              produit » depuis le 18/08/2026** : la vision porte la raison
+              d'être du produit et la North Star la mesure, et c'est ce qu'on
+              lit d'abord.
               Le bloc est en pleine largeur, comme la liste — la page produit ne
               porte aucune grille de blocs de référence, à la différence de la
               page projet.
@@ -535,6 +600,17 @@ export default async function ProductPage({
               au produit **côté serveur** ; le bloc y ajoute l'indicateur au
               rendu, et chacune redérive le droit sur l'identifiant reçu. */}
           <Indicators
+            vision={product.vision}
+            /* **Pas `canWriteIndicators`** : la vision est une propriété du
+               produit, pas de ses accompagnements. Un contributeur désigné
+               écrit les indicateurs de ce bloc et pas sa vision — les deux
+               points d'entrée tombent séparément, et c'est la seule chose que
+               le bloc sait de ces deux droits. */
+            visionHref={
+              session.can.manageDomain && !archived
+                ? ROUTES.productVision(product.id)
+                : null
+            }
             indicators={productIndicators}
             readings={productReadings}
             adoptions={adoptions}

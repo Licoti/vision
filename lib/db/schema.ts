@@ -485,6 +485,22 @@ export const products = pgTable(
       .references(() => entities.id, { onDelete: "restrict" }),
     kind: productKind("kind").notNull().default("product"),
     description: text("description"),
+    /**
+     * La **raison d'être** du produit et la direction qu'il se donne
+     * (18/08/2026).
+     *
+     * **Concept ajouté hors des `docs/`**, comme la North Star l'a été le
+     * 17/08/2026 : ni `docs/02` ni `docs/04` ne le nomment. `docs/02` §7 pose
+     * bien « la question à laquelle aucun outil du centre ne sait répondre »,
+     * mais comme une question, jamais comme une colonne. L'écart est consigné
+     * dans `JOURNAL-TECHNIQUE.md`, comme le prévoit la règle 6.
+     *
+     * **Nullable, et sans longueur maximale** : un produit sans vision est un
+     * état normal — l'écran le dit et propose de l'écrire —, et `description`
+     * ne plafonne pas davantage. Aucun index : la colonne ne se filtre ni ne
+     * se trie, elle se lit sur la page de son produit.
+     */
+    vision: text("vision"),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     ...stamps,
   },

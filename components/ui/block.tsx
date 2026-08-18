@@ -113,27 +113,42 @@ export function BlockHeader({
 }
 
 /**
- * Un intertitre dans un bloc : un `h3`, puis un filet qui court jusqu'au bord.
+ * Un intertitre dans un bloc : un `h3`, une marque facultative, puis un filet
+ * qui court jusqu'au bord.
  *
- * Il n'a qu'un usage — « Autres indicateurs » — et il est ici plutôt que dans
- * `indicators.tsx` parce qu'il fait partie du langage : le jour où un second
- * bloc de la page se coupe en deux, il se coupe de la même façon.
+ * Il est ici plutôt que dans `indicators.tsx` parce qu'il fait partie du
+ * langage : le jour où un second bloc de la page se coupe en trois, il se coupe
+ * de la même façon. Il en a d'ailleurs deux usages depuis le 18/08/2026 —
+ * « North Star » et « Indicateurs associés ».
+ *
+ * **La marque est arrivée avec le bloc « Vision produit »** (18/08/2026) : le ★
+ * désignait la North Star tant qu'elle titrait le bloc, et il devait la suivre
+ * quand elle est devenue une de ses parties. Un ★ écrit dans la chaîne du titre
+ * serait lu par la synthèse vocale ; la marque, non — c'est la règle de
+ * `BlockHeader`, et la couleur ne porte jamais seule (`docs/06` §11).
  *
  * Le filet reprend le filet du bloc qui le contient, passé en `rule` : sur la
  * surface bleue ce n'est pas le même que sur la pâle, et un séparateur qui ne
  * suivrait pas sa carte se verrait.
  */
 export function BlockDivider({
+  mark,
   title,
   rule,
 }: {
+  /**
+   * Une marque décorative devant le titre — le ★ de la North Star. **Elle sort
+   * de l'arbre d'accessibilité**, comme celle de `BlockHeader`.
+   */
+  mark?: ReactNode;
   title: string;
   /** La classe de fond du filet, accordée à la tonalité du bloc. */
   rule: string;
 }) {
   return (
     <div className="flex items-center gap-3">
-      <h3 className="text-xs font-bold uppercase text-content-neutral-dark">
+      <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase text-content-neutral-dark">
+        {mark ? <span aria-hidden="true">{mark}</span> : null}
         {title}
       </h3>
       <span aria-hidden="true" className={`h-px flex-1 ${rule}`} />

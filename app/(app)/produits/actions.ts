@@ -42,6 +42,11 @@ import {
   type ProductFormState,
   type ProductInput,
 } from "@/lib/forms/product";
+import {
+  readVisionForm,
+  parseVisionForm,
+  type VisionFormState,
+} from "@/lib/forms/vision";
 import { ROUTES } from "@/lib/navigation";
 
 /** L'issue d'une écriture : l'identifiant à atteindre, ou l'état à réafficher. */
@@ -183,9 +188,16 @@ export async function updateProduct(
  * sérialise dans un champ `$ACTION_…` du balisage, en clair en développement, et
  * une soumission peut le réécrire. **Une action ne tire jamais une autorisation
  * de la valeur qu'on lui a liée** — elle interroge le droit sur la valeur reçue.
+ *
+ * `refused` est **le message, pas la règle** (18/08/2026) : la règle est la
+ * même pour les trois appelants — `manageDomain` —, mais un refus qui parle
+ * d'archivage à qui corrigeait une vision décrit un geste qu'on n'a pas fait.
+ * Le défaut garde mot pour mot celui de T4bis.2, si bien que les deux
+ * appelants d'origine sont inchangés.
  */
 async function openProduct(
   productId: string,
+  refused = "L'archivage et le rétablissement d'un produit sont réservés au responsable de domaine.",
 ): Promise<
   | {
       session: Awaited<ReturnType<typeof requireSession>>;
@@ -196,10 +208,7 @@ async function openProduct(
   const session = await requireSession();
 
   if (!session.can.manageDomain) {
-    return {
-      message:
-        "L'archivage et le rétablissement d'un produit sont réservés au responsable de domaine.",
-    };
+    return { message: refused };
   }
 
   const product = await session.db.find(products, productId);
@@ -292,4 +301,86 @@ export async function restoreProduct(productId: string): Promise<void> {
 
   revalidatePath(ROUTES.products);
   revalidatePath(ROUTES.product(productId));
+}
+
+
+/* ==========================================================================
+   La vision produit — 18/08/2026
+
+   **Le même droit que les quatre autres colonnes de `products`** : F1-D1 et D9,
+   `manageDomain` et lui seul. La vision dit la raison d'être du produit et la
+   direction qu'il se donne ; elle n'appartient pas à qui intervient dessus sur
+   un trimestre. C'est ce qui la distingue des indicateurs, dont le droit est
+   **dérivé des accompagnements** (arbitrage (b) de `tickets-C5.md`) et se
+   tranche dans `app/(app)/produits/[id]/actions.ts`.
+
+   Le geste vit ici, avec les autres écritures de `products` sous `manageDomain`,
+   et non dans les actions de la page de détail : c'est la table qu'il écrit qui
+   décide, pas l'écran depuis lequel il part.
+   ========================================================================== */
+
+/**
+ * Écrire ou récrire la vision d'un produit — un seul champ, un seul geste.
+ *
+ * **Le champ vidé retire la vision** (`null`), et l'écran revient à son état
+ * vide. Ce n'est pas la suppression de donnée métier que la règle 4 proscrit :
+ * c'est la correction d'un champ de texte, comme `description`, et le geste se
+ * rejoue à l'identique. La note du panneau l'annonce.
+ *
+ * **Un produit archivé ne se modifie plus** (T4bis.2), et le contrôle porte sur
+ * la ligne **lue**, jamais sur ce que l'écran affichait : le bloc retire son
+ * point d'entrée sur un produit archivé, mais une route retirée n'a jamais
+ * protégé l'action qu'elle affichait — le champ récolté avant l'archivage se
+ * repostant tel quel ensuite.
+ *
+ * Aucun `try` autour de l'écriture, à la différence des deux actions
+ * ci-dessus : `update` sur une seule colonne `text` ne peut pas lever de
+ * `DomainScopeError`, qui naît d'une **référence** hors domaine. Il n'y en a
+ * aucune ici.
+ */
+export async function updateProductVision(
+  productId: string,
+  _previous: VisionFormState,
+  formData: FormData,
+): Promise<VisionFormState> {
+  const refused =
+    "La vision d'un produit est réservée au responsable de domaine.";
+
+  /* Le droit se redérive sur l'identifiant **reçu**, jamais sur la valeur liée :
+     Next sérialise les arguments liés dans un champ `$ACTION_…`, réécrivable. */
+  const gate = await openProduct(productId, refused);
+  if ("message" in gate) {
+    return { values: readVisionForm(formData), errors: {}, message: gate.message };
+  }
+  const { session, product } = gate;
+
+  if (product.archivedAt) {
+    return {
+      values: readVisionForm(formData),
+      errors: {},
+      message:
+        "Ce produit est archivé : il ne se modifie plus. Rétablissez-le d'abord.",
+    };
+  }
+
+  const { values, errors, input } = parseVisionForm(formData);
+  if (!input) return { values, errors };
+
+  /* Un objet littéral d'une seule clé, jamais un étalement de `FormData` : un
+     champ caché ajouté par n'importe qui deviendrait une colonne écrite. */
+  const updated = await session.db.update(products, productId, input);
+  if (!updated) {
+    return {
+      values,
+      errors: {},
+      message: "Ce produit n'existe plus dans ce domaine.",
+    };
+  }
+
+  revalidatePath(ROUTES.product(productId));
+
+  /* La page nue, panneau refermé : la vision écrite paraît en tête du bloc, et
+     c'est toute la confirmation (`docs/06` §9). `redirect` lève, donc hors de
+     tout `try` — il n'y en a aucun ici, et c'est délibéré. */
+  redirect(ROUTES.product(productId));
 }

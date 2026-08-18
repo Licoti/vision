@@ -133,6 +133,14 @@ export type ProductDetail = {
   id: string;
   name: string;
   description: string | null;
+  /**
+   * La raison d'être du produit et la direction qu'il se donne (18/08/2026).
+   *
+   * Nulle tant qu'elle n'est pas écrite — c'est un état normal, et le bloc de
+   * tête de la page produit le dit plutôt que de laisser un blanc. Le concept
+   * est ajouté hors des `docs/` : voir `JOURNAL-TECHNIQUE.md`.
+   */
+  vision: string | null;
   entityLabel: string;
   /**
    * Nul tant que le produit est vivant (T4bis.2). La ligne était déjà rendue
@@ -160,6 +168,7 @@ export function findProductDetail(
         id: products.id,
         name: products.name,
         description: products.description,
+        vision: products.vision,
         entityLabel: entities.label,
         archivedAt: products.archivedAt,
       })

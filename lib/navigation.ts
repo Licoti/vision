@@ -200,6 +200,34 @@ export const READING_PANEL_PARAM = "releve";
 export const READINGS_PANEL_PARAM = "releves";
 
 /**
+ * Le panneau de la **vision produit** (18/08/2026), cinquième clé d'ouverture de
+ * la page produit — et la première qui ne touche ni un indicateur ni un relevé.
+ *
+ * **Une seule valeur d'ouverture, `modifier`**, et non un identifiant : l'objet
+ * visé est le produit de la page, comme pour `archiver`. Il n'y a rien à
+ * désigner, et une valeur polymorphe n'aurait rien dit de plus. Toute autre
+ * valeur n'ouvre rien.
+ *
+ * **Une seule valeur pour les deux gestes**, écrire et récrire : la vision est
+ * une colonne nullable, pas deux lignes — c'est l'état de la colonne qui décide
+ * du titre du panneau, jamais l'URL. `indicateur` avait besoin de `nouvel`
+ * parce que créer et corriger portent sur deux lignes distinctes ; ici, non.
+ *
+ * Elle rejoint le **décompte d'exclusivité** de la page produit, qui passe de
+ * quatre clés à cinq sans que son énoncé change d'un caractère — il a été écrit
+ * en décompte pour cela dès T5.2.
+ *
+ * **Le droit qui la garde n'est pas celui des indicateurs** : `manageDomain`
+ * seul (F1-D1, D9), la vision étant une propriété du produit et non de ses
+ * accompagnements. Ce n'est pas cette route qui protège, mais
+ * `updateProductVision`, qui redérive le droit sur l'identifiant reçu.
+ */
+export const VISION_PANEL_PARAM = "vision";
+
+/** La seule valeur d'ouverture. Toute autre n'ouvre rien. */
+export const VISION_PANEL_EDIT = "modifier";
+
+/**
  * Les deux bornes de la fenêtre de la **roadmap**, sur la page du produit.
  *
  * **Ce ne sont pas des clés d'ouverture**, et elles ne rejoignent donc pas le
@@ -282,6 +310,17 @@ export const ROUTES = {
    */
   productReadings: (id: string, indicatorId: string) =>
     `/produits/${id}?${READINGS_PANEL_PARAM}=${indicatorId}`,
+  /**
+   * La page du produit, panneau de la vision ouvert (18/08/2026). **Ce n'est pas
+   * un écran de plus** : c'est le même, avec un paramètre — la forme de
+   * `productArchive` jusqu'au nom de la clé, et la fermeture est donc
+   * `product(id)`, qui n'a pas besoin d'entrée à elle.
+   *
+   * **Une seule entrée pour les deux gestes**, écrire et récrire : c'est l'état
+   * de la colonne qui décide de ce que le panneau annonce, jamais l'URL.
+   */
+  productVision: (id: string) =>
+    `/produits/${id}?${VISION_PANEL_PARAM}=${VISION_PANEL_EDIT}`,
   /**
    * La page du produit, roadmap resserrée sur une fenêtre de mois.
    *

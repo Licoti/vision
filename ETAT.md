@@ -2,7 +2,7 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 17/08/2026 — T5bis.2 terminé : la cinquième entrée de navigation, `listTeam` et l'écran Équipe en lecture.
+**Dernière mise à jour :** 18/08/2026 — hors ticket : le bloc « North Star » devient « Vision produit ».
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
 **Ticket suivant :** **T5bis.3** — les filtres de la liste (`tickets-C5bis.md`)
 
@@ -79,6 +79,12 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   contraste de bordure à 1,33:1** porté par les deux menus North Star. « Annuler » sort en
   `ConfirmPanel` (`?annuler=<id>`), son motif étant obligatoire : `cancelActivity` passe du refus
   muet au `ConfirmState`.
+- **« Vision produit » — hors ticket, le 18/08/2026.** Le bloc de tête ne disait que la mesure, il
+  porte la question : `products.vision` (migration **0005**), panneau `?vision=modifier` sous
+  `manageDomain` — seul geste du bloc hors du droit dérivé —, puis `★ North Star` et « Indicateurs
+  associés », chaque carte nommant son accompagnement. Deux écarts consignés. Sa leçon est dans le
+  harnais : **`resolveDomainId` rend le premier domaine actif *par nom***, et le fichier de tests
+  voisin ne passait que par chance alphabétique.
 
 ---
 
