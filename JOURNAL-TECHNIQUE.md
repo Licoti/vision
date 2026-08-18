@@ -3599,3 +3599,79 @@ d'écriture se prouve par `app/(app)/produits/actions.test.ts`** — quatre cas,
 en fait **256** après cette entrée, compressée deux fois. Un ticket ne peut pas balayer —
 `CLAUDE.md` réserve ce geste à la session de découpage — et une entrée de moins d'une ligne n'existe
 pas. Le seuil est donc franchi sciemment, et il le restera jusqu'au découpage de C6.
+
+---
+
+## Hors ticket — l'ordre et le nom des trois blocs de la page produit, 18/08/2026
+
+**L'ordre demandé rend à `docs/06` §6 ce que la veille lui avait pris, et ouvre un autre écart.**
+La page rend désormais « Vision produit », puis la frise, puis la liste — donc la frise **au-dessus
+de la liste des accompagnements, sans la déplacer**, ce que le document réclame et que l'ordre du
+17/08/2026 avait inversé en la faisant fermer la page. Ce qui reste hors du document n'est plus la
+position, c'est **le nom et la fenêtre** : le bloc s'intitule « Accompagnements en cours » et la
+liste « Tous les accompagnements », deux libellés qu'aucun document ne porte ; et la frise s'ouvre
+sur l'année en cours là où `docs/06` §6 décrit « une frise unique sur un axe temporel commun » sans
+rien dire de son cadrage par défaut. Le couple se lit comme un couple : le cadrage annuel en haut,
+l'histoire entière en bas.
+
+**« En cours » qualifie la fenêtre, pas le statut.** Arbitrage tranché avant écriture : aucun filtre
+sur `statusNature` n'a été posé. Un accompagnement terminé en mars 2026 reste dessiné dans le bloc,
+parce que ce que le bloc montre est *ce qui s'est passé cette année*, et non *ce qui est actif
+aujourd'hui*. La seconde lecture aurait demandé un tri des natures — donc une règle de plus, sur un
+écran qui n'en demandait pas.
+
+**Le repli hors-axe est ce qui empêche `defaultWindow` de mentir, et il se mesure.** `timelineWindow`
+**borne**, il n'écarte pas : `yearWindow(scale, 2027)` sur un produit dont les données s'arrêtent en
+février 2026 ramène les deux bornes sur `2026-02` et rend une fenêtre **d'un seul mois** — une
+période affirmée que rien ne porte. C'est exactement le piège que `withinWindow` avait corrigé pour
+les bandes le 17/08/2026, reparu un étage plus haut. La mise en défaut le montre en clair :
+neutraliser le repli fait tomber **deux** tests, ceux qui le nomment, avec
+`expected { firstMonth: '2026-02' } to deeply equal { firstMonth: '2024-03' }`. Éprouvé aussi **dans
+le rendu**, en faisant croire au composant qu'on est en 2030 : l'axe servi rend alors ses sept
+graduations de mars '24 à mars '27, et « Tout » porte `aria-current`.
+
+**Une URL sans paramètre ne vaut plus « Tout », et le préréglage a dû changer de cible.** Il pointait
+sur `ROUTES.product(productId)` ; il écrit désormais les deux bornes de l'axe entier
+(`?de=<premier>&a=<dernier>`). Sans ce geste, le bouton « Tout » aurait ramené la fenêtre par défaut
+au lieu de l'élargir — un contrôle qui ne fait pas ce qu'il dit. Vérifié dans le HTML servi sur trois
+produits.
+
+**Deuxième drapeau du fichier, et la même raison que le premier.** `SHOW_MONTH_RANGE = false` masque
+le formulaire « De … à … » au mois. Une suppression aurait rendu morts `windowMonths` et les deux
+paramètres d'URL — que les préréglages d'année continuent d'emprunter —, pour les ressusciter au
+prochain ticket. Le formulaire est **sorti dans son propre composant** (`MonthRange`) plutôt que
+laissé sous une condition dans `FilterBar` : sinon `const months = windowMonths(scale)` y restait
+calculé sans lecteur, et rendait un avertissement ESLint là où on venait justement d'en retirer un.
+
+**L'avertissement ESLint de `Header` est tombé, et ce n'est pas un nettoyage de passage.** Le
+paramètre `filterable` était reçu sans être lu depuis le 17/08/2026 — c'est la « modification
+étrangère au travail, laissée en place » consignée ce jour-là. Sa raison d'être était que la note ne
+promette le filtre que lorsqu'il est rendu ; la note neuve — « Les accompagnements de ce produit sur
+l'année en cours. » — ne promet plus rien, donc le paramètre n'a plus d'objet et il part avec elle.
+Il reste **un** avertissement au dépôt, dans `components/ui/section.tsx` (`note` reçu sans lecteur,
+même famille, sur le composant de la page projet) : hors périmètre, non corrigé, mesuré à 2
+avertissements avant et 1 après.
+
+**Le mot « roadmap » ne paraît plus à l'écran ; il reste dans le code.** `roadmap.tsx` et le
+composant `Roadmap` gardent leur nom : ils désignent la couche de `docs/03` §7, dont la nature n'a
+pas changé. Renommer le fichier aurait déplacé un import pour un mot d'interface, et le vocabulaire
+du `CLAUDE.md` ne connaît de toute façon pas « roadmap » comme concept de modèle.
+
+**Un piège de lecture du HTML, pas de code.** Le segment du bloc s'extrayait en coupant à la
+première occurrence de « Tous les accompagnements » — qui apparaît désormais **à l'intérieur** du
+paragraphe d'état vide de la frise, laquelle y renvoie. La coupe tombait donc avant le paragraphe
+qu'on cherchait à lire, et l'absence se serait conclue à faux. Troisième variante de la même leçon
+après le `grep` lossy et le `perl -0pi` sans cible : **l'outil de mesure ment plus souvent que le
+code**.
+
+Les deux états vides ont été éprouvés **en mettant la règle en défaut**, non en les décrivant :
+`!scale` forcé à vrai rend la phrase « Aucun accompagnement de ce produit ne porte de date … Le bloc
+« Tous les accompagnements », ci-dessous, les porte tous. » ; `projects.length === 0` forcé à vrai
+rend « Les accompagnements de ce produit s'afficheront ici dès que l'un d'eux sera daté … ». Les deux
+neutralisations ont été défaites avant la vérification finale, et l'absence de mutation résiduelle
+vérifiée par `grep` avant de relire le rendu.
+
+**`ETAT.md` passe de 256 à 263 lignes**, seuil de 250 toujours franchi. Rien de neuf : le
+dépassement est celui qu'a consigné l'entrée « Vision produit » le matin même, et un travail hors
+ticket ne balaie pas plus qu'un ticket — `CLAUDE.md` réserve ce geste à la session de découpage.
+La ligne ajoutée est celle qu'exige l'étape 5, pas une de plus.

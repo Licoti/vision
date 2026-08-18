@@ -472,6 +472,43 @@ export function yearWindow(scale: TimelineScale, year: number): TimelineScale {
 }
 
 /**
+ * La fenêtre d'ouverture du bloc, quand l'URL n'en demande aucune : **l'année en
+ * cours, de janvier à décembre** (demande du 18/08/2026).
+ *
+ * L'axe entier était l'état par défaut jusque-là. Il écrase l'année courante
+ * contre toute l'histoire du produit, alors que le bloc s'appelle désormais
+ * « Accompagnements en cours » : c'est la fenêtre qui porte ce nom, et non un
+ * filtre sur le statut — un accompagnement terminé en mars reste dessiné, la
+ * liste du bas restant celle qui porte tout.
+ *
+ * **Le repli sur l'axe entier est ce qui rend la règle honnête.** Sans lui,
+ * `yearWindow` ramènerait `2026-01` et `2026-12` sur la borne haute d'un produit
+ * dont l'histoire s'arrête en 2024 (`timelineWindow` borne, il n'écarte pas) et
+ * rendrait une fenêtre **d'un seul mois** — une période affirmée que rien ne
+ * porte, exactement le piège que `withinWindow` a corrigé pour les bandes.
+ *
+ * Une année partiellement couverte se borne, elle : un produit dont la dernière
+ * date connue est juin 2026 s'ouvre sur janvier → juin 2026, ce que `yearWindow`
+ * fait déjà.
+ *
+ * L'année arrive en argument plutôt que d'être lue ici : une fonction qui lit
+ * l'horloge ne s'éprouve pas par un test. L'appelant la lit, ce module la pose.
+ */
+export function defaultWindow(
+  scale: TimelineScale,
+  year: number,
+): TimelineScale {
+  /* Les millésimes se lisent sur la chaîne, jamais par un `Date` — la règle du
+     module, et `monthIndex` la documente. */
+  const firstYear = Number(scale.firstMonth.slice(0, 4));
+  const lastYear = Number(scale.lastMonth.slice(0, 4));
+
+  if (year < firstYear || year > lastYear) return scale;
+
+  return yearWindow(scale, year);
+}
+
+/**
  * Tous les mois de l'axe, du premier au dernier — les options des sélecteurs.
  *
  * Reçoit l'axe entier pour la raison de `windowYears` : une fenêtre resserrée ne

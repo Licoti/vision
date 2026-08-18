@@ -2,7 +2,7 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 18/08/2026 — hors ticket : le bloc « North Star » devient « Vision produit ».
+**Dernière mise à jour :** 18/08/2026 — hors ticket : l'ordre et le nom des trois blocs de la page produit.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
 **Ticket suivant :** **T5bis.3** — les filtres de la liste (`tickets-C5bis.md`)
 
@@ -85,6 +85,13 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   associés », chaque carte nommant son accompagnement. Deux écarts consignés. Sa leçon est dans le
   harnais : **`resolveDomainId` rend le premier domaine actif *par nom***, et le fichier de tests
   voisin ne passait que par chance alphabétique.
+- **L'ordre et le nom des trois blocs de la page produit — hors ticket, le 18/08/2026.** La frise
+  remonte en deuxième position sous « Accompagnements en cours » et s'ouvre sur l'année en cours
+  (`defaultWindow`, migration nulle) ; la liste descend en dernière sous « Tous les
+  accompagnements » ; le formulaire de fenêtre au mois passe sous `SHOW_MONTH_RANGE`. L'ordre rend à
+  `docs/06` §6 la place qu'il réclamait ; le nom et le cadrage restent hors document. Sa leçon :
+  **`timelineWindow` borne, il n'écarte pas** — sans repli hors-axe, un produit terminé en 2024
+  s'ouvrirait sur une fenêtre d'un seul mois, mesuré à `firstMonth: '2026-02'`.
 
 ---
 

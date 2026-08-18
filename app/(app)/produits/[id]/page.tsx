@@ -643,16 +643,36 @@ export default async function ProductPage({
               canWriteIndicators ? setNorthStar.bind(null, product.id) : null
             }
           />
-          {/* **Le bloc du milieu, aligné sur les deux autres** (17/08/2026) :
-              il était la seule section nue de la page — sans carte, sous un
-              titre de rang moindre, sa note posée à côté du titre plutôt que
-              dessous. Il porte désormais la même coquille et le même en-tête
-              que « North Star » et « Roadmap ».
+          {/* **Le deuxième bloc de la page** (18/08/2026), sous le nom
+              « Accompagnements en cours ». Il ferme la position qu'il occupait
+              la veille et retrouve celle de `docs/06` §6 — « au-dessus de la
+              liste des accompagnements, sans la déplacer ». L'écart qui reste
+              au document n'est plus l'ordre mais **le nom et la fenêtre** :
+              le bloc s'ouvre sur l'année en cours, janvier à décembre, et la
+              liste ci-dessous porte l'histoire entière.
+
+              Elle ne connaît aucun droit — elle se lit par tout le domaine (D9),
+              sur un produit vivant comme archivé — et n'ouvre aucun point
+              d'entrée d'écriture. `de` et `a` sont des paramètres de **lecture**,
+              et `timelineWindow` est la seule porte par où ils entrent. */}
+          <Roadmap
+            productId={product.id}
+            projects={projects}
+            milestones={milestones}
+            from={de}
+            to={a}
+          />
+
+          {/* **Le dernier bloc de la page** (18/08/2026), sous le nom « Tous
+              les accompagnements » : le bloc au-dessus cadre l'année en cours,
+              celui-ci porte l'histoire entière, du plus récent au plus ancien.
+              C'est ce couple qui répond à la question de l'écran — ce qu'on
+              fait en ce moment, et ce qu'on a fait.
 
               **Sa liste est à fond perdu** : la carte est celle du bloc, et
               une liste qui gardait la sienne faisait une carte dans une carte.
               Il ne reste que les lignes, leurs filets et leur rythme — ceux
-              des lignes de la roadmap juste en dessous, ce qui était le but.
+              des lignes de la frise juste au-dessus, ce qui était le but.
 
               L'état vide garde son `EmptyState`, à la différence des deux
               autres blocs qui rendent un paragraphe : c'est le seul des trois
@@ -660,12 +680,12 @@ export default async function ProductPage({
               (règle 5). */}
           <Block>
             <BlockHeader
-              title="Accompagnements"
+              title="Tous les accompagnements"
               note="Les accompagnements de ce produit, du plus récent au plus ancien."
             />
 
             {projects.length > 0 ? (
-              <List flush label="Accompagnements de ce produit">
+              <List flush label="Tous les accompagnements de ce produit">
                 {projects.map((project) => (
                   <ListRow
                     key={project.id}
@@ -717,26 +737,6 @@ export default async function ProductPage({
               />
             )}
           </Block>
-
-          {/* **La roadmap ferme la page** (demande du 17/08/2026), alors que
-              `docs/06` §6 la veut « au-dessus de la liste, sans la déplacer ».
-              L'écart à la documentation est assumé et consigné : la North Star
-              ouvre désormais l'écran, parce qu'elle porte la question à laquelle
-              le produit répond ; la roadmap détaille le comment, et le détail
-              vient après. La liste reste l'équivalent textuel de la roadmap,
-              juste au-dessus d'elle.
-
-              Elle ne connaît aucun droit — elle se lit par tout le domaine (D9),
-              sur un produit vivant comme archivé — et n'ouvre aucun point
-              d'entrée d'écriture. `de` et `a` sont des paramètres de **lecture**,
-              et `timelineWindow` est la seule porte par où ils entrent. */}
-          <Roadmap
-            productId={product.id}
-            projects={projects}
-            milestones={milestones}
-            from={de}
-            to={a}
-          />
 
         </Page>
       </div>

@@ -32,6 +32,7 @@ import {
 } from "@/lib/db/schema";
 
 import {
+  defaultWindow,
   listProductMilestones,
   monthBand,
   monthMark,
@@ -370,6 +371,48 @@ describe("windowYears / yearWindow / windowMonths — la matière du filtre", ()
     expect(months[0]).toBe("2024-03");
     expect(months[11]).toBe("2025-02");
     expect(months[23]).toBe("2026-02");
+  });
+});
+
+/* ==========================================================================
+   La fenêtre d'ouverture — 18/08/2026
+
+   Ce que ces tests épinglent : l'année en cours quand l'axe la porte, et le
+   **repli sur l'axe entier** quand il ne la porte pas. Neutraliser le repli
+   doit faire tomber les deux derniers, et rien d'autre — sans lui, `yearWindow`
+   rendrait une fenêtre d'un seul mois, écrasée contre une borne.
+   ========================================================================== */
+
+describe("defaultWindow — la fenêtre quand l'URL n'en demande aucune", () => {
+  const scale = timelineScale(["2024-03-01", "2026-02-01"]) as TimelineScale;
+
+  test("une année que l'axe couvre entièrement rend ses douze mois", () => {
+    expect(defaultWindow(scale, 2025)).toEqual<TimelineScale>({
+      firstMonth: "2025-01",
+      lastMonth: "2025-12",
+      monthCount: 12,
+    });
+  });
+
+  test("une année que l'axe couvre en partie se borne à l'axe", () => {
+    /* Les données s'arrêtent en février 2026 : la fenêtre s'arrête avec elles,
+       et n'invente pas dix mois à venir. */
+    expect(defaultWindow(scale, 2026)).toEqual<TimelineScale>({
+      firstMonth: "2026-01",
+      lastMonth: "2026-02",
+      monthCount: 2,
+    });
+  });
+
+  test("une année postérieure à l'axe rend l'axe entier", () => {
+    /* Le piège que ce repli écarte : sans lui, `timelineWindow` ramènerait les
+       deux bornes de 2027 sur février 2026 et rendrait une fenêtre d'un seul
+       mois — une période affirmée que rien ne porte. */
+    expect(defaultWindow(scale, 2027)).toEqual(scale);
+  });
+
+  test("une année antérieure à l'axe rend l'axe entier", () => {
+    expect(defaultWindow(scale, 2023)).toEqual(scale);
   });
 });
 
