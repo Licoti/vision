@@ -4111,3 +4111,208 @@ d'être éprouvé au navigateur.
 
 `ETAT.md` passe de 314 à 331 lignes. Le seuil de 250 reste franchi et attend la session de découpage
 de C6 — c'est le seul moment où le fichier se balaie.
+
+---
+
+## Hors ticket — la doctrine de composition, 18/08/2026
+
+**Ce n'est pas un ticket, c'est un audit et un arbitrage.** La question posée était double : le
+produit s'éloigne-t-il d'une logique de composants, et faudrait-il descendre le style dans le CSS
+plutôt que de l'empiler en classes sur les éléments ? Aucun fichier de code n'a été modifié. Ce qui
+suit est le constat mesuré, puis la doctrine qui en sort, puis ce qu'elle refuse.
+
+### Le constat, mesuré et non affirmé
+
+**La prémisse « trop de classes » ne se confirme pas.** 427 attributs `className` littéraux dans
+`app/` et `components/` : **moyenne 3,9 classes, médiane 4, p90 8, maximum 14**. C'est bas pour du
+Tailwind, et c'est le signe que `components/ui/` fait son travail. Les deux attributs les plus
+chargés sont `action-menu.tsx:142` et `projects/roadmap.tsx:556`, à quatorze chacun.
+
+**Les fondations tiennent, et se vérifient.**
+
+- `app/globals.css` efface les namespaces Tailwind (`--color-*: initial`, `--text-*`, `--radius-*`,
+  `--shadow-*`) avant de les reconstruire à partir des seuls jetons. `bg-blue-500` **ne compile
+  pas** : la règle 2 est structurelle et non déclarative. Recherche des violations de couleur sur
+  vingt-deux teintes et onze niveaux : **aucune**. Aucun `#hex` hors de `tokens.css` — les quatre
+  occurrences trouvées sont dans des commentaires.
+- La couche est **acyclique et étanche**, vérifié : `components/ui/` n'importe aucun composant
+  métier, aucune requête, aucune action. L'unique exception est un `import type` d'énuméré
+  (`ui/status-dot.tsx:13`), sans couplage à l'exécution, et c'est lui qui rend
+  `STATUS_PILL: Record<ProjectStatusNature, string>` exhaustif à la compilation. Zéro import croisé
+  entre `components/products/` et `components/projects/`.
+- Zéro dépendance d'interface : ni Radix, ni `cva`, ni `clsx`, ni `tailwind-merge`, ni `vaul`. Le
+  tiroir, le piège de focus, le menu et les icônes sont écrits à la main.
+
+**Ces trois faits sont liés, et c'est ce qui compte.** La composition manuelle par gabarit de chaîne
+est viable **parce que** `--color-*: initial` ferme l'espace de classes : les collisions que
+`tailwind-merge` sert à arbitrer deviennent rares quand la palette fait cent dix couleurs au lieu de
+deux mille. Retirer l'un rendrait l'autre douteux.
+
+### La doctrine — trois niveaux, et le critère entre les deux premiers
+
+| Niveau | Quand | Exemples en place |
+|---|---|---|
+| **Composant** | l'élément rendu est fixe | `FormField`, `Block`, `StatusDot`, `Panel` |
+| **Constante de classes exportée** | c'est **la balise** qui varie | `ACTION_LINK`, `CONTROL`, `MENU_ITEM` |
+| **Rien** | usage unique, aucun choix mesuré | mise en page locale |
+
+Le niveau 2 n'est pas un pis-aller, et `components/ui/action-link.ts` le dit déjà mieux que cette
+note : « une constante et non un composant : elle s'applique à un `<Link>`, à un
+`<button type="submit">` et à un `<summary>` — un composant imposerait l'un des trois ». Le bouton
+secondaire est dans ce cas exact : `produits/[id]/page.tsx:320-332` le porte sur un `<Link>` et un
+`<DrawerLink>` **dans le même `<span>`**, à côté d'un `<button type="submit">`. Il lui faut les deux
+niveaux, pas un.
+
+### Ce que la doctrine refuse, et pourquoi
+
+**`@apply` et `@layer components` : écartés.** Une classe CSS de composant poserait une troisième
+couche de noms (`.btn-primary`) par-dessus les jetons, **sous** TypeScript : sans props typées, sans
+variante vérifiée à la compilation, et surtout sans l'endroit où s'écrit la justification mesurée.
+Or c'est cette justification qui est l'actif rare de ce dépôt — « `content-neutral-normal` à 3,88:1,
+substitut au jeton de bordure de contrôle qui manque au design system » se lit dans
+`form-field.tsx:24-37` et ne se loge pas dans une règle CSS. Le bénéfice habituellement invoqué pour
+`@apply` — pouvoir rethémer sans recompiler — est déjà obtenu, et mieux, par `@theme inline`.
+
+**La taxonomie de l'atomic design : écartée.** Il faut distinguer ses deux moitiés. Le **modèle
+mental** — il existe des niveaux de composition — est vrai et Vision l'applique déjà intégralement,
+avec une couche que Brad Frost n'a pas : les jetons, qui viennent d'ailleurs et lui sont
+orthogonaux. La **taxonomie de dossiers** (`atoms/ molecules/ organisms/`) est l'autre moitié, et
+elle coûte sans rendre :
+
+- elle remplacerait une frontière **vérifiable par `grep`** — « ce fichier importe-t-il une requête
+  ou une action ? » — par une frontière **discutable** : `FormField` est-il un atome ou une
+  molécule ? `Field` ? `StatusDot` ? Ces questions n'ont pas de réponse et se rejouent à chaque
+  ajout ;
+- `organisms/` est un seau plat, là où `products/` et `projects/` disent **où le composant sert**.
+  Le découpage actuel calque le vocabulaire imposé par `CLAUDE.md` — Domaine › Produit › Projet — et
+  la taxonomie le contredirait ;
+- elle renommerait une trentaine de fichiers, donc tous les chemins cités dans les en-têtes, **là où
+  vit le raisonnement**.
+
+**Décision : `ui/ · products/ · projects/ · shell/ · team/` ne bouge pas.**
+
+### Ce que l'atomic design a raison d'imposer, et qui manque
+
+Sa pratique réelle est que **l'inventaire se décide avant, pas à la huitième copie**. Cet inventaire
+existe déjà : `docs/design/design-system.md` §10 nomme une quarantaine de composants.
+`components/ui/` en porte dix-sept, et **pas de bouton** — l'élément le plus réutilisé de toute
+interface.
+
+La dette est donc une dette de **couverture**, pas de technique, et son rythme se lit dans ce
+journal :
+
+| Élément | Copies atteintes avant extraction |
+|---|---|
+| `FormField` | **8** (extrait en TD.1) |
+| `Panel` | **6** (extrait en TD.1) |
+| `ACTION_LINK` | **4** (extrait en TD.1) — puis **redivergé** depuis |
+| Bouton primaire | **11**, jamais extrait, **déjà dérivé** |
+| Lien-action `sm` | **9**, jamais extrait |
+| État vide dans un bloc | **~15, en 5 variantes** |
+
+Le processus extrait à quatre ou huit copies, **après** la divergence. Il fonctionne — TD.1 a retiré
+644 lignes nettes à HTML constant — mais il paie le nettoyage deux fois. T4.2 avait déjà nommé la
+loi et elle se vérifie : « le vrai coût n'est pas la duplication du balisage mais celle des **choix
+mesurés** qu'il porte ».
+
+**La preuve la plus nette est fraîche.** `components/products/readings-panel.tsx:42` redéfinit un
+`ACTION_LINK` local qui **diverge** de celui du socle (`underline-offset-2` en trop), alors que le
+fichier importe déjà depuis `components/ui/`. C'est le défaut que l'en-tête d'`action-link.ts`
+prétend avoir refermé, revenu par une autre porte, **six jours après**. Un socle qu'on ne voit pas ne
+protège personne — d'où l'idée d'une page de catalogue, non retenue faute de ticket, notée ci-dessous.
+
+### Trois défauts trouvés en chemin, tous consignés
+
+- **`components/ui/section.tsx:26` déclare une prop `note` et ne la rend jamais.**
+  `components/projects/roadmap.tsx:171` lui passe « Le récit de l'accompagnement, au mois. » — cette
+  phrase **n'est dans aucun HTML servi**. TypeScript ne dit rien : la prop est déclarée, seulement
+  jamais lue. **Mais ESLint, lui, le dit** — `'note' is defined but never used`, et c'est
+  l'**unique** avertissement de `npm run lint` sur tout le dépôt. Il est donc là depuis T2.3, lu par
+  personne. C'est exactement ce que l'en-tête d'`underscoreIsIntentional` dans `eslint.config.mjs`
+  annonçait en creux : « un avertissement permanent est un avertissement qu'on cesse de lire, donc un
+  avertissement neuf qu'on ne verra pas ». La règle a été écrite pour supprimer quatre faux positifs ;
+  le seul vrai positif qui restait a survécu à côté d'eux. **Règle : `npm run lint` doit finir à zéro
+  avertissement, sinon le suivant est invisible.** → **TD.4 (c), à trancher avant écriture.**
+- **`--spacing` est le seul trou de la règle 2.** `--spacing: var(--number-4)` est un **pas**, pas
+  une échelle : Tailwind en dérive n'importe quel multiplicateur. **Une soixantaine de valeurs hors
+  échelle** se sont accumulées — `gap-2.5` (10px, ×12), `px-2.25` (9px), `mt-3.5` (14px), `top-7.5`
+  (30px), `w-2.75` (11px), `w-5.5` (22px) : aucune n'existe au §4 du design system. Seuls `0.5` et
+  `1.5` sont conformes, retombant sur `--number-2` et `--number-6`. → **TD.5.**
+- **Deux dimensions en dur et une épaisseur brute** : `indicators.tsx:494`
+  (`minmax(300px,1fr)`), `indicators.tsx:586` (`grid-cols-[20rem_1fr]`), et
+  `projects/roadmap.tsx:556` (`border-l-3` là où `globals.css:201` prescrit
+  `border-l-[length:var(--border-width-2)]`). → **TD.5.**
+
+### La contrainte qui pèse sur tout ce qui suivra
+
+**Il n'existe aucun test de présentation**, et c'est délibéré : `vitest.config.mts` restreint à
+`lib/**` et `app/**/*.test.ts`, en `environment: "node"`, avec « aucun composant n'entre ». Ni
+jsdom, ni snapshot, ni e2e. La doctrine est cohérente — le droit s'éprouve par l'action, jamais par
+l'écran — mais elle a une conséquence directe : **toute refonte de présentation se fait sans filet
+automatisé.** C'est ce qui impose le critère de TD.1 à tous les tickets TD (diff HTML capturé
+avant/après, base immobile entre les deux mesures), et c'est ce qui commande de séparer les
+extractions **mécaniques** des fusions **éditoriales**. Les secondes — `Section` contre `Block`, la
+note perdue — demandent un arbitrage humain et ne se décident pas en cours de ticket.
+
+### Un échec de test intermittent, observé une fois et non reproduit
+
+**Le premier `npm test` de la session a rendu « 1 failed | 22 passed », soit un test sur 732.** Deux
+relances consécutives ont rendu **732/732**, et le nom du test en échec n'a pas pu être capturé — la
+sortie n'était plus disponible au moment de la recherche. Aucun fichier de code n'avait été modifié :
+ce n'est donc pas une régression, et la cause la plus probable est le réseau, les tests de
+`lib/queries/**` frappant une vraie base Neon par HTTP.
+
+Le fait est consigné parce qu'il compte : **une suite qui échoue une fois sur trois lancements sans
+raison visible est une suite qu'on cesse de croire**, et c'est le seul filet automatisé du projet.
+→ **si le symptôme revient, instrumenter avant de conclure** — `vitest --reporter=verbose` conservé
+dans un fichier, plutôt qu'une relance qui efface la preuve.
+
+### Le garde-fou est devenu TD.6, et son mécanisme a été éprouvé avant d'être prescrit
+
+Les deux pistes notées d'abord sans ticket ont été départagées : **la règle ESLint devient TD.6**, la
+page de catalogue reste ouverte.
+
+**Le mécanisme a été mis à l'épreuve le 18/08/2026 par une sonde jetable**, parce qu'une fiche qui
+prescrit une règle sans l'avoir vue se déclencher l'affirme au lieu de la lire. `no-restricted-syntax`
+accepte un sélecteur esquery portant une expression régulière sur la valeur du nœud, et il faut
+**deux** sélecteurs — `Literal` pour `className="…"`, `TemplateElement` pour `className={\`…\`}` —,
+mesuré : le second seul a rattrapé le cas en gabarit de chaîne.
+
+Sur la seule signature du bouton primaire, motif `bg-surface-primary-base[^"]*px-4[^"]*py-2` :
+
+- **12 déclenchements** — les 11 copies exactes **plus** `app/dev/session/page.tsx:112`. C'est le
+  motif **lâche** qui rattrape la dérivée, qu'une regex calquée sur la chaîne exacte aurait manquée.
+  **Règle : le motif porte sur ce qui fait la signature, jamais sur la chaîne entière.**
+- **Témoin négatif concluant** : `bg-surface-neutral-pale px-4 py-2` et
+  `bg-surface-primary-base px-3 py-1` n'ont pas déclenché.
+
+Un piège mesuré au passage, à savoir pour qui relira la sonde : **une config ESLint minimale
+rapporte des faux positifs** — trois « Definition for rule was not found » sur des `eslint-disable`
+inline pointant des règles qu'elle ne définit pas. Le décompte brut annonçait 14 ; le vrai est 12.
+
+**Ce que TD.6 ne fera pas, et qui doit rester dit :** la règle garde **les signatures qu'elle
+connaît**. C'est un cliquet sur la duplication constatée, pas une preuve de cohérence.
+
+- **La page de catalogue `/dev/design`** — sur le modèle de `/dev/session` : 404 en production,
+  reliée à aucune navigation, rendant tous les exports de `components/ui/`. C'est ce qui montrerait
+  l'inventaire d'un coup d'œil, là où la règle ne fait que refuser. Écartée de TD.6 : **ouvrir une
+  route est une décision d'architecture, pas une factorisation**, et elle ne se prend pas au détour
+  d'un garde-fou. → **si l'inventaire continue de diverger, ou sur demande.**
+
+### Un fichier modifié hors de cette session, à 23:20
+
+**`tickets-C5bis.md` a changé pendant la session, après toutes les écritures faites ici.** Il n'était
+pas modifié au début — `git status` ne le listait pas, et son horodatage était du 17/08 11:37. Il
+porte désormais un amendement daté du 18/08/2026, cohérent, complet et sans marqueur de conflit, qui
+met les arbitrages (a) de C5bis à jour de la mécanique de tiroir de TD.2 et leur ajoute une section
+« La mécanique des panneaux depuis TD.2 ». **Aucune commande de cette session ne l'a touché**, et son
+horodatage — 23:20 — est postérieur à la dernière écriture faite ici (23:11).
+
+Le fichier a été **laissé intact**. → **à savoir : une seconde session travaille peut-être sur ce
+dépôt ; vérifier avant de committer que le contenu de `tickets-C5bis.md` est bien voulu.**
+
+`ETAT.md` passe de 331 à 366 lignes, soit **116 au-dessus du seuil de 250**. Le balayage reste
+réservé à la session de découpage de C6 — c'est le seul moment où le fichier se balaie, et cette note
+n'y déroge pas —, mais il faut le dire franchement : **l'écart se creuse plus vite qu'il ne se
+résorbe**, et trois travaux hors ticket en trois jours y ont chacun ajouté leur ligne. Le repliage de
+C5bis devra sortir vers `HISTORIQUE-TICKETS.md` bien plus que ses propres lignes.

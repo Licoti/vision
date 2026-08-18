@@ -67,9 +67,16 @@ Elle n'est pas générale. Elle vaut sous **six garde-fous, qui sont la fiche de
 
 **(a) D29 tient à la lettre : la fiche est un panneau, jamais une page.** « Pas de page personne au
 POC » n'est pas rouvert — aucune route `/equipe/[id]` n'existe à la fin de ce chantier. La fiche
-s'ouvre par un paramètre d'URL sur `/equipe`, sur la mécanique des six panneaux existants : une URL
-et non un état, la page rendue derrière et portant `inert`, les sorties en liens. Ce que D29 refusait
-était un écran de plus dans la navigation ; il n'y en a pas un de plus.
+s'ouvre en panneau sur `/equipe`, la page restant rendue derrière et portant `inert`. Ce que D29
+refusait était un écran de plus dans la navigation ; il n'y en a pas un de plus.
+
+**Amendé le 18/08/2026, après TD.2.** Cet arbitrage disait « sur la mécanique des six panneaux
+existants : une URL et non un état ». Cette mécanique n'existe plus — TD.2 l'a retournée : un
+panneau s'ouvre désormais **côté client**, son corps est rendu par une fonction serveur, et l'URL ne
+bouge pas. Ce qui ne change pas, et qui était le fond de l'arbitrage : pas d'écran de plus, la page
+derrière `inert`, les sorties en liens vers la page nue, et **l'URL d'ouverture reste une adresse
+valide** — `/equipe?personne=<uuid>` rend encore la fiche, au rendu serveur. Voir la section
+« La mécanique des panneaux depuis TD.2 » ci-dessous, qui vaut pour T5bis.4 comme pour T5bis.6.
 
 **(b) Le niveau est un référentiel, la disponibilité est un énuméré.** Les deux listes n'ont pas la
 même nature. L'échelle de maîtrise doit **pouvoir évoluer** — la demande l'exige en toutes lettres —
@@ -107,6 +114,46 @@ formulaire de projet (T2.6) disparaît en T5bis.7. C'est la demande — « il ne
 manuellement une personne à chaque accompagnement » — et cela **referme** le point ouvert « on
 n'ajoute qu'une personne par enregistrement », dont la limitation n'a plus d'objet une fois la
 création partie ailleurs.
+
+---
+
+## La mécanique des panneaux depuis TD.2
+
+*(section ajoutée le 18/08/2026, quand TD.2 a retourné l'invariant de T3.2. Elle remplace, pour
+T5bis.4 et T5bis.6, tout ce que les fiches disaient de « une URL et non un état ».)*
+
+Un panneau **n'est plus un paramètre d'URL, c'est un état client**. `DrawerHost`
+(`components/ui/drawer.tsx`) monte la coquille — voile, tiroir, en-tête, croix, `FocusTrap`,
+`inert` — **avant** tout aller-retour ; une fonction `"use server"` renvoie ensuite le **corps
+rendu**, avec ses lectures, ses référentiels et ses actions liées côté serveur. L'URL ne bouge pas.
+
+**Les URL d'ouverture restent des adresses**, et c'est un arbitrage tenu : `?personne=<uuid>` collé
+dans la barre ouvre encore la fiche, au rendu serveur, et les deux chemins traversent la **même**
+résolution — aucune règle de droit ne vit à deux endroits.
+
+Cinq gestes pour un panneau neuf :
+
+1. une entrée dans l'union de demandes de la page (`lib/drawers/types.ts`) ;
+2. un `case` dans le résolveur de la page (`lib/drawers/<page>.tsx`) — c'est **là** que vivent le
+   droit, la confrontation de la cible et les lectures conditionnelles ;
+3. la clé d'URL dans le traducteur `…RequestFromParams` et dans `…_PANEL_PARAMS`, pour garder
+   l'adresse ;
+4. le point d'entrée en `<DrawerLink href={…} request={…}>` — un vrai `<a href>`, dont seul le clic
+   gauche est intercepté ;
+5. pour une **page hôte neuve** — `/equipe` en est une — envelopper son contenu dans `<DrawerHost>`
+   et écrire son `app/(app)/<page>/drawers.tsx`.
+
+Trois conséquences pour ce chantier, à ne pas redécouvrir en cours de ticket :
+
+- **La règle d'exclusivité par décompte ne vaut plus que pour le chemin URL.** Côté clic elle est
+  devenue *structurelle* : l'état ne porte qu'une demande à la fois, et deux `role="dialog"`
+  concurrents ne sont plus représentables.
+- **Une action de panneau ne redirige plus.** Elle rend `ok: true` ; `revalidatePath` reste, et la
+  réponse porte l'arbre réactualisé. Le `redirect` ne subsiste que pour les formulaires de page
+  pleine.
+- **La fonction serveur est un point d'entrée HTTP à part entière**, et se traite comme une action :
+  elle relit la session, retrouve l'objet et redérive le droit sur ce qu'elle a **reçu**. Elle
+  s'éprouve donc comme une action, pas comme un écran.
 
 ---
 
@@ -271,23 +318,32 @@ appartient à cette liste.
 **Objectif** — Tout ce qu'on veut savoir d'une personne d'un coup d'œil, **sans écran de plus**
 (arbitrage (a), D29).
 
-**Périmètre** — `lib/navigation.ts` ; `components/ui/panel.tsx` ; `components/team/person-card.tsx`
-(neuf) ; `app/(app)/equipe/page.tsx` ; `lib/queries/team.ts` et son test.
+**Périmètre** *(récrit le 18/08/2026, après TD.2)* — `lib/drawers/types.ts` ;
+`lib/drawers/team.tsx` (neuf) ; `app/(app)/equipe/drawers.tsx` (neuf) ;
+`components/team/person-detail.tsx` (neuf) ; `components/team/person-card.tsx` (neuf) ;
+`lib/navigation.ts` ; `app/(app)/equipe/page.tsx` ; `lib/queries/team.ts` et son test.
 
-**Attendu** — `PERSON_PANEL_PARAM = "personne"`, valeur = l'identifiant de la personne, toute autre
-valeur n'ouvrant rien. La page prend la **règle d'exclusivité par décompte** de la page produit
-(T5.2) — écrite d'avance pour les deux clés que T5bis.6 ajoutera, comme T5.2 l'avait été pour
-`releve`.
+**`components/ui/panel.tsx` sort du périmètre**, et c'est le ticket qui s'allège : il ne porte plus
+la coquille depuis TD.2, seulement le corps d'un formulaire. Un panneau de **lecture** n'en a donc
+pas besoin du tout — il fournit un corps sans `<form>`, comme `readings-panel.tsx` et
+`persona-detail.tsx` le font déjà. La généralisation que cette fiche demandait — rendre `action`,
+`pending` et `submitLabel` facultatifs — **n'a plus d'objet** : TD.2 l'a obtenue autrement, en
+sortant la coquille plutôt qu'en assouplissant le corps.
 
-**`Panel` gagne un mode lecture plutôt qu'une septième coquille.** `action`, `pending`,
-`submitLabel`, `message` et `errors` deviennent **facultatifs** : sans `action`, pas de `<form>`, pas
-de bouton d'enregistrement, un pied qui ne porte que « Fermer ». C'est exactement la propriété que
-TD.1 cherchait — on ne recopie pas la coquille, on la généralise. Le voile, le `role="dialog"`, le
-filet mesuré, `FocusTrap`, l'`autoFocus` et l'`inert` de la page **ne bougent pas d'une ligne**.
+**Attendu** — `/equipe` devient la **troisième page hôte** : son contenu s'enveloppe dans
+`<DrawerHost>`, et `app/(app)/equipe/drawers.tsx` porte sa fonction serveur. La demande est
+`{ kind: "personDetail"; id }` dans une union `TeamDrawerRequest` neuve ; le point d'entrée est un
+`<DrawerLink>` sur la carte.
 
-`Panel` est un composant client ; **le contenu de la fiche reste serveur**, passé en `children`
-depuis la page. C'est ce qui permettra au radar de T5bis.5 d'y entrer sans franchir la frontière du
-bundle.
+`PERSON_PANEL_PARAM = "personne"` reste, comme **adresse** : `/equipe?personne=<uuid>` ouvre encore
+la fiche au rendu serveur, toute autre valeur n'ouvrant rien. La **règle d'exclusivité par décompte**
+ne gouverne que ce chemin-là — écrite d'avance pour les deux clés que T5bis.6 ajoutera, comme T5.2
+l'avait été pour `releve`. Côté clic, l'exclusivité est structurelle et n'a rien à écrire.
+
+**Le contenu de la fiche est rendu sur le serveur** — c'est la fonction serveur qui le compose, et
+non plus un `children` descendu depuis la page. La propriété que cette fiche cherchait est intacte,
+et même élargie : le radar de T5bis.5 y entrera sans franchir la frontière du bundle, et sans que la
+page paie sa lecture quand le panneau est fermé.
 
 `findPersonDetail(scope, personId)` rend : identité, métier, présentation, disponibilité ; les
 compétences avec leur niveau, ordonnées par `rank` **décroissant** puis par libellé — un ordre de
@@ -296,12 +352,24 @@ accompagnements**, par jointure `project_members ⋈ projects`, chacun cliquable
 `ROUTES.project(id)` avec sa période et son statut. Les accompagnements archivés sont écartés ;
 l'absence est un état vide écrit.
 
-**Validation** — Lu dans le HTML servi : `/equipe?personne=<uuid>` porte la fiche, la page reste
-rendue derrière et porte `inert`, les trois sorties sont des liens vers `/equipe`. Le panneau
-s'ouvre et se ferme **sans une ligne de JavaScript**, JavaScript désactivé. Un UUID inconnu, un UUID
-d'un autre domaine et une personne archivée n'ouvrent rien. Les rendus de panneaux capturés par TD.1
-sont **rejoués à données constantes** — `git stash` d'abord, la base de développement ayant dérivé —
-et la généralisation de `Panel` ne change **pas un caractère** de leur HTML.
+**Validation** *(récrite le 18/08/2026)* — **Les deux chemins s'éprouvent, séparément.**
+
+*Par l'adresse, dans le HTML servi :* `/equipe?personne=<uuid>` porte la fiche, la page reste rendue
+derrière et porte `inert`, les trois sorties sont des liens vers `/equipe`. Le panneau **s'ouvre et
+se ferme sans une ligne de JavaScript**, JavaScript désactivé — TD.2 n'a pas retiré ce repli, il l'a
+seulement cessé d'en faire le mécanisme. Un UUID inconnu, un UUID d'un autre domaine et une personne
+archivée n'ouvrent rien.
+
+*Par le clic, au navigateur :* la coquille est dans le document **avant** que le corps n'arrive ;
+**aucune navigation de page** au réseau, une seule requête — celle de la fonction serveur ; l'URL ne
+bouge pas ; le défilement est conservé ; le focus entre sur la croix et **revient au déclencheur** à
+la fermeture. Fermer une fiche ouverte par son adresse retire `personne` de l'URL sans empiler
+d'entrée d'historique.
+
+*Le droit s'éprouve par l'action :* `loadTeamDrawer` est un point d'entrée HTTP neuf. Sa requête se
+capture au navigateur puis se rejoue à la main sous une identité sans droit, avec des charges
+forgées — personne d'un autre domaine, `kind` appartenant à une autre page, identifiant qui n'est
+pas un UUID.
 
 **Interdits** — Aucun graphique (T5bis.5). Aucune route `/equipe/[id]`, aucun lien vers une page
 personne depuis un projet ou un produit : D29 tient. Aucun bouton d'écriture (T5bis.6). Aucun
@@ -356,10 +424,11 @@ personne.
 **Objectif** — Les trois gestes sur les deux objets, dans le ticket qui les introduit (arbitrage (a)
 de C5, tenu). Sans lui, C5bis livrerait un référentiel qu'un script seul alimente.
 
-**Périmètre** — `lib/forms/person.ts` et son test (neufs) ; `lib/forms/person-skill.ts` et son test
-(neufs) ; `components/team/person-panel.tsx` (neuf) ; `components/team/skill-panel.tsx` (neuf) ;
-`app/(app)/equipe/actions.ts` (neuf) ; `lib/navigation.ts` ; `app/(app)/equipe/page.tsx` ;
-`components/team/person-card.tsx`.
+**Périmètre** *(complété le 18/08/2026, après TD.2)* — `lib/forms/person.ts` et son test (neufs) ;
+`lib/forms/person-skill.ts` et son test (neufs) ; `components/team/person-panel.tsx` (neuf) ;
+`components/team/skill-panel.tsx` (neuf) ; `app/(app)/equipe/actions.ts` (neuf) ;
+`lib/drawers/types.ts` ; `lib/drawers/team.tsx` ; `lib/navigation.ts` ;
+`app/(app)/equipe/page.tsx` ; `components/team/person-card.tsx`.
 
 **Attendu** — Le patron en trois couches tenu depuis T3.3, sans dépendance neuve : un module de
 validation **pur** (`readPersonForm`, `validatePersonForm`, `toPersonFormValues`, `parsePersonForm`,
@@ -367,11 +436,20 @@ où `input` est non nul **si et seulement si** `errors` est vide, par renarrowin
 `as`) ; un composant client à `useActionState`, avec sa `key` pour que l'état initial se relise au
 montage ; une action serveur `"use server"` avec sa **porte**.
 
-Deux clés d'ouverture, sur les formes déjà tranchées : `personne=nouvelle` crée et
-`personne=<uuid>` corrige — la forme d'`indicateur` (T5.2) ; `competence=<uuid de personne>` pose une
-compétence et `competence=<uuid de person_skills>` la corrige — la forme **polymorphe** de `releve`
-(T5.3), tranchée par deux lectures scopées successives, un UUID de `persons` n'étant pas un UUID de
-`person_skills`. La règle d'exclusivité de T5bis.4 les absorbe **sans changer d'énoncé**.
+**Trois demandes de plus dans `TeamDrawerRequest`** — `person` (avec ou sans identifiant), `skill`
+(polymorphe) et `archive` —, et trois `case` de plus dans `lib/drawers/team.tsx`, où vivent le droit
+et la confrontation. Les points d'entrée sont des `<DrawerLink>`.
+
+Les clés d'URL restent, comme **adresses**, sur les formes déjà tranchées : `personne=nouvelle` crée
+et `personne=<uuid>` corrige — la forme d'`indicateur` (T5.2) ; `competence=<uuid de personne>` pose
+une compétence et `competence=<uuid de person_skills>` la corrige — la forme **polymorphe** de
+`releve` (T5.3), tranchée par deux lectures scopées successives, un UUID de `persons` n'étant pas un
+UUID de `person_skills`. Le décompte d'exclusivité de T5bis.4 les absorbe **sans changer d'énoncé**
+sur le chemin URL ; côté clic il n'y a rien à absorber.
+
+**Les six actions ne redirigent pas** : elles rendent `ok: true`, et la coquille se referme dessus
+(TD.2). `revalidatePath` reste — c'est lui qui fait paraître la personne créée dans la liste
+derrière le voile.
 
 Six gestes : créer une personne ; corriger son profil (nom, métier, genre, présentation,
 disponibilité) ; **archiver** une personne, par `ConfirmPanel` et `ARCHIVE_PANEL_PARAM`, la
@@ -389,6 +467,11 @@ compétence posée sur un `stakeholder` (arbitrage (d)).
 membre, chacun des **six** points d'entrée est reposté à la main, en **multipart** — un harnais qui
 poste en urlencoded obtient un 200 muet, indiscernable d'un refus (leçon de TD.1) —, précédé d'une
 **étape témoin** qui prouve que le harnais atteint bien l'action ; base comptée avant et après.
+
+**Et `loadTeamDrawer` compte pour un septième**, depuis TD.2 : une fonction serveur est un point
+d'entrée HTTP, pas un détail de rendu. Sa requête se capture au navigateur (`next-action` et corps)
+puis se rejoue sous une identité sans droit et avec des charges forgées — un `kind` d'écriture
+demandé par qui ne peut pas écrire doit rendre `null`, et non un panneau que seul l'écran cacherait.
 Charges forgées refusées : une personne d'un autre domaine, une compétence d'un autre domaine, une
 compétence posée sur un intervenant côté entité, une personne déjà archivée.
 

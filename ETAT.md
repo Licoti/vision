@@ -2,9 +2,11 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 18/08/2026 — TD.2 : les panneaux s'ouvrent côté client.
+**Dernière mise à jour :** 18/08/2026 — audit de la couche de présentation, doctrine de
+composition tranchée, `tickets-TD.md` écrit.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
-**Ticket suivant :** **T5bis.3** — les filtres de la liste (`tickets-C5bis.md`)
+**Ticket suivant :** **T5bis.3** — les filtres de la liste (`tickets-C5bis.md`). **TD.3 est
+disponible et ne dépend de rien** (`tickets-TD.md`) : l'ordre entre les deux revient à l'humain.
 
 ---
 
@@ -19,6 +21,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **terminé** |
 | C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **terminé** |
 | TD — Dette technique | TD.1, TD.2 | **terminé** |
+| TD — Couche de présentation | TD.3 → TD.6 | **découpé**, non entamé (`tickets-TD.md`) |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **en cours** — T5bis.2 terminé |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
@@ -124,6 +127,15 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   **`display: flex` retire à `<summary>` le triangle natif du navigateur**, ce que le `<details>` de
   la roadmap projet croyait conserver ; la marque de repli se pose donc en `mark`, comme le ★.
 
+- **L'audit de la couche de présentation — hors ticket, le 18/08/2026.** Pas une ligne de code : un
+  constat, une doctrine, trois fiches. Il dément la prémisse — **3,9 classes en moyenne par
+  `className`**, **zéro** violation de couleur — et chiffre la dette : le **bouton** recopié 24 fois et
+  **déjà dérivé**, l'état vide de bloc en **cinq variantes**, `ACTION_LINK` **redivergé** six jours
+  après son extraction. Trois niveaux tranchés — composant, constante de classes, rien — `@apply` et la
+  taxonomie de l'atomic design écartés, les dossiers ne bougent pas. Sa leçon est celle de T4.2,
+  vérifiée cette fois contre le dépôt lui-même : **le coût n'est pas le balisage dupliqué mais les
+  choix mesurés qu'il porte** — et un socle qu'on ne voit nulle part ne protège personne.
+
 ---
 
 ## Points ouverts
@@ -149,6 +161,14 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   → **ticket propre, C7 au plus tard** — vérifié aux découpages de C5 puis de C5bis : aucune de leurs
   fiches n'ouvre `archiveProject` ni `restoreProject`. T5bis.6 archive une **personne**, ce qui ne
   cascade sur rien (arbitrage (e)) et laisse ce point où il est.
+
+- **`SectionHeader` déclare une note et ne la rend jamais.** `components/ui/section.tsx:26` accepte
+  une prop `note` qu'aucune ligne n'affiche ; `components/projects/roadmap.tsx:171` lui passe « Le
+  récit de l'accompagnement, au mois. », et **cette phrase n'est dans aucun HTML servi**. TypeScript
+  se tait, la prop étant déclarée — mais **`npm run lint` le signale depuis toujours**, en unique
+  avertissement permanent du dépôt. Deux issues, et le choix est éditorial : **rendre la note**, ce qui
+  change le HTML et aligne le composant sur `BlockHeader` ; ou **retirer la prop**, ce qui perd la
+  phrase volontairement et fait tomber l'appel à la compilation. → **arbitrage humain avant TD.4.**
 
 ### b. Assignés à un ticket
 
@@ -208,6 +228,21 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   cinquième discipline interdisait. Le découpage de C5bis la referme autrement qu'en la levant :
   l'arbitrage (g) sort la création d'une personne du formulaire de projet, et une limite sur un bloc
   qui n'existe plus n'a plus d'objet. → **T5bis.7.**
+
+- **Le socle couvre dix-sept des quarante composants du design system.** Détail et mesures dans
+  `JOURNAL-TECHNIQUE.md` (18/08/2026) : le **bouton** absent et ses trois chaînes recopiées **24
+  fois** — dont une dérivée, `app/dev/session/page.tsx:112` —, l'**état vide dans un bloc** en **cinq
+  variantes**, le **bandeau d'archivage** dupliqué entre les deux pages de détail, et
+  `readings-panel.tsx:42` **redivergé** d'`ACTION_LINK`. La doctrine est tranchée : ce qui manque
+  n'est plus une décision, c'est du travail.
+  → **TD.3 à TD.6 (`tickets-TD.md`), dans l'ordre TD.3 · TD.5 · TD.4 · TD.6.** TD.6 est le seul qui
+  ne retire rien : il **empêche la copie suivante**, faute de quoi les trois autres ne sont qu'un
+  nettoyage — `ACTION_LINK`, extrait en TD.1, a redivergé six jours plus tard.
+- **La règle 2 n'est pas surveillée sur les espacements.** `--spacing` est un pas et non une échelle :
+  Tailwind en dérive n'importe quel multiplicateur, et **une soixantaine de valeurs hors `--number-*`**
+  se sont accumulées (`gap-2.5`, `px-2.25`, `mt-3.5`, `top-7.5`…), plus deux dimensions en dur dans
+  `indicators.tsx` et un `border-l-3`. Les couleurs, elles, sont structurellement protégées et n'ont
+  **aucune** violation. → **TD.5.**
 
 ### c. Dettes assumées, sans échéance
 
