@@ -3774,3 +3774,109 @@ celles qu'exigent les étapes 5 et 6 — une ligne de journal et deux dettes mes
 destination. Le dépassement préexiste depuis le 18/08 au matin, et un travail hors ticket ne balaie
 pas plus qu'un ticket : `CLAUDE.md` réserve ce geste à la session de découpage, qui devra le faire
 avant d'ouvrir C6.
+
+---
+
+## Hors ticket — le bloc « Personae », 18/08/2026
+
+**Le concept « Persona » est ajouté hors des `docs/`**, et c'est la troisième fois. Ni `docs/02` ni
+`docs/04` ne le nomment : le vocabulaire de `CLAUDE.md` ne connaît que `persons`, la personne
+réelle. La North Star (17/08) puis la vision produit (18/08) avaient ouvert ce chemin ; celui-ci va
+plus loin qu'eux — ce n'est pas une colonne sur une table existante, ce sont **deux tables neuves**,
+`personas` et `persona_traits`. La règle 6 demande de le consigner plutôt que de rouvrir une
+décision : c'est fait ici. Ce qu'il faudra trancher un jour, et qui n'appartient pas à un travail
+hors ticket : `docs/02` et `docs/04` décrivent-ils désormais les personae, ou vit-on avec un modèle
+dont trois éléments ne sont écrits que dans le code ?
+
+**`persons` et `personas` ne diffèrent que d'une lettre, et n'ont aucun rapport.** C'est la seconde
+paire de ce genre après `activities` / `events`, que `CLAUDE.md` signale comme « piège à ne jamais
+confondre ». `persons` porte les membres du centre et les intervenants, avec leurs compétences et
+leur disponibilité ; `personas` porte des archétypes d'utilisateurs qui n'existent pas et ne se
+connectent à rien. Le piège est écrit en tête des deux tables du schéma. **Il est plus dangereux que
+le premier** : `activities` et `events` ne se ressemblent qu'au sens, ces deux-là se ressemblent à
+la frappe — et l'autocomplétion propose les deux.
+
+**`persona_traits` n'a délibérément pas d'`archived_at`, et c'est ce qui la rend écrivable.** Le
+typage de `lib/db/scoped.ts` réserve `unlink` — la seule vraie suppression de la couche — aux tables
+sans cette colonne. Une ligne d'objectif est une ligne d'une zone de texte : on la retire comme on
+vide la vision d'un produit, et ce n'est pas la donnée métier que la règle 4 protège. Poser
+`archived_at` « par prudence » aurait rendu la table non modifiable autrement que par archivage, et
+une correction de faute d'orthographe aurait laissé la faute en base à côté de sa correction.
+
+**Le diff par `(kind, label)` plutôt que le remplacement : la seule décision d'architecture du
+lot.** `syncTraits` aurait pu récrire les trois listes à chaque enregistrement — c'est plus court,
+et personne ne l'aurait vu. La demande porte pourtant sur un **référentiel** : « pour quel persona
+concevons-nous cet élément », et à terme « quel irritant cet écran adresse ». Un remplacement
+donnerait à chaque trait un identifiant neuf à chaque correction, et la liaison posée hier
+pointerait demain une ligne effacée. Le rapprochement se fait donc sur ce qu'une personne reconnaît
+— la famille et le libellé —, et le test qui l'épingle est explicite : *« les traits gardent leur
+identifiant quand leur libellé ne change pas »*. **Corollaire assumé** : corriger une faute dans un
+libellé casse l'identité de ce trait. C'est le prix d'un rapprochement par le texte, faute d'un
+champ stable que la saisie en zone de texte ne peut pas porter.
+
+**Le champ répétable reste interdit, et la structure ne le paie pas.** La limite du 14/08 tient : un
+champ qui se duplique au clic exige le JavaScript que la cinquième discipline refuse. Trois zones de
+texte, une ligne = un élément, et `readLines` fait le découpage. **La saisie est donc du texte et la
+donnée est structurée**, ce qui était le point de la demande — et le formulaire fonctionne sans une
+ligne de script, comme les huit autres.
+
+**Deux clés d'URL pour un même objet, et c'est la première fois.** `?persona=` ouvre la saisie,
+`?fiche=` ouvre la lecture. La règle du dépôt depuis T3.2 est « une clé, dont la valeur porte le
+cas » ; elle est enfreinte ici sciemment, parce que ce ne sont pas deux gestes de même rang mais
+**deux droits** : la fiche se lit par tout le domaine (D9), la saisie demande le droit d'écrire. Une
+clé unique aurait fait tomber la fiche avec le droit, ou ouvert la saisie à qui ne l'a pas. C'est la
+séparation que `releves` tenait déjà pour la série d'un indicateur, portée cette fois sur le même
+objet. Le décompte d'exclusivité passe de cinq clés à sept **sans qu'un caractère change** — c'est
+la troisième fois qu'il encaisse une clé neuve, et il avait été écrit en décompte pour cela.
+
+**Le seul `<img>` du dépôt, et le seul `eslint-disable`.** Vision n'héberge aucun fichier : l'adresse
+d'un portrait est arbitraire et externe. `next/image` aurait demandé d'ouvrir `remotePatterns` à
+**tout** hôte distant dans `next.config.ts` et fait transiter l'image par notre serveur — deux
+choses qu'une photo de persona ne justifie pas. La balise nue porte `alt=""` (l'image est
+décorative, le nom est écrit à côté — la règle d'`Avatar`), `loading="lazy"` et
+`referrerPolicy="no-referrer"`, pour que l'hôte distant n'apprenne pas depuis quelle page de Vision
+il est appelé. **Ce que le lot ne fait pas** : vérifier que l'adresse mène à une image. Elle est
+validée comme lien web, comme celle d'une ressource, et rien de plus — une adresse morte affiche une
+image cassée, ce qu'aucun écran ne rattrape aujourd'hui.
+
+**La directive `eslint-disable-next-line` a d'abord porté sur un commentaire.** Écrite sur deux
+lignes — la directive puis son explication —, elle désignait la **seconde ligne de commentaire**, pas
+la balise. ESLint l'a dit exactement : « Unused eslint-disable directive » **et** l'avertissement
+qu'elle prétendait taire, côte à côte. Les deux avertissements ensemble sont le symptôme ; un seul
+aurait pu passer pour normal. L'explication est passée avant, la directive collée à la balise.
+
+**La création n'est pas atomique, et rejoint la dette de la création d'un projet.** `neon-http` n'a
+pas de transaction interactive : un persona écrit dont les traits échoueraient resterait sans
+traits. Le cas est bénin ici — c'est exactement l'état d'un persona créé sans qu'on saisisse de
+trait, donc un état que l'écran sait rendre et que la correction répare —, mais il est de la même
+famille, et il s'ajoutera à ce que refermera le jour où la couche exposera une transaction.
+
+**Aucun persona n'est semé.** Le brief n'en fournit aucun, et la règle de tête de `scripts/seed.ts`
+interdit d'en inventer — l'écart de T5bis.1 est encore frais. Le bloc s'ouvre donc sur son état vide,
+qui est un écran à part entière (règle 5) et qui porte le geste. **Deux personae ont en revanche été
+écrits à la main dans la base de développement** pour lire les cartes et la fiche dans le HTML servi.
+Ils y restent : la base de développement est jetable, et `db:seed` ne les connaîtra pas.
+
+**La mise en défaut a été prise quatre fois, et chaque fois elle a désigné exactement sa règle.**
+Le filtre de domaine de `lib/db/scoped.ts` neutralisé fait tomber **cinq** tests de
+`lib/queries/personas.test.ts` et eux seuls — les deux lignes forgées, plus trois lectures qui se
+mettent alors à voir le domaine voisin. La règle d'URL retirée fait tomber **deux** tests de forme.
+Le rapprochement `persona.productId !== productId` retiré d'`openPersona` fait tomber **les deux**
+tests de soumission forgée, et rien d'autre. Le droit dérivé neutralisé dans `openProductWrite` fait
+tomber **quatre** tests — un par action de persona, plus celui de `setNorthStar`, ce qui confirme au
+passage que les cinq actions plus anciennes passent bien par cette porte.
+
+**Aucun couple de couleurs neuf, et c'est le résultat d'une mesure, pas d'une intention.** Les
+quatorze couples du bloc, de la fiche et du panneau ont été calculés : le plus bas des couples de
+**texte** est à 4,98:1, et tous les autres montent à 6,84, 8,12, 15,72 ou 17,87:1. Deux couples non
+textuels restent sous 3:1 — le filet de carte à 1,17:1 et le fond de la puce « Principal » à 1,04:1
+—, mais **ni l'un ni l'autre n'est neuf** : ce sont exactement les couples et les positions de
+`Section`, d'`EmptyState` et de `Tag`, dont l'en-tête porte déjà l'arbitrage. Ce qui a été vérifié
+avant de s'y résoudre : **aucun jeton ne fait mieux**. `surface-neutral-lightest` comme fond de carte
+donne 1,05:1 contre le bloc, et le plus franc des `surface-neutral-*` plafonne à 2,22:1. La dette est
+récrite dans `ETAT.md`, elle n'a pas reçu d'addendum.
+
+**`ETAT.md` passe de 288 à 303 lignes.** Le seuil de 250 était déjà franchi ce matin ; les quinze
+lignes ajoutées sont celles qu'exigent les étapes 5 et 6 — une ligne de journal, et une dette récrite
+plutôt qu'augmentée. Un travail hors ticket ne balaie pas plus qu'un ticket : `CLAUDE.md` réserve ce
+geste à la session de découpage, qui devra le faire avant d'ouvrir C6.

@@ -83,11 +83,14 @@ import { notFound } from "next/navigation";
 
 import {
   archiveIndicator,
+  archivePersona,
   archiveReading,
   createIndicator,
+  createPersona,
   createReading,
   setNorthStar,
   updateIndicator,
+  updatePersona,
   updateReading,
 } from "./actions";
 import {
@@ -97,6 +100,9 @@ import {
 } from "../actions";
 import { IndicatorPanel } from "@/components/products/indicator-panel";
 import { Indicators } from "@/components/products/indicators";
+import { PersonaDetail } from "@/components/products/persona-detail";
+import { PersonaPanel } from "@/components/products/persona-panel";
+import { Personas } from "@/components/products/personas";
 import { ReadingPanel } from "@/components/products/reading-panel";
 import { ReadingsPanel } from "@/components/products/readings-panel";
 import { Roadmap } from "@/components/products/roadmap";
@@ -110,14 +116,16 @@ import { List, ListRow } from "@/components/ui/list";
 import { Page, PageHeader } from "@/components/ui/page";
 import { StatusDot } from "@/components/ui/status-dot";
 import { requireSession } from "@/lib/auth/provider";
-import { indicatorReadings, indicators } from "@/lib/db/schema";
+import { indicatorReadings, indicators, personas } from "@/lib/db/schema";
 import { toIndicatorFormValues } from "@/lib/forms/indicator";
+import { toPersonaFormValues } from "@/lib/forms/persona";
 import { toReadingFormValues } from "@/lib/forms/reading";
 import { toVisionFormValues } from "@/lib/forms/vision";
 import { formatAccompaniments, formatMonth, formatPeriod } from "@/lib/format";
 import {
   ARCHIVE_PANEL_CONFIRM,
   INDICATOR_PANEL_NEW,
+  PERSONA_PANEL_NEW,
   ROUTES,
   VISION_PANEL_EDIT,
 } from "@/lib/navigation";
@@ -126,6 +134,10 @@ import {
   listProductIndicators,
   listProductReadings,
 } from "@/lib/queries/indicators";
+import {
+  listPersonaTraits,
+  listProductPersonas,
+} from "@/lib/queries/personas";
 import { findProductDetail, listProductProjects } from "@/lib/queries/products";
 import { listProductMilestones } from "@/lib/queries/timeline";
 import { isUuid } from "@/lib/uuid";
@@ -152,6 +164,19 @@ export default async function ProductPage({
      * distinguer dans l'URL.
      */
     vision?: string;
+    /**
+     * Le panneau de **saisie d'un persona** (18/08/2026). Une seule clé, dont
+     * la **valeur** porte le cas — la forme d'`indicateur` : `nouveau` ouvre le
+     * panneau vide, un identifiant l'ouvre sur la ligne à corriger.
+     */
+    persona?: string;
+    /**
+     * La **fiche** d'un persona, en lecture (18/08/2026). Sa valeur est
+     * toujours un identifiant. **Deux clés pour un même objet**, parce que ce
+     * sont deux droits différents : la fiche se lit par tout le domaine (D9),
+     * la saisie demande le droit d'écrire.
+     */
+    fiche?: string;
     /**
      * Les deux bornes de la fenêtre de la roadmap. **Elles ne rejoignent pas le
      * décompte d'exclusivité** des trois clés au-dessus : elles n'ouvrent aucun
@@ -183,14 +208,21 @@ export default async function ProductPage({
      (T5.5), et les courbes sont les indicateurs et les relevés que les deux
      lectures du bloc rendent déjà (T5.6). Seuls les repères de la roadmap et
      les cibles des courbes demandent une lecture neuve — une chacun. */
-  const [projects, productIndicators, productReadings, milestones, adoptions] =
-    await Promise.all([
-      listProductProjects(session.db, product.id),
-      listProductIndicators(session.db, product.id),
-      listProductReadings(session.db, product.id),
-      listProductMilestones(session.db, product.id),
-      listProductAdoptions(session.db, product.id),
-    ]);
+  const [
+    projects,
+    productIndicators,
+    productReadings,
+    milestones,
+    adoptions,
+    productPersonas,
+  ] = await Promise.all([
+    listProductProjects(session.db, product.id),
+    listProductIndicators(session.db, product.id),
+    listProductReadings(session.db, product.id),
+    listProductMilestones(session.db, product.id),
+    listProductAdoptions(session.db, product.id),
+    listProductPersonas(session.db, product.id),
+  ]);
 
   const archived = product.archivedAt !== null;
 
@@ -209,7 +241,7 @@ export default async function ProductPage({
     (session.can.manageDomain ||
       projects.some((project) => session.can.writeProject(project.id)));
 
-  const { archiver, indicateur, releve, releves, vision, de, a } =
+  const { archiver, indicateur, releve, releves, vision, persona, fiche, de, a } =
     await searchParams;
 
   /* L'exclusivité, avant tout le reste : plusieurs clés d'ouverture
@@ -227,7 +259,7 @@ export default async function ProductPage({
      l'écran à aucun panneau — elle ne pose ni `role="dialog"` ni `inert` —, et
      les faire compter fermerait un panneau chaque fois que la roadmap est
      filtrée. */
-  const keys = { archiver, indicateur, releve, releves, vision };
+  const keys = { archiver, indicateur, releve, releves, vision, persona, fiche };
   const conflict =
     Object.values(keys).filter((value) => value !== undefined).length > 1;
   const asked: Partial<typeof keys> = conflict ? {} : keys;
@@ -354,12 +386,62 @@ export default async function ProductPage({
   const visionPanelOpen =
     session.can.manageDomain && !archived && asked.vision === VISION_PANEL_EDIT;
 
+  /* Les deux clés du persona (18/08/2026), et **elles ne se ressemblent qu'en
+     apparence** : `persona` ouvre la saisie et tombe avec le droit d'écrire ;
+     `fiche` ouvre la lecture et ne dépend d'aucun droit — la fiche est le détail
+     que la carte résume, et le bloc se lit par tout le domaine (D9). C'est la
+     même séparation que `releves` tient déjà pour la série d'un indicateur.
+
+     La valeur de `persona` porte le cas, comme celle d'`indicateur` : `nouveau`
+     crée, un identifiant corrige, tout le reste n'ouvre rien. La forme est
+     vérifiée avant la base — une colonne `uuid` interrogée avec n'importe quoi
+     rend une erreur PostgreSQL, donc un 500, là où l'on attend une page nue. */
+  const editedPersonaRow =
+    canWriteIndicators &&
+    asked.persona &&
+    asked.persona !== PERSONA_PANEL_NEW &&
+    isUuid(asked.persona)
+      ? await session.db.find(personas, asked.persona)
+      : undefined;
+
+  const editedPersona =
+    editedPersonaRow &&
+    editedPersonaRow.productId === product.id &&
+    editedPersonaRow.archivedAt === null
+      ? editedPersonaRow
+      : null;
+
+  const personaPanelOpen =
+    canWriteIndicators &&
+    (asked.persona === PERSONA_PANEL_NEW || editedPersona !== null);
+
+  /* La fiche : toujours un identifiant, jamais polymorphe. Elle se résout sur
+     la liste **déjà lue** plutôt que par une lecture de plus — le persona
+     affiché est celui du bloc, et un persona archivé ou d'un autre produit n'y
+     est pas. C'est ce qui remplace ici la confrontation en deux temps que
+     l'indicateur demande. */
+  const detailedPersona =
+    asked.fiche && isUuid(asked.fiche)
+      ? (productPersonas.find((row) => row.id === asked.fiche) ?? null)
+      : null;
+
+  /* La seule lecture conditionnelle de la page : les traits n'arrivent que
+     lorsqu'un des deux panneaux du persona est ouvert. Jamais une lecture par
+     carte — le bloc n'en a pas besoin, la carte ne résume que le haut de la
+     fiche. */
+  const openedPersonaId = detailedPersona?.id ?? editedPersona?.id ?? null;
+  const personaTraitRows = openedPersonaId
+    ? await listPersonaTraits(session.db, openedPersonaId)
+    : [];
+
   const panelOpen =
     archivePanelOpen ||
     indicatorPanelOpen ||
     readingPanel !== null ||
     readingsIndicator !== undefined ||
-    visionPanelOpen;
+    visionPanelOpen ||
+    personaPanelOpen ||
+    detailedPersona !== null;
 
   return (
     <>
@@ -516,6 +598,57 @@ export default async function ProductPage({
         />
       ) : null}
 
+      {personaPanelOpen ? (
+        /* Les identifiants sont liés **côté serveur** — au produit en création,
+           au produit et au persona en correction : le panneau ne connaît ni
+           l'un ni l'autre. Ce n'est pas un verrou, Next les sérialisant en
+           clair dans un champ `$ACTION_…`. Le verrou est dans l'action :
+           `createPersona` passe par `openProductWrite`, `updatePersona` par
+           `openPersona`, et les deux redérivent le droit sur le produit
+           **reçu**. */
+        <PersonaPanel
+          /* La `key` change avec ce que le panneau édite : `useActionState` ne
+             relit son état initial qu'au montage. */
+          key={editedPersona ? editedPersona.id : PERSONA_PANEL_NEW}
+          productName={product.name}
+          closeHref={ROUTES.product(product.id)}
+          action={
+            editedPersona
+              ? updatePersona.bind(null, product.id, editedPersona.id)
+              : createPersona.bind(null, product.id)
+          }
+          {...(editedPersona
+            ? {
+                title: "Modifier le persona",
+                submitLabel: "Enregistrer les modifications",
+                initial: toPersonaFormValues(editedPersona, personaTraitRows),
+              }
+            : {})}
+        />
+      ) : null}
+
+      {/* La fiche **se lit par tout le domaine** (D9), à la différence du
+          panneau ci-dessus : son ouverture ne passe par aucun droit. Ce sont
+          ses deux gestes qui tombent avec lui, chacun à `null`. */}
+      {detailedPersona ? (
+        <PersonaDetail
+          productName={product.name}
+          persona={detailedPersona}
+          traits={personaTraitRows}
+          closeHref={ROUTES.product(product.id)}
+          editHref={
+            canWriteIndicators
+              ? ROUTES.productPersonaEdit(product.id, detailedPersona.id)
+              : null
+          }
+          archivePersona={
+            canWriteIndicators
+              ? archivePersona.bind(null, product.id, detailedPersona.id)
+              : null
+          }
+        />
+      ) : null}
+
       {/* `inert` est un attribut HTML, pas un script : le contenu reste lu et
           affiché derrière le voile, mais ne prend plus ni focus ni clic tant
           que le panneau est ouvert. */}
@@ -643,6 +776,27 @@ export default async function ProductPage({
               canWriteIndicators ? setNorthStar.bind(null, product.id) : null
             }
           />
+          {/* **Le troisième bloc de la page** (18/08/2026) : « Vision produit »
+              dit pourquoi ce produit existe et ce qu'il mesure, celui-ci dit
+              **pour qui**. Il vient juste après, avant les accompagnements :
+              c'est la question qu'on se pose en concevant, pas ce qu'on a fait.
+
+              Le bloc se lit par tout le domaine (D9) — d'où le lien de fiche,
+              jamais nul. Son seul point d'entrée d'écriture tombe avec
+              `canWriteIndicators` : **le même droit que les indicateurs**,
+              dérivé des accompagnements du produit, et la lecture seule d'un
+              produit archivé avec lui. Ce n'est pas ce rendu qui protège — les
+              trois actions redérivent le droit sur les identifiants reçus. */}
+          <Personas
+            personas={productPersonas}
+            detailHref={(personaId) =>
+              ROUTES.productPersona(product.id, personaId)
+            }
+            addHref={
+              canWriteIndicators ? ROUTES.productPersonaNew(product.id) : null
+            }
+          />
+
           {/* **Le deuxième bloc de la page** (18/08/2026), sous le nom
               « Accompagnements en cours ». Il ferme la position qu'il occupait
               la veille et retrouve celle de `docs/06` §6 — « au-dessus de la

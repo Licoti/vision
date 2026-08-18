@@ -79,6 +79,8 @@ import type { Session } from "@/lib/auth/session";
 import {
   indicatorReadings,
   indicators,
+  personaTraits,
+  personas,
   products,
   projectIndicators,
   projects,
@@ -89,6 +91,12 @@ import {
   readIndicatorForm,
   type IndicatorFormState,
 } from "@/lib/forms/indicator";
+import {
+  parsePersonaForm,
+  readPersonaForm,
+  type PersonaFormState,
+  type PersonaTraitInput,
+} from "@/lib/forms/persona";
 import {
   parseReadingForm,
   readReadingForm,
@@ -709,6 +717,298 @@ export async function archiveReading(
   if ("message" in gate) return;
 
   await session.db.archive(indicatorReadings, readingId);
+
+  revalidatePath(ROUTES.product(productId));
+}
+
+/* ==========================================================================
+   Les personae — 18/08/2026
+
+   **Le même droit que les indicateurs**, et par la même porte : `manageDomain`,
+   ou contributeur désigné d'au moins un accompagnement vivant du produit
+   (arbitrage (b) de `tickets-C5.md`). Un persona sort du travail
+   d'accompagnement — une campagne de tests, des entretiens — et lui inventer un
+   troisième niveau de droit serait ce que D9 refuse.
+
+   C'est ce qui distingue ces trois actions de `updateProductVision`, qui vit
+   dans `app/(app)/produits/actions.ts` sous `manageDomain` seul : la vision est
+   une **colonne de `products`**, les personae sont **leurs propres tables**.
+   C'est la table écrite qui décide du fichier, pas l'écran d'où part le geste.
+
+   **Deux tables par geste**, et c'est leur seule singularité : une ligne de
+   `personas`, et la liste de ses traits. `syncTraits` fait le second temps.
+   ========================================================================== */
+
+/** Un refus qui n'appartient à aucun champ, sur la saisie d'un persona. */
+function personaRefusal(formData: FormData, message: string): PersonaFormState {
+  return { values: readPersonaForm(formData), errors: {}, message };
+}
+
+/** Le même filet de dernier recours, sur la saisie d'un persona. */
+function personaScopeRefusal(
+  error: unknown,
+  formData: FormData,
+): PersonaFormState {
+  if (error instanceof DomainScopeError) {
+    return personaRefusal(
+      formData,
+      "Une référence de ce formulaire n'appartient pas au domaine : la saisie n'a pas été enregistrée.",
+    );
+  }
+  throw error;
+}
+
+/**
+ * Le persona reçu, rapproché du produit reçu — la quatrième porte, sur le modèle
+ * exact d'`openIndicator`.
+ *
+ * Deux contrôles, et chacun ferme une porte :
+ *
+ * 1. `openProductWrite` sur le `productId` **reçu** — le droit dérivé,
+ *    l'appartenance au domaine et la lecture seule d'un produit archivé, d'un
+ *    seul appel ;
+ * 2. le persona reçu **appartient à ce produit** et n'est pas déjà archivé.
+ *    Sans ce second contrôle, une soumission forgée corrigerait ou rangerait le
+ *    persona d'un autre produit, les identifiants liés étant sérialisés en clair
+ *    dans un champ `$ACTION_…`.
+ *
+ * Les deux refus se ressemblent volontairement : l'écran ne distingue pas le
+ * persona inconnu de celui d'un autre domaine, pour la même raison que la page
+ * produit rend 404 dans les deux cas.
+ *
+ * Le message n'est utilisé que par `updatePersona` : `archivePersona` refuse en
+ * silence, n'ayant aucune saisie à rendre.
+ */
+async function openPersona(
+  session: Session,
+  productId: string,
+  personaId: string,
+  refused: string,
+): Promise<{ persona: Row<typeof personas> } | { message: string }> {
+  const gate = await openProductWrite(session, productId, refused);
+  if ("message" in gate) return gate;
+
+  const persona = await session.db.find(personas, personaId);
+  if (
+    !persona ||
+    persona.productId !== productId ||
+    persona.archivedAt !== null
+  ) {
+    return { message: "Ce persona n'existe plus sur ce produit." };
+  }
+
+  return { persona };
+}
+
+/**
+ * Le second temps de l'écriture : les traits du persona, mis à jour **par
+ * différence**.
+ *
+ * C'est `syncJobs` (`app/(app)/projets/actions.ts`) transposé, et le choix du
+ * diff plutôt que du remplacement n'est pas une économie de requêtes : c'est ce
+ * qui garde l'**identifiant d'un trait stable** d'une correction à l'autre. Un
+ * remplacement récrirait des lignes neuves à chaque enregistrement, et le jour
+ * où un use case désignera « l'irritant qu'il adresse », il désignerait une
+ * ligne effacée par la correction suivante. Le rapprochement se fait donc sur
+ * `(kind, label)` — ce qu'une personne reconnaît comme « le même irritant ».
+ *
+ * **Les ajouts avant les retraits** (T3.6) : `neon-http` n'a pas de transaction
+ * interactive, et un échec au milieu doit laisser trop de traits plutôt que pas
+ * assez. Le rang se met à jour entre les deux, sur les lignes qui survivent.
+ *
+ * `unlink` est une vraie suppression, et le typage la réserve aux tables sans
+ * `archived_at` : `persona_traits` en est une, délibérément (voir le schéma).
+ * Retirer une ligne d'une zone de texte n'est pas l'archivage que la règle 4
+ * proscrit — c'est la correction d'un champ, comme vider la vision d'un produit.
+ */
+async function syncTraits(
+  session: Session,
+  personaId: string,
+  wanted: readonly PersonaTraitInput[],
+): Promise<void> {
+  const current = await session.db.list(personaTraits, {
+    where: eq(personaTraits.personaId, personaId),
+  });
+
+  /* La clé du rapprochement : la famille et le libellé. `parsePersonaForm`
+     déduplique déjà à la saisie, si bien qu'une clé ne désigne qu'une ligne. */
+  const keyOf = (trait: { kind: string; label: string }): string =>
+    `${trait.kind} ${trait.label}`;
+
+  const held = new Map(current.map((row) => [keyOf(row), row]));
+
+  const added = wanted.filter((trait) => !held.has(keyOf(trait)));
+  if (added.length > 0) {
+    await session.db.insertMany(
+      personaTraits,
+      added.map((trait) => ({
+        personaId,
+        kind: trait.kind,
+        label: trait.label,
+        position: trait.position,
+      })),
+    );
+  }
+
+  for (const trait of wanted) {
+    const row = held.get(keyOf(trait));
+    if (row && row.position !== trait.position) {
+      await session.db.update(personaTraits, row.id, {
+        position: trait.position,
+      });
+    }
+  }
+
+  const target = new Set(wanted.map(keyOf));
+  for (const row of current) {
+    if (!target.has(keyOf(row))) {
+      await session.db.unlink(personaTraits, row.id);
+    }
+  }
+}
+
+/**
+ * Saisir un persona sur un produit.
+ *
+ * `productId` est lié côté serveur ; `previous` est l'état que `useActionState`
+ * fait circuler, dont l'action n'a pas besoin — la saisie repart du `FormData` à
+ * chaque soumission.
+ *
+ * **La création n'est pas atomique, et ne peut pas l'être** : `neon-http` n'a
+ * pas de transaction interactive. Un persona dont les traits échoueraient
+ * resterait sans traits — soit exactement l'état d'un persona qu'on vient de
+ * créer sans en saisir, donc un état que l'écran sait rendre, et que la
+ * correction répare. C'est la dette déjà consignée pour la création d'un projet.
+ */
+export async function createPersona(
+  productId: string,
+  _previous: PersonaFormState,
+  formData: FormData,
+): Promise<PersonaFormState> {
+  const session = await requireSession();
+
+  const gate = await openProductWrite(
+    session,
+    productId,
+    "La saisie d'un persona est réservée au responsable de domaine et aux contributeurs désignés d'un accompagnement de ce produit.",
+  );
+  if ("message" in gate) return personaRefusal(formData, gate.message);
+
+  const { values, errors, input } = parsePersonaForm(formData);
+  if (!input) return { values, errors };
+
+  try {
+    /* Un objet littéral, jamais un étalement de `FormData` : un champ caché
+       ajouté par n'importe qui deviendrait une colonne écrite. */
+    const created = await session.db.insert(personas, {
+      productId,
+      ...input.persona,
+    });
+    await syncTraits(session, created.id, input.traits);
+  } catch (error) {
+    return personaScopeRefusal(error, formData);
+  }
+
+  /* **Cette page-là, et elle seule.** La liste des produits n'affiche aucun
+     persona, et aucun autre écran n'en porte encore. */
+  revalidatePath(ROUTES.product(productId));
+
+  // La page nue, panneau refermé : la carte paraît dans le bloc, et c'est toute
+  // la confirmation (`docs/06` §9). `redirect` lève : elle est appelée hors de
+  // tout `try`, faute de quoi le `catch` ci-dessus avalerait la navigation.
+  redirect(ROUTES.product(productId));
+}
+
+/**
+ * Corriger un persona déjà saisi : **le même formulaire, la même validation,
+ * les mêmes refus** qu'à la création — la propriété qui fait qu'un seul panneau
+ * sert les deux gestes.
+ *
+ * `productId` et `personaId` sont liés côté serveur. **Ce ne sont pas des
+ * secrets** : Next les sérialise en clair dans un champ `$ACTION_…`, et une
+ * soumission peut les réécrire. Ce qui protège est `openPersona`, qui interroge
+ * le droit sur le produit **reçu** puis rapproche le persona **reçu** de ce
+ * produit.
+ *
+ * **Le produit ne se corrige pas ici** : `personas.product_id` n'est pas un
+ * champ du formulaire et ne le devient pas. Déplacer un persona d'un produit à
+ * l'autre serait un geste que rien ne demande.
+ */
+export async function updatePersona(
+  productId: string,
+  personaId: string,
+  _previous: PersonaFormState,
+  formData: FormData,
+): Promise<PersonaFormState> {
+  const session = await requireSession();
+
+  const gate = await openPersona(
+    session,
+    productId,
+    personaId,
+    "La modification d'un persona est réservée au responsable de domaine et aux contributeurs désignés d'un accompagnement de ce produit.",
+  );
+  if ("message" in gate) return personaRefusal(formData, gate.message);
+
+  const { values, errors, input } = parsePersonaForm(formData);
+  if (!input) return { values, errors };
+
+  try {
+    const updated = await session.db.update(personas, personaId, input.persona);
+    if (!updated) {
+      return personaRefusal(
+        formData,
+        "Ce persona n'existe plus sur ce produit.",
+      );
+    }
+    await syncTraits(session, personaId, input.traits);
+  } catch (error) {
+    return personaScopeRefusal(error, formData);
+  }
+
+  revalidatePath(ROUTES.product(productId));
+
+  // La page nue, panneau refermé : la carte corrigée paraît dans le bloc, et
+  // c'est toute la confirmation. `redirect` lève, donc hors du `try`.
+  redirect(ROUTES.product(productId));
+}
+
+/**
+ * Ranger un persona : il quitte le bloc, rien n'est supprimé (règle 4).
+ *
+ * **Sans confirmation** — arbitrage (c) de `tickets-C4bis.md` : elle se justifie
+ * là où le geste retire de la lecture tout un ensemble. Un persona ne porte rien
+ * d'autre que ses propres traits, et `docs/06` §9 proscrit la confirmation
+ * partout où elle ne protège rien.
+ *
+ * **Aucun rétablissement** — arbitrage (b) de `tickets-C4bis.md` : le
+ * rétablissement existe pour les deux objets qui ont une page, et un persona
+ * n'en a pas. Ses traits restent en base avec lui : archiver le parent ne
+ * cascade sur rien (arbitrage (f)), et la fiche redeviendrait entière le jour où
+ * un écran la rétablirait.
+ *
+ * **Le refus est muet**, comme `archiveIndicator` et `archiveReading` : ce geste
+ * n'a aucune saisie à rendre, et rien ne justifie de lui inventer un message que
+ * l'écran n'atteint jamais en usage normal — le point d'entrée n'est rendu qu'à
+ * qui peut écrire, sur un persona vivant de ce produit. Ce n'est pas ce rendu
+ * qui protège : la porte redérive le droit sur les identifiants reçus.
+ */
+export async function archivePersona(
+  productId: string,
+  personaId: string,
+): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openPersona(
+    session,
+    productId,
+    personaId,
+    // Jamais rendu : ce geste n'affiche aucun refus.
+    "Le rangement d'un persona est réservé au responsable de domaine et aux contributeurs désignés d'un accompagnement de ce produit.",
+  );
+  if ("message" in gate) return;
+
+  await session.db.archive(personas, personaId);
 
   revalidatePath(ROUTES.product(productId));
 }

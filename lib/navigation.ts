@@ -228,6 +228,41 @@ export const VISION_PANEL_PARAM = "vision";
 export const VISION_PANEL_EDIT = "modifier";
 
 /**
+ * Le panneau de **saisie d'un persona** (18/08/2026), sixième clé d'ouverture
+ * de la page produit.
+ *
+ * **Une seule clé, dont la valeur porte le cas** — la forme d'`indicateur` :
+ * `nouveau` ouvre le panneau vide, un identifiant de persona l'ouvre sur la
+ * ligne à corriger, tout le reste n'ouvre rien. Créer et corriger portent ici
+ * sur deux lignes distinctes, à la différence de la vision : la valeur doit
+ * donc désigner.
+ *
+ * **Le droit qui la garde est celui des indicateurs**, dérivé des
+ * accompagnements du produit (arbitrage (b) de `tickets-C5.md`) : un persona
+ * sort du travail d'accompagnement, et inventer un troisième niveau de droit
+ * pour lui serait ce que D9 refuse. Ce n'est pas cette route qui protège, mais
+ * les trois actions, qui redérivent le droit sur l'identifiant reçu.
+ */
+export const PERSONA_PANEL_PARAM = "persona";
+
+/** La valeur qui ouvre le panneau vide. Un identifiant ouvre la correction. */
+export const PERSONA_PANEL_NEW = "nouveau";
+
+/**
+ * Le panneau de **lecture d'un persona** (18/08/2026), septième et dernière clé
+ * d'ouverture de la page produit. Sa valeur est **toujours** un identifiant de
+ * persona, jamais polymorphe.
+ *
+ * **Deux clés et non une pour un même objet**, à rebours de la règle
+ * d'`indicateur` : ce ne sont pas deux gestes de même rang, ce sont deux
+ * **droits** différents. La fiche se lit par tout le domaine (D9), comme le
+ * bloc qui la porte ; la saisie demande le droit d'écrire. Une clé unique aurait
+ * mêlé les deux, et la fiche serait tombée avec le droit — c'est exactement la
+ * séparation que `releves` tient déjà pour la série d'un indicateur.
+ */
+export const PERSONA_DETAIL_PARAM = "fiche";
+
+/**
  * Les deux bornes de la fenêtre de la **roadmap**, sur la page du produit.
  *
  * **Ce ne sont pas des clés d'ouverture**, et elles ne rejoignent donc pas le
@@ -321,6 +356,26 @@ export const ROUTES = {
    */
   productVision: (id: string) =>
     `/produits/${id}?${VISION_PANEL_PARAM}=${VISION_PANEL_EDIT}`,
+  /**
+   * La page du produit, panneau de saisie d'un persona ouvert sur le vide.
+   * Même mécanique que `productIndicatorNew` jusqu'au nom de la clé : un
+   * paramètre, pas un écran de plus, et la fermeture reste `product(id)`.
+   */
+  productPersonaNew: (id: string) =>
+    `/produits/${id}?${PERSONA_PANEL_PARAM}=${PERSONA_PANEL_NEW}`,
+  /**
+   * La même page, le même panneau, ouvert sur un persona à corriger : la valeur
+   * porte le cas, et c'est la seule différence avec l'entrée ci-dessus.
+   */
+  productPersonaEdit: (id: string, personaId: string) =>
+    `/produits/${id}?${PERSONA_PANEL_PARAM}=${personaId}`,
+  /**
+   * La page du produit, **fiche** d'un persona ouverte en lecture. Elle ne
+   * demande aucun droit : c'est le détail que la carte résume, et il se lit par
+   * tout le domaine (D9). Les gestes *dans* la fiche, eux, tombent avec le droit.
+   */
+  productPersona: (id: string, personaId: string) =>
+    `/produits/${id}?${PERSONA_DETAIL_PARAM}=${personaId}`,
   /**
    * La page du produit, roadmap resserrée sur une fenêtre de mois.
    *

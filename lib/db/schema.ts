@@ -100,6 +100,36 @@ export const syncMode = pgEnum("sync_mode", ["manual", "api"]);
 /** D10 — `internal` porte les missions transverses. */
 export const productKind = pgEnum("product_kind", ["product", "internal"]);
 
+/**
+ * Le rang d'un persona d'un produit — **principal** ou **secondaire**.
+ *
+ * Concept ajouté hors des `docs/` (18/08/2026), comme la North Star et la
+ * vision avant lui : ni `docs/02` ni `docs/04` ne nomment le persona. L'écart
+ * est consigné dans `JOURNAL-TECHNIQUE.md`, comme le prévoit la règle 6.
+ *
+ * Ce n'est **ni un score ni un classement** (D39) : deux valeurs saisies à la
+ * main, qui disent quels profils portent le produit. Rien ne les calcule, rien
+ * ne les ordonne au-delà de « les principaux d'abord », et un produit peut en
+ * porter autant de principaux qu'il veut — aucune unicité ne s'y oppose.
+ */
+export const personaKind = pgEnum("persona_kind", ["primary", "secondary"]);
+
+/**
+ * La famille d'un trait de persona : un **objectif**, un **irritant**, une
+ * **attente**.
+ *
+ * C'est cette liste qui fait des trois zones de texte du panneau un contenu
+ * **structuré** : un irritant est une ligne de `persona_traits`, avec son
+ * identifiant propre, et non une phrase noyée dans un paragraphe. C'est la
+ * condition pour qu'un parcours ou un use case puisse un jour désigner
+ * « l'irritant que cet écran adresse » sans reprise de données.
+ */
+export const personaTraitKind = pgEnum("persona_trait_kind", [
+  "goal",
+  "pain",
+  "expectation",
+]);
+
 /** D43 — liste fermée, non configurable : la logique du produit en dépend. */
 export const activityState = pgEnum("activity_state", [
   "planned",
@@ -507,6 +537,113 @@ export const products = pgTable(
   (t) => [
     index("products_domain_id_idx").on(t.domainId),
     index("products_entity_id_idx").on(t.entityId),
+  ],
+);
+
+/**
+ * Un **persona** du produit : l'archétype d'utilisateur pour qui on conçoit.
+ *
+ * **Concept ajouté hors des `docs/`** (18/08/2026), comme `products.vision` et
+ * `indicators.is_north_star` avant lui. Le bloc de tête de la page produit dit
+ * *pourquoi* le produit existe et *ce qu'il mesure* ; il ne disait nulle part
+ * **pour qui**. L'écart au modèle documenté est consigné dans
+ * `JOURNAL-TECHNIQUE.md` (règle 6).
+ *
+ * **Piège de nom, à ne jamais confondre** — la paire `activities` / `events` de
+ * `CLAUDE.md` a désormais une sœur : `persons` est une **personne réelle**,
+ * membre du centre ou intervenant côté entité, qui peut porter un compte et
+ * figurer dans une équipe. `personas` est un **archétype d'utilisateur du
+ * produit**, qui n'existe pas et ne se connecte à rien. Deux tables sans aucun
+ * rapport, dont les noms ne diffèrent que d'une lettre.
+ *
+ * **Un référentiel, pas un contenu éditorial.** La ligne porte un identifiant
+ * stable, et c'est sa raison d'être : un parcours, un use case ou une
+ * fonctionnalité pourra la désigner le jour où ces objets existeront, sans
+ * reprise de données. **Aucune table de liaison n'est créée aujourd'hui** —
+ * une table sans écrivain ni lecteur est une table qu'on relit un jour sans
+ * savoir pourquoi (la leçon de T5.2).
+ *
+ * `on delete cascade` sur le produit, comme `indicators` : un persona n'existe
+ * pas hors du produit qu'il décrit. La cascade ne se déclenche jamais en usage
+ * — rien ne supprime un produit (règle 4).
+ */
+export const personas = pgTable(
+  "personas",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    domainId: domainRef(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** Le rôle ou le contexte : « Responsable d'agence », « Client pressé ». */
+    role: text("role"),
+    /** La description courte, celle que le panneau de détail porte sous le nom. */
+    summary: text("summary"),
+    /**
+     * L'adresse de l'image, **hébergée ailleurs**.
+     *
+     * Vision ne stocke aucun fichier (`docs/02`) : c'est un lien, comme
+     * `resources.url`, et la même règle de forme le valide — `http:` ou
+     * `https:`. Nulle, l'écran retombe sur la pastille d'initiales.
+     */
+    imageUrl: text("image_url"),
+    kind: personaKind("kind").notNull().default("secondary"),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    ...stamps,
+  },
+  (t) => [
+    index("personas_domain_id_idx").on(t.domainId),
+    index("personas_product_id_idx").on(t.productId),
+  ],
+);
+
+/**
+ * Un **trait** de persona : un objectif, un irritant ou une attente.
+ *
+ * Une ligne par élément, et c'est tout l'enjeu du modèle : la saisie se fait
+ * par trois zones de texte — une ligne = un élément —, mais ce qui arrive en
+ * base est une liste d'objets identifiés, pas trois paragraphes. Sans cette
+ * table, « rattacher un use case à l'irritant qu'il adresse » imposerait
+ * demain une reprise de données.
+ *
+ * **Aucun `archived_at`, délibérément.** C'est une `LinkTable` au sens de
+ * `lib/db/scoped.ts`, ce qui rend `unlink` disponible **à la compilation** :
+ * une ligne d'objectif est une ligne d'une zone de texte, qu'on récrit et
+ * qu'on retire, pas une donnée métier qu'on archive. C'est la règle de
+ * `project_jobs` et d'`activity_participants`, et la même que suit la vision
+ * produit — corriger un champ de texte n'est pas la suppression que la règle 4
+ * proscrit.
+ *
+ * **Aucune contrainte d'unicité sur `(persona_id, kind, label)`**, et c'est un
+ * choix : elle imposerait de retirer avant d'ajouter, à rebours de la règle de
+ * T3.6 — les ajouts passent avant les retraits, faute de transaction. Le
+ * dédoublonnage se fait donc à la saisie (`lib/forms/persona.ts`), là où il se
+ * lit.
+ */
+export const personaTraits = pgTable(
+  "persona_traits",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    domainId: domainRef(),
+    personaId: uuid("persona_id")
+      .notNull()
+      .references(() => personas.id, { onDelete: "cascade" }),
+    kind: personaTraitKind("kind").notNull(),
+    label: text("label").notNull(),
+    /**
+     * Le rang dans sa famille, 0-indexé — l'ordre de saisie.
+     *
+     * Un objectif n'a pas d'ordre naturel, et le trier par libellé ferait
+     * varier l'affichage à chaque correction. Le rang est donc celui des
+     * lignes de la zone de texte, tel qu'il a été tapé.
+     */
+    position: smallint("position").notNull(),
+    ...stamps,
+  },
+  (t) => [
+    index("persona_traits_domain_id_idx").on(t.domainId),
+    index("persona_traits_persona_id_idx").on(t.personaId),
   ],
 );
 

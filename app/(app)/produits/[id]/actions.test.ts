@@ -14,11 +14,18 @@
  * (`openProductWrite`, `openIndicator`), si bien que ce qui est éprouvé ici
  * vaut pour elles — mais il aura fallu une action neuve pour l'écrire.
  *
- * **Deux modules de Next sont remplacés**, et seulement deux : `next/headers`,
- * dont le cookie désigne la personne courante au POC, et `next/cache`, dont la
- * revalidation n'a aucun sens hors d'un rendu. Rien d'autre n'est simulé — la
- * base est réelle, les portes sont les vraies, et `requireSession` fait son
- * travail entier.
+ * **Trois modules de Next sont remplacés**, et seulement trois : `next/headers`,
+ * dont le cookie désigne la personne courante au POC ; `next/cache`, dont la
+ * revalidation n'a aucun sens hors d'un rendu ; et `next/navigation` depuis le
+ * 18/08/2026, `redirect` levant une exception que seul un rendu sait attraper —
+ * les trois actions de persona redirigent, là où `setNorthStar` ne redirige pas.
+ * Rien d'autre n'est simulé — la base est réelle, les portes sont les vraies, et
+ * `requireSession` fait son travail entier.
+ *
+ * **Une levée de `redirect` est le constat qu'une écriture a eu lieu**, et son
+ * absence celui d'un refus : une action qui rend un état n'a rien écrit. Les
+ * deux mesures se prennent quand même en base, jamais sur la seule promesse du
+ * chemin pris.
  */
 
 import { and, eq, isNull } from "drizzle-orm";
@@ -30,12 +37,15 @@ import {
   domains,
   entities,
   indicators,
+  personaTraits,
+  personas,
   persons,
   products,
   projectMembers,
   projectStatuses,
   projects,
 } from "@/lib/db/schema";
+import { EMPTY_PERSONA_VALUES } from "@/lib/forms/persona";
 
 /** Qui la requête prétend être. Chaque test la pose avant d'appeler l'action. */
 let currentPerson: string | null = null;
@@ -51,7 +61,17 @@ vi.mock("next/headers", () => ({
 
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
-const { setNorthStar } = await import("./actions");
+/** `redirect` lève : la levée est le constat qu'une action est allée au bout. */
+const REDIRECT = "NEXT_REDIRECT:";
+
+vi.mock("next/navigation", () => ({
+  redirect: (to: string) => {
+    throw new Error(`${REDIRECT}${to}`);
+  },
+}));
+
+const { archivePersona, createPersona, setNorthStar, updatePersona } =
+  await import("./actions");
 
 const suffix = Math.random().toString(36).slice(2, 10);
 
@@ -166,6 +186,8 @@ beforeAll(async () => {
 afterAll(async () => {
   if (!f?.domainId) return;
   const tables = [
+    personaTraits,
+    personas,
     projectMembers,
     indicators,
     projects,
@@ -355,6 +377,364 @@ describe("setNorthStar — ce que le geste refuse", () => {
       expect(written).toBe(f.indicatorId);
     } finally {
       await clear();
+    }
+  });
+});
+
+/* ==========================================================================
+   Les personae — 18/08/2026
+
+   **Le droit s'éprouve par l'action, jamais par l'écran.** Le bloc retire son
+   « Ajouter un persona » à qui n'a pas le droit d'écrire, et la fiche retire ses
+   deux gestes : cela ne prouve rien. Les identifiants liés d'une action serveur
+   sont sérialisés en clair dans un champ `$ACTION_…`, réécrivable — c'est donc
+   l'action qu'on interroge ici, avec les identifiants qu'une soumission forgée
+   porterait.
+
+   Les trois actions partagent la porte des indicateurs (`openProductWrite`), et
+   deux d'entre elles une porte propre (`openPersona`). Ce qui est éprouvé ici
+   vaut donc pour les cinq actions d'indicateur et de relevé — mais l'inverse
+   n'est pas vrai : `openPersona` est neuve, et c'est elle qui rapproche le
+   persona **reçu** du produit **reçu**.
+
+   Deux mesures par refus, et pas une : **la ligne n'est pas écrite** en base, et
+   l'action **rend son refus** plutôt que de rediriger. Une action refusée qui
+   rendrait un état sans message serait indiscernable d'une action qui a écrit.
+   ========================================================================== */
+
+/** Le `FormData` d'un persona valide, dont chaque test ne change que le sien. */
+function personaForm(overrides: Record<string, string> = {}): FormData {
+  const data = new FormData();
+  const values: Record<string, string> = {
+    name: `Chargé de clientèle ${suffix}`,
+    role: "Réseau d'agences",
+    summary: "Vingt dossiers par jour, pas deux minutes.",
+    imageUrl: "",
+    kind: "secondary",
+    goals: "Ouvrir un dossier vite\nRetrouver un client",
+    pains: "Ressaisir trois fois",
+    expectations: "",
+    ...overrides,
+  };
+  for (const [key, value] of Object.entries(values)) data.set(key, value);
+  return data;
+}
+
+/** L'état vide qu'`useActionState` passe en premier argument. */
+const NO_STATE = { values: EMPTY_PERSONA_VALUES, errors: {} };
+
+/** Les personae d'un produit, lus **en base** et non par un écran. */
+async function personasOf(productId: string) {
+  return db
+    .select({ id: personas.id, name: personas.name, kind: personas.kind })
+    .from(personas)
+    .where(
+      and(eq(personas.productId, productId), isNull(personas.archivedAt)),
+    );
+}
+
+/** Les traits d'un persona, lus en base, par famille puis par position. */
+async function traitsOf(personaId: string) {
+  const rows = await db
+    .select({
+      id: personaTraits.id,
+      kind: personaTraits.kind,
+      label: personaTraits.label,
+      position: personaTraits.position,
+    })
+    .from(personaTraits)
+    .where(eq(personaTraits.personaId, personaId));
+  return rows.sort((left, right) =>
+    left.kind === right.kind
+      ? left.position - right.position
+      : left.kind.localeCompare(right.kind),
+  );
+}
+
+/** Écrit un persona par le chemin normal, et rend son identifiant. */
+async function givenPersona(overrides: Record<string, string> = {}) {
+  currentPerson = f.managerId;
+  await expect(
+    createPersona(f.productId, NO_STATE, personaForm(overrides)),
+  ).rejects.toThrow(REDIRECT);
+  const rows = await personasOf(f.productId);
+  return rows[rows.length - 1]!.id;
+}
+
+/** Remet le produit à zéro entre deux tests : la fixture est partagée. */
+async function clearPersonas(): Promise<void> {
+  await db.delete(personaTraits).where(eq(personaTraits.domainId, f.domainId));
+  await db.delete(personas).where(eq(personas.domainId, f.domainId));
+}
+
+describe("createPersona — ce que le geste écrit", () => {
+  test("le responsable de domaine écrit la ligne et ses traits", async () => {
+    try {
+      const personaId = await givenPersona();
+
+      expect(await personasOf(f.productId)).toHaveLength(1);
+      expect(await traitsOf(personaId)).toEqual([
+        {
+          id: expect.any(String),
+          kind: "goal",
+          label: "Ouvrir un dossier vite",
+          position: 0,
+        },
+        {
+          id: expect.any(String),
+          kind: "goal",
+          label: "Retrouver un client",
+          position: 1,
+        },
+        {
+          id: expect.any(String),
+          kind: "pain",
+          label: "Ressaisir trois fois",
+          position: 0,
+        },
+      ]);
+    } finally {
+      await clearPersonas();
+    }
+  });
+
+  test("un contributeur désigné écrit aussi — c'est le droit dérivé", async () => {
+    /* L'arbitrage (b) de `tickets-C5.md`, transposé : un persona sort du travail
+       d'accompagnement, et son droit est celui des indicateurs. */
+    currentPerson = f.contributorId;
+    try {
+      await expect(
+        createPersona(f.productId, NO_STATE, personaForm()),
+      ).rejects.toThrow(REDIRECT);
+
+      expect(await personasOf(f.productId)).toHaveLength(1);
+    } finally {
+      await clearPersonas();
+    }
+  });
+
+  test("un persona sans aucun trait est un persona valide", async () => {
+    try {
+      const personaId = await givenPersona({
+        goals: "",
+        pains: "",
+        expectations: "",
+      });
+
+      expect(await traitsOf(personaId)).toEqual([]);
+    } finally {
+      await clearPersonas();
+    }
+  });
+});
+
+describe("createPersona — ce que le geste refuse", () => {
+  test("un membre sans accompagnement n'écrit rien", async () => {
+    currentPerson = f.outsiderId;
+    try {
+      const state = await createPersona(
+        f.productId,
+        NO_STATE,
+        personaForm(),
+      );
+
+      expect(state.message).toMatch(/réservée au responsable de domaine/);
+      expect(await personasOf(f.productId)).toEqual([]);
+    } finally {
+      await clearPersonas();
+    }
+  });
+
+  test("un produit archivé ne reçoit plus de saisie", async () => {
+    currentPerson = f.managerId;
+    try {
+      const state = await createPersona(
+        f.archivedProductId,
+        NO_STATE,
+        personaForm(),
+      );
+
+      expect(state.message).toMatch(/archivé/);
+      expect(await personasOf(f.archivedProductId)).toEqual([]);
+    } finally {
+      await clearPersonas();
+    }
+  });
+
+  test("une saisie sans nom rend ses erreurs, et n'écrit rien", async () => {
+    currentPerson = f.managerId;
+    try {
+      const state = await createPersona(
+        f.productId,
+        NO_STATE,
+        personaForm({ name: "" }),
+      );
+
+      expect(state.errors.name).toBeDefined();
+      // La saisie revient telle quelle : Vision ne jette jamais en silence.
+      expect(state.values.goals).toBe("Ouvrir un dossier vite\nRetrouver un client");
+      expect(await personasOf(f.productId)).toEqual([]);
+    } finally {
+      await clearPersonas();
+    }
+  });
+});
+
+describe("updatePersona — la porte `openPersona`", () => {
+  test("les traits gardent leur identifiant quand leur libellé ne change pas", async () => {
+    /* **La propriété qui justifie le diff plutôt que le remplacement** : un
+       parcours ou un use case pourra désigner un irritant sans qu'une
+       correction du persona ne l'efface. */
+    try {
+      const personaId = await givenPersona();
+      const before = await traitsOf(personaId);
+
+      currentPerson = f.managerId;
+      await expect(
+        updatePersona(
+          f.productId,
+          personaId,
+          NO_STATE,
+          /* L'ordre des deux objectifs s'inverse, le second irritant apparaît,
+             et l'attente reste vide : trois cas dans une soumission. */
+          personaForm({
+            goals: "Retrouver un client\nOuvrir un dossier vite",
+            pains: "Ressaisir trois fois\nAttendre la validation",
+          }),
+        ),
+      ).rejects.toThrow(REDIRECT);
+
+      const after = await traitsOf(personaId);
+      const idOf = (rows: typeof after, label: string) =>
+        rows.find((row) => row.label === label)?.id;
+
+      // Les trois lignes d'origine sont les mêmes lignes.
+      for (const label of [
+        "Ouvrir un dossier vite",
+        "Retrouver un client",
+        "Ressaisir trois fois",
+      ]) {
+        expect(idOf(after, label)).toBe(idOf(before, label));
+      }
+
+      // Et le rang a suivi l'ordre de saisie.
+      expect(
+        after.find((row) => row.label === "Retrouver un client")?.position,
+      ).toBe(0);
+      expect(after).toHaveLength(4);
+    } finally {
+      await clearPersonas();
+    }
+  });
+
+  test("un trait retiré de la zone de texte disparaît", async () => {
+    try {
+      const personaId = await givenPersona();
+
+      currentPerson = f.managerId;
+      await expect(
+        updatePersona(
+          f.productId,
+          personaId,
+          NO_STATE,
+          personaForm({ goals: "Ouvrir un dossier vite", pains: "" }),
+        ),
+      ).rejects.toThrow(REDIRECT);
+
+      expect((await traitsOf(personaId)).map((row) => row.label)).toEqual([
+        "Ouvrir un dossier vite",
+      ]);
+    } finally {
+      await clearPersonas();
+    }
+  });
+
+  test("le persona d'un autre produit ne se corrige pas depuis celui-ci", async () => {
+    /* La soumission forgée que `bind` n'empêche pas : le `productId` lié est
+       celui du produit ouvert, le `personaId` celui d'un persona voisin. */
+    try {
+      const personaId = await givenPersona();
+
+      currentPerson = f.managerId;
+      const state = await updatePersona(
+        f.otherProductId,
+        personaId,
+        NO_STATE,
+        personaForm({ name: `Forgé ${suffix}` }),
+      );
+
+      expect(state.message).toBe("Ce persona n'existe plus sur ce produit.");
+      expect((await personasOf(f.productId))[0]?.name).toBe(
+        `Chargé de clientèle ${suffix}`,
+      );
+    } finally {
+      await clearPersonas();
+    }
+  });
+
+  test("un membre sans accompagnement ne corrige rien", async () => {
+    try {
+      const personaId = await givenPersona();
+
+      currentPerson = f.outsiderId;
+      const state = await updatePersona(
+        f.productId,
+        personaId,
+        NO_STATE,
+        personaForm({ name: `Forgé ${suffix}` }),
+      );
+
+      expect(state.message).toMatch(/réservée au responsable de domaine/);
+      expect((await personasOf(f.productId))[0]?.name).toBe(
+        `Chargé de clientèle ${suffix}`,
+      );
+    } finally {
+      await clearPersonas();
+    }
+  });
+});
+
+describe("archivePersona — le rangement", () => {
+  test("le persona quitte le bloc, ses traits restent avec lui", async () => {
+    try {
+      const personaId = await givenPersona();
+
+      currentPerson = f.managerId;
+      await archivePersona(f.productId, personaId);
+
+      expect(await personasOf(f.productId)).toEqual([]);
+      // Règle 4 : rien n'est supprimé. La fiche redeviendrait entière.
+      expect(await traitsOf(personaId)).toHaveLength(3);
+    } finally {
+      await clearPersonas();
+    }
+  });
+
+  test("un membre sans accompagnement ne range rien — et le refus est muet", async () => {
+    try {
+      const personaId = await givenPersona();
+
+      currentPerson = f.outsiderId;
+      await expect(
+        archivePersona(f.productId, personaId),
+      ).resolves.toBeUndefined();
+
+      expect(await personasOf(f.productId)).toHaveLength(1);
+    } finally {
+      await clearPersonas();
+    }
+  });
+
+  test("le persona d'un autre produit ne se range pas depuis celui-ci", async () => {
+    try {
+      const personaId = await givenPersona();
+
+      currentPerson = f.managerId;
+      await archivePersona(f.otherProductId, personaId);
+
+      expect(await personasOf(f.productId)).toHaveLength(1);
+    } finally {
+      await clearPersonas();
     }
   });
 });

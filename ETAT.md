@@ -2,7 +2,7 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 18/08/2026 — hors ticket : le bloc « Vision produit » sur la maquette `northstar-v2`.
+**Dernière mise à jour :** 18/08/2026 — hors ticket : le bloc « Personae » sur la page produit.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
 **Ticket suivant :** **T5bis.3** — les filtres de la liste (`tickets-C5bis.md`)
 
@@ -102,6 +102,15 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   d'avant** — deux pastilles de cible et l'anneau des points se peignaient en
   `surface-primary-lighter` pour rester lisibles par-dessus les filets, et auraient dessiné trois
   rectangles bleus sur la carte blanche.
+- **Le bloc « Personae » — hors ticket, le 18/08/2026.** La page disait pourquoi le produit existe
+  et ce qu'il mesure, jamais **pour qui** : `personas` et `persona_traits` (migration **0006**),
+  cartes en grille sous « Vision produit », fiche en panneau (`?fiche=<id>`) et saisie en panneau
+  (`?persona=nouveau|<id>`) — **deux clés pour un même objet, parce que ce sont deux droits** : la
+  fiche se lit par tout le domaine (D9), la saisie suit le droit dérivé des accompagnements. Le
+  décompte d'exclusivité passe de cinq clés à sept sans qu'un caractère change. Sa leçon est dans
+  le modèle : **les trois zones de texte arrivent en base comme des lignes identifiées**, et le
+  `syncTraits` rapproche sur `(kind, label)` plutôt que de remplacer — sans ce diff, un use case
+  qui désignera un irritant désignerait une ligne que la correction suivante efface.
 
 ---
 
@@ -188,13 +197,19 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   connaissance de cause. Le jour où un second bloc reprend le surtitre, `Eyebrow` quitte
   `indicators.tsx` pour `components/ui/block.tsx`. → **arbitrage humain, pas un ticket.**
 
-- **La carte blanche de la North Star se détache à peine de son bloc.** La maquette sépare la carte
-  (`#ffffff`) du bloc (`#eef2fb`) à 1,12:1 ; nos jetons donnent 1,04:1, `surface-primary-lightest`
-  étant presque blanc (`midnight-100`, `#f5f9ff`). **C'est la bordure qui rend la carte lisible**,
-  et elle est plus franche que celle de la maquette : 1,33:1 contre l'intérieur, 1,28:1 contre le
-  bloc. Aucun jeton ne porte le bleu intermédiaire — `midnight-150` (`#e4ecf8`) est une primitive
-  que la couche sémantique §2.1 n'utilise nulle part. Le combler serait ajouter un jeton au design
-  system, hors du périmètre d'une reprise de bloc. → **arbitrage humain, sinon C7.**
+- **Une carte dans un bloc ne se détache d'aucun fond, et c'est le design system qui manque.** La
+  North Star d'abord : la maquette sépare la carte (`#ffffff`) du bloc (`#eef2fb`) à 1,12:1, nos
+  jetons donnent 1,04:1, et **c'est la bordure qui la rend lisible** — 1,33:1 contre l'intérieur,
+  1,28:1 contre le bloc. Les cartes de personae ensuite (18/08/2026), qui posent le même problème
+  sur la tonalité neutre : **aucun fond disponible ne les détache** — `surface-neutral-lightest`
+  sur `surface-neutral-pale` donne 1,05:1 —, si bien qu'elles n'en portent aucun et que **le filet
+  seul fait la carte**, à 1,17:1. C'est le couple de `Section`, de `Block` et d'`EmptyState`, à sa
+  position habituelle : rien de neuf n'a été introduit, et rien de plus sombre n'existe — le plus
+  franc des `surface-neutral-*` plafonne à 2,22:1, toujours sous la limite de 3:1. Aucun jeton ne
+  porte le bleu intermédiaire non plus : `midnight-150` (`#e4ecf8`) est une primitive que la couche
+  sémantique §2.1 n'utilise nulle part. Le combler serait ajouter des jetons au design system, hors
+  du périmètre d'une reprise de bloc. **Tous les couples de texte, eux, sont mesurés au-dessus de
+  4,5:1** — le plus bas est à 4,98:1. → **arbitrage humain, sinon C7.**
 
 - **Sans JavaScript, les gestes d'une carte de roadmap ne sont plus atteignables.** Le menu « … »
   décide lui-même de son ouverture (`useState`), seule exception arbitrée à D30 — élargie le
