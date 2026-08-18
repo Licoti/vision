@@ -2,7 +2,7 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 18/08/2026 — hors ticket : le bloc « Personae » sur la page produit.
+**Dernière mise à jour :** 18/08/2026 — hors ticket : les indicateurs associés repliés par défaut.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
 **Ticket suivant :** **T5bis.3** — les filtres de la liste (`tickets-C5bis.md`)
 
@@ -111,6 +111,11 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   le modèle : **les trois zones de texte arrivent en base comme des lignes identifiées**, et le
   `syncTraits` rapproche sur `(kind, label)` plutôt que de remplacer — sans ce diff, un use case
   qui désignera un irritant désignerait une ligne que la correction suivante efface.
+- **Les indicateurs associés repliés par défaut — hors ticket, le 18/08/2026.** Le rang 3 du bloc
+  « Vision produit » devient un `<details>` fermé, dont `BlockDivider` sait être le `<summary>` — la
+  question du produit reste seule à l'écran, ses cartes tiennent à un clic. Sa leçon :
+  **`display: flex` retire à `<summary>` le triangle natif du navigateur**, ce que le `<details>` de
+  la roadmap projet croyait conserver ; la marque de repli se pose donc en `mark`, comme le ★.
 
 ---
 
@@ -140,6 +145,12 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
 
 ### b. Assignés à un ticket
 
+- **Le groupe « Annulé » de la roadmap projet se replie sans marque visible.** Son `<summary>` est
+  en `flex`, ce qui retire à `<summary>` le triangle natif du navigateur — le commentaire de
+  `components/projects/roadmap.tsx` affirme l'inverse, et c'est lui qui est faux. Rien n'annonce donc
+  qu'il y a là quelque chose à déplier. Le rang « Indicateurs associés » a été doté d'un chevron en
+  `mark` le 18/08/2026 ; le même geste, cinq lignes, referme celui-ci. Hors périmètre ce jour-là
+  (règle 3). → **ticket propre, C7 au plus tard.**
 - **`project_indicators.note` n'a ni écrivain ni lecteur.** La colonne existe depuis T1.2, `docs/04`
   §3 la décrit « texte court », et le panneau d'adoption de T5.4 ne la saisit pas : sa fiche énumère
   ce qu'une ligne du bloc dit et n'en parle nulle part. Arbitrage tranché avant écriture le

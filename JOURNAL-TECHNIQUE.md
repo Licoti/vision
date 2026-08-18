@@ -3880,3 +3880,64 @@ récrite dans `ETAT.md`, elle n'a pas reçu d'addendum.
 lignes ajoutées sont celles qu'exigent les étapes 5 et 6 — une ligne de journal, et une dette récrite
 plutôt qu'augmentée. Un travail hors ticket ne balaie pas plus qu'un ticket : `CLAUDE.md` réserve ce
 geste à la session de découpage, qui devra le faire avant d'ouvrir C6.
+
+---
+
+## Hors ticket — les indicateurs associés repliés, 18/08/2026
+
+**La demande.** Replier par défaut le rang « Indicateurs associés » du bloc « Vision produit », pour
+gagner la place de ses cartes et laisser à l'utilisateur la liberté de les déplier.
+
+**Un `<details>` natif, comme le groupe « Annulé » de la roadmap projet.** Aucun état à tenir, aucun
+JavaScript, aucun composant client de plus : le repli est celui du navigateur, et il survit à un
+rendu serveur. Le `<details>` n'a pas d'attribut `open` — c'est cette absence, lue dans le HTML
+servi, qui est le critère.
+
+**`BlockDivider` sait désormais être un `<summary>`, et c'est pour cela que l'intertitre n'a pas
+bougé.** L'autre voie — inliner le balisage du séparateur dans le `<summary>` — aurait dupliqué un
+langage que `components/ui/block.tsx` déclare tenir « une fois pour toutes », et le jour où le filet
+change, un des deux rangs ne suivrait pas. Un `<div>` autour du contenu n'était pas une option :
+`<summary>` n'accepte que du contenu de phrasé, plus un titre en premier enfant — la remarque était
+déjà écrite dans `roadmap.tsx`. La balise change, le `h3` et le décompte ne changent pas ; le
+décompte compte d'ailleurs pour le repli plus que pour l'ouverture, puisqu'il est ce qui reste à
+l'écran quand les cartes n'y sont plus.
+
+**Le piège, et il contredit un commentaire du dépôt : `display: flex` retire à `<summary>` le
+triangle natif.** Le marqueur d'un `<summary>` n'existe que tant qu'il est `display: list-item` ;
+la classe `flex` — nécessaire ici pour que le filet coure jusqu'au bord — le fait disparaître.
+`roadmap.tsx` affirme en toutes lettres, sur son groupe « Annulé », que « le triangle natif du
+navigateur est conservé » : il ne l'est pas, et ce repli-là n'a donc aujourd'hui aucune marque
+visible. **Le cas n'est pas corrigé ici** — règle 3, c'est un autre bloc et une autre page ; il est
+posé en point ouvert dans `ETAT.md`. Sur le rang des indicateurs, la marque est rétablie en `mark`,
+là où le ★ de la North Star se pose déjà : un `▶` `aria-hidden` qui tourne d'un quart de tour sur
+`group-open`. Aucun jeton n'est enfreint — `text-2xs` est une taille du thème (`--font-size-2xs`),
+`rotate-90` et `transition-transform` ne sont ni une couleur, ni une taille, ni un espacement, ni un
+rayon. L'état, lui, n'est jamais porté par la marque : `<summary>` l'expose nativement à
+l'assistance, et la couleur ne porte jamais seule (`docs/06` §11).
+
+**Ce que la mesure a confirmé dans le CSS servi**, parce qu'un variant Tailwind se vérifie plutôt
+qu'il ne se suppose : `group-open:rotate-90` est bien compilé, en
+`.group-open\:rotate-90:is(:where(.group):is([open], :popover-open, :open) *)` — le `group` est
+posé sur le `<details>`, l'ouverture le traverse. Les deux garde-fous du marqueur (`list-none` et
+`[&::-webkit-details-marker]:hidden`) sont compilés eux aussi.
+
+**« Ajouter un indicateur » se replie avec les cartes**, et c'est un arbitrage. Le sortir de la
+grille pour le garder visible aurait déplacé un point d'entrée que la maquette pose là, et fait du
+rang replié une barre à demi ouverte. Rien n'est perdu : le lien reste dans le rendu — le repli est
+visuel, pas conditionnel —, et aucun droit ne change, puisque les actions redérivent le leur sur
+l'identifiant reçu.
+
+**Ce que le travail ne fait pas.** Il ne mémorise pas l'état d'ouverture d'une visite à l'autre : il
+faudrait une clé d'URL ou un stockage client, et la demande dit « par défaut replié », pas
+« se souvenir ». Il ne touche ni au rang « North Star », ni au bloc « Personae », ni au `<details>`
+de la roadmap projet.
+
+**Aucun couple de couleurs neuf.** Le chevron prend la couleur du `h3` qu'il précède
+(`content-neutral-dark` sur `surface-primary-lighter`), à la position exacte du ★ du rang
+au-dessus : rien à mesurer que l'en-tête du 18/08 n'ait déjà mesuré.
+
+**Les 732 tests passent, et aucun ne parlait de ce rang** — il n'a pas de logique, seulement une
+balise. La mise en défaut porte donc sur le HTML servi : sans l'attribut `open`, les trois pages
+produit de la base de développement rendent leurs cartes et leur lien d'ajout **dans le document**,
+repliés. `ETAT.md` passe de 303 à 309 lignes ; le seuil de 250 reste franchi, et attend la session
+de découpage de C6.

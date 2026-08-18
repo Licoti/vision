@@ -444,50 +444,73 @@ export function Indicators({
 
             Le décompte est neuf (maquette `northstar-v2`) et dit
             « complémentaire » là où l'intertitre dit « associé » : répéter le
-            même mot à dix centimètres n'aurait rien ajouté. */}
-        <div className="mt-8.5 mb-4">
+            même mot à dix centimètres n'aurait rien ajouté.
+
+            **Replié par défaut** (18/08/2026, demande de l'humain) : le rang
+            gagne la place de ses cartes tant qu'on ne les demande pas, et la
+            question du produit — la vision, puis la North Star — reste seule à
+            l'écran. C'est un `<details>` natif, sans JavaScript, comme le
+            groupe « Annulé » de la roadmap projet ; l'intertitre en devient le
+            `<summary>`, décompte compris — savoir combien d'indicateurs sont
+            repliés est ce qui donne envie de les déplier.
+
+            **L'ajout se replie avec eux.** « Ajouter un indicateur » vit dans
+            la grille, et l'en sortir pour le garder visible aurait déplacé un
+            point d'entrée que la maquette pose là. Il reste à un clic, et le
+            menu du bloc n'est pas le seul chemin. */}
+        <details className="group mt-8.5">
           <BlockDivider
+            as="summary"
+            /* Le chevron **remplace le triangle natif**, que `flex` retire à
+               `<summary>` : il tourne d'un quart de tour à l'ouverture. Il est
+               décoratif — `<summary>` expose déjà l'état à l'assistance, et la
+               couleur ne porte jamais seule (`docs/06` §11). */
+            mark={
+              <span className="inline-block text-2xs leading-none transition-transform group-open:rotate-90">
+                ▶
+              </span>
+            }
             title="Indicateurs associés"
             note={formatComplementaryIndicators(others.length)}
             rule="bg-border-primary-lighter"
           />
-        </div>
 
-        {/* La grille **ne bouge pas** : la maquette `northstar-v2` ne porte
-            plus les cartes, et c'est une omission de la maquette, pas une
-            suppression demandée. */}
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
-          {others.map((indicator) => (
-            <IndicatorCard
-              key={indicator.id}
-              indicator={indicator}
-              adoptions={adopted.get(indicator.id) ?? []}
-              editHref={editHref}
-              archiveIndicator={archiveIndicator}
-              addReadingHref={addReadingHref}
-              readingsHref={readingsHref}
-              setNorthStar={setNorthStar}
-            />
-          ))}
+          {/* La grille **ne bouge pas** : la maquette `northstar-v2` ne porte
+              plus les cartes, et c'est une omission de la maquette, pas une
+              suppression demandée. */}
+          <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
+            {others.map((indicator) => (
+              <IndicatorCard
+                key={indicator.id}
+                indicator={indicator}
+                adoptions={adopted.get(indicator.id) ?? []}
+                editHref={editHref}
+                archiveIndicator={archiveIndicator}
+                addReadingHref={addReadingHref}
+                readingsHref={readingsHref}
+                setNorthStar={setNorthStar}
+              />
+            ))}
 
-          {addHref ? (
-            <Link
-              href={addHref}
-              className="flex min-h-24 items-center justify-center gap-2 rounded-2xl border border-dashed border-border-primary-light text-sm font-semibold text-content-primary-dark"
-            >
-              <span aria-hidden="true" className="text-lg leading-none">
-                +
-              </span>
-              Ajouter un indicateur
-            </Link>
-          ) : null}
+            {addHref ? (
+              <Link
+                href={addHref}
+                className="flex min-h-24 items-center justify-center gap-2 rounded-2xl border border-dashed border-border-primary-light text-sm font-semibold text-content-primary-dark"
+              >
+                <span aria-hidden="true" className="text-lg leading-none">
+                  +
+                </span>
+                Ajouter un indicateur
+              </Link>
+            ) : null}
 
-          {others.length === 0 && !addHref ? (
-            <p className="text-sm leading-175 text-content-neutral-dark">
-              Aucun indicateur associé sur ce produit.
-            </p>
-          ) : null}
-        </div>
+            {others.length === 0 && !addHref ? (
+              <p className="text-sm leading-175 text-content-neutral-dark">
+                Aucun indicateur associé sur ce produit.
+              </p>
+            ) : null}
+          </div>
+        </details>
       </div>
     </Block>
   );

@@ -606,7 +606,6 @@ function Header() {
   return (
     <BlockHeader
       title="Accompagnements en cours"
-      note="Les accompagnements de ce produit sur l'année en cours."
     />
   );
 }

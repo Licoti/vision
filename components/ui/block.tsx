@@ -137,16 +137,27 @@ export function BlockHeader({
  * légende du rang suivant plutôt que comme celle de l'intertitre. Elle reste
  * dans le flux du texte, jamais en `aria-hidden` : « 3 indicateurs
  * complémentaires » est une information, pas un ornement.
+ *
+ * **Il sait aussi être le `<summary>` d'un `<details>`** (18/08/2026) : c'est
+ * ainsi que le rang « Indicateurs associés » se replie, sans une ligne de
+ * JavaScript, comme le groupe « Annulé » de la roadmap projet. L'intertitre ne
+ * change alors ni de contenu ni de niveau de titre — seule sa balise change, et
+ * avec elle le curseur. Le triangle natif du navigateur, lui, **disparaît dès
+ * que `<summary>` cesse d'être `display: list-item`**, ce que fait `flex` ; la
+ * marque de repli se passe donc en `mark`, comme le ★, et se retourne sur
+ * `group-open`. Sans cela, un contenu replié n'annoncerait plus qu'il l'est.
  */
 export function BlockDivider({
   mark,
   title,
   note,
   rule,
+  as = "div",
 }: {
   /**
-   * Une marque décorative devant le titre — le ★ de la North Star. **Elle sort
-   * de l'arbre d'accessibilité**, comme celle de `BlockHeader`.
+   * Une marque décorative devant le titre — le ★ de la North Star, le chevron
+   * d'un rang repliable. **Elle sort de l'arbre d'accessibilité**, comme celle
+   * de `BlockHeader` : l'état ouvert ou fermé, c'est `<summary>` qui l'expose.
    */
   mark?: ReactNode;
   title: string;
@@ -154,9 +165,21 @@ export function BlockDivider({
   note?: string;
   /** La classe de fond du filet, accordée à la tonalité du bloc. */
   rule: string;
+  /** `summary` quand l'intertitre ouvre et referme le rang qu'il annonce. */
+  as?: "div" | "summary";
 }) {
+  const Wrapper = as;
+
   return (
-    <div className="flex items-center gap-3">
+    <Wrapper
+      className={
+        as === "summary"
+          ? /* `list-none` et le pseudo-élément WebKit retirent la puce que
+               certains navigateurs laissent malgré `flex`. */
+            "flex cursor-pointer list-none items-center gap-3 [&::-webkit-details-marker]:hidden"
+          : "flex items-center gap-3"
+      }
+    >
       <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase text-content-neutral-dark">
         {mark ? <span aria-hidden="true">{mark}</span> : null}
         {title}
@@ -165,6 +188,6 @@ export function BlockDivider({
         <p className="text-xs text-content-neutral-dark">{note}</p>
       ) : null}
       <span aria-hidden="true" className={`h-px flex-1 ${rule}`} />
-    </div>
+    </Wrapper>
   );
 }

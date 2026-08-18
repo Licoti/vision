@@ -52,7 +52,7 @@ export function Personas({
     <Block>
       <BlockHeader
         title="Personae"
-        note="Les profils pour lesquels ce produit est conçu. Chaque fiche porte ses objectifs, ses irritants et ses attentes."
+        note="Les profils pour lesquels ce produit est conçu."
         action={
           addHref && personas.length > 0 ? (
             <Link href={addHref} className={ACTION_LINK}>
