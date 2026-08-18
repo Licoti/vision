@@ -39,7 +39,7 @@
  * `listProjectResources` a déjà lu, filtré et trié.
  */
 
-import Link from "next/link";
+import { DrawerLink } from "@/components/ui/drawer";
 
 import { ACTION_LINK } from "@/components/ui/action-link";
 import { ExternalLink } from "@/components/ui/external-link";
@@ -144,13 +144,14 @@ export function Resources({
               {editHref || archiveResource ? (
                 <div className="mt-1.5 flex flex-wrap items-center gap-4">
                   {editHref ? (
-                    <Link
+                    <DrawerLink
                       href={editHref(resource.id)}
+                      request={{ kind: "resource", id: resource.id }}
                       aria-label={`Modifier la ressource ${resource.title}`}
                       className={ACTION_LINK}
                     >
                       Modifier
-                    </Link>
+                    </DrawerLink>
                   ) : null}
                   {archiveResource ? (
                     <form action={archiveResource.bind(null, resource.id)}>
@@ -207,12 +208,13 @@ function LinkResource({
   className: string;
 }) {
   return (
-    <Link
+    <DrawerLink
       href={href}
+      request={{ kind: "resource" }}
       className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold ${className}`}
     >
       <span aria-hidden="true">+</span>
       Relier une ressource
-    </Link>
+    </DrawerLink>
   );
 }

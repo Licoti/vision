@@ -14,120 +14,84 @@
  * une **liste**, et il reste rendu sur le serveur — d'où l'absence de
  * `"use client"`, seul panneau du projet dans ce cas.
  *
- * Il ne réutilise pas `Panel` pour cette raison exacte : la coquille de TD.1
+ * Il ne réutilise pas `Panel` pour cette raison exacte : le corps de TD.1
  * enveloppe ses `children` dans un `<form>` et exige un dispatch, une attente et
  * un libellé d'envoi. Les emprunter pour une liste aurait demandé de rendre
- * `Panel` générique sur ce qu'il n'est pas. Il en reprend en revanche la mise en
- * page, le voile et le `FocusTrap` — la fermeture reste un lien vers la page nue.
+ * `Panel` générique sur ce qu'il n'est pas.
+ *
+ * **Sa coquille l'a quitté en TD.2**, et c'est ce qui lui permet de rester
+ * serveur : le voile, le tiroir, l'en-tête et la croix vivent dans
+ * `DrawerHost`, qui est client et porte donc la fermeture. Un composant serveur
+ * ne peut pas recevoir de fonction ; il n'a désormais plus à en recevoir.
+ *
+ * **Ses deux gestes ouvrent un autre panneau sans fermer celui-ci** : ce sont
+ * des `DrawerLink`, et la coquille échange son corps au lieu de naviguer.
  *
  * **Rien n'est calculé d'une ligne à l'autre** : ni écart, ni évolution, ni
  * cumul, ni moyenne. On liste la série, on ne la résume pas. La série est
  * **reçue triée** ; aucun tri ne se rejoue ici.
  */
 
-import Link from "next/link";
-
-import { FocusTrap } from "@/components/ui/focus-trap";
+import { DrawerLink } from "@/components/ui/drawer";
 import { formatDateMonth, formatResultValue } from "@/lib/format";
-import type { ProductIndicator, ProductReading } from "@/lib/queries/indicators";
+import type {
+  ProductIndicator,
+  ProductReading,
+} from "@/lib/queries/indicators";
 
 const ACTION_LINK =
   "text-xs font-semibold text-content-primary-dark underline underline-offset-2";
 
 export function ReadingsPanel({
-  productName,
   indicator,
   readings,
-  closeHref,
   addReadingHref,
   editReadingHref,
   archiveReading,
 }: {
-  productName: string;
   indicator: ProductIndicator;
   /** La série de **cet** indicateur, du plus récent au plus ancien (T5.3). */
   readings: ProductReading[];
-  /** La page nue. Les trois sorties y mènent. */
-  closeHref: string;
   /** `null` retire le point d'entrée — le composant ne connaît aucun droit. */
   addReadingHref: string | null;
   editReadingHref: ((readingId: string) => string) | null;
   archiveReading: ((readingId: string) => Promise<void>) | null;
 }) {
   return (
-    <FocusTrap
-      closeHref={closeHref}
-      className="fixed inset-0 z-40 flex justify-end"
-    >
-      {/* Le voile ferme au clic et **ne prend jamais le focus** : la fermeture
-          au clavier passe par la croix, qui la porte. La règle de `Panel`. */}
-      <Link
-        href={closeHref}
-        aria-hidden="true"
-        tabIndex={-1}
-        className="absolute inset-0 bg-surface-neutral-opacity-distinct"
-      />
+    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
+      {addReadingHref ? (
+        <DrawerLink
+          href={addReadingHref}
+          request={{ kind: "reading", id: indicator.id }}
+          className={ACTION_LINK}
+        >
+          Ajouter un relevé
+        </DrawerLink>
+      ) : null}
 
-      <div
-        role="dialog"
-        aria-labelledby="panneau-releves-titre"
-        className="relative flex w-110 max-w-full flex-col gap-5 overflow-y-auto bg-surface-neutral-pale px-6 py-5"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex flex-col gap-1">
-            <h2
-              id="panneau-releves-titre"
-              className="text-md font-semibold text-content-neutral-darkest"
-            >
-              Relevés
-            </h2>
-            <p className="text-xs text-content-neutral-base">
-              {`${productName} · ${indicator.label}`}
-            </p>
-          </div>
-
-          {/* `autoFocus` : c'est la sortie, et elle doit être le premier arrêt
-              du clavier à l'ouverture. La règle de `Panel`. */}
-          <Link
-            href={closeHref}
-            autoFocus
-            aria-label="Fermer"
-            className="flex h-8 w-8 flex-none items-center justify-center rounded-lg text-content-neutral-base"
-          >
-            <span aria-hidden="true">×</span>
-          </Link>
-        </div>
-
-        {addReadingHref ? (
-          <Link href={addReadingHref} className={ACTION_LINK}>
-            Ajouter un relevé
-          </Link>
-        ) : null}
-
-        {readings.length > 0 ? (
-          <ul role="list" className="flex flex-col gap-3">
-            {readings.map((reading) => (
-              <Reading
-                key={reading.id}
-                reading={reading}
-                unit={indicator.unit}
-                indicatorLabel={indicator.label}
-                editReadingHref={editReadingHref}
-                archiveReading={archiveReading}
-              />
-            ))}
-          </ul>
-        ) : (
-          /* Un paragraphe et non un `EmptyState` — la règle de `Resources` et
+      {readings.length > 0 ? (
+        <ul role="list" className="flex flex-col gap-3">
+          {readings.map((reading) => (
+            <Reading
+              key={reading.id}
+              reading={reading}
+              unit={indicator.unit}
+              indicatorLabel={indicator.label}
+              editReadingHref={editReadingHref}
+              archiveReading={archiveReading}
+            />
+          ))}
+        </ul>
+      ) : (
+        /* Un paragraphe et non un `EmptyState` — la règle de `Resources` et
              d'`Indicators` : un état vide dans un panneau n'a pas de titre à
              porter, le panneau en a déjà un. */
-          <p className="text-sm leading-175 text-content-neutral-base">
-            Aucun relevé pour l&apos;instant. Un indicateur sans relevé n&apos;est
-            pas situé sur l&apos;axe du temps.
-          </p>
-        )}
-      </div>
-    </FocusTrap>
+        <p className="text-sm leading-175 text-content-neutral-base">
+          Aucun relevé pour l&apos;instant. Un indicateur sans relevé n&apos;est
+          pas situé sur l&apos;axe du temps.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -174,13 +138,14 @@ function Reading({
       {editReadingHref || archiveReading ? (
         <div className="flex flex-wrap items-center gap-4">
           {editReadingHref ? (
-            <Link
+            <DrawerLink
               href={editReadingHref(reading.id)}
+              request={{ kind: "reading", id: reading.id }}
               aria-label={`Modifier le relevé de ${value} en ${month} — ${indicatorLabel}`}
               className={ACTION_LINK}
             >
               Modifier
-            </Link>
+            </DrawerLink>
           ) : null}
           {archiveReading ? (
             /* Un formulaire nu : ni confirmation (arbitrage (c) de

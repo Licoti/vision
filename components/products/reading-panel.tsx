@@ -40,11 +40,7 @@
 
 import { useActionState } from "react";
 
-import {
-  borderOf,
-  CONTROL,
-  FormField,
-} from "@/components/ui/form-field";
+import { borderOf, CONTROL, FormField } from "@/components/ui/form-field";
 import { Panel } from "@/components/ui/panel";
 import {
   EMPTY_READING_VALUES,
@@ -53,19 +49,10 @@ import {
 } from "@/lib/forms/reading";
 
 export function ReadingPanel({
-  productName,
-  indicatorLabel,
-  closeHref,
   action,
-  title = "Ajouter un relevé",
   submitLabel = "Ajouter le relevé",
   initial = EMPTY_READING_VALUES,
 }: {
-  productName: string;
-  /** L'indicateur mesuré. Le panneau ne quitte pas son contexte, il le rappelle. */
-  indicatorLabel: string;
-  /** La page du produit, sans son paramètre. Les trois sorties y mènent. */
-  closeHref: string;
   /**
    * L'action serveur, **déjà liée** au produit et à l'indicateur côté serveur —
    * au produit et au relevé en correction. Le panneau ne connaît pas ce qu'il
@@ -75,8 +62,6 @@ export function ReadingPanel({
     state: ReadingFormState,
     formData: FormData,
   ) => Promise<ReadingFormState>;
-  /** « Ajouter un relevé » en saisie, « Modifier le relevé » sinon. */
-  title?: string;
   submitLabel?: string;
   /**
    * Les valeurs du relevé corrigé. C'est l'**état initial** de `useActionState` :
@@ -90,20 +75,17 @@ export function ReadingPanel({
     errors: {},
   });
 
-    const values = state.values;
+  const values = state.values;
   const errors = state.errors;
 
   return (
     <Panel
-      titleId="panneau-releve-titre"
-      title={title}
-      subtitles={[`${productName} · ${indicatorLabel}`]}
-      closeHref={closeHref}
       action={submit}
       pending={pending}
       submitLabel={submitLabel}
       message={state.message}
       errors={errors}
+      ok={state.ok}
     >
       {/* `type="text"` et non `type="number"` : le champ numérique refuse
           la virgule française selon la locale du navigateur, et ne rend
@@ -131,9 +113,7 @@ export function ReadingPanel({
           defaultValue={values.value}
           autoComplete="off"
           aria-invalid={errors.value ? true : undefined}
-          aria-describedby={
-            errors.value ? "releve-valeur-erreur" : undefined
-          }
+          aria-describedby={errors.value ? "releve-valeur-erreur" : undefined}
           className={`${CONTROL} ${borderOf(errors.value)}`}
         />
       </FormField>
@@ -156,9 +136,7 @@ export function ReadingPanel({
           type="date"
           defaultValue={values.readOn}
           aria-invalid={errors.readOn ? true : undefined}
-          aria-describedby={
-            errors.readOn ? "releve-date-erreur" : undefined
-          }
+          aria-describedby={errors.readOn ? "releve-date-erreur" : undefined}
           className={`${CONTROL} ${borderOf(errors.readOn)}`}
         />
       </FormField>

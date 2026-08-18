@@ -27,7 +27,7 @@
  * un produit.
  */
 
-import Link from "next/link";
+import { DrawerLink } from "@/components/ui/drawer";
 
 import { ACTION_LINK } from "@/components/ui/action-link";
 import { Avatar } from "@/components/ui/avatar";
@@ -55,9 +55,13 @@ export function Personas({
         note="Les profils pour lesquels ce produit est conçu."
         action={
           addHref && personas.length > 0 ? (
-            <Link href={addHref} className={ACTION_LINK}>
+            <DrawerLink
+              href={addHref}
+              request={{ kind: "persona" }}
+              className={ACTION_LINK}
+            >
               Ajouter un persona
-            </Link>
+            </DrawerLink>
           ) : null
         }
       />
@@ -66,10 +70,7 @@ export function Personas({
         /* Une grille de cartes, et non une `List` : celle-ci est dense et
            verticale, faite pour comparer des lignes. Ici on reconnaît un
            visage et un rôle, pas on ne compare des colonnes. */
-        <ul
-          role="list"
-          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-        >
+        <ul role="list" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {personas.map((persona) => (
             <li key={persona.id} className="min-w-0">
               <PersonaCard persona={persona} href={detailHref(persona.id)} />
@@ -88,9 +89,13 @@ export function Personas({
           {...(addHref
             ? {
                 action: (
-                  <Link href={addHref} className={ACTION_LINK}>
+                  <DrawerLink
+                    href={addHref}
+                    request={{ kind: "persona" }}
+                    className={ACTION_LINK}
+                  >
                     Ajouter un persona
-                  </Link>
+                  </DrawerLink>
                 ),
               }
             : {})}
@@ -125,8 +130,9 @@ function PersonaCard({
   href: string;
 }) {
   return (
-    <Link
+    <DrawerLink
       href={href}
+      request={{ kind: "personaDetail", id: persona.id }}
       className="flex h-full items-start gap-3.5 rounded-2xl border border-surface-neutral-lighter p-4"
     >
       <PersonaImage persona={persona} />
@@ -146,7 +152,7 @@ function PersonaCard({
           </span>
         ) : null}
       </span>
-    </Link>
+    </DrawerLink>
   );
 }
 

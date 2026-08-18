@@ -373,4 +373,27 @@
 
   /* Élévations (§8) et gradients (§9) : le document les nomme sans
      fournir de valeur. Rien n'est inventé ici. Voir JOURNAL-TECHNIQUE.md. */
+
+  /* ------------------------------------------------------------------ */
+  /* Mouvement — SEPTIÈME MANQUE DU DESIGN SYSTEM (TD.2)                 */
+  /* ------------------------------------------------------------------ */
+  /* Le document ne nomme aucune durée ni aucune courbe : il n'y avait
+     jusqu'ici rien à animer. Le panneau qui s'ouvre côté client en a
+     besoin, et la règle 2 interdit de l'écrire en dur dans un composant.
+     Deux jetons sont donc posés ici, à la place des autres, et le manque
+     est à faire remonter avec les six précédents (ETAT.md).
+
+     La courbe est décélérée : le tiroir part vite et se pose. */
+  --duration-instant: 0ms;
+  --duration-drawer: 220ms;
+  --easing-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Qui a demandé moins de mouvement n'en reçoit aucun : la durée tombe à
+   zéro, et le tiroir paraît au lieu de glisser. Un seul endroit à couper,
+   parce qu'un seul jeton porte le mouvement. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-drawer: var(--duration-instant);
+  }
 }

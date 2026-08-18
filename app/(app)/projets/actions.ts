@@ -629,7 +629,13 @@ export async function archiveProject(
   await session.db.archive(projects, projectId);
 
   refreshAround(projectId, project.productId);
-  redirect(ROUTES.project(projectId));
+  /* **Le panneau se referme sur ce succès, et non plus sur une navigation**
+     (TD.2). `redirect` était la fermeture ; elle ne peut plus l'être sans
+     re-rendre la page que le panneau n'a justement plus à quitter.
+     `revalidatePath` reste, et la réponse de l'action porte l'arbre
+     réactualisé : ce qui a été écrit paraît dans son bloc, et c'est toute la
+     confirmation (`docs/06` §9). */
+  return { ok: true };
 }
 
 /**

@@ -123,7 +123,6 @@
 
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 
 import type { ConfirmState } from "@/components/ui/confirm-panel";
 import { requireSession } from "@/lib/auth/provider";
@@ -407,12 +406,13 @@ export async function createActivity(
 
   refresh(projectId, gate.project.productId);
 
-  // La page nue, panneau refermé : « enregistrement sans confirmation
-  // intermédiaire » (`docs/06` §9). La roadmap affiche l'activité dans le
-  // groupe que sa période commande, et c'est toute la confirmation. `redirect`
-  // lève : elle est appelée hors de tout `try`, faute de quoi le `catch`
-  // ci-dessus avalerait la navigation.
-  redirect(ROUTES.project(projectId));
+  /* **Le panneau se referme sur ce succès, et non plus sur une navigation**
+     (TD.2). `redirect` était la fermeture ; elle ne peut plus l'être sans
+     re-rendre la page que le panneau n'a justement plus à quitter.
+     `revalidatePath` reste, et la réponse de l'action porte l'arbre
+     réactualisé : ce qui a été écrit paraît dans son bloc, et c'est toute la
+     confirmation (`docs/06` §9). */
+  return { values, errors: {}, ok: true };
 }
 
 /* ==========================================================================
@@ -522,7 +522,13 @@ export async function updateActivity(
     refresh(projectId, gate.project.productId);
   }
 
-  redirect(ROUTES.project(projectId));
+  /* **Le panneau se referme sur ce succès, et non plus sur une navigation**
+     (TD.2). `redirect` était la fermeture ; elle ne peut plus l'être sans
+     re-rendre la page que le panneau n'a justement plus à quitter.
+     `revalidatePath` reste, et la réponse de l'action porte l'arbre
+     réactualisé : ce qui a été écrit paraît dans son bloc, et c'est toute la
+     confirmation (`docs/06` §9). */
+  return { values, errors: {}, ok: true };
 }
 
 /* ==========================================================================
@@ -662,7 +668,13 @@ export async function cancelActivity(
   });
 
   refresh(activity.projectId, project.productId);
-  redirect(ROUTES.project(activity.projectId));
+  /* **Le panneau se referme sur ce succès, et non plus sur une navigation**
+     (TD.2). `redirect` était la fermeture ; elle ne peut plus l'être sans
+     re-rendre la page que le panneau n'a justement plus à quitter.
+     `revalidatePath` reste, et la réponse de l'action porte l'arbre
+     réactualisé : ce qui a été écrit paraît dans son bloc, et c'est toute la
+     confirmation (`docs/06` §9). */
+  return { ok: true };
 }
 
 /* ==========================================================================
@@ -884,12 +896,13 @@ export async function createResource(
      le contraire au lecteur de ce fichier. */
   revalidatePath(ROUTES.project(projectId));
 
-  // La page nue, panneau refermé : « enregistrement sans confirmation
-  // intermédiaire » (`docs/06` §9). La ressource paraît en tête de son bloc —
-  // l'ordre tranché par T4.1 —, et c'est toute la confirmation. `redirect`
-  // lève : elle est appelée hors de tout `try`, faute de quoi le `catch`
-  // ci-dessus avalerait la navigation.
-  redirect(ROUTES.project(projectId));
+  /* **Le panneau se referme sur ce succès, et non plus sur une navigation**
+     (TD.2). `redirect` était la fermeture ; elle ne peut plus l'être sans
+     re-rendre la page que le panneau n'a justement plus à quitter.
+     `revalidatePath` reste, et la réponse de l'action porte l'arbre
+     réactualisé : ce qui a été écrit paraît dans son bloc, et c'est toute la
+     confirmation (`docs/06` §9). */
+  return { values, errors: {}, ok: true };
 }
 
 /* ==========================================================================
@@ -977,10 +990,13 @@ export async function updateResource(
   // ressource n'est pas écrire une activité, et `last_activity_at` n'a pas bougé.
   revalidatePath(ROUTES.project(projectId));
 
-  // La page nue, panneau refermé : le titre corrigé paraît dans son bloc, et
-  // c'est toute la confirmation (`docs/06` §9). `redirect` lève, donc hors du
-  // `try`.
-  redirect(ROUTES.project(projectId));
+  /* **Le panneau se referme sur ce succès, et non plus sur une navigation**
+     (TD.2). `redirect` était la fermeture ; elle ne peut plus l'être sans
+     re-rendre la page que le panneau n'a justement plus à quitter.
+     `revalidatePath` reste, et la réponse de l'action porte l'arbre
+     réactualisé : ce qui a été écrit paraît dans son bloc, et c'est toute la
+     confirmation (`docs/06` §9). */
+  return { values, errors: {}, ok: true };
 }
 
 /**
@@ -1178,12 +1194,13 @@ export async function createResult(
      au lecteur de ce fichier. */
   revalidatePath(ROUTES.project(projectId));
 
-  // La page nue, panneau refermé : « enregistrement sans confirmation
-  // intermédiaire » (`docs/06` §9). Le résultat paraît sur l'entrée de roadmap
-  // de son activité — la lecture de T4.3 —, et le point d'entrée y devient
-  // « Corriger le résultat » (T4bis.6) : c'est toute la confirmation.
-  // `redirect` lève, donc hors de tout `try`.
-  redirect(ROUTES.project(projectId));
+  /* **Le panneau se referme sur ce succès, et non plus sur une navigation**
+     (TD.2). `redirect` était la fermeture ; elle ne peut plus l'être sans
+     re-rendre la page que le panneau n'a justement plus à quitter.
+     `revalidatePath` reste, et la réponse de l'action porte l'arbre
+     réactualisé : ce qui a été écrit paraît dans son bloc, et c'est toute la
+     confirmation (`docs/06` §9). */
+  return { values, errors: {}, ok: true };
 }
 
 /* ==========================================================================
@@ -1360,10 +1377,13 @@ export async function updateResult(
   // résultat n'est pas écrire une activité, et `last_activity_at` n'a pas bougé.
   revalidatePath(ROUTES.project(projectId));
 
-  // La page nue, panneau refermé : la valeur corrigée paraît sur l'entrée de
-  // roadmap, et c'est toute la confirmation (`docs/06` §9). `redirect` lève,
-  // donc hors du `try`.
-  redirect(ROUTES.project(projectId));
+  /* **Le panneau se referme sur ce succès, et non plus sur une navigation**
+     (TD.2). `redirect` était la fermeture ; elle ne peut plus l'être sans
+     re-rendre la page que le panneau n'a justement plus à quitter.
+     `revalidatePath` reste, et la réponse de l'action porte l'arbre
+     réactualisé : ce qui a été écrit paraît dans son bloc, et c'est toute la
+     confirmation (`docs/06` §9). */
+  return { values, errors: {}, ok: true };
 }
 
 /**
@@ -1632,11 +1652,13 @@ export async function createAdoption(
 
   refreshAdoption(projectId, gate.project.productId);
 
-  // La page nue, panneau refermé : « enregistrement sans confirmation
-  // intermédiaire » (`docs/06` §9). L'adoption paraît dans son bloc, et c'est
-  // toute la confirmation. `redirect` lève : elle est appelée hors de tout
-  // `try`, faute de quoi le `catch` ci-dessus avalerait la navigation.
-  redirect(ROUTES.project(projectId));
+  /* **Le panneau se referme sur ce succès, et non plus sur une navigation**
+     (TD.2). `redirect` était la fermeture ; elle ne peut plus l'être sans
+     re-rendre la page que le panneau n'a justement plus à quitter.
+     `revalidatePath` reste, et la réponse de l'action porte l'arbre
+     réactualisé : ce qui a été écrit paraît dans son bloc, et c'est toute la
+     confirmation (`docs/06` §9). */
+  return { values, errors: {}, ok: true };
 }
 
 /**
@@ -1718,9 +1740,13 @@ export async function updateAdoption(
 
   refreshAdoption(projectId, gate.project.productId);
 
-  // La page nue, panneau refermé : les valeurs corrigées paraissent dans le
-  // bloc, et c'est toute la confirmation. `redirect` lève, donc hors du `try`.
-  redirect(ROUTES.project(projectId));
+  /* **Le panneau se referme sur ce succès, et non plus sur une navigation**
+     (TD.2). `redirect` était la fermeture ; elle ne peut plus l'être sans
+     re-rendre la page que le panneau n'a justement plus à quitter.
+     `revalidatePath` reste, et la réponse de l'action porte l'arbre
+     réactualisé : ce qui a été écrit paraît dans son bloc, et c'est toute la
+     confirmation (`docs/06` §9). */
+  return { values, errors: {}, ok: true };
 }
 
 /**

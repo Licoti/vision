@@ -1,27 +1,30 @@
 "use client";
 
 /**
- * Le piège de focus d'un panneau modal — **une amélioration progressive, et
- * rien de plus.**
+ * Le piège de focus d'un panneau modal.
  *
  * L'ordre de lecture de ce fichier compte : ce qui suit n'est pas ce qui fait
- * marcher le panneau. Le panneau s'ouvre par une URL et se ferme par trois
- * liens ; son contenu de page porte `inert` ; le focus entre dedans par
- * l'attribut HTML `autofocus`. Tout cela tient sans une ligne de JavaScript, et
- * continue de tenir si celui-ci ne s'exécute pas.
+ * marcher le panneau ouvert **par son URL**. Celui-là se ferme par trois liens,
+ * son contenu de page porte `inert`, et le focus entre dedans par l'attribut
+ * HTML `autofocus` — tout cela tient sans une ligne de JavaScript, et continue
+ * de tenir si celui-ci ne s'exécute pas.
  *
- * Ce que ce composant ajoute quand JavaScript est là, et qui n'a **aucun
- * équivalent HTML** : la tabulation reboucle à l'intérieur du panneau. `tabindex`
- * réordonne les arrêts, il n'en fait pas un cycle — après le dernier, le focus
- * sort dans la barre du navigateur, revient en haut du document et traverse la
- * coquille de navigation, qui est pourtant derrière le voile. Fermer ce cycle
- * demande d'écouter la touche, il n'y a pas d'autre voie.
+ * Ce que ce composant ajoute, et qui n'a **aucun équivalent HTML** : la
+ * tabulation reboucle à l'intérieur du panneau. `tabindex` réordonne les
+ * arrêts, il n'en fait pas un cycle — après le dernier, le focus sort dans la
+ * barre du navigateur, revient en haut du document et traverse la coquille de
+ * navigation, qui est pourtant derrière le voile. Fermer ce cycle demande
+ * d'écouter la touche, il n'y a pas d'autre voie.
  *
- * Même forme que `project-form.tsx` depuis T2.5 : un composant client dont le
- * seul rôle est le confort, posé sur un socle qui fonctionne sans lui. Ses
- * enfants restent rendus **sur le serveur** — ils sont passés en `children`, et
- * la composition RSC fait que le référentiel lu en base ne traverse jamais la
- * frontière du client.
+ * **`Échap` ferme par rappel depuis TD.2, et non plus par navigation.** Il
+ * poussait `closeHref` dans le routeur ; il appelle désormais la fermeture de
+ * `DrawerHost`, qui est la même sortie que la croix, « Annuler » et le voile.
+ * L'import de `next/navigation` disparaît avec elle : ce composant ne navigue
+ * plus.
+ *
+ * Ses enfants restent rendus **sur le serveur** — ils sont passés en
+ * `children`, et la composition RSC fait que le référentiel lu en base ne
+ * traverse jamais la frontière du client.
  *
  * `aria-modal` est posé **ici et pas dans le balisage servi**, pour une raison
  * de véracité : il annonce à l'assistance que l'extérieur du dialogue est hors
@@ -30,7 +33,6 @@
  * il devient vrai.
  */
 
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
 
 /**
@@ -48,17 +50,16 @@ const FOCUSABLE = [
 ].join(",");
 
 export function FocusTrap({
-  closeHref,
+  onEscape,
   className,
   children,
 }: {
-  /** Où mène la touche Échap : la même adresse que les trois sorties visibles. */
-  closeHref: string;
+  /** Ce que fait la touche Échap : la même sortie que les trois visibles. */
+  onEscape: () => void;
   className?: string;
   children: ReactNode;
 }) {
   const root = useRef<HTMLDivElement>(null);
-  const router = useRouter();
 
   useEffect(() => {
     const container = root.current;
@@ -80,7 +81,7 @@ export function FocusTrap({
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
-        router.push(closeHref);
+        onEscape();
         return;
       }
       if (event.key !== "Tab") return;
@@ -113,7 +114,7 @@ export function FocusTrap({
       document.removeEventListener("keydown", onKeyDown);
       dialog?.removeAttribute("aria-modal");
     };
-  }, [closeHref, router]);
+  }, [onEscape]);
 
   return (
     <div ref={root} className={className}>

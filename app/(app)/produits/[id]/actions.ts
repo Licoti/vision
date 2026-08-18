@@ -72,7 +72,6 @@
 
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 
 import { requireSession } from "@/lib/auth/provider";
 import type { Session } from "@/lib/auth/session";
@@ -356,12 +355,13 @@ export async function createIndicator(
      touche à la fraîcheur d'un produit — la leçon de T4.2. */
   revalidatePath(ROUTES.product(productId));
 
-  // La page nue, panneau refermé : « enregistrement sans confirmation
-  // intermédiaire » (`docs/06` §9). L'indicateur paraît dans le bloc de T5.1, à
-  // sa place alphabétique, et c'est toute la confirmation. `redirect` lève :
-  // elle est appelée hors de tout `try`, faute de quoi le `catch` ci-dessus
-  // avalerait la navigation.
-  redirect(ROUTES.product(productId));
+  /* **Le panneau se referme sur ce succès, et non plus sur une navigation**
+     (TD.2). `redirect` était la fermeture ; elle ne peut plus l'être sans
+     re-rendre la page que le panneau n'a justement plus à quitter.
+     `revalidatePath` reste, et la réponse de l'action porte l'arbre
+     réactualisé : ce qui a été écrit paraît dans son bloc, et c'est toute la
+     confirmation (`docs/06` §9). */
+  return { values, errors: {}, ok: true };
 }
 
 /* ==========================================================================
@@ -420,10 +420,13 @@ export async function updateIndicator(
 
   revalidatePath(ROUTES.product(productId));
 
-  // La page nue, panneau refermé : le libellé corrigé paraît dans le bloc, et
-  // c'est toute la confirmation (`docs/06` §9). `redirect` lève, donc hors du
-  // `try`.
-  redirect(ROUTES.product(productId));
+  /* **Le panneau se referme sur ce succès, et non plus sur une navigation**
+     (TD.2). `redirect` était la fermeture ; elle ne peut plus l'être sans
+     re-rendre la page que le panneau n'a justement plus à quitter.
+     `revalidatePath` reste, et la réponse de l'action porte l'arbre
+     réactualisé : ce qui a été écrit paraît dans son bloc, et c'est toute la
+     confirmation (`docs/06` §9). */
+  return { values, errors: {}, ok: true };
 }
 
 /* ==========================================================================
@@ -619,11 +622,13 @@ export async function createReading(
 
   revalidatePath(ROUTES.product(productId));
 
-  // La page nue, panneau refermé : le relevé paraît en tête de sa série et
-  // devient le « dernier relevé » du bloc, et c'est toute la confirmation
-  // (`docs/06` §9). `redirect` lève : elle est appelée hors de tout `try`, faute
-  // de quoi le `catch` ci-dessus avalerait la navigation.
-  redirect(ROUTES.product(productId));
+  /* **Le panneau se referme sur ce succès, et non plus sur une navigation**
+     (TD.2). `redirect` était la fermeture ; elle ne peut plus l'être sans
+     re-rendre la page que le panneau n'a justement plus à quitter.
+     `revalidatePath` reste, et la réponse de l'action porte l'arbre
+     réactualisé : ce qui a été écrit paraît dans son bloc, et c'est toute la
+     confirmation (`docs/06` §9). */
+  return { values, errors: {}, ok: true };
 }
 
 /**
@@ -674,9 +679,13 @@ export async function updateReading(
 
   revalidatePath(ROUTES.product(productId));
 
-  // La page nue, panneau refermé : la série se réordonne d'elle-même, et c'est
-  // toute la confirmation (`docs/06` §9). `redirect` lève, donc hors du `try`.
-  redirect(ROUTES.product(productId));
+  /* **Le panneau se referme sur ce succès, et non plus sur une navigation**
+     (TD.2). `redirect` était la fermeture ; elle ne peut plus l'être sans
+     re-rendre la page que le panneau n'a justement plus à quitter.
+     `revalidatePath` reste, et la réponse de l'action porte l'arbre
+     réactualisé : ce qui a été écrit paraît dans son bloc, et c'est toute la
+     confirmation (`docs/06` §9). */
+  return { values, errors: {}, ok: true };
 }
 
 /**
@@ -913,10 +922,13 @@ export async function createPersona(
      persona, et aucun autre écran n'en porte encore. */
   revalidatePath(ROUTES.product(productId));
 
-  // La page nue, panneau refermé : la carte paraît dans le bloc, et c'est toute
-  // la confirmation (`docs/06` §9). `redirect` lève : elle est appelée hors de
-  // tout `try`, faute de quoi le `catch` ci-dessus avalerait la navigation.
-  redirect(ROUTES.product(productId));
+  /* **Le panneau se referme sur ce succès, et non plus sur une navigation**
+     (TD.2). `redirect` était la fermeture ; elle ne peut plus l'être sans
+     re-rendre la page que le panneau n'a justement plus à quitter.
+     `revalidatePath` reste, et la réponse de l'action porte l'arbre
+     réactualisé : ce qui a été écrit paraît dans son bloc, et c'est toute la
+     confirmation (`docs/06` §9). */
+  return { values, errors: {}, ok: true };
 }
 
 /**
@@ -968,9 +980,13 @@ export async function updatePersona(
 
   revalidatePath(ROUTES.product(productId));
 
-  // La page nue, panneau refermé : la carte corrigée paraît dans le bloc, et
-  // c'est toute la confirmation. `redirect` lève, donc hors du `try`.
-  redirect(ROUTES.product(productId));
+  /* **Le panneau se referme sur ce succès, et non plus sur une navigation**
+     (TD.2). `redirect` était la fermeture ; elle ne peut plus l'être sans
+     re-rendre la page que le panneau n'a justement plus à quitter.
+     `revalidatePath` reste, et la réponse de l'action porte l'arbre
+     réactualisé : ce qui a été écrit paraît dans son bloc, et c'est toute la
+     confirmation (`docs/06` §9). */
+  return { values, errors: {}, ok: true };
 }
 
 /**

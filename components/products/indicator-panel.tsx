@@ -39,11 +39,7 @@
 
 import { useActionState } from "react";
 
-import {
-  borderOf,
-  CONTROL,
-  FormField,
-} from "@/components/ui/form-field";
+import { borderOf, CONTROL, FormField } from "@/components/ui/form-field";
 import { Panel } from "@/components/ui/panel";
 import { formatIndicatorDirection } from "@/lib/format";
 import {
@@ -54,16 +50,10 @@ import {
 } from "@/lib/forms/indicator";
 
 export function IndicatorPanel({
-  productName,
-  closeHref,
   action,
-  title = "Ajouter un indicateur",
   submitLabel = "Ajouter l'indicateur",
   initial = EMPTY_INDICATOR_VALUES,
 }: {
-  productName: string;
-  /** La page du produit, sans son paramètre. Les trois sorties y mènent. */
-  closeHref: string;
   /**
    * L'action serveur, **déjà liée** au produit côté serveur — et à l'indicateur
    * en correction. Le panneau ne connaît pas ce qu'il écrit.
@@ -72,8 +62,6 @@ export function IndicatorPanel({
     state: IndicatorFormState,
     formData: FormData,
   ) => Promise<IndicatorFormState>;
-  /** « Ajouter un indicateur » en création, « Modifier l'indicateur » sinon. */
-  title?: string;
   submitLabel?: string;
   /**
    * Les valeurs de l'indicateur corrigé. C'est l'**état initial** de
@@ -87,20 +75,17 @@ export function IndicatorPanel({
     errors: {},
   });
 
-    const values = state.values;
+  const values = state.values;
   const errors = state.errors;
 
   return (
     <Panel
-      titleId="panneau-indicateur-titre"
-      title={title}
-      subtitles={[productName]}
-      closeHref={closeHref}
       action={submit}
       pending={pending}
       submitLabel={submitLabel}
       message={state.message}
       errors={errors}
+      ok={state.ok}
     >
       <FormField
         label="Libellé"
@@ -141,9 +126,7 @@ export function IndicatorPanel({
           defaultValue={values.unit}
           autoComplete="off"
           aria-invalid={errors.unit ? true : undefined}
-          aria-describedby={
-            errors.unit ? "indicateur-unite-erreur" : undefined
-          }
+          aria-describedby={errors.unit ? "indicateur-unite-erreur" : undefined}
           className={`${CONTROL} ${borderOf(errors.unit)}`}
         />
       </FormField>

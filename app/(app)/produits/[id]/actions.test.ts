@@ -61,7 +61,29 @@ vi.mock("next/headers", () => ({
 
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
-/** `redirect` lève : la levée est le constat qu'une action est allée au bout. */
+/**
+ * **Le constat qu'une écriture a eu lieu est `ok`, et non plus une levée**
+ * (TD.2).
+ *
+ * Les actions de panneau redirigeaient vers la page nue : la navigation *était*
+ * la fermeture, et sa levée le signe qu'on était allé au bout. Le panneau se
+ * fermant désormais côté client, elles rendent leur succès — le signe change de
+ * nature, pas de fonction. Son absence reste le constat d'un refus, et
+ * `message` dit lequel.
+ *
+ * Le mock de `next/navigation` reste en place : les deux formulaires de page
+ * pleine — création et modification d'un produit — continuent de rediriger, et
+ * `produits/actions.test.ts` continue de le lire ainsi.
+ */
+async function expectWritten<T extends { ok?: boolean; message?: string }>(
+  action: Promise<T>,
+): Promise<T> {
+  const state = await action;
+  expect(state.message).toBeUndefined();
+  expect(state.ok).toBe(true);
+  return state;
+}
+
 const REDIRECT = "NEXT_REDIRECT:";
 
 vi.mock("next/navigation", () => ({
@@ -454,9 +476,9 @@ async function traitsOf(personaId: string) {
 /** Écrit un persona par le chemin normal, et rend son identifiant. */
 async function givenPersona(overrides: Record<string, string> = {}) {
   currentPerson = f.managerId;
-  await expect(
+  await expectWritten(
     createPersona(f.productId, NO_STATE, personaForm(overrides)),
-  ).rejects.toThrow(REDIRECT);
+  );
   const rows = await personasOf(f.productId);
   return rows[rows.length - 1]!.id;
 }
@@ -503,9 +525,9 @@ describe("createPersona — ce que le geste écrit", () => {
        d'accompagnement, et son droit est celui des indicateurs. */
     currentPerson = f.contributorId;
     try {
-      await expect(
+      await expectWritten(
         createPersona(f.productId, NO_STATE, personaForm()),
-      ).rejects.toThrow(REDIRECT);
+      );
 
       expect(await personasOf(f.productId)).toHaveLength(1);
     } finally {
@@ -590,7 +612,7 @@ describe("updatePersona — la porte `openPersona`", () => {
       const before = await traitsOf(personaId);
 
       currentPerson = f.managerId;
-      await expect(
+      await expectWritten(
         updatePersona(
           f.productId,
           personaId,
@@ -602,7 +624,7 @@ describe("updatePersona — la porte `openPersona`", () => {
             pains: "Ressaisir trois fois\nAttendre la validation",
           }),
         ),
-      ).rejects.toThrow(REDIRECT);
+      );
 
       const after = await traitsOf(personaId);
       const idOf = (rows: typeof after, label: string) =>
@@ -632,14 +654,14 @@ describe("updatePersona — la porte `openPersona`", () => {
       const personaId = await givenPersona();
 
       currentPerson = f.managerId;
-      await expect(
+      await expectWritten(
         updatePersona(
           f.productId,
           personaId,
           NO_STATE,
           personaForm({ goals: "Ouvrir un dossier vite", pains: "" }),
         ),
-      ).rejects.toThrow(REDIRECT);
+      );
 
       expect((await traitsOf(personaId)).map((row) => row.label)).toEqual([
         "Ouvrir un dossier vite",

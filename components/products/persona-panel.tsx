@@ -57,16 +57,10 @@ const KIND_LABELS = [
 ] as const;
 
 export function PersonaPanel({
-  productName,
-  closeHref,
   action,
-  title = "Ajouter un persona",
   submitLabel = "Ajouter le persona",
   initial = EMPTY_PERSONA_VALUES,
 }: {
-  productName: string;
-  /** La page du produit, sans son paramètre. Les trois sorties y mènent. */
-  closeHref: string;
   /**
    * L'action serveur, **déjà liée** au produit — et au persona en correction —
    * côté serveur. Le panneau ne connaît pas ce qu'il écrit.
@@ -75,8 +69,6 @@ export function PersonaPanel({
     state: PersonaFormState,
     formData: FormData,
   ) => Promise<PersonaFormState>;
-  /** « Ajouter… » en création, « Modifier… » en correction. */
-  title?: string;
   submitLabel?: string;
   /**
    * Le persona en place. C'est l'**état initial** de `useActionState` : un refus
@@ -102,15 +94,12 @@ export function PersonaPanel({
 
   return (
     <Panel
-      titleId={`${prefix}-titre`}
-      title={title}
-      subtitles={[productName]}
-      closeHref={closeHref}
       action={submit}
       pending={pending}
       submitLabel={submitLabel}
       message={state.message}
       errors={errors}
+      ok={state.ok}
     >
       <FormField
         label="Nom du persona"

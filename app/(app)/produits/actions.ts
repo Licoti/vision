@@ -282,7 +282,13 @@ export async function archiveProduct(
 
   revalidatePath(ROUTES.products);
   revalidatePath(ROUTES.product(productId));
-  redirect(ROUTES.product(productId));
+  /* **Le panneau se referme sur ce succès, et non plus sur une navigation**
+     (TD.2). `redirect` était la fermeture ; elle ne peut plus l'être sans
+     re-rendre la page que le panneau n'a justement plus à quitter.
+     `revalidatePath` reste, et la réponse de l'action porte l'arbre
+     réactualisé : ce qui a été écrit paraît dans son bloc, et c'est toute la
+     confirmation (`docs/06` §9). */
+  return { ok: true };
 }
 
 /**
@@ -382,5 +388,11 @@ export async function updateProductVision(
   /* La page nue, panneau refermé : la vision écrite paraît en tête du bloc, et
      c'est toute la confirmation (`docs/06` §9). `redirect` lève, donc hors de
      tout `try` — il n'y en a aucun ici, et c'est délibéré. */
-  redirect(ROUTES.product(productId));
+  /* **Le panneau se referme sur ce succès, et non plus sur une navigation**
+     (TD.2). `redirect` était la fermeture ; elle ne peut plus l'être sans
+     re-rendre la page que le panneau n'a justement plus à quitter.
+     `revalidatePath` reste, et la réponse de l'action porte l'arbre
+     réactualisé : ce qui a été écrit paraît dans son bloc, et c'est toute la
+     confirmation (`docs/06` §9). */
+  return { values, errors: {}, ok: true };
 }

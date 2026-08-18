@@ -46,16 +46,10 @@ import {
 } from "@/lib/forms/vision";
 
 export function VisionPanel({
-  productName,
-  closeHref,
   action,
-  title = "Ajouter la vision produit",
   submitLabel = "Ajouter la vision",
   initial = EMPTY_VISION_VALUES,
 }: {
-  productName: string;
-  /** La page du produit, sans son paramètre. Les trois sorties y mènent. */
-  closeHref: string;
   /**
    * L'action serveur, **déjà liée** au produit côté serveur. Le panneau ne
    * connaît pas ce qu'il écrit.
@@ -64,8 +58,6 @@ export function VisionPanel({
     state: VisionFormState,
     formData: FormData,
   ) => Promise<VisionFormState>;
-  /** « Ajouter… » sur une colonne nulle, « Modifier… » sinon. */
-  title?: string;
   submitLabel?: string;
   /**
    * La vision en place. C'est l'**état initial** de `useActionState` : un refus
@@ -84,15 +76,12 @@ export function VisionPanel({
 
   return (
     <Panel
-      titleId="panneau-vision-titre"
-      title={title}
-      subtitles={[productName]}
-      closeHref={closeHref}
       action={submit}
       pending={pending}
       submitLabel={submitLabel}
       message={state.message}
       errors={errors}
+      ok={state.ok}
     >
       {/* `rows={4}` et non les 3 du champ description : la vision porte le
           pourquoi **et** la direction, ce que trois lignes serrent. Aucun

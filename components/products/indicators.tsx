@@ -100,7 +100,7 @@
 
 import type { ReactNode } from "react";
 
-import Link from "next/link";
+import { DrawerLink } from "@/components/ui/drawer";
 
 import {
   ActionMenu,
@@ -144,7 +144,10 @@ import {
  * la maquette ne faisait pas — « Encore 3 points » sur un taux d'abandon à 8 %
  * pour une cible à 5 % se lisait à l'envers.
  */
-function gapSentence(gap: TargetGap | null, unit: string | null): string | null {
+function gapSentence(
+  gap: TargetGap | null,
+  unit: string | null,
+): string | null {
   if (!gap) return null;
 
   if (gap.reached) return "Cible atteinte.";
@@ -275,11 +278,16 @@ export function Indicators({
                   c'est l'ordre de lecture du bloc, et un menu qui rangerait le
                   premier rang après le second se lirait à l'envers. */}
               {visionHref ? (
-                <Link href={visionHref} role="menuitem" className={MENU_ITEM}>
+                <DrawerLink
+                  href={visionHref}
+                  request={{ kind: "vision" }}
+                  role="menuitem"
+                  className={MENU_ITEM}
+                >
                   {vision
                     ? "Modifier la vision produit"
                     : "Ajouter la vision produit"}
-                </Link>
+                </DrawerLink>
               ) : null}
               {designate
                 ? indicators.map((indicator) => (
@@ -350,8 +358,9 @@ export function Indicators({
                   {vision}
                 </p>
                 <p className="mt-3 text-sm leading-175 text-content-neutral-dark">
-                  La raison d&apos;être de ce produit, et la direction qu&apos;il
-                  se donne. Tous les indicateurs ci-dessous servent cette vision.
+                  La raison d&apos;être de ce produit, et la direction
+                  qu&apos;il se donne. Tous les indicateurs ci-dessous servent
+                  cette vision.
                 </p>
               </>
             ) : (
@@ -368,14 +377,18 @@ export function Indicators({
                  droit sur l'identifiant reçu. */
               <p className="text-md leading-175 text-content-neutral-dark">
                 Aucune vision pour l&apos;instant. Ce bloc dira pourquoi ce
-                produit existe et vers quoi il va — la question que la North Star
-                mesure.
+                produit existe et vers quoi il va — la question que la North
+                Star mesure.
                 {visionHref ? (
                   <>
                     {" "}
-                    <Link href={visionHref} className={ACTION_LINK}>
+                    <DrawerLink
+                      href={visionHref}
+                      request={{ kind: "vision" }}
+                      className={ACTION_LINK}
+                    >
                       Ajouter la vision produit
-                    </Link>
+                    </DrawerLink>
                   </>
                 ) : null}
               </p>
@@ -493,15 +506,16 @@ export function Indicators({
             ))}
 
             {addHref ? (
-              <Link
+              <DrawerLink
                 href={addHref}
+                request={{ kind: "indicator" }}
                 className="flex min-h-24 items-center justify-center gap-2 rounded-2xl border border-dashed border-border-primary-light text-sm font-semibold text-content-primary-dark"
               >
                 <span aria-hidden="true" className="text-lg leading-none">
                   +
                 </span>
                 Ajouter un indicateur
-              </Link>
+              </DrawerLink>
             ) : null}
 
             {others.length === 0 && !addHref ? (
@@ -590,8 +604,8 @@ function NorthStar({
           </p>
         ) : (
           <p className="mt-4 text-sm leading-175 text-content-neutral-dark">
-            Aucun relevé pour l&apos;instant : cette mesure n&apos;est pas encore
-            située dans le temps.
+            Aucun relevé pour l&apos;instant : cette mesure n&apos;est pas
+            encore située dans le temps.
           </p>
         )}
 
@@ -860,57 +874,57 @@ function Curve({
               ce sont eux qui portent le libellé, et les rétrécir l'aurait
               décollé du bord. */}
           <div className="absolute inset-y-0 left-0 right-8">
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-            className="absolute inset-0 h-full w-full overflow-visible"
-          >
-            <path
-              d={curvePath(points)}
-              fill="none"
-              strokeWidth={2.5}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              vectorEffect="non-scaling-stroke"
-              className="stroke-content-primary-dark"
-            />
-          </svg>
-
-          {points.map((point) => (
-            <div
-              key={point.id}
-              className="absolute -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${point.x}%`, top: `${100 - point.y}%` }}
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+              className="absolute inset-0 h-full w-full overflow-visible"
             >
-              {/* L'anneau est une **bordure** de la couleur du fond, et non
+              <path
+                d={curvePath(points)}
+                fill="none"
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+                className="stroke-content-primary-dark"
+              />
+            </svg>
+
+            {points.map((point) => (
+              <div
+                key={point.id}
+                className="absolute -translate-x-1/2 -translate-y-1/2"
+                style={{ left: `${point.x}%`, top: `${100 - point.y}%` }}
+              >
+                {/* L'anneau est une **bordure** de la couleur du fond, et non
                   l'ombre de la maquette : le design system nomme ses trois
                   élévations sans leur donner de valeur (`tokens.css` §8). */}
-              <span
-                aria-hidden="true"
-                className="block h-2.75 w-2.75 rounded-full border-[length:var(--border-width-1)] border-surface-neutral-pale bg-surface-primary-dark"
-              />
-              {/* La valeur écrite : c'est elle qui empêche la courbe d'être un
+                <span
+                  aria-hidden="true"
+                  className="block h-2.75 w-2.75 rounded-full border-[length:var(--border-width-1)] border-surface-neutral-pale bg-surface-primary-dark"
+                />
+                {/* La valeur écrite : c'est elle qui empêche la courbe d'être un
                   graphique décoratif. */}
-              {/* Le libellé se cale sur la position, comme les graduations de
+                {/* Le libellé se cale sur la position, comme les graduations de
                   temps : centré au milieu, mais rentré aux deux bouts — sinon
                   la moitié du premier sort à gauche et la moitié du dernier
                   déborde dans la gouttière. */}
-              <span
-                className={`absolute bottom-4 whitespace-nowrap text-xs font-semibold text-content-primary-dark ${
-                  point.x <= 8
-                    ? "left-0"
-                    : point.x >= 92
-                      ? "right-0"
-                      : "left-1/2 -translate-x-1/2"
-                }`}
-              >
-                {point.label}
-              </span>
-            </div>
-          ))}
+                <span
+                  className={`absolute bottom-4 whitespace-nowrap text-xs font-semibold text-content-primary-dark ${
+                    point.x <= 8
+                      ? "left-0"
+                      : point.x >= 92
+                        ? "right-0"
+                        : "left-1/2 -translate-x-1/2"
+                  }`}
+                >
+                  {point.label}
+                </span>
+              </div>
+            ))}
 
-          {/* ⚠ Le crochet d'écart et sa pastille — la dérogation à D39, voir
+            {/* ⚠ Le crochet d'écart et sa pastille — la dérogation à D39, voir
               plus haut. Ils vivent **dans la gouttière** avec les points, et
               non dans la boîte pleine largeur : le crochet se pose à l'abscisse
               du dernier point, et un autre repère y aurait décalé les deux.
@@ -918,28 +932,28 @@ function Curve({
               La pastille se range **à gauche** du crochet et non dessus : à
               cette abscisse, le crochet touche presque le bord droit, et la
               poser dessus l'en aurait fait sortir. */}
-          {bracket ? (
-            <>
-              <div
-                aria-hidden="true"
-                className="absolute w-0 border-l-[length:var(--border-width-1)] border-dotted border-content-warning-darker"
-                style={{
-                  left: `${bracket.left}%`,
-                  top: `${bracket.top}%`,
-                  height: `${bracket.height}%`,
-                }}
-              />
-              <span
-                className="absolute -ml-2 -translate-x-full -translate-y-1/2 whitespace-nowrap rounded-full bg-content-warning-darker px-2.25 py-0.5 text-2xs font-bold text-content-neutral-pale"
-                style={{
-                  left: `${bracket.left}%`,
-                  top: `${bracket.top + bracket.height / 2}%`,
-                }}
-              >
-                {bracket.label}
-              </span>
-            </>
-          ) : null}
+            {bracket ? (
+              <>
+                <div
+                  aria-hidden="true"
+                  className="absolute w-0 border-l-[length:var(--border-width-1)] border-dotted border-content-warning-darker"
+                  style={{
+                    left: `${bracket.left}%`,
+                    top: `${bracket.top}%`,
+                    height: `${bracket.height}%`,
+                  }}
+                />
+                <span
+                  className="absolute -ml-2 -translate-x-full -translate-y-1/2 whitespace-nowrap rounded-full bg-content-warning-darker px-2.25 py-0.5 text-2xs font-bold text-content-neutral-pale"
+                  style={{
+                    left: `${bracket.left}%`,
+                    top: `${bracket.top + bracket.height / 2}%`,
+                  }}
+                >
+                  {bracket.label}
+                </span>
+              </>
+            ) : null}
           </div>
         </div>
       </div>
@@ -1030,55 +1044,58 @@ function IndicatorCard({
         /* **Le conteneur porte le positionnement, jamais le menu** : sa racine
            est `relative`, dont son déroulant a besoin pour s'ancrer. */
         <div className="absolute right-3 top-3">
-        <ActionMenu label={`Options de l'indicateur ${indicator.label}`}>
-          {editHref ? (
-            <Link
-              href={editHref(indicator.id)}
-              role="menuitem"
-              className={MENU_ITEM}
-            >
-              Modifier l&apos;indicateur
-            </Link>
-          ) : null}
-          {addReadingHref ? (
-            <Link
-              href={addReadingHref(indicator.id)}
-              role="menuitem"
-              className={MENU_ITEM}
-            >
-              Ajouter un relevé
-            </Link>
-          ) : null}
-          {readingsHref ? (
-            <Link
-              href={readingsHref(indicator.id)}
-              role="menuitem"
-              className={MENU_ITEM}
-            >
-              Gérer les relevés
-            </Link>
-          ) : null}
-          {setNorthStar ? (
-            <form action={setNorthStar.bind(null, indicator.id)}>
-              <button type="submit" role="menuitem" className={MENU_ITEM}>
-                Définir comme North Star
-              </button>
-            </form>
-          ) : null}
-          {/* **Le geste disparaît quand l'indicateur est adopté** — l'arbitrage
-              (e) de `tickets-C5.md`, inchangé. */}
-          {archiveIndicator && indicator.adoptionCount === 0 ? (
-            <form action={archiveIndicator.bind(null, indicator.id)}>
-              <button
-                type="submit"
+          <ActionMenu label={`Options de l'indicateur ${indicator.label}`}>
+            {editHref ? (
+              <DrawerLink
+                href={editHref(indicator.id)}
+                request={{ kind: "indicator", id: indicator.id }}
                 role="menuitem"
-                className={MENU_ITEM_DANGER}
+                className={MENU_ITEM}
               >
-                Archiver
-              </button>
-            </form>
-          ) : null}
-        </ActionMenu>
+                Modifier l&apos;indicateur
+              </DrawerLink>
+            ) : null}
+            {addReadingHref ? (
+              <DrawerLink
+                href={addReadingHref(indicator.id)}
+                request={{ kind: "reading", id: indicator.id }}
+                role="menuitem"
+                className={MENU_ITEM}
+              >
+                Ajouter un relevé
+              </DrawerLink>
+            ) : null}
+            {readingsHref ? (
+              <DrawerLink
+                href={readingsHref(indicator.id)}
+                request={{ kind: "readings", id: indicator.id }}
+                role="menuitem"
+                className={MENU_ITEM}
+              >
+                Gérer les relevés
+              </DrawerLink>
+            ) : null}
+            {setNorthStar ? (
+              <form action={setNorthStar.bind(null, indicator.id)}>
+                <button type="submit" role="menuitem" className={MENU_ITEM}>
+                  Définir comme North Star
+                </button>
+              </form>
+            ) : null}
+            {/* **Le geste disparaît quand l'indicateur est adopté** — l'arbitrage
+              (e) de `tickets-C5.md`, inchangé. */}
+            {archiveIndicator && indicator.adoptionCount === 0 ? (
+              <form action={archiveIndicator.bind(null, indicator.id)}>
+                <button
+                  type="submit"
+                  role="menuitem"
+                  className={MENU_ITEM_DANGER}
+                >
+                  Archiver
+                </button>
+              </form>
+            ) : null}
+          </ActionMenu>
         </div>
       ) : null}
 

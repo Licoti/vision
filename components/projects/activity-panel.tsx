@@ -63,11 +63,7 @@
 
 import { useActionState } from "react";
 
-import {
-  borderOf,
-  CONTROL,
-  FormField,
-} from "@/components/ui/form-field";
+import { borderOf, CONTROL, FormField } from "@/components/ui/form-field";
 import { Panel } from "@/components/ui/panel";
 import {
   EMPTY_ACTIVITY_VALUES,
@@ -97,19 +93,13 @@ const FAMILY_LABEL: Record<ActivityFamily, string> = {
 };
 
 export function ActivityPanel({
-  projectName,
-  closeHref,
   action,
   activityTypes,
   approaches,
   persons,
-  title = "Nouvelle activité",
   submitLabel = "Enregistrer",
   initial = EMPTY_ACTIVITY_VALUES,
 }: {
-  projectName: string;
-  /** La page du projet, sans son paramètre. Les trois sorties y mènent. */
-  closeHref: string;
   /**
    * L'action serveur, **déjà liée** côté serveur : au projet en création, au
    * projet **et** à l'activité en correction. Le panneau ne connaît ni l'un ni
@@ -123,8 +113,6 @@ export function ActivityPanel({
   approaches: readonly ApproachOption[];
   /** Facultatif (`docs/03` §4). Aucune création à la volée — T2.6, D19. */
   persons: readonly ActivityFormPerson[];
-  /** « Nouvelle activité », ou le type de celle qu'on corrige. */
-  title?: string;
   submitLabel?: string;
   /**
    * La saisie de départ — vide en création, la ligne existante en correction
@@ -139,7 +127,7 @@ export function ActivityPanel({
     errors: {},
   });
 
-    const values = state.values;
+  const values = state.values;
   const errors = state.errors;
 
   /* Le référentiel arrive déjà trié par famille : les regrouper ne demande
@@ -156,15 +144,12 @@ export function ActivityPanel({
 
   return (
     <Panel
-      titleId="panneau-activite-titre"
-      title={title}
-      subtitles={[projectName]}
-      closeHref={closeHref}
       action={submit}
       pending={pending}
       submitLabel={submitLabel}
       message={state.message}
       errors={errors}
+      ok={state.ok}
     >
       {/* D16 — le type est le seul champ vraiment obligatoire, et il vient
           du référentiel du domaine : jamais une liste codée en dur
@@ -189,10 +174,7 @@ export function ActivityPanel({
           >
             <option value="">Choisir un type</option>
             {families.map((group) => (
-              <optgroup
-                key={group.family}
-                label={FAMILY_LABEL[group.family]}
-              >
+              <optgroup key={group.family} label={FAMILY_LABEL[group.family]}>
                 {group.types.map((type) => (
                   <option key={type.id} value={type.id}>
                     {type.label}
@@ -232,16 +214,16 @@ export function ActivityPanel({
             defaultChecked={values.isUnscheduled}
             aria-invalid={errors.isUnscheduled ? true : undefined}
             aria-describedby={
-              errors.isUnscheduled
-                ? "activite-unscheduled-erreur"
-                : undefined
+              errors.isUnscheduled ? "activite-unscheduled-erreur" : undefined
             }
             className="accent-surface-primary-base"
           />
           À planifier, sans date
         </label>
         <p className="text-xs text-content-neutral-base">
-          {"Cochée, elle remplace la période : l'activité rejoint le groupe « à planifier » de la roadmap. La période se saisit au jour et se lit au mois."}
+          {
+            "Cochée, elle remplace la période : l'activité rejoint le groupe « à planifier » de la roadmap. La période se saisit au jour et se lit au mois."
+          }
         </p>
         {errors.isUnscheduled ? (
           <p
@@ -297,7 +279,9 @@ export function ActivityPanel({
         {/* L'état n'est pas un champ : il se déduit de ce qui précède
             (`docs/06` §9). Le dire évite qu'on le cherche. */}
         <p className="text-xs text-content-neutral-base">
-          {"L'état ne se saisit pas : une période passée donne une activité terminée, une période en cours une activité en cours, une période à venir ou sans date une activité prévue."}
+          {
+            "L'état ne se saisit pas : une période passée donne une activité terminée, une période en cours une activité en cours, une période à venir ou sans date une activité prévue."
+          }
         </p>
       </fieldset>
 
@@ -361,7 +345,9 @@ export function ActivityPanel({
           Participants
         </legend>
         <p className="text-xs text-content-neutral-base">
-          {"Facultatif. Les personnes qui ont pris part à cette activité, parmi celles déjà référencées dans le domaine."}
+          {
+            "Facultatif. Les personnes qui ont pris part à cette activité, parmi celles déjà référencées dans le domaine."
+          }
         </p>
 
         {persons.length > 0 ? (

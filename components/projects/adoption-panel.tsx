@@ -47,11 +47,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 
-import {
-  borderOf,
-  CONTROL,
-  FormField,
-} from "@/components/ui/form-field";
+import { borderOf, CONTROL, FormField } from "@/components/ui/form-field";
 import { Panel } from "@/components/ui/panel";
 import {
   EMPTY_ADOPTION_VALUES,
@@ -73,18 +69,12 @@ function optionLabel(option: AdoptionIndicatorOption): string {
 }
 
 export function AdoptionPanel({
-  projectName,
-  closeHref,
   productHref,
   action,
   indicators,
-  title = "Adopter un indicateur",
   submitLabel = "Adopter l'indicateur",
   initial = EMPTY_ADOPTION_VALUES,
 }: {
-  projectName: string;
-  /** La page du projet, sans son paramètre. Les trois sorties y mènent. */
-  closeHref: string;
   /** La page du produit — le seul endroit où un indicateur se crée. */
   productHref: string;
   /**
@@ -101,8 +91,6 @@ export function AdoptionPanel({
    * nominative, calculée par la lecture et non par ce composant.
    */
   indicators: readonly AdoptionIndicatorOption[];
-  /** « Adopter un indicateur » en saisie, « Modifier l'adoption » sinon. */
-  title?: string;
   submitLabel?: string;
   /**
    * Les valeurs de l'adoption corrigée. C'est l'**état initial** de
@@ -116,20 +104,17 @@ export function AdoptionPanel({
     errors: {},
   });
 
-    const values = state.values;
+  const values = state.values;
   const errors = state.errors;
 
   return (
     <Panel
-      titleId="panneau-adoption-titre"
-      title={title}
-      subtitles={[projectName]}
-      closeHref={closeHref}
       action={submit}
       pending={pending}
       submitLabel={submitLabel}
       message={state.message}
       errors={errors}
+      ok={state.ok}
     >
       {/* Les indicateurs proposés sont ceux du produit que cet
           accompagnement n'adopte pas encore : l'unicité `(projet,
@@ -170,8 +155,8 @@ export function AdoptionPanel({
           </select>
         ) : (
           <p className="text-sm text-content-neutral-dark">
-            Ce produit ne porte aucun indicateur à adopter. Un indicateur
-            se crée sur{" "}
+            Ce produit ne porte aucun indicateur à adopter. Un indicateur se
+            crée sur{" "}
             <Link
               href={productHref}
               className="text-content-info-base underline"

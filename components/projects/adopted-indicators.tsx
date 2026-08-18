@@ -42,6 +42,8 @@
 
 import Link from "next/link";
 
+import { DrawerLink } from "@/components/ui/drawer";
+
 import { ACTION_LINK } from "@/components/ui/action-link";
 import { Field } from "@/components/ui/field";
 import { Section, SectionHeader } from "@/components/ui/section";
@@ -115,7 +117,10 @@ export function AdoptedIndicators({
                   l'en-tête, sur le même fond. */}
               <dl className="mt-2 flex flex-wrap gap-x-8 gap-y-3">
                 <Field label="Référence">
-                  <Reported value={adoption.baselineValue} unit={adoption.unit} />
+                  <Reported
+                    value={adoption.baselineValue}
+                    unit={adoption.unit}
+                  />
                 </Field>
                 <Field label="Cible">
                   <Reported value={adoption.targetValue} unit={adoption.unit} />
@@ -146,13 +151,14 @@ export function AdoptedIndicators({
               {editHref || removeAdoption ? (
                 <div className="mt-2.5 flex flex-wrap items-center gap-4">
                   {editHref ? (
-                    <Link
+                    <DrawerLink
                       href={editHref(adoption.id)}
+                      request={{ kind: "adoption", id: adoption.id }}
                       aria-label={`Modifier l'adoption de l'indicateur ${adoption.label}`}
                       className={ACTION_LINK}
                     >
                       Modifier
-                    </Link>
+                    </DrawerLink>
                   ) : null}
                   {removeAdoption ? (
                     <form action={removeAdoption.bind(null, adoption.id)}>
@@ -176,7 +182,10 @@ export function AdoptedIndicators({
             Les indicateurs du produit que cet accompagnement reprend à son
             compte s&apos;afficheront ici, avec leur valeur de référence, la
             cible fixée et le dernier relevé. Un indicateur se crée sur{" "}
-            <Link href={productHref} className="text-content-info-base underline">
+            <Link
+              href={productHref}
+              className="text-content-info-base underline"
+            >
               la page du produit
             </Link>
             , puis s&apos;adopte ici.
@@ -256,9 +265,10 @@ function LastReading({ adoption }: { adoption: ProjectAdoption }) {
  * Le point d'entrée du panneau, aux deux emplacements — en tête du bloc et dans
  * son état vide.
  *
- * Un `<Link>` et non un bouton : il mène à une URL, donc il se copie, se
- * partage et s'ouvre dans un onglet. La forme de `LinkResource` (T4.2), jusqu'au
- * `+` en `aria-hidden` — le mot porte seul le sens.
+ * Un lien et non un bouton : il mène à une URL, donc il se copie, se partage
+ * et s'ouvre dans un onglet — ce que TD.2 préserve exactement, le clic gauche
+ * seul étant intercepté. La forme de `LinkResource` (T4.2), jusqu'au `+` en
+ * `aria-hidden` : le mot porte seul le sens.
  */
 function AdoptIndicator({
   href,
@@ -268,12 +278,13 @@ function AdoptIndicator({
   className: string;
 }) {
   return (
-    <Link
+    <DrawerLink
       href={href}
+      request={{ kind: "adoption" }}
       className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold ${className}`}
     >
       <span aria-hidden="true">+</span>
       Adopter un indicateur
-    </Link>
+    </DrawerLink>
   );
 }

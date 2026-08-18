@@ -68,6 +68,16 @@ export type ResourceFormState = {
   errors: ResourceFormErrors;
   /** Un empêchement qui n'appartient à aucun champ : un droit, une panne. */
   message?: string;
+  /**
+   * L'écriture a eu lieu : le panneau se referme (TD.2).
+   *
+   * **C'est ce qui remplace le `redirect` de l'action.** La navigation *était*
+   * la fermeture ; elle ne peut plus l'être sans re-rendre la page que TD.2
+   * cherche justement à ne plus re-rendre. `revalidatePath` reste, et sa
+   * réponse porte l'arbre réactualisé : ce qui a été saisi paraît dans son
+   * bloc, et c'est toute la confirmation (`docs/06` §9).
+   */
+  ok?: boolean;
 };
 
 export const EMPTY_RESOURCE_VALUES: ResourceFormValues = {

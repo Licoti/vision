@@ -7,12 +7,19 @@
  * d'envoi. C'est une **lecture**, et il reste rendu sur le serveur — comme
  * `readings-panel.tsx`, le seul autre panneau du projet dans ce cas.
  *
- * Il ne réutilise pas `Panel` pour cette raison exacte : la coquille de TD.1
+ * Il ne réutilise pas `Panel` pour cette raison exacte : le corps de TD.1
  * enveloppe ses `children` dans un `<form>` et exige un dispatch, une attente et
  * un libellé d'envoi. Les emprunter pour une fiche aurait demandé de rendre
- * `Panel` générique sur ce qu'il n'est pas. Il en reprend en revanche la mise en
- * page, le voile, le `FocusTrap` et la croix `autoFocus` — la fermeture reste un
- * lien vers la page nue.
+ * `Panel` générique sur ce qu'il n'est pas.
+ *
+ * **Sa coquille l'a quitté en TD.2**, et c'est ce qui lui permet de rester
+ * serveur : le voile, le tiroir et la croix vivent dans `DrawerHost`, qui est
+ * client et porte donc la fermeture.
+ *
+ * **Il garde son en-tête**, et c'est le seul panneau dans ce cas : le portrait
+ * et l'étiquette « Principal » à côté du nom ne se disent pas en deux lignes de
+ * texte. `DrawerContent.header` existe pour lui — le descendre dans le corps
+ * aurait défait la ressemblance avec la carte qu'il détaille.
  *
  * **Il se lit par tout le domaine** (D9), à la différence du panneau de saisie :
  * c'est pourquoi son ouverture ne passe par aucun droit. Ce sont ses **deux
@@ -27,11 +34,9 @@
  * couverture, ni comparaison entre personae. On affiche ce qui a été saisi.
  */
 
-import Link from "next/link";
-
 import { ACTION_LINK } from "@/components/ui/action-link";
 import { Avatar } from "@/components/ui/avatar";
-import { FocusTrap } from "@/components/ui/focus-trap";
+import { DrawerLink } from "@/components/ui/drawer";
 import { Tag } from "@/components/ui/tag";
 import type {
   PersonaTrait,
@@ -55,12 +60,14 @@ const FAMILIES: readonly {
   {
     kind: "goal",
     title: "Objectifs",
-    empty: "Aucun objectif saisi pour l'instant — ce que ce profil cherche à faire.",
+    empty:
+      "Aucun objectif saisi pour l'instant — ce que ce profil cherche à faire.",
   },
   {
     kind: "pain",
     title: "Irritants",
-    empty: "Aucun irritant saisi pour l'instant — ce qui le bloque ou le ralentit aujourd'hui.",
+    empty:
+      "Aucun irritant saisi pour l'instant — ce qui le bloque ou le ralentit aujourd'hui.",
   },
   {
     kind: "expectation",
@@ -69,127 +76,105 @@ const FAMILIES: readonly {
   },
 ];
 
-export function PersonaDetail({
+/**
+ * L'en-tête de la fiche, que la coquille rend à la place du couple
+ * titre / sous-titres. Il porte lui-même le `<h2>` que `aria-labelledby`
+ * désigne.
+ */
+export function PersonaDetailHeader({
   productName,
   persona,
-  traits,
-  closeHref,
-  editHref,
-  archivePersona,
 }: {
   productName: string;
   persona: ProductPersona;
+}) {
+  return (
+    <div className="flex min-w-0 items-start gap-3.5">
+      <PersonaImage persona={persona} />
+      <div className="flex min-w-0 flex-col gap-1">
+        <h2
+          id="panneau-persona-titre"
+          className="text-md font-semibold text-content-neutral-darkest"
+        >
+          {persona.name}
+        </h2>
+        <p className="text-xs text-content-neutral-base">
+          {persona.role ? `${productName} · ${persona.role}` : productName}
+        </p>
+        {persona.kind === "primary" ? (
+          <span className="mt-1">
+            <Tag label="Principal" />
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+export function PersonaDetail({
+  persona,
+  traits,
+  editHref,
+  archivePersona,
+}: {
+  persona: ProductPersona;
   /** Les traits de **ce** persona, déjà triés par famille puis par position. */
   traits: PersonaTrait[];
-  /** La page nue. Les trois sorties y mènent. */
-  closeHref: string;
   /** `null` retire le geste — le composant ne connaît aucun droit. */
   editHref: string | null;
   archivePersona: (() => Promise<void>) | null;
 }) {
   return (
-    <FocusTrap
-      closeHref={closeHref}
-      className="fixed inset-0 z-40 flex justify-end"
-    >
-      {/* Le voile ferme au clic et **ne prend jamais le focus** : la fermeture
-          au clavier passe par la croix, qui la porte. La règle de `Panel`. */}
-      <Link
-        href={closeHref}
-        aria-hidden="true"
-        tabIndex={-1}
-        className="absolute inset-0 bg-surface-neutral-opacity-distinct"
-      />
+    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
+      {persona.summary ? (
+        <p className="text-sm leading-175 text-content-neutral-dark">
+          {persona.summary}
+        </p>
+      ) : null}
 
-      <div
-        role="dialog"
-        aria-labelledby="panneau-persona-titre"
-        className="relative flex w-110 max-w-full flex-col gap-5 overflow-y-auto bg-surface-neutral-pale px-6 py-5"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3.5">
-            <PersonaImage persona={persona} />
-            <div className="flex min-w-0 flex-col gap-1">
-              <h2
-                id="panneau-persona-titre"
-                className="text-md font-semibold text-content-neutral-darkest"
-              >
-                {persona.name}
-              </h2>
-              <p className="text-xs text-content-neutral-base">
-                {persona.role
-                  ? `${productName} · ${persona.role}`
-                  : productName}
-              </p>
-              {persona.kind === "primary" ? (
-                <span className="mt-1">
-                  <Tag label="Principal" />
-                </span>
-              ) : null}
-            </div>
-          </div>
+      {FAMILIES.map((family) => (
+        <Family
+          key={family.kind}
+          title={family.title}
+          empty={family.empty}
+          items={traits.filter((trait) => trait.kind === family.kind)}
+        />
+      ))}
 
-          {/* `autoFocus` : c'est la sortie, et elle doit être le premier arrêt
-              du clavier à l'ouverture. La règle de `Panel`. */}
-          <Link
-            href={closeHref}
-            autoFocus
-            aria-label="Fermer"
-            className="flex h-8 w-8 flex-none items-center justify-center rounded-lg text-content-neutral-base"
-          >
-            <span aria-hidden="true">×</span>
-          </Link>
-        </div>
-
-        {persona.summary ? (
-          <p className="text-sm leading-175 text-content-neutral-dark">
-            {persona.summary}
-          </p>
-        ) : null}
-
-        {FAMILIES.map((family) => (
-          <Family
-            key={family.kind}
-            title={family.title}
-            empty={family.empty}
-            items={traits.filter((trait) => trait.kind === family.kind)}
-          />
-        ))}
-
-        {/* Un `div` et non un `span` : `<form>` est du contenu de flux, et un
+      {/* Un `div` et non un `span` : `<form>` est du contenu de flux, et un
             élément de phrasé ne l'accepte pas — le balisage servi serait réécrit
             par le navigateur. La règle de `readings-panel.tsx`. */}
-        {editHref || archivePersona ? (
-          <div className="flex flex-wrap items-center gap-4 border-t border-surface-neutral-lighter pt-4">
-            {editHref ? (
-              <Link
-                href={editHref}
-                aria-label={`Modifier le persona ${persona.name}`}
-                className={ACTION_LINK}
-              >
-                Modifier ce persona
-              </Link>
-            ) : null}
-            {archivePersona ? (
-              /* Un formulaire nu : ni confirmation (arbitrage (c) de
+      {editHref || archivePersona ? (
+        <div className="flex flex-wrap items-center gap-4 border-t border-surface-neutral-lighter pt-4">
+          {editHref ? (
+            <DrawerLink
+              href={editHref}
+              request={{ kind: "persona", id: persona.id }}
+              aria-label={`Modifier le persona ${persona.name}`}
+              className={ACTION_LINK}
+            >
+              Modifier ce persona
+            </DrawerLink>
+          ) : null}
+          {archivePersona ? (
+            /* Un formulaire nu : ni confirmation (arbitrage (c) de
                  `tickets-C4bis.md`), ni motif. « Archiver » est le mot de
                  l'arbitrage (d), jamais « Supprimer » : rien n'est supprimé
                  (règle 4) — le persona quitte le bloc, ses traits restent avec
                  lui. */
-              <form action={archivePersona}>
-                <button
-                  type="submit"
-                  aria-label={`Archiver le persona ${persona.name}`}
-                  className={ACTION_LINK}
-                >
-                  Archiver ce persona
-                </button>
-              </form>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-    </FocusTrap>
+            <form action={archivePersona}>
+              <button
+                type="submit"
+                aria-label={`Archiver le persona ${persona.name}`}
+                className={ACTION_LINK}
+              >
+                Archiver ce persona
+              </button>
+            </form>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

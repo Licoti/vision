@@ -42,7 +42,6 @@ import {
   projectStatuses,
   projects,
 } from "@/lib/db/schema";
-import { ROUTES } from "@/lib/navigation";
 
 /** Qui la requête prétend être. Chaque test la pose avant d'appeler l'action. */
 let currentPerson: string | null = null;
@@ -86,21 +85,27 @@ function call(productId: string, vision: string) {
 }
 
 /**
- * L'issue d'une écriture réussie : la cible de la redirection.
+ * L'issue d'une écriture réussie — **`ok`, et non plus une redirection** (TD.2).
  *
- * Elle **exige** la levée. Une action qui rendrait un état au lieu de rediriger
- * n'a pas écrit, et ce helper le dit plutôt que de laisser le test conclure sur
- * une base qu'un autre test aurait remplie.
+ * `updateProductVision` fermait son panneau en redirigeant vers la page nue :
+ * la navigation *était* la fermeture, et sa cible disait où l'on retombait. Le
+ * panneau se fermant désormais côté client, elle rend son succès.
+ *
+ * Il **exige** `ok`. Une action qui rendrait un état sans lui n'a pas écrit, et
+ * ce helper le dit plutôt que de laisser le test conclure sur une base qu'un
+ * autre test aurait remplie — c'est la propriété que `redirectedTo` cherchait,
+ * et elle est tenue par la même exigence.
  */
-async function redirectedTo(promise: Promise<unknown>): Promise<string> {
-  try {
-    await promise;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    if (message.startsWith(REDIRECT)) return message.slice(REDIRECT.length);
-    throw error;
+async function written<T extends { ok?: boolean; message?: string }>(
+  promise: Promise<T>,
+): Promise<T> {
+  const state = await promise;
+  if (!state.ok) {
+    throw new Error(
+      `l'action n'a pas écrit : ${state.message ?? "aucun message"}`,
+    );
   }
-  throw new Error("l'action a rendu un état au lieu de rediriger");
+  return state;
 }
 
 type Fixture = {
@@ -238,11 +243,10 @@ describe("updateProductVision — ce que le geste écrit", () => {
   test("le responsable de domaine écrit la vision, et la base la porte", async () => {
     currentPerson = f.managerId;
     try {
-      const to = await redirectedTo(
+      await written(
         call(f.productId, "Devenir le point d'entrée unique des démarches."),
       );
 
-      expect(to).toBe(ROUTES.product(f.productId));
       expect(await visionOf(f.productId)).toBe(
         "Devenir le point d'entrée unique des démarches.",
       );
@@ -254,8 +258,8 @@ describe("updateProductVision — ce que le geste écrit", () => {
   test("récrire remplace, et ne complète pas", async () => {
     currentPerson = f.managerId;
     try {
-      await redirectedTo(call(f.productId, "Première direction."));
-      await redirectedTo(call(f.productId, "Seconde direction."));
+      await written(call(f.productId, "Première direction."));
+      await written(call(f.productId, "Seconde direction."));
 
       expect(await visionOf(f.productId)).toBe("Seconde direction.");
     } finally {
@@ -266,7 +270,7 @@ describe("updateProductVision — ce que le geste écrit", () => {
   test("le champ rogné : les espaces de bord ne partent pas en base", async () => {
     currentPerson = f.managerId;
     try {
-      await redirectedTo(call(f.productId, "   Une direction.   "));
+      await written(call(f.productId, "   Une direction.   "));
       expect(await visionOf(f.productId)).toBe("Une direction.");
     } finally {
       await clear();
@@ -279,8 +283,8 @@ describe("updateProductVision — ce que le geste écrit", () => {
        passerait pour une vision en rendant un paragraphe blanc. */
     currentPerson = f.managerId;
     try {
-      await redirectedTo(call(f.productId, "Une direction."));
-      await redirectedTo(call(f.productId, "   "));
+      await written(call(f.productId, "Une direction."));
+      await written(call(f.productId, "   "));
 
       expect(await visionOf(f.productId)).toBeNull();
     } finally {

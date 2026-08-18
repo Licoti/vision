@@ -47,11 +47,7 @@
 
 import { useActionState } from "react";
 
-import {
-  borderOf,
-  CONTROL,
-  FormField,
-} from "@/components/ui/form-field";
+import { borderOf, CONTROL, FormField } from "@/components/ui/form-field";
 import { Panel } from "@/components/ui/panel";
 import {
   EMPTY_RESULT_VALUES,
@@ -61,23 +57,11 @@ import {
 import type { ResultToolOption } from "@/lib/queries/activities";
 
 export function ResultPanel({
-  projectName,
-  activityLabel,
-  closeHref,
   action,
   tools,
-  title = "Saisir un résultat",
   submitLabel = "Enregistrer le résultat",
   initial = EMPTY_RESULT_VALUES,
 }: {
-  projectName: string;
-  /**
-   * « Audit UX · septembre 2026 ». Ce panneau écrit sur une activité précise,
-   * et ne pas la nommer laisserait la personne la deviner à l'URL.
-   */
-  activityLabel: string;
-  /** La page du projet, sans son paramètre. Les trois sorties y mènent. */
-  closeHref: string;
   /**
    * L'action serveur, **déjà liée** au projet et à l'activité côté serveur. Le
    * panneau ne connaît ni l'un ni l'autre.
@@ -92,8 +76,6 @@ export function ResultPanel({
    * référentiel ne porte pas encore.
    */
   tools: readonly ResultToolOption[];
-  /** « Saisir un résultat » à la saisie, « Corriger le résultat » sinon. */
-  title?: string;
   submitLabel?: string;
   /**
    * Les valeurs du résultat corrigé (T4bis.6). C'est l'**état initial** de
@@ -107,20 +89,17 @@ export function ResultPanel({
     errors: {},
   });
 
-    const values = state.values;
+  const values = state.values;
   const errors = state.errors;
 
   return (
     <Panel
-      titleId="panneau-resultat-titre"
-      title={title}
-      subtitles={[activityLabel, projectName]}
-      closeHref={closeHref}
       action={submit}
       pending={pending}
       submitLabel={submitLabel}
       message={state.message}
       errors={errors}
+      ok={state.ok}
     >
       <FormField
         label="Libellé"
@@ -164,9 +143,7 @@ export function ResultPanel({
           defaultValue={values.value}
           autoComplete="off"
           aria-invalid={errors.value ? true : undefined}
-          aria-describedby={
-            errors.value ? "resultat-valeur-erreur" : undefined
-          }
+          aria-describedby={errors.value ? "resultat-valeur-erreur" : undefined}
           className={`${CONTROL} ${borderOf(errors.value)}`}
         />
       </FormField>
@@ -187,9 +164,7 @@ export function ResultPanel({
           defaultValue={values.unit}
           autoComplete="off"
           aria-invalid={errors.unit ? true : undefined}
-          aria-describedby={
-            errors.unit ? "resultat-unite-erreur" : undefined
-          }
+          aria-describedby={errors.unit ? "resultat-unite-erreur" : undefined}
           className={`${CONTROL} ${borderOf(errors.unit)}`}
         />
       </FormField>

@@ -81,63 +81,34 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import {
-  archiveIndicator,
-  archivePersona,
-  archiveReading,
-  createIndicator,
-  createPersona,
-  createReading,
-  setNorthStar,
-  updateIndicator,
-  updatePersona,
-  updateReading,
-} from "./actions";
-import {
-  archiveProduct,
-  restoreProduct,
-  updateProductVision,
-} from "../actions";
-import { IndicatorPanel } from "@/components/products/indicator-panel";
+import { archiveIndicator, setNorthStar } from "./actions";
+import { restoreProduct } from "../actions";
 import { Indicators } from "@/components/products/indicators";
-import { PersonaDetail } from "@/components/products/persona-detail";
-import { PersonaPanel } from "@/components/products/persona-panel";
 import { Personas } from "@/components/products/personas";
-import { ReadingPanel } from "@/components/products/reading-panel";
-import { ReadingsPanel } from "@/components/products/readings-panel";
 import { Roadmap } from "@/components/products/roadmap";
-import { VisionPanel } from "@/components/products/vision-panel";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
+import { DrawerHost, DrawerLink } from "@/components/ui/drawer";
 import { AvatarGroup } from "@/components/ui/avatar";
 import { Block, BlockHeader } from "@/components/ui/block";
-import { ConfirmPanel } from "@/components/ui/confirm-panel";
 import { EmptyState } from "@/components/ui/empty-state";
 import { List, ListRow } from "@/components/ui/list";
 import { Page, PageHeader } from "@/components/ui/page";
 import { StatusDot } from "@/components/ui/status-dot";
+import { loadProductDrawer } from "./drawers";
 import { requireSession } from "@/lib/auth/provider";
-import { indicatorReadings, indicators, personas } from "@/lib/db/schema";
-import { toIndicatorFormValues } from "@/lib/forms/indicator";
-import { toPersonaFormValues } from "@/lib/forms/persona";
-import { toReadingFormValues } from "@/lib/forms/reading";
-import { toVisionFormValues } from "@/lib/forms/vision";
-import { formatAccompaniments, formatMonth, formatPeriod } from "@/lib/format";
 import {
-  ARCHIVE_PANEL_CONFIRM,
-  INDICATOR_PANEL_NEW,
-  PERSONA_PANEL_NEW,
-  ROUTES,
-  VISION_PANEL_EDIT,
-} from "@/lib/navigation";
+  productRequestFromParams,
+  PRODUCT_PANEL_PARAMS,
+  resolveProductDrawer,
+} from "@/lib/drawers/product";
+import { formatAccompaniments, formatMonth, formatPeriod } from "@/lib/format";
+import { ROUTES } from "@/lib/navigation";
 import {
   listProductAdoptions,
   listProductIndicators,
   listProductReadings,
 } from "@/lib/queries/indicators";
-import {
-  listPersonaTraits,
-  listProductPersonas,
-} from "@/lib/queries/personas";
+import { listProductPersonas } from "@/lib/queries/personas";
 import { findProductDetail, listProductProjects } from "@/lib/queries/products";
 import { listProductMilestones } from "@/lib/queries/timeline";
 import { isUuid } from "@/lib/uuid";
@@ -241,479 +212,133 @@ export default async function ProductPage({
     (session.can.manageDomain ||
       projects.some((project) => session.can.writeProject(project.id)));
 
-  const { archiver, indicateur, releve, releves, vision, persona, fiche, de, a } =
-    await searchParams;
+  const {
+    archiver,
+    indicateur,
+    releve,
+    releves,
+    vision,
+    persona,
+    fiche,
+    de,
+    a,
+  } = await searchParams;
 
-  /* L'exclusivité, avant tout le reste : plusieurs clés d'ouverture
-     concurrentes n'en ouvrent aucune. Tout ce qui suit lit `asked`, pas les
-     paramètres bruts, si bien qu'aucun chemin ne peut ouvrir deux panneaux à la
-     fois — la garantie est dans le code, pas dans la relecture.
+  /* **L'URL reste une adresse, elle n'est plus le mécanisme** (TD.2). Coller
+     `?fiche=<id>` ouvre encore le panneau, ici, au rendu serveur ; le clic, lui,
+     passe par `DrawerHost` et n'écrit plus rien. Les deux chemins traversent
+     ensuite la **même** résolution — `resolveProductDrawer` —, si bien qu'aucune
+     règle de droit ni aucune confrontation ne vit à deux endroits.
 
-     La forme est celle de la page projet (T4.4, T4bis.3) : un **décompte**, et
-     non une comparaison binaire. T5.3 y a ajouté `releve` sans que l'énoncé
-     change d'un caractère, puis `releves`, puis `vision` le 18/08/2026 — c'est
-     très exactement ce pour quoi il avait été écrit ainsi.
+     L'exclusivité ne vaut donc plus que pour ce chemin-ci : plusieurs clés
+     présentes ensemble n'ouvrent **rien**. Côté clic, elle est devenue
+     structurelle — l'état ne porte qu'une demande à la fois, et deux
+     `role="dialog"` concurrents ne sont plus représentables.
 
-     **`de` et `a` n'y entrent pas**, et le décompte reste donc sur trois clés :
-     ce ne sont pas des clés d'ouverture. Une fenêtre de roadmap ne dispute
-     l'écran à aucun panneau — elle ne pose ni `role="dialog"` ni `inert` —, et
-     les faire compter fermerait un panneau chaque fois que la roadmap est
-     filtrée. */
-  const keys = { archiver, indicateur, releve, releves, vision, persona, fiche };
+     **`de` et `a` n'y entrent pas**, et le décompte les ignore comme avant : ce
+     ne sont pas des clés d'ouverture, et les faire compter fermerait un panneau
+     chaque fois que la roadmap est filtrée. */
+  const keys = {
+    archiver,
+    indicateur,
+    releve,
+    releves,
+    vision,
+    persona,
+    fiche,
+  };
   const conflict =
     Object.values(keys).filter((value) => value !== undefined).length > 1;
   const asked: Partial<typeof keys> = conflict ? {} : keys;
 
-  /* Le droit décide de tout ce qui suit, et l'archivage avec lui : on ne
-     confirme pas l'archivage de ce qui est déjà rangé. Un membre qui tape
-     l'URL d'ouverture obtient la page nue — pas un 404 : la page produit reste
-     lisible par tout le domaine (D9), seul le panneau disparaît. */
-  const archivePanelOpen =
-    session.can.manageDomain &&
-    !archived &&
-    asked.archiver === ARCHIVE_PANEL_CONFIRM;
+  const request = productRequestFromParams(asked);
 
-  /* Une seule clé, dont la **valeur** porte le cas (T3.2, T4bis.5) : `nouvel`
-     crée, un identifiant corrige, tout le reste n'ouvre rien. L'indicateur est
-     confronté au produit et à l'archivage — le bloc n'affiche aucun lien vers un
-     indicateur archivé, mais une URL se tape.
-
-     La forme est vérifiée avant la base, comme pour l'identifiant de la page :
-     une colonne `uuid` interrogée avec n'importe quoi rend une erreur
-     PostgreSQL, donc un 500, là où l'on attend une page nue. */
-  const editedIndicator =
-    canWriteIndicators &&
-    asked.indicateur &&
-    asked.indicateur !== INDICATOR_PANEL_NEW &&
-    isUuid(asked.indicateur)
-      ? await session.db.find(indicators, asked.indicateur)
-      : undefined;
-
-  const indicator =
-    editedIndicator &&
-    editedIndicator.productId === product.id &&
-    editedIndicator.archivedAt === null
-      ? editedIndicator
-      : null;
-
-  const indicatorPanelOpen =
-    canWriteIndicators &&
-    (asked.indicateur === INDICATOR_PANEL_NEW || indicator !== null);
-
-  /* La clé de T5.3, dont la valeur change de **table** et non de nature :
-     l'identifiant d'un indicateur saisit un relevé, celui d'un relevé le
-     corrige. Deux lectures scopées successives tranchent — un UUID d'`indicators`
-     n'est pas un UUID d'`indicator_readings` —, et ce qui n'est ni l'un ni
-     l'autre n'ouvre rien.
-
-     La forme est vérifiée avant la base, comme partout ailleurs sur cette page :
-     une colonne `uuid` interrogée avec n'importe quoi rend une erreur
-     PostgreSQL, donc un 500, là où l'on attend une page nue. */
-  const readingTarget =
-    canWriteIndicators && asked.releve && isUuid(asked.releve)
-      ? asked.releve
-      : null;
-
-  /* L'indicateur d'abord : c'est le cas courant, et le seul qu'un lien de
-     l'écran atteint. Il doit être vivant et appartenir à **ce** produit — le
-     bloc ne montre aucun indicateur archivé, mais une URL se tape. */
-  const readingIndicator = readingTarget
-    ? await session.db.find(indicators, readingTarget)
-    : undefined;
-
-  const newReadingFor =
-    readingIndicator &&
-    readingIndicator.productId === product.id &&
-    readingIndicator.archivedAt === null
-      ? readingIndicator
-      : null;
-
-  /* Le relevé ensuite, et sa chaîne remontée jusqu'au produit — relevé,
-     indicateur, produit : la même que remonte `openReading` dans l'action, et
-     pour la même raison. Un relevé retiré, ou porté par un indicateur archivé ou
-     rattaché à un autre produit, n'ouvre rien. */
-  const editedReading =
-    readingTarget && !newReadingFor
-      ? await session.db.find(indicatorReadings, readingTarget)
-      : undefined;
-
-  const editedReadingIndicator =
-    editedReading && editedReading.archivedAt === null
-      ? await session.db.find(indicators, editedReading.indicatorId)
-      : undefined;
-
-  const readingPanel = newReadingFor
-    ? { indicator: newReadingFor, reading: null }
-    : editedReading &&
-        editedReadingIndicator &&
-        editedReadingIndicator.productId === product.id &&
-        editedReadingIndicator.archivedAt === null
-      ? { indicator: editedReadingIndicator, reading: editedReading }
-      : null;
-
-  /* La septième clé, et la plus simple : sa valeur est **toujours** un
-     identifiant d'indicateur, jamais polymorphe. La forme est vérifiée avant la
-     base, comme partout sur cette page — une colonne `uuid` interrogée avec
-     n'importe quoi rend une erreur PostgreSQL, donc un 500, là où l'on attend
-     une page nue.
-
-     **Elle ne dépend d'aucun droit** : lire la série d'un indicateur se fait par
-     tout le domaine (D9), comme le bloc lui-même. Ce sont les gestes *dans* le
-     panneau qui tombent avec `canWriteIndicators`. */
-  const readingsTarget =
-    asked.releves && isUuid(asked.releves) ? asked.releves : null;
-
-  const readingsIndicatorRow = readingsTarget
-    ? await session.db.find(indicators, readingsTarget)
-    : undefined;
-
-  const readingsIndicator =
-    readingsIndicatorRow &&
-    readingsIndicatorRow.productId === product.id &&
-    readingsIndicatorRow.archivedAt === null
-      ? productIndicators.find((row) => row.id === readingsIndicatorRow.id)
-      : undefined;
-
-  /* La huitième clé, et **la seule qui n'ouvre pas sur le droit dérivé** : la
-     vision est une propriété du produit, donc `manageDomain` seul (F1-D1, D9),
-     comme l'archivage juste au-dessus. Un contributeur désigné, qui écrit les
-     indicateurs de ce bloc, n'écrit pas sa vision — et le panneau lui est
-     simplement absent. Ce n'est pas ce rendu qui protège : `updateProductVision`
-     redérive le droit sur l'identifiant **reçu**.
-
-     Un produit archivé est en lecture seule (T4bis.2), et le `!archived` le dit
-     ici comme il le dit pour l'archivage. L'action le redit sur la ligne lue. */
-  const visionPanelOpen =
-    session.can.manageDomain && !archived && asked.vision === VISION_PANEL_EDIT;
-
-  /* Les deux clés du persona (18/08/2026), et **elles ne se ressemblent qu'en
-     apparence** : `persona` ouvre la saisie et tombe avec le droit d'écrire ;
-     `fiche` ouvre la lecture et ne dépend d'aucun droit — la fiche est le détail
-     que la carte résume, et le bloc se lit par tout le domaine (D9). C'est la
-     même séparation que `releves` tient déjà pour la série d'un indicateur.
-
-     La valeur de `persona` porte le cas, comme celle d'`indicateur` : `nouveau`
-     crée, un identifiant corrige, tout le reste n'ouvre rien. La forme est
-     vérifiée avant la base — une colonne `uuid` interrogée avec n'importe quoi
-     rend une erreur PostgreSQL, donc un 500, là où l'on attend une page nue. */
-  const editedPersonaRow =
-    canWriteIndicators &&
-    asked.persona &&
-    asked.persona !== PERSONA_PANEL_NEW &&
-    isUuid(asked.persona)
-      ? await session.db.find(personas, asked.persona)
-      : undefined;
-
-  const editedPersona =
-    editedPersonaRow &&
-    editedPersonaRow.productId === product.id &&
-    editedPersonaRow.archivedAt === null
-      ? editedPersonaRow
-      : null;
-
-  const personaPanelOpen =
-    canWriteIndicators &&
-    (asked.persona === PERSONA_PANEL_NEW || editedPersona !== null);
-
-  /* La fiche : toujours un identifiant, jamais polymorphe. Elle se résout sur
-     la liste **déjà lue** plutôt que par une lecture de plus — le persona
-     affiché est celui du bloc, et un persona archivé ou d'un autre produit n'y
-     est pas. C'est ce qui remplace ici la confrontation en deux temps que
-     l'indicateur demande. */
-  const detailedPersona =
-    asked.fiche && isUuid(asked.fiche)
-      ? (productPersonas.find((row) => row.id === asked.fiche) ?? null)
-      : null;
-
-  /* La seule lecture conditionnelle de la page : les traits n'arrivent que
-     lorsqu'un des deux panneaux du persona est ouvert. Jamais une lecture par
-     carte — le bloc n'en a pas besoin, la carte ne résume que le haut de la
-     fiche. */
-  const openedPersonaId = detailedPersona?.id ?? editedPersona?.id ?? null;
-  const personaTraitRows = openedPersonaId
-    ? await listPersonaTraits(session.db, openedPersonaId)
-    : [];
-
-  const panelOpen =
-    archivePanelOpen ||
-    indicatorPanelOpen ||
-    readingPanel !== null ||
-    readingsIndicator !== undefined ||
-    visionPanelOpen ||
-    personaPanelOpen ||
-    detailedPersona !== null;
+  /* Les collections que la page a **déjà lues** pour son écran : la résolution
+     n'en relit aucune. C'est `loadProductDrawerContext` qui paie une lecture,
+     et seulement quand le clic ouvre un panneau qui en a besoin. */
+  const drawer = request
+    ? await resolveProductDrawer(
+        session,
+        product,
+        {
+          canWrite: canWriteIndicators,
+          indicators: productIndicators,
+          readings: productReadings,
+          personas: productPersonas,
+        },
+        request,
+      )
+    : null;
 
   return (
-    <>
-      {archivePanelOpen ? (
-        /* L'action est liée **côté serveur** au produit courant : l'identifiant
-           sort de la saisie, et le panneau ne connaît pas ce qu'il archive. Ce
-           n'est pas un verrou — Next sérialise les arguments liés dans un champ
-           `$ACTION_…`, réécrivable. Le verrou est dans l'action, qui interroge
-           `manageDomain` puis rapproche le produit reçu du domaine courant. */
-        <ConfirmPanel
-          title="Archiver ce produit"
-          context={product.name}
-          closeHref={ROUTES.product(product.id)}
-          action={archiveProduct.bind(null, product.id)}
-          submitLabel="Archiver ce produit"
-          pendingLabel="Archivage…"
-        >
-          {/* Ce que le geste retire, et ce qu'il laisse. Le texte est rendu sur
-              le serveur et traverse en `children` : le panneau est client pour
-              son seul refus. */}
-          <div className="flex flex-col gap-3 text-sm text-content-neutral-dark">
-            <p>
-              Ce produit disparaît de la liste des produits et des écrans qui la
-              reprennent. Rien n&apos;est supprimé.
-            </p>
-            <p>
-              Sa page reste lisible par son adresse, avec ses accompagnements
-              passés : c&apos;est la mémoire du centre, elle ne se perd pas.
-            </p>
-            <p>Le geste se défait : « Rétablir » ramène le produit.</p>
-          </div>
-        </ConfirmPanel>
-      ) : null}
-
-      {indicatorPanelOpen ? (
-        /* L'action est liée **côté serveur** — au produit courant en création,
-           au produit et à l'indicateur en correction (la forme d'`updateResource`
-           depuis T4bis.5) : les identifiants sortent de la saisie, et le panneau
-           ne connaît ni le produit ni l'indicateur qu'il écrit. Ce n'est pas un
-           verrou — Next sérialise les arguments liés dans un champ `$ACTION_…`,
-           réécrivable. Le verrou est dans l'action, qui dérive le droit sur le
-           produit **reçu** puis rapproche l'indicateur **reçu** de ce produit ;
-           un panneau absent du rendu n'a jamais protégé le point d'entrée HTTP
-           qui l'accompagne. */
-        <IndicatorPanel
-          /* La `key` change avec ce que le panneau édite, pour la raison écrite
-             sur celle du panneau d'activité : `useActionState` ne relit son état
-             initial qu'au montage. */
-          key={indicator ? indicator.id : INDICATOR_PANEL_NEW}
-          productName={product.name}
-          closeHref={ROUTES.product(product.id)}
-          action={
-            indicator
-              ? updateIndicator.bind(null, product.id, indicator.id)
-              : createIndicator.bind(null, product.id)
-          }
-          {...(indicator
-            ? {
-                title: "Modifier l'indicateur",
-                submitLabel: "Enregistrer les modifications",
-                initial: toIndicatorFormValues(indicator),
-              }
-            : {})}
-        />
-      ) : null}
-
-      {readingPanel ? (
-        /* Les identifiants sont liés **côté serveur** — au produit et à
-           l'indicateur en saisie, au produit et au relevé en correction : le
-           panneau ne connaît ni l'un ni l'autre. Ce n'est pas un verrou, Next
-           les sérialisant en clair dans un champ `$ACTION_…`. Le verrou est dans
-           l'action : `createReading` passe par `openIndicator`, `updateReading`
-           par `openReading`, et les deux s'arrêtent au même `openProductWrite`
-           sur le produit **reçu**. */
-        <ReadingPanel
-          /* La `key` change avec ce que le panneau édite — et distingue la
-             saisie d'un indicateur de celle d'un autre : `useActionState` ne
-             relit son état initial qu'au montage. */
-          key={
-            readingPanel.reading
-              ? readingPanel.reading.id
-              : `nouveau-${readingPanel.indicator.id}`
-          }
-          productName={product.name}
-          indicatorLabel={readingPanel.indicator.label}
-          closeHref={ROUTES.product(product.id)}
-          action={
-            readingPanel.reading
-              ? updateReading.bind(null, product.id, readingPanel.reading.id)
-              : createReading.bind(null, product.id, readingPanel.indicator.id)
-          }
-          {...(readingPanel.reading
-            ? {
-                title: "Modifier le relevé",
-                submitLabel: "Enregistrer les modifications",
-                initial: toReadingFormValues(readingPanel.reading),
-              }
-            : {})}
-        />
-      ) : null}
-
-      {/* Le panneau de série (hors ticket, 17/08/2026) : il **se lit par tout le
-          domaine**, à la différence des six autres, et c'est pourquoi son
-          ouverture ne passe pas par `canWriteIndicators`. Ce sont ses trois
-          gestes qui tombent avec le droit, chacun à `null`. */}
-      {readingsIndicator ? (
-        <ReadingsPanel
-          productName={product.name}
-          indicator={readingsIndicator}
-          readings={productReadings.filter(
-            (reading) => reading.indicatorId === readingsIndicator.id,
-          )}
-          closeHref={ROUTES.product(product.id)}
-          addReadingHref={
-            canWriteIndicators
-              ? ROUTES.productReadingNew(product.id, readingsIndicator.id)
-              : null
-          }
-          editReadingHref={
-            canWriteIndicators
-              ? (readingId) =>
-                  ROUTES.productReadingEdit(product.id, readingId)
-              : null
-          }
-          archiveReading={
-            canWriteIndicators ? archiveReading.bind(null, product.id) : null
-          }
-        />
-      ) : null}
-
-      {visionPanelOpen ? (
-        /* L'action est liée **côté serveur** au produit courant : l'identifiant
-           sort de la saisie, et le panneau ne connaît pas ce qu'il écrit. Ce
-           n'est pas un verrou — Next sérialise les arguments liés dans un champ
-           `$ACTION_…`, réécrivable. Le verrou est dans l'action, qui interroge
-           `manageDomain` sur le produit **reçu** puis refuse le produit archivé
-           sur la ligne lue. */
-        <VisionPanel
-          /* La `key` change avec ce que le panneau édite — ici, avec l'état de
-             la colonne : `useActionState` ne relit son état initial qu'au
-             montage, et le panneau rouvert après écriture doit repartir de la
-             vision écrite, pas de celle d'avant. */
-          key={product.vision ?? "nouvelle"}
-          productName={product.name}
-          closeHref={ROUTES.product(product.id)}
-          action={updateProductVision.bind(null, product.id)}
-          {...(product.vision
-            ? {
-                title: "Modifier la vision produit",
-                submitLabel: "Enregistrer les modifications",
-                initial: toVisionFormValues(product),
-              }
-            : {})}
-        />
-      ) : null}
-
-      {personaPanelOpen ? (
-        /* Les identifiants sont liés **côté serveur** — au produit en création,
-           au produit et au persona en correction : le panneau ne connaît ni
-           l'un ni l'autre. Ce n'est pas un verrou, Next les sérialisant en
-           clair dans un champ `$ACTION_…`. Le verrou est dans l'action :
-           `createPersona` passe par `openProductWrite`, `updatePersona` par
-           `openPersona`, et les deux redérivent le droit sur le produit
-           **reçu**. */
-        <PersonaPanel
-          /* La `key` change avec ce que le panneau édite : `useActionState` ne
-             relit son état initial qu'au montage. */
-          key={editedPersona ? editedPersona.id : PERSONA_PANEL_NEW}
-          productName={product.name}
-          closeHref={ROUTES.product(product.id)}
-          action={
-            editedPersona
-              ? updatePersona.bind(null, product.id, editedPersona.id)
-              : createPersona.bind(null, product.id)
-          }
-          {...(editedPersona
-            ? {
-                title: "Modifier le persona",
-                submitLabel: "Enregistrer les modifications",
-                initial: toPersonaFormValues(editedPersona, personaTraitRows),
-              }
-            : {})}
-        />
-      ) : null}
-
-      {/* La fiche **se lit par tout le domaine** (D9), à la différence du
-          panneau ci-dessus : son ouverture ne passe par aucun droit. Ce sont
-          ses deux gestes qui tombent avec lui, chacun à `null`. */}
-      {detailedPersona ? (
-        <PersonaDetail
-          productName={product.name}
-          persona={detailedPersona}
-          traits={personaTraitRows}
-          closeHref={ROUTES.product(product.id)}
-          editHref={
-            canWriteIndicators
-              ? ROUTES.productPersonaEdit(product.id, detailedPersona.id)
-              : null
-          }
-          archivePersona={
-            canWriteIndicators
-              ? archivePersona.bind(null, product.id, detailedPersona.id)
-              : null
-          }
-        />
-      ) : null}
-
-      {/* `inert` est un attribut HTML, pas un script : le contenu reste lu et
-          affiché derrière le voile, mais ne prend plus ni focus ni clic tant
-          que le panneau est ouvert. */}
-      <div inert={panelOpen}>
-        <Breadcrumb
-          items={[
-            { href: ROUTES.products, label: "Produits" },
-            { label: product.name },
-          ]}
-        />
-        <Page>
-          {/* La mention datée, au mois (D13) : c'est une date de rangement, pas
+    <DrawerHost
+      initial={drawer}
+      load={loadProductDrawer.bind(null, product.id)}
+      panelParams={PRODUCT_PANEL_PARAMS}
+      closeHref={ROUTES.product(product.id)}
+    >
+      <Breadcrumb
+        items={[
+          { href: ROUTES.products, label: "Produits" },
+          { label: product.name },
+        ]}
+      />
+      <Page>
+        {/* La mention datée, au mois (D13) : c'est une date de rangement, pas
               un horodatage — le jour n'apprendrait rien de plus. Le trio de
               jetons est celui de l'en-tête de la page projet, mesuré en T2.4 et
               repris sans qu'un couple neuf apparaisse. */}
-          {product.archivedAt ? (
-            <p className="rounded-xl border border-surface-neutral-lighter bg-surface-neutral-pale px-7 py-4 text-sm text-content-neutral-dark">
-              <span className="font-semibold">Produit archivé</span>
-              {` en ${formatMonth(product.archivedAt)}. Il n'apparaît plus dans la liste des produits ; sa page et ses accompagnements passés restent lisibles.`}
-            </p>
-          ) : null}
+        {product.archivedAt ? (
+          <p className="rounded-xl border border-surface-neutral-lighter bg-surface-neutral-pale px-7 py-4 text-sm text-content-neutral-dark">
+            <span className="font-semibold">Produit archivé</span>
+            {` en ${formatMonth(product.archivedAt)}. Il n'apparaît plus dans la liste des produits ; sa page et ses accompagnements passés restent lisibles.`}
+          </p>
+        ) : null}
 
-          <PageHeader
-            overline={`${product.entityLabel} · ${formatAccompaniments(projects.length)}`}
-            title={product.name}
-            {...(product.description ? { lead: product.description } : {})}
-            action={
-              session.can.manageDomain ? (
-                <span className="flex flex-wrap items-center gap-3">
-                  {archived ? (
-                    /* Un formulaire nu : le rétablissement n'a rien à saisir et
+        <PageHeader
+          overline={`${product.entityLabel} · ${formatAccompaniments(projects.length)}`}
+          title={product.name}
+          {...(product.description ? { lead: product.description } : {})}
+          action={
+            session.can.manageDomain ? (
+              <span className="flex flex-wrap items-center gap-3">
+                {archived ? (
+                  /* Un formulaire nu : le rétablissement n'a rien à saisir et
                        rien à confirmer — c'est le geste qui **défait**, et
                        `docs/06` §9 proscrit la confirmation là où elle ne
                        protège rien. */
-                    <form action={restoreProduct.bind(null, product.id)}>
-                      <button
-                        type="submit"
-                        className="rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale"
-                      >
-                        Rétablir ce produit
-                      </button>
-                    </form>
-                  ) : (
-                    <>
-                      <Link
-                        href={ROUTES.productEdit(product.id)}
-                        className="rounded-lg border border-content-neutral-normal px-4 py-2 text-sm font-semibold text-content-neutral-dark"
-                      >
-                        Modifier ce produit
-                      </Link>
-                      <Link
-                        href={ROUTES.productArchive(product.id)}
-                        className="rounded-lg border border-content-neutral-normal px-4 py-2 text-sm font-semibold text-content-neutral-dark"
-                      >
-                        Archiver
-                      </Link>
-                      <NewProjectLink productId={product.id} />
-                    </>
-                  )}
-                </span>
-              ) : null
-            }
-          />
+                  <form action={restoreProduct.bind(null, product.id)}>
+                    <button
+                      type="submit"
+                      className="rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale"
+                    >
+                      Rétablir ce produit
+                    </button>
+                  </form>
+                ) : (
+                  <>
+                    <Link
+                      href={ROUTES.productEdit(product.id)}
+                      className="rounded-lg border border-content-neutral-normal px-4 py-2 text-sm font-semibold text-content-neutral-dark"
+                    >
+                      Modifier ce produit
+                    </Link>
+                    <DrawerLink
+                      href={ROUTES.productArchive(product.id)}
+                      request={{ kind: "archive" }}
+                      className="rounded-lg border border-content-neutral-normal px-4 py-2 text-sm font-semibold text-content-neutral-dark"
+                    >
+                      Archiver
+                    </DrawerLink>
+                    <NewProjectLink productId={product.id} />
+                  </>
+                )}
+              </span>
+            ) : null
+          }
+        />
 
-          {/* **Le premier bloc de la page** depuis le 17/08/2026, et **« Vision
+        {/* **Le premier bloc de la page** depuis le 17/08/2026, et **« Vision
               produit » depuis le 18/08/2026** : la vision porte la raison
               d'être du produit et la North Star la mesure, et c'est ce qu'on
               lit d'abord.
@@ -732,51 +357,49 @@ export default async function ProductPage({
               — c'est la propriété que ce `&&` cherchait. Les actions sont liées
               au produit **côté serveur** ; le bloc y ajoute l'indicateur au
               rendu, et chacune redérive le droit sur l'identifiant reçu. */}
-          <Indicators
-            vision={product.vision}
-            /* **Pas `canWriteIndicators`** : la vision est une propriété du
+        <Indicators
+          vision={product.vision}
+          /* **Pas `canWriteIndicators`** : la vision est une propriété du
                produit, pas de ses accompagnements. Un contributeur désigné
                écrit les indicateurs de ce bloc et pas sa vision — les deux
                points d'entrée tombent séparément, et c'est la seule chose que
                le bloc sait de ces deux droits. */
-            visionHref={
-              session.can.manageDomain && !archived
-                ? ROUTES.productVision(product.id)
-                : null
-            }
-            indicators={productIndicators}
-            readings={productReadings}
-            adoptions={adoptions}
-            addHref={
-              canWriteIndicators ? ROUTES.productIndicatorNew(product.id) : null
-            }
-            editHref={
-              canWriteIndicators
-                ? (indicatorId) =>
-                    ROUTES.productIndicatorEdit(product.id, indicatorId)
-                : null
-            }
-            archiveIndicator={
-              canWriteIndicators
-                ? archiveIndicator.bind(null, product.id)
-                : null
-            }
-            addReadingHref={
-              canWriteIndicators
-                ? (indicatorId) =>
-                    ROUTES.productReadingNew(product.id, indicatorId)
-                : null
-            }
-            /* La série se lit par tout le domaine (D9), comme le bloc : ce
+          visionHref={
+            session.can.manageDomain && !archived
+              ? ROUTES.productVision(product.id)
+              : null
+          }
+          indicators={productIndicators}
+          readings={productReadings}
+          adoptions={adoptions}
+          addHref={
+            canWriteIndicators ? ROUTES.productIndicatorNew(product.id) : null
+          }
+          editHref={
+            canWriteIndicators
+              ? (indicatorId) =>
+                  ROUTES.productIndicatorEdit(product.id, indicatorId)
+              : null
+          }
+          archiveIndicator={
+            canWriteIndicators ? archiveIndicator.bind(null, product.id) : null
+          }
+          addReadingHref={
+            canWriteIndicators
+              ? (indicatorId) =>
+                  ROUTES.productReadingNew(product.id, indicatorId)
+              : null
+          }
+          /* La série se lit par tout le domaine (D9), comme le bloc : ce
                point d'entrée n'est pas conditionné par le droit d'écrire. */
-            readingsHref={(indicatorId) =>
-              ROUTES.productReadings(product.id, indicatorId)
-            }
-            setNorthStar={
-              canWriteIndicators ? setNorthStar.bind(null, product.id) : null
-            }
-          />
-          {/* **Le troisième bloc de la page** (18/08/2026) : « Vision produit »
+          readingsHref={(indicatorId) =>
+            ROUTES.productReadings(product.id, indicatorId)
+          }
+          setNorthStar={
+            canWriteIndicators ? setNorthStar.bind(null, product.id) : null
+          }
+        />
+        {/* **Le troisième bloc de la page** (18/08/2026) : « Vision produit »
               dit pourquoi ce produit existe et ce qu'il mesure, celui-ci dit
               **pour qui**. Il vient juste après, avant les accompagnements :
               c'est la question qu'on se pose en concevant, pas ce qu'on a fait.
@@ -787,17 +410,17 @@ export default async function ProductPage({
               dérivé des accompagnements du produit, et la lecture seule d'un
               produit archivé avec lui. Ce n'est pas ce rendu qui protège — les
               trois actions redérivent le droit sur les identifiants reçus. */}
-          <Personas
-            personas={productPersonas}
-            detailHref={(personaId) =>
-              ROUTES.productPersona(product.id, personaId)
-            }
-            addHref={
-              canWriteIndicators ? ROUTES.productPersonaNew(product.id) : null
-            }
-          />
+        <Personas
+          personas={productPersonas}
+          detailHref={(personaId) =>
+            ROUTES.productPersona(product.id, personaId)
+          }
+          addHref={
+            canWriteIndicators ? ROUTES.productPersonaNew(product.id) : null
+          }
+        />
 
-          {/* **Le deuxième bloc de la page** (18/08/2026), sous le nom
+        {/* **Le deuxième bloc de la page** (18/08/2026), sous le nom
               « Accompagnements en cours ». Il ferme la position qu'il occupait
               la veille et retrouve celle de `docs/06` §6 — « au-dessus de la
               liste des accompagnements, sans la déplacer ». L'écart qui reste
@@ -809,15 +432,15 @@ export default async function ProductPage({
               sur un produit vivant comme archivé — et n'ouvre aucun point
               d'entrée d'écriture. `de` et `a` sont des paramètres de **lecture**,
               et `timelineWindow` est la seule porte par où ils entrent. */}
-          <Roadmap
-            productId={product.id}
-            projects={projects}
-            milestones={milestones}
-            from={de}
-            to={a}
-          />
+        <Roadmap
+          productId={product.id}
+          projects={projects}
+          milestones={milestones}
+          from={de}
+          to={a}
+        />
 
-          {/* **Le dernier bloc de la page** (18/08/2026), sous le nom « Tous
+        {/* **Le dernier bloc de la page** (18/08/2026), sous le nom « Tous
               les accompagnements » : le bloc au-dessus cadre l'année en cours,
               celui-ci porte l'histoire entière, du plus récent au plus ancien.
               C'est ce couple qui répond à la question de l'écran — ce qu'on
@@ -832,69 +455,67 @@ export default async function ProductPage({
               autres blocs qui rendent un paragraphe : c'est le seul des trois
               qui porte un **geste**, et `EmptyState` est ce qui le place
               (règle 5). */}
-          <Block>
-            <BlockHeader
-              title="Tous les accompagnements"
-              note="Les accompagnements de ce produit, du plus récent au plus ancien."
+        <Block>
+          <BlockHeader
+            title="Tous les accompagnements"
+            note="Les accompagnements de ce produit, du plus récent au plus ancien."
+          />
+
+          {projects.length > 0 ? (
+            <List flush label="Tous les accompagnements de ce produit">
+              {projects.map((project) => (
+                <ListRow
+                  key={project.id}
+                  flush
+                  href={ROUTES.project(project.id)}
+                >
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="flex items-center gap-2 font-semibold text-content-neutral-dark">
+                        <StatusDot nature={project.statusNature} />
+                        {project.statusLabel}
+                      </span>
+                      <span
+                        aria-hidden="true"
+                        className="text-content-neutral-light"
+                      >
+                        ·
+                      </span>
+                      <span className="text-content-neutral-base">
+                        {formatPeriod(project.startedOn, project.expectedEndOn)}
+                      </span>
+                    </span>
+
+                    <span className="text-md font-semibold text-content-neutral-darkest">
+                      {project.name}
+                    </span>
+
+                    {project.objective ? (
+                      <span className="max-w-160 text-sm text-content-neutral-base">
+                        {project.objective}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <AvatarGroup
+                    names={project.team.map((member) => member.fullName)}
+                  />
+                </ListRow>
+              ))}
+            </List>
+          ) : (
+            <EmptyState
+              level={3}
+              title="Aucun accompagnement pour l'instant"
+              description="Les accompagnements de ce produit s'afficheront ici, du plus récent au plus ancien, chacun avec sa période, son statut, son objectif et son équipe."
+              {...(session.can.manageDomain && !archived
+                ? { action: <NewProjectLink productId={product.id} /> }
+                : {})}
             />
-
-            {projects.length > 0 ? (
-              <List flush label="Tous les accompagnements de ce produit">
-                {projects.map((project) => (
-                  <ListRow
-                    key={project.id}
-                    flush
-                    href={ROUTES.project(project.id)}
-                  >
-                    <div className="flex min-w-0 flex-1 flex-col gap-1">
-                      <span className="flex flex-wrap items-center gap-2 text-xs">
-                        <span className="flex items-center gap-2 font-semibold text-content-neutral-dark">
-                          <StatusDot nature={project.statusNature} />
-                          {project.statusLabel}
-                        </span>
-                        <span
-                          aria-hidden="true"
-                          className="text-content-neutral-light"
-                        >
-                          ·
-                        </span>
-                        <span className="text-content-neutral-base">
-                          {formatPeriod(project.startedOn, project.expectedEndOn)}
-                        </span>
-                      </span>
-
-                      <span className="text-md font-semibold text-content-neutral-darkest">
-                        {project.name}
-                      </span>
-
-                      {project.objective ? (
-                        <span className="max-w-160 text-sm text-content-neutral-base">
-                          {project.objective}
-                        </span>
-                      ) : null}
-                    </div>
-
-                    <AvatarGroup
-                      names={project.team.map((member) => member.fullName)}
-                    />
-                  </ListRow>
-                ))}
-              </List>
-            ) : (
-              <EmptyState
-                level={3}
-                title="Aucun accompagnement pour l'instant"
-                description="Les accompagnements de ce produit s'afficheront ici, du plus récent au plus ancien, chacun avec sa période, son statut, son objectif et son équipe."
-                {...(session.can.manageDomain && !archived
-                  ? { action: <NewProjectLink productId={product.id} /> }
-                  : {})}
-              />
-            )}
-          </Block>
-
-        </Page>
-      </div>
-    </>
+          )}
+        </Block>
+      </Page>
+    </DrawerHost>
   );
 }
 

@@ -3941,3 +3941,173 @@ balise. La mise en défaut porte donc sur le HTML servi : sans l'attribut `open`
 produit de la base de développement rendent leurs cartes et leur lien d'ajout **dans le document**,
 repliés. `ETAT.md` passe de 303 à 309 lignes ; le seuil de 250 reste franchi, et attend la session
 de découpage de C6.
+
+## TD.2 — les panneaux s'ouvrent côté client, 18/08/2026
+
+**Ce que le ticket retourne, et ce qu'il ne rouvre pas.** L'ouverture d'un panneau était un
+paramètre de recherche : chaque clic naviguait, la page se re-rendait entière, l'URL changeait. Le
+geste se lisait comme un changement de page alors qu'un panneau est un élément contextuel. **D30
+n'est pas rouvert** — il pose « panneau latéral plutôt que page dédiée, *pour la fluidité et la
+conservation du contexte* » (`docs/06` §295), ce que ce ticket sert plutôt qu'il ne contredit. Ce qui
+se retourne est l'invariant d'implémentation de T3.2, « le panneau n'est pas un état, c'est une
+URL », qui n'a jamais été une décision de `docs/07` — le journal l'appelait « D30, tenu depuis
+T3.2 », relecture *a posteriori* que ce ticket corrige. La cinquième discipline, elle, avait déjà
+été retirée le 14/08/2026.
+
+**Quatre arbitrages humains, demandés avant d'écrire une ligne.** (1) Les URL d'ouverture restent des
+adresses valides. (2) Le contenu arrive en nœud serveur à la demande. (3) Aucune entrée d'historique
+— le Retour ne referme plus. (4) Glissement à l'ouverture, avec les jetons qu'il faudra poser.
+
+### L'inconnue technique, éprouvée avant d'être supposée
+
+Tout le plan reposait sur une propriété non documentée : **une fonction `"use server"` peut-elle
+renvoyer un `ReactNode` ?** Une sonde jetable a été écrite d'abord, et le repli était cadré (renvoyer
+des données sérialisables, lier les actions côté client, faire passer les deux panneaux serveur en
+client). Elle a rendu, dans le DOM :
+
+```html
+<div data-probe="1">
+  <p data-probe-server="1">SONDE-SERVEUR alpha domaine=57c6dbed</p>
+  <form action="javascript:throw new Error('A React form was unexpectedly submitted…')">
+```
+
+Trois propriétés d'un coup : le nœud traverse, un composant **serveur** imbriqué y rend sur le
+serveur — il a lu la vraie session —, et une action liée côté serveur y reste soumissible, React
+l'ayant interceptée. Le repli n'a pas servi.
+
+**Deux faux départs, tous deux du harnais et non du mécanisme.** (a) Dans un module `"use server"`,
+seules les **exportations** deviennent des actions : une fonction interne liée par `bind` doit porter
+son propre `"use server"`, faute de quoi Next lève « Functions cannot be passed directly to Client
+Components ». (b) `chrome --headless --dump-dom` ferme l'onglet au `load` et **coupe le flux RSC**
+de l'appel en cours — « The destination stream closed early ». Le constat était donc muet pour une
+raison sans rapport avec ce qu'on mesurait. Un harnais CDP qui garde la page vivante a levé les deux
+doutes ; il a servi ensuite à toute la vérification.
+
+### Le partage coquille / corps, qui n'était pas dans le plan initial
+
+Deux panneaux — `readings-panel.tsx` et `persona-detail.tsx` — sont des composants **serveur**. Un
+composant serveur ne peut pas recevoir de fonction : leur donner un `onClose` était impossible. D'où
+le partage retenu : le voile, le tiroir, l'en-tête, la croix et le piège de focus remontent dans
+`DrawerHost`, qui est client ; le corps seul revient du serveur. La conséquence heureuse est que
+**la coquille s'ouvre avant tout aller-retour**, ce qui est exactement la fluidité demandée.
+
+`DrawerContent` a donc gagné un `header` facultatif, employé par un seul panneau : la fiche d'un
+persona porte son portrait et son étiquette « Principal » à côté du nom. Sans lui, il aurait fallu
+descendre l'avatar dans le corps — la fiche n'aurait plus ressemblé à la carte qu'elle détaille.
+
+### Trois pièges que seule l'épreuve au navigateur a montrés
+
+**`autoFocus` n'est honoré qu'à l'analyse du HTML.** Il tenait depuis T3.2 parce que le panneau
+arrivait dans le document servi. Un élément inséré par un script ne le reçoit pas : à l'ouverture au
+clic, le focus restait sur `<body>` — la coquille s'ouvrait **hors du clavier**. Mesuré à 50, 150,
+400, 1200 et 2500 ms, toujours `BODY`. Un effet pose désormais le focus sur la croix ; l'attribut
+reste, parce que c'est lui qui fait le travail quand l'URL ouvre, et le seul sans JavaScript.
+
+**Le focus ne revient pas dans un sous-arbre inerte.** Rendre le focus au déclencheur au moment où la
+fermeture est décidée ne fait rien : le contenu de page porte encore `inert`. Il faut attendre
+l'effet qui suit la levée. Même symptôme que le précédent — `BODY` —, cause opposée.
+
+**Une référence sur un composant, une référence sur un élément.** Le premier correctif posait une
+`ref` sur `DrawerClose` ; le focus restait sur `BODY`. La référence vit maintenant sur le
+`<div role="dialog">`, un élément du DOM, et la croix s'y cherche par son `aria-label` : rien ne
+dépend plus de la façon dont une référence traverse une frontière de composant.
+
+### Une adresse qui mentait
+
+Un panneau ouvert par son URL puis refermé laissait `?vision=modifier` dans la barre : une adresse
+qui dit ouvert ce qui est fermé, et qui rouvre au rechargement. La fermeture retire donc les clés
+d'ouverture par `replaceState` — **aucune entrée d'historique n'est empilée**, et l'adresse n'est pas
+*modifiée* mais remise d'accord avec l'état.
+
+**Retirées une à une, et non remplacées par `closeHref`.** `?de=` et `?a=` ne sont pas des clés
+d'ouverture — ce sont les bornes de la fenêtre de roadmap —, et les balayer aurait défait un filtre
+en fermant un panneau. Éprouvé : fermer `?de=2026-01&a=2026-12&fiche=<id>` laisse
+`?de=2026-01&a=2026-12`. C'est la distinction que le décompte d'exclusivité tient depuis le
+17/08/2026, ici transportée telle quelle.
+
+### `redirect` cesse d'être la fermeture
+
+Dix-huit actions de panneau se terminaient par `redirect` vers la page hôte : la navigation *était*
+la fermeture. Elle ne peut plus l'être sans re-rendre la page que le ticket cherche à ne plus
+re-rendre. Elles rendent désormais `ok: true` ; `revalidatePath` reste, et la réponse de l'action
+porte l'arbre réactualisé — **éprouvé** : après enregistrement, le panneau se referme, la vision
+écrite paraît dans le bloc derrière, et le journal de navigation du navigateur est vide.
+
+Les deux `redirect` restants sont ceux de `goToProduct` et `goToProject`, qui servent les formulaires
+de **page pleine** (`nouveau`, `modifier`) : ceux-là naviguent pour de bon, et rien n'a changé.
+
+**Le constat d'écriture change de nature dans les tests.** `actions.test.ts` tenait qu'« une levée de
+`redirect` est le constat qu'une écriture a eu lieu, et son absence celui d'un refus ». Le signe est
+maintenant `ok` — même fonction, autre forme, et deux helpers (`expectWritten`, `written`) l'exigent
+plutôt que de laisser un test conclure sur une base qu'un autre aurait remplie. Le mock de
+`next/navigation` reste en place pour les formulaires de page pleine. **732 tests passent.**
+
+### Ce que la vérification a établi
+
+**Le critère se lit dans le HTML servi.** Les treize panneaux s'ouvrent encore par leur URL —
+`role="dialog"` présent une fois, `inert` posé, titre attendu — et la page nue n'en porte aucune
+trace. Les points d'entrée restent servis en `<a href>`, si bien que `⌘`+clic, clic milieu et
+l'absence de JavaScript retombent sur la navigation d'avant.
+
+**Les tests se sont mis en défaut.** Confrontation `productId === product.id` neutralisée dans
+`resolveProductDrawer` : un indicateur d'un **autre** produit s'ouvre alors sur cette page, par les
+deux chemins. Rétablie : page nue. Rien d'autre n'a bougé.
+
+**Le contraste n'avait rien de neuf à mesurer, et il fallait le montrer.** Diff des classes de la
+coquille avant/après : le voile et le filet gauche gardent leurs jetons au caractère près
+(`surface-neutral-opacity-distinct`, `border-content-neutral-dark`), seules des utilitaires de
+transition s'ajoutent. Le seul texte neuf est « Chargement… », en `content-neutral-base` sur
+`surface-neutral-pale` — le couple des sous-titres, dans le même en-tête, mesuré à 4,98:1.
+
+**Le droit s'est éprouvé par l'action.** La fonction serveur est un **point d'entrée HTTP neuf** : sa
+requête a été capturée au navigateur (`next-action`, corps `["<productId>",{"kind":"indicator"}]`)
+puis rejouée en `curl` sous quatre identités et quatre charges forgées. Refusés : le membre non
+contributeur du produit, le contributeur d'un **autre** produit, le produit inexistant, un
+`productId` qui n'est pas un UUID, un `kind` appartenant à l'**autre** page, un `kind` inventé.
+Rendus : le responsable de domaine, et le contributeur désigné d'un accompagnement **de ce
+produit-là**.
+
+**Piège de lecture, à ne pas répéter :** `project_members` ne dit pas le droit. C'est
+`is_contributor` qui le dit (`lib/auth/session.ts` l. 190) — une personne peut être membre d'un
+accompagnement du produit et n'y rien écrire. Une première lecture, faite sans cette colonne, a fait
+passer un refus correct pour un défaut ; la requête refaite avec elle a montré que les trois cas
+tombaient juste.
+
+**Le mouvement se coupe pour qui le demande.** Sous `prefers-reduced-motion: reduce`,
+`--duration-drawer` vaut `0s` et le tiroir est posé d'emblée (`translate: 0px` à 35 ms) ; sans
+préférence, `.22s` et le tiroir est à 5,9 % de sa course à 120 ms. Un seul jeton porte le mouvement,
+donc un seul endroit à couper.
+
+**Et la fluidité, mesurée.** À l'ouverture : une seule requête réseau, `POST /produits/<id>` — la
+fonction serveur —, **aucune navigation RSC de page** ; l'URL ne bouge pas ; le défilement est
+conservé (304 px avant, 304 px après) ; le dialogue est dans le DOM à 120 ms, avant que son corps
+n'arrive.
+
+### Dettes et écarts assumés
+
+- **Le Retour navigateur ne referme plus le panneau, il quitte la page** (arbitrage 3). C'est une
+  régression par rapport au comportement d'avant, où la fermeture était une navigation. Une entrée
+  d'historique sur la même adresse la refermerait sans toucher à l'URL affichée. → **si l'usage le
+  réclame.**
+- **Deux jetons de mouvement sont posés dans `app/tokens.css`**, septième manque du design system
+  (`ETAT.md`). Ils y sont à la place des autres et jamais dans un composant : la règle 2 est tenue,
+  et le manque est nommé plutôt que masqué. → **à faire remonter avec les six précédents.**
+- **L'attente ne porte pas de titre.** La coquille s'ouvre avec `aria-label="Panneau en cours
+  d'ouverture"` et « Chargement… », puis reçoit son `<h2>`. Faire porter le titre par le point
+  d'entrée l'aurait affiché plus tôt, au prix de le dupliquer entre le client et le serveur — deux
+  libellés à tenir d'accord pour gagner un aller-retour local. → **sans échéance.**
+- **La coquille applicative n'est toujours pas `inert`.** TD.2 rend le correctif possible pour la
+  première fois (voir le point ouvert récrit dans `ETAT.md`) mais ne le fait pas : la règle 3
+  l'interdit, le ticket ne visant pas `app/(app)/layout.tsx`.
+
+### Leçon de méthode, sur mes propres modifications
+
+**Deux `replace` Python ont échoué en silence** — le motif visé avait été reformaté par Prettier
+entre-temps — et les deux effets de focus n'ont jamais été insérés. Le symptôme observé au navigateur
+était identique à celui d'un correctif qui ne marche pas, et j'ai d'abord cherché la cause dans
+React. Un `grep` sur le fichier a montré qu'il n'y avait rien à chercher. **Règle : toute
+substitution automatique s'assortit d'un `assert`**, et un correctif se relit dans le fichier avant
+d'être éprouvé au navigateur.
+
+`ETAT.md` passe de 314 à 331 lignes. Le seuil de 250 reste franchi et attend la session de découpage
+de C6 — c'est le seul moment où le fichier se balaie.

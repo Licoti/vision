@@ -40,11 +40,7 @@
 
 import { useActionState } from "react";
 
-import {
-  borderOf,
-  CONTROL,
-  FormField,
-} from "@/components/ui/form-field";
+import { borderOf, CONTROL, FormField } from "@/components/ui/form-field";
 import { Panel } from "@/components/ui/panel";
 import { formatResourceType } from "@/lib/format";
 import {
@@ -62,17 +58,11 @@ import {
 export type ResourceActivityOption = { id: string; label: string };
 
 export function ResourcePanel({
-  projectName,
-  closeHref,
   action,
   activities,
-  title = "Relier une ressource",
   submitLabel = "Relier la ressource",
   initial = EMPTY_RESOURCE_VALUES,
 }: {
-  projectName: string;
-  /** La page du projet, sans son paramètre. Les trois sorties y mènent. */
-  closeHref: string;
   /**
    * L'action serveur, **déjà liée** au projet côté serveur. Le panneau ne
    * connaît pas l'accompagnement dans lequel il écrit.
@@ -86,8 +76,6 @@ export function ResourcePanel({
    * §5). Vide est un cas normal : un projet peut n'avoir aucune activité.
    */
   activities: readonly ResourceActivityOption[];
-  /** « Relier une ressource » en création, « Modifier la ressource » sinon. */
-  title?: string;
   submitLabel?: string;
   /**
    * Les valeurs de la ressource corrigée (T4bis.5). C'est l'**état initial** de
@@ -106,15 +94,12 @@ export function ResourcePanel({
 
   return (
     <Panel
-      titleId="panneau-ressource-titre"
-      title={title}
-      subtitles={[projectName]}
-      closeHref={closeHref}
       action={submit}
       pending={pending}
       submitLabel={submitLabel}
       message={state.message}
       errors={errors}
+      ok={state.ok}
     >
       <FormField
         label="Titre"
@@ -131,9 +116,7 @@ export function ResourcePanel({
           defaultValue={values.title}
           autoComplete="off"
           aria-invalid={errors.title ? true : undefined}
-          aria-describedby={
-            errors.title ? "ressource-titre-erreur" : undefined
-          }
+          aria-describedby={errors.title ? "ressource-titre-erreur" : undefined}
           className={`${CONTROL} ${borderOf(errors.title)}`}
         />
       </FormField>

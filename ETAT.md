@@ -2,7 +2,7 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 18/08/2026 — hors ticket : les indicateurs associés repliés par défaut.
+**Dernière mise à jour :** 18/08/2026 — TD.2 : les panneaux s'ouvrent côté client.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
 **Ticket suivant :** **T5bis.3** — les filtres de la liste (`tickets-C5bis.md`)
 
@@ -18,7 +18,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C4 — Ressources et résultats | T4.1 → T4.4 | **terminé** |
 | C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **terminé** |
 | C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **terminé** |
-| TD — Dette technique | TD.1 | **terminé** |
+| TD — Dette technique | TD.1, TD.2 | **terminé** |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **en cours** — T5bis.2 terminé |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
@@ -65,6 +65,13 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   constant sur 26 rendus capturés. Quatre correctifs joints. Sa leçon la plus transportable n'est pas
   dans le code : **un harnais qui poste en urlencoded là où React rend du multipart obtient un 200
   muet**, indiscernable d'un refus sans étape témoin.
+- **TD.2 — 18/08/2026 — les panneaux s'ouvrent côté client.** Ticket **hors chantier**. L'ouverture
+  d'un panneau naviguait : aller-retour serveur, page re-rendue, URL réécrite. Elle est désormais un
+  état client — coquille montée avant l'appel, corps renvoyé **rendu** par une fonction serveur, URL
+  inchangée. D30 ne bouge pas (il ne parle que de « panneau plutôt que page ») ; c'est l'invariant
+  d'implémentation de T3.2 qui se retourne. Les treize URL d'ouverture restent des **adresses**
+  valides et traversent la **même** résolution que le clic. Écarts assumés : le Retour navigateur ne
+  referme plus, et deux jetons de mouvement sont posés faute que le design system en porte.
 - **T5bis.1 — 17/08/2026 — le schéma : compétences, niveaux, profil.** Trois tables, deux colonnes et
   leur `CHECK`, migration **`0004`** — la fiche annonçait `0003`, déjà pris. Écarts : présentations et
   disponibilités **inventées** contre la règle de tête de `seed.ts` ; mise en défaut de la fiche
@@ -164,12 +171,15 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   règle 3. Trois lignes suffiraient, et la colonne n'a **aucun lecteur**. → **ticket propre, C7 au
   plus tard** (destination posée le 14/08/2026, confirmée au découpage de C5 : aucune de ses six
   fiches n'ouvre `activity-panel.tsx`).
-- **La coquille de navigation reste focalisable derrière le voile, sans JavaScript.** La page projet
-  porte `inert` quand un panneau est ouvert, mais la barre latérale vit dans `app/(app)/layout.tsx`,
-  et un layout Next ne reçoit pas les `searchParams`. Avec JavaScript, `FocusTrap` la met hors
-  d'atteinte et `aria-modal` la retire de l'arbre d'accessibilité ; sans JavaScript, le cycle de
-  tabulation passe par elle. Les panneaux de la page reprenant `FocusTrap` tel quel, la couverture
-  partielle est la même pour tous — arbitrage du 14/08/2026, tenu.
+- **La coquille de navigation reste focalisable derrière le voile, sans JavaScript.** La page porte
+  `inert` quand un panneau est ouvert, mais la barre latérale vit dans `app/(app)/layout.tsx`. Avec
+  JavaScript, `FocusTrap` la met hors d'atteinte et `aria-modal` la retire de l'arbre
+  d'accessibilité ; sans JavaScript, le cycle de tabulation passe par elle.
+  **L'obstacle a changé de nature en TD.2** : ce n'était pas un choix mais une impossibilité — un
+  layout Next ne reçoit pas les `searchParams`, et l'ouverture était un `searchParam`. Elle est
+  maintenant un **état client**, que rien n'empêche de remonter dans le layout : `DrawerHost` y
+  poserait `inert` sur la barre comme sur le contenu. Ce n'est plus une limite, c'est un ticket —
+  laissé de côté par la règle 3, TD.2 ne visant pas la coquille applicative.
   À joindre au **rebranchement des deux blocs manquants de la barre latérale** — carte de la personne
   courante et entrée Administration, écartés en T1.6 faute de droit de lire la session. L'obstacle a
   disparu : les écrans lisent la session depuis T2.1 et `can.manageDomain` depuis T2.5. Ce qui manque
@@ -252,7 +262,10 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   (3) Aucun jeton de **bordure d'erreur**. (4) Aucun jeton d'**interlettrage** : les capitales des
   maquettes portent `.04em`, rendues sans. (5) Aucune **surface de voile** au-delà de 40 % — un
   voile qui porterait seul la séparation d'un panneau laisse sa surface à 2,66:1, mesuré.
-  (6) Aucun jeton de **séparateur**.
+  (6) Aucun jeton de **séparateur**. (7) Aucun jeton de **mouvement** — ni durée, ni courbe : il n'y
+  avait rien à animer avant TD.2. `--duration-drawer` et `--easing-drawer` sont posés dans
+  `app/tokens.css`, à la place des autres et non dans un composant, avec leur repli
+  `prefers-reduced-motion`. Le manque est réel, le contournement est nommé.
   **Substituts en vigueur, tous mesurés**, et **désormais à un seul endroit** : TD.1 les a réunis dans
   `components/ui/form-field.tsx` et `components/ui/panel.tsx` — `content-neutral-normal` (3,88:1) pour
   une bordure de contrôle, `content-danger-base` (5,19:1) pour un champ en erreur,
@@ -298,10 +311,14 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   Éprouvée en T3.3, T3.4 et T4.2, où le `projectId` lié à `createResource` s'est lu en clair dans le
   champ `$ACTION_13:1` du balisage servi. Vaut pour les six tickets de C4bis, dont c'est le critère
   central : **le droit s'éprouve par l'action, jamais par l'écran.**
-- **Le panneau de saisie est un composant client depuis T3.3.** `useActionState` est le seul moyen
-  de faire revenir une saisie refusée avec ses valeurs. Ce qui n'a pas bougé : l'ouverture reste une
-  URL, les sorties restent des liens, `inert` et `autofocus` restent des attributs HTML. C'est la
-  frontière du bundle qui a bougé, pas la nature du socle.
+- **Le panneau s'ouvre côté client depuis TD.2, et son corps reste rendu sur le serveur.** Une
+  fonction `"use server"` renvoie un `ReactNode` : les droits se dérivent sur le serveur, les actions
+  s'y lient, les lectures conditionnelles y restent, et `readings-panel.tsx` comme
+  `persona-detail.tsx` demeurent des composants serveur. Ce qui a bougé est le **mécanisme
+  d'ouverture**, pas la nature du contenu. Les URL d'ouverture restent des adresses valides et
+  passent par la même résolution que le clic — `lib/drawers/{product,project}.tsx` —, si bien
+  qu'aucune règle de droit ne vit à deux endroits ; éprouvé en frappant la fonction serveur sous
+  quatre identités.
 - **Le domaine courant est le premier domaine actif trouvé en base.** Pas de variable
   d'environnement : `docs/05` §3 pose un domaine unique. Le jour où un second existe, le choix
   revient au fournisseur d'identité.

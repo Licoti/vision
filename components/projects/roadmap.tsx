@@ -32,7 +32,7 @@
  * `listProjectRoadmap` a déjà groupé et trié.
  */
 
-import Link from "next/link";
+import { DrawerLink } from "@/components/ui/drawer";
 
 import {
   ActionMenu,
@@ -75,7 +75,10 @@ const GROUP_TONE: Record<RoadmapGroupKey, { dot: string; edge: string }> = {
     dot: "bg-surface-neutral-base",
     edge: "border-l-surface-neutral-base",
   },
-  done: { dot: "bg-surface-success-base", edge: "border-l-surface-success-base" },
+  done: {
+    dot: "bg-surface-success-base",
+    edge: "border-l-surface-success-base",
+  },
   cancelled: {
     dot: "bg-surface-neutral-light",
     edge: "border-l-surface-neutral-lighter",
@@ -84,7 +87,8 @@ const GROUP_TONE: Record<RoadmapGroupKey, { dot: string; edge: string }> = {
 
 /** L'action du cycle de vie, gatée à `null` comme `editHref`. */
 type TransitionAction =
-  ((activityId: string, target: "in_progress" | "done") => Promise<void>) | null;
+  | ((activityId: string, target: "in_progress" | "done") => Promise<void>)
+  | null;
 
 /**
  * L'archivage d'une saisie erronée (T4bis.4), gaté à `null` comme les deux
@@ -99,8 +103,7 @@ type ArchiveAction = ((activityId: string) => Promise<void>) | null;
  * elle-même rapprochée du projet lié côté serveur.
  */
 type ArchiveResultAction =
-  | ((activityId: string, resultId: string) => Promise<void>)
-  | null;
+  ((activityId: string, resultId: string) => Promise<void>) | null;
 
 export function Roadmap({
   groups,
@@ -224,21 +227,16 @@ export function Roadmap({
  *
  * Le `+` de la maquette est décoratif : « Ajouter une activité » se lit seul.
  */
-function AddActivity({
-  href,
-  className,
-}: {
-  href: string;
-  className: string;
-}) {
+function AddActivity({ href, className }: { href: string; className: string }) {
   return (
-    <Link
+    <DrawerLink
       href={href}
+      request={{ kind: "activity" }}
       className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold ${className}`}
     >
       <span aria-hidden="true">+</span>
       Ajouter une activité
-    </Link>
+    </DrawerLink>
   );
 }
 
@@ -330,7 +328,9 @@ function RoadmapSection({
           transitionActivity={transitionActivity}
           archiveActivity={archiveActivity}
           archiveResult={archiveResult}
-          {...(editHref && !cancelled ? { editHref: editHref(activity.id) } : {})}
+          {...(editHref && !cancelled
+            ? { editHref: editHref(activity.id) }
+            : {})}
           {...(cancelHref && cancellable
             ? { cancelHref: cancelHref(activity.id) }
             : {})}
@@ -528,11 +528,15 @@ function RoadmapEntry({
   );
 
   const canMarkInProgress =
-    transitionActivity && (groupKey === "planned" || groupKey === "unscheduled");
+    transitionActivity &&
+    (groupKey === "planned" || groupKey === "unscheduled");
   const canMarkDone =
-    transitionActivity && groupKey === "in_progress" && activity.periodEnd !== null;
+    transitionActivity &&
+    groupKey === "in_progress" &&
+    activity.periodEnd !== null;
   const canArchiveResult = archiveResult !== null && activity.result !== null;
-  const canArchiveActivity = archiveActivity !== null && activity.result === null;
+  const canArchiveActivity =
+    archiveActivity !== null && activity.result === null;
 
   /* Sept conditions, une disjonction : elle décide du **bouton**, là où chacune
      décide de son entrée. Sans elle, une entrée sans aucun geste porterait un
@@ -606,9 +610,14 @@ function RoadmapEntry({
             label={`Options de l'activité ${activity.typeLabel} — ${period}`}
           >
             {editHref ? (
-              <Link href={editHref} role="menuitem" className={MENU_ITEM}>
+              <DrawerLink
+                href={editHref}
+                request={{ kind: "activity", id: activity.id }}
+                role="menuitem"
+                className={MENU_ITEM}
+              >
                 Modifier
-              </Link>
+              </DrawerLink>
             ) : null}
             {/* Le point d'entrée de T4.4, **et sa correction depuis T4bis.6** :
                 une seule adresse, un seul panneau, deux gestes. Ce n'est pas le
@@ -621,9 +630,16 @@ function RoadmapEntry({
                 que la mesure a bougé, ce qui serait un second relevé et
                 appartient aux indicateurs (C5). */}
             {resultHref ? (
-              <Link href={resultHref} role="menuitem" className={MENU_ITEM}>
-                {activity.result ? "Corriger le résultat" : "Saisir un résultat"}
-              </Link>
+              <DrawerLink
+                href={resultHref}
+                request={{ kind: "result", id: activity.id }}
+                role="menuitem"
+                className={MENU_ITEM}
+              >
+                {activity.result
+                  ? "Corriger le résultat"
+                  : "Saisir un résultat"}
+              </DrawerLink>
             ) : null}
             {/* Le retrait de T4bis.6, juste sous le geste qui corrige : l'ordre
                 va du plus courant au plus rare, celui qu'avait la colonne.
@@ -636,7 +652,11 @@ function RoadmapEntry({
                 exclut l'un l'autre. */}
             {archiveResult && activity.result ? (
               <form
-                action={archiveResult.bind(null, activity.id, activity.result.id)}
+                action={archiveResult.bind(
+                  null,
+                  activity.id,
+                  activity.result.id,
+                )}
               >
                 <button type="submit" role="menuitem" className={MENU_ITEM}>
                   Archiver le résultat
@@ -645,7 +665,11 @@ function RoadmapEntry({
             ) : null}
             {canMarkInProgress ? (
               <form
-                action={transitionActivity.bind(null, activity.id, "in_progress")}
+                action={transitionActivity.bind(
+                  null,
+                  activity.id,
+                  "in_progress",
+                )}
               >
                 <button type="submit" role="menuitem" className={MENU_ITEM}>
                   Marquer en cours
@@ -687,13 +711,14 @@ function RoadmapEntry({
                 faire, et c'est même le mot que porte la sortie du panneau vers
                 lequel il conduit. */}
             {cancelHref ? (
-              <Link
+              <DrawerLink
                 href={cancelHref}
+                request={{ kind: "cancel", id: activity.id }}
                 role="menuitem"
                 className={MENU_ITEM_DANGER}
               >
                 Annuler l&apos;activité
-              </Link>
+              </DrawerLink>
             ) : null}
           </ActionMenu>
         ) : null}
