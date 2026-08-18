@@ -4316,3 +4316,102 @@ réservé à la session de découpage de C6 — c'est le seul moment où le fich
 n'y déroge pas —, mais il faut le dire franchement : **l'écart se creuse plus vite qu'il ne se
 résorbe**, et trois travaux hors ticket en trois jours y ont chacun ajouté leur ligne. Le repliage de
 C5bis devra sortir vers `HISTORIQUE-TICKETS.md` bien plus que ses propres lignes.
+
+---
+
+## T5bis.3 — les filtres de la liste Équipe, 18/08/2026
+
+### Quatre arbitrages rendus avant écriture
+
+`AskUserQuestion` n'était pas disponible dans la session de plan ; les quatre choix ont donc été
+posés en prose, avec leur valeur par défaut, et tranchés par l'humain avant la première écriture.
+
+**(1) Le patron de `ProjectFilters` est repris entier**, et pas seulement son formulaire : la ligne
+de synthèse `aria-live`, le lien « Retirer tous les filtres » et **un état vide distinct** quand des
+filtres sont posés. Sans le troisième, une recherche infructueuse afficherait « Aucune personne pour
+l'instant » — un texte qui ment sur la cause. **Écart de périmètre assumé :** `formatPersons`
+s'ajoute à `lib/format.ts`, cinquième d'une famille qui en comptait quatre.
+
+**(2) Métier et compétence ne proposent que ce qu'une personne vivante porte** — la règle déjà posée
+par `listProjectFilterOptions` : proposer un filtre qui ne ramène rien serait offrir un chemin vers
+le vide. **L'échelle, elle, est proposée entière**, et la raison est sa sémantique : « au moins ce
+niveau » est un **seuil**, pas une valeur. Un échelon que personne n'occupe exactement reste un
+seuil qui a du sens, et une échelle tronquée se lirait comme un référentiel amputé.
+
+**(3) `likePattern` est recopié dans `team.ts`, les libellés de disponibilité ne le sont pas.** Les
+deux cas se ressemblent et se tranchent à l'inverse, et c'est délibéré : importer `likePattern` de
+`lib/queries/projects.ts` coupleraient deux modules de lecture sans rapport, et lui choisir un
+module neutre est une décision qui appartient à TD, pas à un ticket de filtre (règle 3). Les trois
+libellés, eux, sont **les mêmes mots à l'écran** : les recopier, c'est se garantir qu'un jour la
+pastille et le filtre en diront deux versions. `AVAILABILITY_LABEL` est donc exporté
+d'`availability-dot.tsx` — un mot ajouté, aucun comportement changé, **écart de périmètre assumé**.
+→ **l'extraction de `likePattern` vers un module neutre est proposée à TD** ; deux copies d'une
+fonction pure de trois lignes, dont l'échappement est le seul choix mesuré qu'elle porte.
+
+**(4) La clé de recherche est `q`**, que la fiche de T5bis.3 écrit deux fois — contre le `recherche`
+de la liste des projets et contre les segments de route, tous en français. Les quatre autres clés
+sont françaises. **La fiche prime, et l'incohérence est réelle.** → **à uniformiser le jour où l'un
+des deux écrans se rouvre ; sans échéance.**
+
+### Ce que la vérification a appris
+
+**Un `filter()` neuf qu'aucune ligne forgée ne vise n'est pas éprouvé.** Les cinq filtres
+d'étanchéité de T5bis.2 couvraient les deux lectures d'alors ; ce ticket en ajoute **huit** — deux
+dans le `exists` conjonctif, six dans `listTeamFilterOptions` — et les lignes forgées existantes
+n'en couvraient que la moitié. Deux forgeages de plus ont été ajoutés, chacun ne franchissant la
+frontière que sur **une** colonne :
+
+- une liaison **de `a` en tout point sauf la personne**, qui est de `b` : seul `filter(persons)` de
+  la requête d'options de compétence l'écarte — la liste, elle, ne peut pas s'en apercevoir, sa
+  seconde lecture étant bornée aux personnes qu'elle vient de lire ;
+- une **personne de `b` portant un métier de `a`** que personne d'autre ne porte : l'exact miroir de
+  la Chloé forgée de T5bis.2, et seul `filter(persons)` de la requête d'options de métier l'écarte.
+
+**Onze neutralisations ont été jouées**, chacune suivie d'un `vitest run` dont les tests tombés ont
+été relevés et comparés à la liste attendue. **Onze fois sur onze, le compte est exact** : la règle
+de conjonction (`or` à la place des `exists` conjoints) fait tomber un test et un seul ; le retrait
+du `gte` en fait tomber deux, ceux qui isolent le seuil ; et chacun des neuf `filter()` fait tomber
+son propre cas d'étanchéité, jamais celui d'un autre.
+
+**La requête d'options de compétence joint `skill_levels` sans le lire.** C'est une jointure qui ne
+sert qu'à filtrer : sans elle, une liaison dont le niveau vient d'un autre domaine — que la liste
+n'honore pas — ferait paraître sa compétence dans les options, et le filtre proposé ne ramènerait
+personne. Les deux requêtes disent alors la même chose de la même ligne.
+
+**Le droit s'éprouve par l'action — et ici l'action n'existe pas, ce qui se mesure aussi.** Le HTML
+servi de `/equipe` porte **un** `<form>`, en `method="get"`, **zéro** champ `$ACTION_…` et **zéro**
+`"use server"` dans le périmètre. L'absence de point d'entrée en écriture est un constat, pas un
+sous-entendu.
+
+**Le contraste n'introduit aucun couple neuf par la position**, et c'est vérifié plutôt qu'affirmé :
+la barre reprend les jetons de `components/ui/form-field.tsx` aux mêmes positions que celle de la
+liste des projets, sur le même fond (`--surface-neutral-lightest`, `#f7f7f8`). Mesures refaites :
+`content-neutral-dark` sur le fond de page **7,72:1** (le `<legend>` et les intitulés de champ),
+`content-neutral-darkest` **16,98:1** (les libellés de case), et le filet de contrôle
+`content-neutral-normal` **3,88:1** contre l'intérieur du champ, **3,69:1** contre le fond de page —
+au-dessus de la limite de 3:1 des deux côtés. **Aucun septième substitut n'a été inventé** ; les
+cases à cocher restent natives, sans `accent-*`.
+
+### Deux pièges rencontrés
+
+**`searchParams` rend une chaîne *ou* un tableau**, et le typer en `string` seul ferait mentir le
+compilateur sur le cas qui est justement l'objet du ticket : `competence` est répétable, et Next
+rend un tableau **dès la seconde occurrence** — jamais à la première. D'où `string | string[]` dans
+le type et les deux aides `one()` / `many()`, cette dernière dédoublonnant.
+
+**Un `<fieldset>` ne se met pas en `flex`.** Le `<legend>` y devient un élément de flux dont le
+rendu diffère d'un moteur à l'autre. Le groupe de cases est donc un `<div class="flex flex-wrap">`
+**à l'intérieur** d'un `<fieldset>` resté en flux normal, et la `<legend>` porte sa marge basse.
+
+### Un vestige de sonde, et sa propreté
+
+La vérification du cas « une compétence d'un autre domaine » a demandé un **second domaine en base
+de développement** — il n'y en avait qu'un. Il a été créé sous le nom `Zzz Domaine sonde T5bis.3`,
+délibérément **après « Groupe Meridian » dans l'alphabet** : `resolveDomainId` rend le premier
+domaine actif **par nom**, et un nom en tête aurait fait basculer tout l'écran de développement sur
+la sonde — la leçon du 18/08 sur le harnais voisin, qui ne passait que par chance alphabétique. La
+sonde et sa compétence ont été **supprimées** après mesure, la base ne portant plus qu'un domaine ;
+c'est une fixture locale, pas de la donnée métier (règle du 14/08).
+
+`ETAT.md` passe de 366 à 378 lignes, soit **128 au-dessus du seuil de 250**. Le constat du
+18/08/2026 tient sans être récrit : le balayage reste réservé à la session de découpage de C6.

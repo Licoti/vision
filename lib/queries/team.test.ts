@@ -1,10 +1,11 @@
 /**
- * Les tests de la lecture de l'écran Équipe.
+ * Les tests des lectures de l'écran Équipe — la liste, ses cinq filtres, et les
+ * options qu'ils proposent.
  *
  * Ils tournent sur la branche Neon dédiée — `vitest.config.mts` remappe
  * `DATABASE_URL` sur `TEST_DATABASE_URL` — et écrivent réellement : un tri par
- * nom, un `leftJoin` filtré sur le domaine et quatre filtres d'étanchéité ne se
- * vérifient pas sur un faux.
+ * nom, un `leftJoin` filtré sur le domaine, un `exists` conjonctif et six
+ * filtres d'étanchéité ne se vérifient pas sur un faux.
  *
  * Deux domaines sont amorcés, comme dans `lib/db/scoped.test.ts` : sans un
  * second domaine, aucun test d'étanchéité ne prouve quoi que ce soit.
@@ -16,6 +17,11 @@
  * domaine masquerait le manque. Chacune est taillée pour n'être écartée que par
  * **un seul** filtre : c'est ce qui rend la mise en défaut concluante, filtre
  * par filtre.
+ *
+ * **Carla est la personne qui rend la conjonction observable** : elle porte
+ * *l'une* des deux compétences d'Alice, jamais les deux, et la porte à un rang
+ * plus bas. Sans elle, un `or` à la place des `exists` conjoints rendrait
+ * exactement le même résultat et le test ne prouverait rien.
  *
  * Les constats se lisent par identifiant et non par position — sauf le test du
  * tri, qui compare des rangs relatifs. Un défaut d'ordre ne doit pas faire
@@ -36,7 +42,7 @@ import {
   skills,
 } from "@/lib/db/schema";
 
-import { listTeam } from "./team";
+import { listTeam, listTeamFilterOptions } from "./team";
 
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
 const teardownOrder = [personSkills, persons, skillLevels, skills, jobs];
@@ -48,15 +54,30 @@ type Fixture = {
   aliceId: string;
   /** Sans métier, sans compétence : le `leftJoin` et l'état vide. */
   brunoId: string;
+  /** Une seule des deux compétences d'Alice, et à un rang plus bas. */
+  carlaId: string;
   /** Côté entité : la mention, et pas de disponibilité (arbitrage (d)). */
   zoeId: string;
-  /** Archivée : absente du référentiel. */
+  /** Archivée : absente du référentiel, et de ses options. */
   yvesId: string;
   /** Aucune compétence légitime : c'est sur elle que les fuites sont forgées. */
   damienId: string;
   jobId: string;
+  /** Porté par Carla seule : c'est lui qui rend le filtre `metier` observable. */
+  researchJobId: string;
+  /** Porté par la seule personne archivée : il ne doit paraître nulle part. */
+  forgottenJobId: string;
+  /** Porté par personne : c'est sur lui qu'une fuite de métier se forge. */
+  ghostJobId: string;
   advancedLevelId: string;
   expertLevelId: string;
+  uxSkillId: string;
+  a11ySkillId: string;
+  protoSkillId: string;
+  /** Portée par Alice, puis archivée : affichée sur sa ligne, hors des options. */
+  archivedSkillId: string;
+  /** Portée par la seule personne archivée. */
+  forgottenSkillId: string;
   probeLinkSkillId: string;
   probeSkillId: string;
   probeLevelSkillId: string;
@@ -76,6 +97,11 @@ async function seedDomain(label: string): Promise<Fixture> {
   const scope = forDomain({ domainId: domain.id });
 
   const job = await scope.insert(jobs, { label: `Product Design ${label}` });
+  const research = await scope.insert(jobs, { label: `UX Research ${label}` });
+  const forgottenJob = await scope.insert(jobs, {
+    label: `Métier oublié ${label}`,
+  });
+  const ghostJob = await scope.insert(jobs, { label: `Métier fantôme ${label}` });
 
   const advanced = await scope.insert(skillLevels, {
     label: `Avancé ${label}`,
@@ -89,6 +115,12 @@ async function seedDomain(label: string): Promise<Fixture> {
   const ux = await scope.insert(skills, { label: `UX Design ${label}` });
   const a11y = await scope.insert(skills, { label: `Accessibilité ${label}` });
   const proto = await scope.insert(skills, { label: `Prototypage ${label}` });
+  const archivedSkill = await scope.insert(skills, {
+    label: `Design System ${label}`,
+  });
+  const forgottenSkill = await scope.insert(skills, {
+    label: `Compétence oubliée ${label}`,
+  });
 
   // Trois compétences qui n'appartiennent à personne : elles ne servent qu'aux
   // lignes forgées, et chacune nomme le filtre qu'elle éprouve.
@@ -113,14 +145,31 @@ async function seedDomain(label: string): Promise<Fixture> {
     fullName: `Yves Ancien ${label}`,
     source: "manual",
     kind: "center",
+    jobId: forgottenJob.id,
     availability: "available",
   });
+  /* Le métier et la compétence d'Yves ne sont portés que par lui, et il est
+     archivé : ni l'un ni l'autre ne doit paraître dans les options. C'est le
+     seul test de `isNull(persons.archivedAt)` sur cette requête. */
+  await scope.insert(personSkills, {
+    personId: yves.id,
+    skillId: forgottenSkill.id,
+    levelId: expert.id,
+  });
   await scope.archive(persons, yves.id);
+
   const damien = await scope.insert(persons, {
     fullName: `Damien Sonde ${label}`,
     source: "manual",
     kind: "center",
     jobId: job.id,
+    availability: "partial",
+  });
+  const carla = await scope.insert(persons, {
+    fullName: `Carla Dubois ${label}`,
+    source: "manual",
+    kind: "center",
+    jobId: research.id,
     availability: "partial",
   });
   const bruno = await scope.insert(persons, {
@@ -155,17 +204,44 @@ async function seedDomain(label: string): Promise<Fixture> {
     levelId: expert.id,
   });
 
+  /* Une compétence qu'Alice porte et dont le référentiel a été archivé depuis :
+     elle reste sur sa ligne (la personne l'a déclarée) et sort des options (on
+     ne la propose plus au choix). Deux règles, une seule ligne. */
+  await scope.insert(personSkills, {
+    personId: alice.id,
+    skillId: archivedSkill.id,
+    levelId: advanced.id,
+  });
+  await scope.archive(skills, archivedSkill.id);
+
+  /* Carla : *une* des deux compétences d'Alice, au rang inférieur. C'est elle
+     que la conjonction doit écarter, et le seuil de niveau aussi. */
+  await scope.insert(personSkills, {
+    personId: carla.id,
+    skillId: ux.id,
+    levelId: advanced.id,
+  });
+
   return {
     domainId: domain.id,
     scope,
     aliceId: alice.id,
     brunoId: bruno.id,
+    carlaId: carla.id,
     zoeId: zoe.id,
     yvesId: yves.id,
     damienId: damien.id,
     jobId: job.id,
+    researchJobId: research.id,
+    forgottenJobId: forgottenJob.id,
+    ghostJobId: ghostJob.id,
     advancedLevelId: advanced.id,
     expertLevelId: expert.id,
+    uxSkillId: ux.id,
+    a11ySkillId: a11y.id,
+    protoSkillId: proto.id,
+    archivedSkillId: archivedSkill.id,
+    forgottenSkillId: forgottenSkill.id,
     probeLinkSkillId: probeLink.id,
     probeSkillId: probeSkill.id,
     probeLevelSkillId: probeLevel.id,
@@ -173,7 +249,7 @@ async function seedDomain(label: string): Promise<Fixture> {
 }
 
 /**
- * Les quatre lignes que la couche scopée refuserait d'écrire.
+ * Les six lignes que la couche scopée refuserait d'écrire.
  *
  * Chacune ne franchit la frontière que sur **une** colonne : c'est ce qui fait
  * qu'un seul filtre l'écarte, et donc qu'un seul test tombe quand on le retire.
@@ -202,9 +278,19 @@ async function forgeLeaks(): Promise<void> {
       skillId: a.probeLevelSkillId,
       levelId: b.expertLevelId,
     },
+    // (4) La **personne** est d'un autre domaine — la liaison, la compétence et
+    //     le niveau sont de `a`. Seul `filter(persons)` l'écarte, et il n'y a
+    //     que les options de filtre pour s'en apercevoir : la liste, elle, est
+    //     bornée aux personnes qu'elle vient de lire.
+    {
+      domainId: a.domainId,
+      personId: b.aliceId,
+      skillId: a.probeSkillId,
+      levelId: a.advancedLevelId,
+    },
   ]);
 
-  // (4) Une personne de `a` dont le métier est celui de `b`. Seul `filter(jobs)`
+  // (5) Une personne de `a` dont le métier est celui de `b`. Seul `filter(jobs)`
   //     l'écarte — et le `leftJoin` la garde alors sans métier.
   const forged = await db
     .insert(persons)
@@ -217,6 +303,16 @@ async function forgeLeaks(): Promise<void> {
     })
     .returning({ id: persons.id });
   forgedJobPersonId = forged[0]!.id;
+
+  // (6) L'inverse : une personne de `b` dont le métier est celui de `a`. Seul
+  //     `filter(persons)` l'écarte des options de métier de `a`.
+  await db.insert(persons).values({
+    domainId: b.domainId,
+    fullName: `Vera Forgée ${suffix}`,
+    source: "manual",
+    kind: "center",
+    jobId: a.ghostJobId,
+  });
 }
 
 beforeAll(async () => {
@@ -250,7 +346,8 @@ describe("listTeam", () => {
     // Des rangs relatifs, et non des positions absolues : ce test ne dit rien
     // du contenu de la liste, seulement de son ordre.
     expect(rankOf(rows, a.aliceId)).toBeLessThan(rankOf(rows, a.brunoId));
-    expect(rankOf(rows, a.brunoId)).toBeLessThan(rankOf(rows, a.damienId));
+    expect(rankOf(rows, a.brunoId)).toBeLessThan(rankOf(rows, a.carlaId));
+    expect(rankOf(rows, a.carlaId)).toBeLessThan(rankOf(rows, a.damienId));
     expect(rankOf(rows, a.damienId)).toBeLessThan(rankOf(rows, a.zoeId));
   });
 
@@ -299,14 +396,16 @@ describe("listTeam", () => {
     expect(alice?.skills.map((skill) => skill.label)).toEqual([
       "Accessibilité a",
       "UX Design a",
+      "Design System a",
       "Prototypage a",
     ]);
     expect(alice?.skills.map((skill) => skill.levelLabel)).toEqual([
       "Expert a",
       "Expert a",
       "Avancé a",
+      "Avancé a",
     ]);
-    expect(alice?.skills.map((skill) => skill.levelRank)).toEqual([4, 4, 3]);
+    expect(alice?.skills.map((skill) => skill.levelRank)).toEqual([4, 4, 3, 3]);
   });
 
   test("une personne sans compétence en rend une liste vide", async () => {
@@ -316,9 +415,151 @@ describe("listTeam", () => {
 });
 
 /* ==========================================================================
+   Les cinq filtres
+
+   Le cas central est « la conjonction » : c'est celui qui tombe, et lui seul,
+   quand on remplace les `exists` conjoints par un `or`.
+   ========================================================================== */
+
+describe("listTeam — les filtres", () => {
+  /** Les identifiants rendus, dans l'ordre de la requête. */
+  async function idsOf(filters: Parameters<typeof listTeam>[1]) {
+    const rows = await listTeam(a.scope, filters);
+    return rows.map((row) => row.id);
+  }
+
+  test("la recherche porte sur le nom", async () => {
+    const ids = await idsOf({ search: "Alice" });
+    expect(ids).toContain(a.aliceId);
+    expect(ids).not.toContain(a.carlaId);
+  });
+
+  test("le motif de recherche est échappé", async () => {
+    // Sans échappement, `%` serait un joker et ramènerait tout le monde.
+    expect(await idsOf({ search: "%" })).toEqual([]);
+  });
+
+  test("le métier restreint aux personnes qui le portent", async () => {
+    const ids = await idsOf({ jobId: a.researchJobId });
+    expect(ids).toEqual([a.carlaId]);
+  });
+
+  test("une compétence cochée rend tous ceux qui la portent", async () => {
+    const ids = await idsOf({ skillIds: [a.uxSkillId] });
+    expect(ids).toContain(a.aliceId);
+    expect(ids).toContain(a.carlaId);
+    expect(ids).not.toContain(a.brunoId);
+  });
+
+  test("deux compétences cochées se cumulent : l'une ET l'autre", async () => {
+    const ids = await idsOf({ skillIds: [a.uxSkillId, a.a11ySkillId] });
+    expect(ids).toContain(a.aliceId);
+    // Carla porte l'UX Design, pas l'accessibilité. Un `or` la garderait.
+    expect(ids).not.toContain(a.carlaId);
+  });
+
+  test("le niveau posé seul vaut « au moins une compétence à ce rang »", async () => {
+    const atLeastFour = await idsOf({ minRank: 4 });
+    expect(atLeastFour).toContain(a.aliceId);
+    expect(atLeastFour).not.toContain(a.carlaId);
+
+    const atLeastThree = await idsOf({ minRank: 3 });
+    expect(atLeastThree).toContain(a.aliceId);
+    expect(atLeastThree).toContain(a.carlaId);
+  });
+
+  test("le niveau s'applique aux compétences cochées", async () => {
+    // Carla porte l'UX Design, mais au rang 3.
+    const ids = await idsOf({ skillIds: [a.uxSkillId], minRank: 4 });
+    expect(ids).toEqual([a.aliceId]);
+  });
+
+  test("la disponibilité restreint aux trois valeurs de l'énuméré", async () => {
+    const ids = await idsOf({ availability: "partial" });
+    expect(ids).toContain(a.carlaId);
+    expect(ids).toContain(a.damienId);
+    expect(ids).not.toContain(a.aliceId);
+  });
+
+  test("les filtres se cumulent", async () => {
+    const ids = await idsOf({
+      skillIds: [a.uxSkillId],
+      availability: "available",
+    });
+    expect(ids).toEqual([a.aliceId]);
+  });
+
+  test("l'ordre reste le nom sous filtre — jamais le niveau", async () => {
+    const ids = await idsOf({ minRank: 3 });
+    expect(ids.indexOf(a.aliceId)).toBeLessThan(ids.indexOf(a.carlaId));
+  });
+
+  test("une personne archivée ne revient sous aucun filtre", async () => {
+    expect(await idsOf({ search: "Yves" })).toEqual([]);
+  });
+
+  test("la ligne retenue affiche son profil entier, pas la correspondance", async () => {
+    const rows = await listTeam(a.scope, { skillIds: [a.a11ySkillId] });
+    const alice = rows.find((row) => row.id === a.aliceId);
+    // Quatre compétences déclarées, dont celle qui a filtré : rien n'est
+    // retiré, rien n'est marqué.
+    expect(alice?.skills).toHaveLength(4);
+  });
+
+  test("une compétence d'un autre domaine ne filtre rien et ne fuit rien", async () => {
+    const rows = await listTeam(a.scope, { skillIds: [b.uxSkillId] });
+    expect(rows).toEqual([]);
+  });
+});
+
+/* ==========================================================================
+   Les options de la barre de filtres
+   ========================================================================== */
+
+describe("listTeamFilterOptions", () => {
+  test("les métiers portés par une personne vivante, et eux seuls", async () => {
+    const options = await listTeamFilterOptions(a.scope);
+    const ids = options.jobs.map((job) => job.id);
+
+    expect(ids).toContain(a.jobId);
+    expect(ids).toContain(a.researchJobId);
+    // Porté par la seule personne archivée : proposer ce filtre serait offrir
+    // un chemin vers le vide.
+    expect(ids).not.toContain(a.forgottenJobId);
+  });
+
+  test("les compétences portées par une personne vivante, et elles seules", async () => {
+    const options = await listTeamFilterOptions(a.scope);
+    const labels = options.skills.map((skill) => skill.label);
+
+    expect(labels).toContain("UX Design a");
+    expect(labels).toContain("Accessibilité a");
+    expect(labels).toContain("Prototypage a");
+
+    // Archivée : Alice la porte encore, on ne la propose plus au choix.
+    expect(labels).not.toContain("Design System a");
+    // Portée par la seule personne archivée.
+    expect(labels).not.toContain("Compétence oubliée a");
+    // Portées par personne : les trois sondes des lignes forgées.
+    expect(labels).not.toContain("Sonde liaison a");
+    expect(labels).not.toContain("Sonde niveau a");
+  });
+
+  test("l'échelle est proposée entière, par rang croissant", async () => {
+    const options = await listTeamFilterOptions(a.scope);
+
+    expect(options.levels.map((level) => level.label)).toEqual([
+      "Avancé a",
+      "Expert a",
+    ]);
+    expect(options.levels.map((level) => level.rank)).toEqual([3, 4]);
+  });
+});
+
+/* ==========================================================================
    L'étanchéité — un test par `filter()`
 
-   Chacun de ces cinq tests tombe quand on retire *son* filtre, et lui seul.
+   Chacun de ces tests tombe quand on retire *son* filtre, et lui seul.
    ========================================================================== */
 
 describe("listTeam — étanchéité", () => {
@@ -354,5 +595,56 @@ describe("listTeam — étanchéité", () => {
 
   test("aucun niveau d'un autre domaine — `filter(skillLevels)`", async () => {
     expect(await probeSkillsOfDamien()).not.toContain("Sonde niveau a");
+  });
+
+  /* Les deux filtres du `exists` conjonctif ont leurs propres cas : celui de la
+     seconde lecture ne les couvre pas, la liaison forgée n'étant écartée là-bas
+     que parce qu'elle porte sur une personne du domaine. */
+
+  test("le `exists` ignore une liaison d'un autre domaine — `filter(personSkills)`", async () => {
+    const rows = await listTeam(a.scope, { skillIds: [a.probeLinkSkillId] });
+    expect(rows).toEqual([]);
+  });
+
+  test("le `exists` ignore un niveau d'un autre domaine — `filter(skillLevels)`", async () => {
+    const rows = await listTeam(a.scope, { skillIds: [a.probeLevelSkillId] });
+    expect(rows).toEqual([]);
+  });
+});
+
+describe("listTeamFilterOptions — étanchéité", () => {
+  test("aucun métier d'un autre domaine — `filter(jobs)`", async () => {
+    const options = await listTeamFilterOptions(a.scope);
+    // Chloé est une personne vivante de `a` dont le métier est celui de `b` :
+    // sans `filter(jobs)`, ce métier paraîtrait dans les options de `a`.
+    expect(options.jobs.map((job) => job.id)).not.toContain(b.jobId);
+  });
+
+  test("aucune compétence d'un autre domaine — `filter(skills)`", async () => {
+    const options = await listTeamFilterOptions(a.scope);
+    expect(options.skills.map((skill) => skill.label)).not.toContain(
+      "Sonde compétence b",
+    );
+  });
+
+  test("aucun niveau d'un autre domaine", async () => {
+    const options = await listTeamFilterOptions(a.scope);
+    expect(options.levels.map((level) => level.id)).not.toContain(
+      b.expertLevelId,
+    );
+  });
+
+  test("aucune personne d'un autre domaine ne fait paraître un métier — `filter(persons)`", async () => {
+    const options = await listTeamFilterOptions(a.scope);
+    // Vera est de `b` et porte un métier de `a` que personne d'autre ne porte.
+    expect(options.jobs.map((job) => job.id)).not.toContain(a.ghostJobId);
+  });
+
+  test("aucune personne d'un autre domaine ne fait paraître une compétence — `filter(persons)`", async () => {
+    const options = await listTeamFilterOptions(a.scope);
+    // La liaison (4) est de `a` en tout point, sauf la personne.
+    expect(options.skills.map((skill) => skill.label)).not.toContain(
+      "Sonde compétence a",
+    );
   });
 });

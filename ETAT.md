@@ -2,10 +2,10 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 18/08/2026 — audit de la couche de présentation, doctrine de
-composition tranchée, `tickets-TD.md` écrit.
+**Dernière mise à jour :** 18/08/2026 — T5bis.3 terminé : les cinq filtres de la liste Équipe, dont
+la conjonction des compétences.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
-**Ticket suivant :** **T5bis.3** — les filtres de la liste (`tickets-C5bis.md`). **TD.3 est
+**Ticket suivant :** **T5bis.4** — la fiche, en panneau (`tickets-C5bis.md`). **TD.3 est
 disponible et ne dépend de rien** (`tickets-TD.md`) : l'ordre entre les deux revient à l'humain.
 
 ---
@@ -22,7 +22,7 @@ disponible et ne dépend de rien** (`tickets-TD.md`) : l'ordre entre les deux re
 | C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **terminé** |
 | TD — Dette technique | TD.1, TD.2 | **terminé** |
 | TD — Couche de présentation | TD.3 → TD.6 | **découpé**, non entamé (`tickets-TD.md`) |
-| C5bis — Équipe | T5bis.1 → T5bis.7 | **en cours** — T5bis.2 terminé |
+| C5bis — Équipe | T5bis.1 → T5bis.7 | **en cours** — T5bis.3 terminé |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
@@ -121,6 +121,18 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   le modèle : **les trois zones de texte arrivent en base comme des lignes identifiées**, et le
   `syncTraits` rapproche sur `(kind, label)` plutôt que de remplacer — sans ce diff, un use case
   qui désignera un irritant désignerait une ligne que la correction suivante efface.
+- **T5bis.3 — 18/08/2026 — les filtres de la liste.** Cinq clés dans l'URL, sans une ligne de
+  JavaScript : `q`, `metier`, `competence` (répétable), `niveau`, `dispo`. La conjonction est **un
+  `exists` par compétence cochée** — la seule forme qui dise « les deux » sans `group by` ni
+  `having count(*)`, donc sans le décompte qu'interdit le garde-fou 2 ; mesuré sur la fixture, 3 ∩ 3
+  = 1. `listTeamFilterOptions` ne propose que les valeurs qu'une personne vivante porte, sauf
+  l'échelle, proposée entière parce que « au moins ce niveau » est un seuil. Trois écarts consignés,
+  dont `q` contre la convention française des autres clés. Sa leçon vaut pour tout ticket qui ajoute
+  un `filter()` : **un filtre de domaine qu'aucune ligne forgée ne vise n'est pas éprouvé** — le
+  retirer ne fait tomber aucun test. Deux lignes forgées de plus (une personne d'un autre domaine
+  portant une liaison du domaine, une autre portant un de ses métiers) rendent les **onze**
+  neutralisations concluantes, chacune sur son seul test.
+
 - **Les indicateurs associés repliés par défaut — hors ticket, le 18/08/2026.** Le rang 3 du bloc
   « Vision produit » devient un `<details>` fermé, dont `BlockDivider` sait être le `<summary>` — la
   question du produit reste seule à l'écran, ses cartes tiennent à un clic. Sa leçon :

@@ -1819,6 +1819,78 @@ sur la branche de test — écrits dans `scripts/`, joués, puis **supprimés** 
 
 ---
 
+### T5bis.3 — les filtres de la liste Équipe — 18/08/2026
+
+**Ce que le ticket livre.** Cinq clés dans l'URL, un `form method="get"`, pas une ligne de
+JavaScript : `q` (le nom), `metier`, `competence` (répétable et **conjonctif**), `niveau` (« au
+moins ce niveau ») et `dispo`. `listTeam` reçoit un second paramètre ; `listTeamFilterOptions` naît
+à côté d'elle et dit ce que la barre propose au choix. La liste elle-même n'a pas changé d'une
+ligne.
+
+**Le cœur du ticket est un `exists` par compétence cochée.** C'est la seule forme qui dise « l'une
+**et** l'autre » sans `group by` ni `having count(*)` — donc sans le décompte que le garde-fou 2
+interdit. Une jointure doublerait les lignes ; un `or` répondrait à la question inverse. Le seuil de
+niveau s'y glisse comme une condition de plus, ce qui lui donne gratuitement sa double sémantique :
+posé avec des compétences il les qualifie, posé seul il vaut « porte au moins une compétence à ce
+rang ». La fixture de T5bis.1 avait été semée pour ce cas précis, et elle a tenu : **Léa Fontaine
+est la seule à porter User Research et Accessibilité**, quand trois personnes portent l'une et trois
+autres l'autre — 3 ∩ 3 = 1, lu dans le HTML servi.
+
+**Ce que la seconde lecture ne fait pas.** Elle remonte **toutes** les compétences des personnes
+retenues, jamais les seules qui ont filtré. Une ligne affiche un profil, pas une correspondance :
+marquer les compétences cochées serait le surlignage du plus qualifié que la fiche interdit, et
+c'est le genre d'aide qu'on ajoute sans y penser. Un test le tient — quatre compétences affichées
+sous un filtre qui n'en nomme qu'une.
+
+**Les options ne proposent pas de chemin vers le vide, sauf l'échelle, et c'est raisonné.** Métier
+et compétence ne remontent que ce qu'une personne vivante porte, la règle de
+`listProjectFilterOptions`. L'échelle est proposée entière parce que « au moins ce niveau » est un
+**seuil** et non une valeur : un échelon que personne n'occupe exactement reste un seuil qui a du
+sens. La requête d'options de compétence joint `skill_levels` **sans le lire**, pour la seule raison
+qu'une liaison que la liste n'honore pas — son niveau venant d'un autre domaine — ne doit pas faire
+paraître sa compétence dans les cases à cocher.
+
+**Vérification — trois disciplines sur quatre ont un objet, la quatrième se mesure quand même.** Le
+critère se lit dans le HTML servi : la conjonction et son sur-ensemble strict, le seuil appliqué aux
+compétences cochées puis posé seul, le cumul des cinq clés, l'échappement de `%` qui ne ramène
+personne, les `checked` et les `selected` qui redisent l'état de l'URL, les deux états vides et leur
+sortie. Une compétence d'un **autre domaine** — un second domaine créé en base pour l'occasion — ne
+filtre rien, ne fuit pas son libellé, et **ne relâche pas** le filtre légitime avec lequel elle est
+cumulée. Un paramètre qui n'est pas un UUID rend un 200 et un écran, jamais un 500. Le contraste n'a
+introduit aucun couple neuf par la position, et les trois de la barre ont été remesurés — 7,72:1,
+16,98:1, et le filet de contrôle à 3,88:1 / 3,69:1 selon le voisin. **Le droit s'éprouve par
+l'action, et ici l'action n'existe pas** : le HTML servi porte un `<form>` en `method="get"`, zéro
+champ `$ACTION_…` et zéro `"use server"` dans le périmètre — l'absence de point d'entrée en écriture
+est un constat, pas un sous-entendu.
+
+**Onze mises en défaut, onze comptes exacts.** Un pilote a joué chaque neutralisation puis relevé
+les tests tombés : `or` à la place des `exists` conjoints en fait tomber **un**, celui de la
+conjonction ; le retrait du `gte` en fait tomber **deux**, ceux qui isolent le seuil ; et chacun des
+neuf `filter()` fait tomber **son** cas d'étanchéité, jamais celui d'un autre.
+
+**Ce que la mise en défaut a changé au code — ou plutôt aux lignes forgées.** Huit `filter()` neufs
+sont entrés dans le module, et les quatre lignes forgées de T5bis.2 n'en couvraient que la moitié :
+retirer `filter(persons)` de l'une ou l'autre requête d'options ne faisait tomber **aucun** test.
+Deux forgeages ont été ajoutés, chacun ne franchissant la frontière que sur **une** colonne — une
+liaison de `a` en tout point sauf la personne, et une personne de `b` portant un métier de `a` que
+personne d'autre ne porte. **Un filtre de domaine qu'aucune ligne forgée ne vise n'est pas éprouvé**
+— il est seulement écrit.
+
+**Écarts.** Trois fichiers hors périmètre, tous arbitrés avant écriture : `formatPersons` dans
+`lib/format.ts` (la ligne de synthèse), l'`export` d'`AVAILABILITY_LABEL` dans
+`availability-dot.tsx` (le `select` de disponibilité dit les mêmes trois mots que la pastille), et
+la clé `q` retenue contre la convention française des quatre autres — la fiche l'écrit deux fois.
+`likePattern` est en revanche **recopié** dans `team.ts` plutôt qu'importé de `projects.ts` : lui
+choisir un module neutre appartient à TD.
+
+**Sondes.** Un second domaine et une compétence créés en base de développement pour éprouver le cas
+« d'un autre domaine », puis **supprimés** — une fixture locale n'est pas de la donnée métier. Son
+nom commençait par `Zzz` délibérément : `resolveDomainId` rend le premier domaine actif **par nom**,
+et un nom en tête aurait fait basculer tout l'écran sur la sonde. Le script de mesure et le pilote
+de mise en défaut ont été retirés avant le commit.
+
+---
+
 ## Points ouverts refermés
 
 *(archivés depuis `ETAT.md` le 14/08/2026 — ils étaient barrés dans la section « Points ouverts »,

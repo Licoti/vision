@@ -1,35 +1,66 @@
 /**
- * Équipe — le référentiel des personnes.
+ * Équipe — le référentiel des personnes, et ses filtres.
  *
  * Il répond à « qui compose le centre de compétence, et que sait faire
- * chacun ? ». `persons` existe depuis T1.2, mais aucun écran ne présentait une
- * personne : elle n'existait que vue depuis un projet.
+ * chacun ? », puis — depuis T5bis.3 — à « quelles personnes pourraient
+ * intervenir sur un accompagnement demandant de l'UX Research **et** de
+ * l'accessibilité ? ».
+ *
+ * **Les filtres passent par l'URL** et non par un état client : ils se
+ * partagent, ils survivent à un rechargement, et l'écran reste un composant
+ * serveur. Le formulaire fonctionne sans JavaScript. C'est le patron de
+ * `ProjectFilters` (`app/(app)/projets/page.tsx`), **repris et non généralisé** :
+ * une barre de recherche appartient à sa liste (D32), elle n'est pas un
+ * composant de socle.
+ *
+ * **Les compétences se cumulent : l'une *et* l'autre.** Le conjonctif est la
+ * question qui fonde le chantier ; un `or` y répondrait à côté.
+ *
+ * Un identifiant qui ne désigne rien dans le domaine est ignoré, jamais
+ * affiché : inventer un libellé à partir d'un paramètre serait donner du crédit
+ * à ce qu'on n'a pas lu.
+ *
+ * **Aucun classement, aucun décompte de correspondance** (garde-fous 2 et 3) :
+ * l'ordre reste le nom quelle que soit la recherche, et une ligne retenue
+ * affiche son profil entier — jamais les seules compétences qui ont filtré.
  *
  * **Les lignes ne mènent nulle part** (D29) : il n'y a pas de page personne, et
- * il n'y en aura pas — la fiche s'ouvrira en T5bis.4 par un paramètre d'URL sur
- * cette même page, la mécanique des panneaux existants.
- *
- * **La mention « côté entité » est du texte**, et le nom est écrit en toutes
- * lettres à côté de la pastille d'initiales : la couleur ne porte jamais seule
- * la distinction (`docs/06` §11). C'est le balisage de la page projet, repris
- * tel quel.
+ * il n'y en aura pas — la fiche s'ouvrira en T5bis.4 en panneau sur cette même
+ * page.
  *
  * **Aucune écriture ici** : ni bouton, ni action, ni point d'entrée. Les trois
- * gestes arrivent en T5bis.6, et cet écran ne lit donc aucun droit — un ticket
- * de lecture précède un ticket d'écriture, le rythme de T3.1 et de T5.1.
+ * gestes arrivent en T5bis.6, et cet écran ne lit donc aucun droit.
  *
  * Aucune requête directe : tout passe par `session.db`, déjà scopé sur le
  * domaine courant. Règle 1.
  */
 
-import { AvailabilityDot } from "@/components/team/availability-dot";
+import { asc, inArray } from "drizzle-orm";
+import Link from "next/link";
+import type { ReactNode } from "react";
+
+import {
+  AVAILABILITY_LABEL,
+  AvailabilityDot,
+} from "@/components/team/availability-dot";
 import { Avatar } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/ui/empty-state";
+import { borderOf, CONTROL, CONTROL_TEXT } from "@/components/ui/form-field";
 import { List, ListHeader, ListRow } from "@/components/ui/list";
 import { Page, PageHeader } from "@/components/ui/page";
 import { Tag } from "@/components/ui/tag";
 import { requireSession } from "@/lib/auth/provider";
-import { listTeam } from "@/lib/queries/team";
+import { jobs, personAvailability, skillLevels, skills } from "@/lib/db/schema";
+import { formatPersons } from "@/lib/format";
+import { ROUTES } from "@/lib/navigation";
+import {
+  listTeam,
+  listTeamFilterOptions,
+  type PersonAvailability,
+  type TeamFilterOption,
+  type TeamFilterOptions,
+} from "@/lib/queries/team";
+import { isUuid } from "@/lib/uuid";
 
 export const metadata = {
   title: "Équipe — Vision",
@@ -44,9 +75,133 @@ const COLUMN = {
   skills: "min-w-0 flex-[1.6]",
 } as const;
 
-export default async function TeamPage() {
+/**
+ * Les noms des paramètres d'URL.
+ *
+ * Quatre en français, comme les segments de route — et `q` pour la recherche,
+ * que la fiche de T5bis.3 écrit ainsi. L'écart avec le `recherche` de la liste
+ * des projets est consigné dans `JOURNAL-TECHNIQUE.md`.
+ */
+const PARAM = {
+  search: "q",
+  job: "metier",
+  skill: "competence",
+  level: "niveau",
+  availability: "dispo",
+} as const;
+
+/**
+ * `string | string[]` est **structurel** : `competence` est répétable, et Next
+ * rend un tableau dès la seconde occurrence. Le typer en `string` seul ferait
+ * mentir le compilateur sur le cas qui est justement l'objet du ticket.
+ */
+type SearchParams = Partial<
+  Record<(typeof PARAM)[keyof typeof PARAM], string | string[]>
+>;
+
+/** La première valeur d'un paramètre qu'on n'attend qu'une fois. */
+function one(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+/** Toutes les valeurs d'un paramètre répétable, dédoublonnées. */
+function many(value: string | string[] | undefined): string[] {
+  if (value === undefined) return [];
+  return [...new Set(Array.isArray(value) ? value : [value])];
+}
+
+/** La forme est vérifiée avant la base : un paramètre fantaisiste doit
+ *  produire un écran, pas une erreur PostgreSQL. */
+function uuidParam(value: string | undefined): string | undefined {
+  return value && isUuid(value) ? value : undefined;
+}
+
+/** La disponibilité n'est pas un identifiant : elle se vérifie contre
+ *  l'énuméré, sans aller en base. */
+function availabilityParam(
+  value: string | undefined,
+): PersonAvailability | undefined {
+  return personAvailability.enumValues.find((option) => option === value);
+}
+
+/** Les trois disponibilités, telles que le `select` les propose. Le libellé
+ *  vient de la pastille : un seul endroit dit ces trois mots. */
+const AVAILABILITY_OPTIONS: TeamFilterOption[] =
+  personAvailability.enumValues.map((value) => ({
+    id: value,
+    label: AVAILABILITY_LABEL[value],
+  }));
+
+export default async function TeamPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
   const session = await requireSession();
-  const rows = await listTeam(session.db);
+  const params = await searchParams;
+
+  const search = one(params[PARAM.search])?.trim() ?? "";
+  const availability = availabilityParam(one(params[PARAM.availability]));
+
+  const requestedJob = uuidParam(one(params[PARAM.job]));
+  const requestedLevel = uuidParam(one(params[PARAM.level]));
+  const requestedSkills = many(params[PARAM.skill]).filter(isUuid);
+
+  /* Chaque valeur est confrontée au domaine avant d'être crue — la règle de
+     `?produit=` (T2.5). `find` et `list` sont scopés : la valeur d'un autre
+     domaine n'existe pas, elle ne « manque » pas. Les compétences passent par
+     **une seule** lecture, qui confronte et fournit les libellés de la ligne de
+     synthèse dans le même aller-retour ; celles que la couche n'a pas rendues
+     sont simplement ignorées. */
+  const [activeJob, activeLevel, activeSkills] = await Promise.all([
+    requestedJob ? session.db.find(jobs, requestedJob) : undefined,
+    requestedLevel ? session.db.find(skillLevels, requestedLevel) : undefined,
+    requestedSkills.length > 0
+      ? session.db.list(skills, {
+          where: inArray(skills.id, requestedSkills),
+          orderBy: [asc(skills.position), asc(skills.label)],
+        })
+      : [],
+  ]);
+
+  const options = await listTeamFilterOptions(session.db);
+
+  const rows = await listTeam(session.db, {
+    search: search || undefined,
+    jobId: activeJob?.id,
+    skillIds: activeSkills.map((skill) => skill.id),
+    minRank: activeLevel?.rank,
+    availability,
+  });
+
+  /** Ce qui est actif, dit en toutes lettres. Le libellé vient de la ligne lue
+   *  en base, jamais du paramètre. */
+  const applied: { field: string; value: string }[] = [
+    ...(search ? [{ field: "Recherche", value: `« ${search} »` }] : []),
+    ...(activeJob ? [{ field: "Métier", value: activeJob.label }] : []),
+    ...(activeSkills.length > 0
+      ? [
+          {
+            field:
+              activeSkills.length > 1 ? "Compétences" : "Compétence",
+            value: activeSkills.map((skill) => skill.label).join(" et "),
+          },
+        ]
+      : []),
+    ...(activeLevel
+      ? [{ field: "Niveau minimum", value: activeLevel.label }]
+      : []),
+    ...(availability
+      ? [{ field: "Disponibilité", value: AVAILABILITY_LABEL[availability] }]
+      : []),
+  ];
+
+  /* La barre paraît dès qu'il y a quelque chose à filtrer, ou qu'un filtre est
+     déjà posé — sans quoi une recherche infructueuse retirerait le formulaire
+     qui l'a produite, et il n'y aurait plus aucun moyen de la corriger. */
+  const showFilters = rows.length > 0 || applied.length > 0;
+
+  const checked = new Set(activeSkills.map((skill) => skill.id));
 
   return (
     <Page>
@@ -54,6 +209,49 @@ export default async function TeamPage() {
         title="Équipe"
         lead="Qui compose le centre de compétence, et que sait faire chacun ?"
       />
+
+      {showFilters ? (
+        <TeamFilters
+          options={options}
+          search={search}
+          jobId={activeJob?.id}
+          checkedSkills={checked}
+          levelId={activeLevel?.id}
+          availability={availability}
+        />
+      ) : null}
+
+      {showFilters ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p
+            // Le compteur et les filtres changent sans rechargement de page
+            // perceptible : l'assistance doit l'entendre.
+            aria-live="polite"
+            className="flex flex-wrap items-center gap-2 text-sm text-content-neutral-dark"
+          >
+            <span className="font-semibold text-content-neutral-darkest">
+              {formatPersons(rows.length)}
+            </span>
+            {applied.map((filter) => (
+              <span key={filter.field} className="flex items-center gap-2">
+                <span aria-hidden="true" className="text-content-neutral-light">
+                  ·
+                </span>
+                {filter.field} : {filter.value}
+              </span>
+            ))}
+          </p>
+
+          {applied.length > 0 ? (
+            <Link
+              href={ROUTES.team}
+              className="text-sm font-semibold text-content-primary-dark underline"
+            >
+              Retirer tous les filtres
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
       {rows.length > 0 ? (
         <List label="Les personnes du domaine">
@@ -99,8 +297,9 @@ export default async function TeamPage() {
                 ) : null}
               </span>
 
-              {/* Une personne sans compétence le dit. Ce n'est pas un état
-                  d'erreur : le profil n'est simplement pas encore recueilli. */}
+              {/* Le profil entier, et non les seules compétences qui ont
+                  filtré : une ligne affiche ce que la personne déclare, jamais
+                  une correspondance (garde-fou 2). */}
               <span className={COLUMN.skills}>
                 <span className="sr-only">Compétences : </span>
                 {row.skills.length > 0 ? (
@@ -121,6 +320,19 @@ export default async function TeamPage() {
             </ListRow>
           ))}
         </List>
+      ) : applied.length > 0 ? (
+        <EmptyState
+          title="Aucune personne ne répond à ces critères"
+          description="Les filtres se combinent : chacun restreint le résultat du précédent, et les compétences cochées se cumulent — une personne doit les porter toutes. En décocher une suffit peut-être à retrouver ce que vous cherchez."
+          action={
+            <Link
+              href={ROUTES.team}
+              className="text-sm font-semibold text-content-primary-dark underline"
+            >
+              Voir toutes les personnes
+            </Link>
+          }
+        />
       ) : (
         <EmptyState
           title="Aucune personne pour l'instant"
@@ -128,5 +340,189 @@ export default async function TeamPage() {
         />
       )}
     </Page>
+  );
+}
+
+/**
+ * La barre de filtres.
+ *
+ * Un `form method="get"` : le navigateur écrit lui-même l'URL, l'écran la
+ * relit, et rien n'est conservé en mémoire côté client. Chaque contrôle se
+ * réaffiche sur la valeur active — le formulaire dit l'état de l'URL.
+ *
+ * Locale à cet écran, comme `ProjectFilters` l'est resté à la sienne : c'est
+ * une barre de recherche de liste (D32), pas un composant de socle.
+ *
+ * **Deux rangs, et le second est un `<fieldset>`** : onze compétences ne
+ * tiennent pas dans une barre en ligne, et un `<fieldset>` est ce qui dit à
+ * l'assistance que ces cases forment un groupe et lui donne son nom.
+ *
+ * Les classes de contrôle viennent de `components/ui/form-field.tsx` — les
+ * jetons y sont mesurés depuis T2.3 (`content-neutral-normal` à 3,88:1 sur
+ * `surface-neutral-pale`, la bordure d'un composant se lisant à 3:1). **Aucun
+ * jeton neuf, aucun septième substitut** ; les cases à cocher restent natives.
+ */
+function TeamFilters({
+  options,
+  search,
+  jobId,
+  checkedSkills,
+  levelId,
+  availability,
+}: {
+  options: TeamFilterOptions;
+  search: string;
+  jobId: string | undefined;
+  checkedSkills: ReadonlySet<string>;
+  levelId: string | undefined;
+  availability: PersonAvailability | undefined;
+}) {
+  return (
+    <form
+      method="get"
+      action={ROUTES.team}
+      className="flex flex-col gap-3"
+      aria-label="Filtrer les personnes"
+    >
+      <div className="flex flex-wrap items-end gap-3">
+        <Field label="Rechercher" htmlFor="filtre-q" className="min-w-60 flex-1">
+          <input
+            id="filtre-q"
+            type="search"
+            name={PARAM.search}
+            defaultValue={search}
+            placeholder="Un nom…"
+            className={`${CONTROL_TEXT} ${borderOf(undefined)}`}
+          />
+        </Field>
+
+        <Select
+          id="filtre-metier"
+          label="Métier"
+          name={PARAM.job}
+          all="Tous"
+          options={options.jobs}
+          value={jobId}
+          className="w-56"
+        />
+        {/* « Au moins ce niveau » : c'est un seuil, d'où l'échelle entière et
+            l'intitulé qui le dit. */}
+        <Select
+          id="filtre-niveau"
+          label="Niveau minimum"
+          name={PARAM.level}
+          all="Tous"
+          options={options.levels}
+          value={levelId}
+          className="w-52"
+        />
+        <Select
+          id="filtre-dispo"
+          label="Disponibilité"
+          name={PARAM.availability}
+          all="Toutes"
+          options={AVAILABILITY_OPTIONS}
+          value={availability}
+          className="w-56"
+        />
+
+        <button
+          type="submit"
+          className="rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale"
+        >
+          Filtrer
+        </button>
+      </div>
+
+      {options.skills.length > 0 ? (
+        <fieldset>
+          <legend className="mb-2 text-2xs font-semibold text-content-neutral-dark uppercase">
+            Compétences — cochées, elles se cumulent
+          </legend>
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            {options.skills.map((skill) => (
+              <label
+                key={skill.id}
+                className="flex items-center gap-2 text-sm text-content-neutral-darkest"
+              >
+                <input
+                  type="checkbox"
+                  name={PARAM.skill}
+                  value={skill.id}
+                  defaultChecked={checkedSkills.has(skill.id)}
+                  className="h-4 w-4 flex-none"
+                />
+                {skill.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
+    </form>
+  );
+}
+
+/** Un champ et son étiquette — jamais un placeholder à la place du libellé. */
+function Field({
+  label,
+  htmlFor,
+  className,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`flex flex-col gap-1 ${className ?? ""}`}>
+      <label
+        htmlFor={htmlFor}
+        className="text-2xs font-semibold text-content-neutral-dark uppercase"
+      >
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+/** Une liste déroulante de filtre. L'option vide retire le filtre. */
+function Select({
+  id,
+  label,
+  name,
+  all,
+  options,
+  value,
+  className,
+}: {
+  id: string;
+  label: string;
+  name: string;
+  /** « Toutes » ou « Tous », selon le genre du concept. */
+  all: string;
+  options: TeamFilterOption[];
+  value: string | undefined;
+  className?: string;
+}) {
+  if (options.length === 0) return null;
+
+  return (
+    <Field label={label} htmlFor={id} className={className}>
+      <select
+        id={id}
+        name={name}
+        defaultValue={value ?? ""}
+        className={`${CONTROL} ${borderOf(undefined)}`}
+      >
+        <option value="">{all}</option>
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </Field>
   );
 }

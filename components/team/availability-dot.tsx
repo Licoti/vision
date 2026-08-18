@@ -33,8 +33,14 @@ const DOT: Record<PersonAvailability, string> = {
   unavailable: "bg-surface-neutral-base",
 };
 
-/** Le mot, écrit juste à côté de la pastille. Jamais abrégé. */
-const LABEL: Record<PersonAvailability, string> = {
+/**
+ * Le mot, écrit juste à côté de la pastille. Jamais abrégé.
+ *
+ * **Exporté depuis T5bis.3** : le `select` « Disponibilité » de la barre de
+ * filtres nomme les trois mêmes valeurs, et recopier trois libellés, c'est se
+ * garantir qu'un jour la pastille et le filtre en diront deux versions.
+ */
+export const AVAILABILITY_LABEL: Record<PersonAvailability, string> = {
   available: "Disponible",
   partial: "Partiellement disponible",
   unavailable: "Indisponible",
@@ -51,7 +57,7 @@ export function AvailabilityDot({
         aria-hidden="true"
         className={`h-2 w-2 flex-none rounded-full ${DOT[availability]}`}
       />
-      {LABEL[availability]}
+      {AVAILABILITY_LABEL[availability]}
     </span>
   );
 }

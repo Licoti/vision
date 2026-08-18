@@ -247,6 +247,19 @@ export function formatProjects(count: number): string {
 }
 
 /**
+ * « 3 personnes » · « 1 personne » · « Aucune personne ».
+ *
+ * Le compteur de la liste Équipe, qui dit ce que les filtres ont retenu. Il
+ * compte des lignes affichées, **jamais une mesure d'activité** : ce n'est pas
+ * la taille du centre, c'est le résultat d'une recherche. Zéro s'écrit en
+ * toutes lettres, la règle des quatre fonctions voisines.
+ */
+export function formatPersons(count: number): string {
+  if (count === 0) return "Aucune personne";
+  return `${count} personne${count > 1 ? "s" : ""}`;
+}
+
+/**
  * « 3 relevés » · « 1 relevé » · « Aucun relevé ».
  *
  * Le compteur d'un indicateur, sur la page produit. Zéro s'écrit en toutes

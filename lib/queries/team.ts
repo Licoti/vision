@@ -11,7 +11,18 @@
  * courant. Règle 1.
  */
 
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  exists,
+  gte,
+  ilike,
+  inArray,
+  isNull,
+  sql,
+} from "drizzle-orm";
 
 import type { ScopedDb } from "@/lib/db/scoped";
 import {
@@ -63,12 +74,52 @@ export type TeamMemberRow = {
 };
 
 /**
+ * Les cinq filtres de l'écran (T5bis.3). Tous facultatifs, tous cumulatifs.
+ *
+ * **Aucun d'eux ne touche à l'ordre** : le tri reste le nom, quelle que soit la
+ * recherche (garde-fou 3). Un filtre restreint ce qu'on voit, il ne classe pas
+ * ce qui reste.
+ */
+export type TeamFilters = {
+  /** Le nom de la personne. Déjà coupé ; une chaîne vide vaut absent. */
+  search?: string | undefined;
+  jobId?: string | undefined;
+  /**
+   * **Conjonctif** : la personne porte *toutes* ces compétences, jamais l'une
+   * ou l'autre. C'est la question qui fonde le chantier — « de l'UX Research
+   * **et** de l'accessibilité ».
+   */
+  skillIds?: readonly string[] | undefined;
+  /** « Au moins ce rang ». S'applique aux compétences cochées ; seul, à n'importe laquelle. */
+  minRank?: number | undefined;
+  availability?: PersonAvailability | undefined;
+};
+
+/**
+ * Le motif d'un `like`, échappé.
+ *
+ * Sans cela, un `%` saisi ramène toute la liste et un `_` devient un joker : la
+ * recherche cesserait de dire ce qu'elle affiche. `\` est échappé en premier,
+ * faute de quoi il masquerait les échappements suivants.
+ *
+ * **Jumelle de `likePattern` de `lib/queries/projects.ts`**, et c'est une copie
+ * assumée : l'importer de là-bas coupleraient deux modules de lecture qui n'ont
+ * rien à voir, et choisir sa destination partagée n'est pas une décision de
+ * ticket de filtre (règle 3). L'extraction vers un module neutre est proposée
+ * dans `JOURNAL-TECHNIQUE.md`.
+ */
+function likePattern(search: string): string {
+  return `%${search.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+}
+
+/**
  * Les personnes du domaine, avec leur métier, leur disponibilité et les
  * compétences qu'elles déclarent.
  *
  * **Le tri est le nom, et rien d'autre** (garde-fou 3) : aucun classement, quel
- * que soit ce que porte le profil. L'identifiant départage deux homonymes, sans
- * quoi l'ordre varierait d'un affichage à l'autre — ce qui serait un défaut.
+ * que soit ce que porte le profil, et **quel que soit le filtre posé**.
+ * L'identifiant départage deux homonymes, sans quoi l'ordre varierait d'un
+ * affichage à l'autre — ce qui serait un défaut.
  *
  * Les personnes archivées sont écartées : l'écran est un référentiel. Elles
  * restent affichées dans l'équipe des accompagnements qu'elles ont menés
@@ -79,16 +130,78 @@ export type TeamMemberRow = {
  * ligne de personne autant de fois qu'elle porte de compétences — le motif
  * exact déjà tranché pour les membres d'un projet (`listProjects`) et pour les
  * participants d'une activité (`findProjectActivities`). Le nombre de requêtes
- * ne dépend pas du nombre de personnes.
+ * ne dépend ni du nombre de personnes, ni du nombre de compétences cochées.
  *
  * **Les compétences dont le référentiel a été archivé restent affichées** : seul
  * le filtre de domaine porte sur les tables jointes. La personne a déclaré cette
  * compétence ; la retirer de l'écran ferait disparaître ce que l'écran
- * racontait. T5bis.3 écartera les valeurs archivées des **options de filtre**,
- * ce qui n'est pas le même objet — un filtre n'affiche aucun profil.
+ * racontait. `listTeamFilterOptions` écarte en revanche les valeurs archivées
+ * des **options de filtre**, ce qui n'est pas le même objet — un filtre
+ * n'affiche aucun profil.
+ *
+ * **La seconde lecture ignore les filtres**, et c'est délibéré : elle remonte
+ * *toutes* les compétences des personnes retenues, jamais les seules qui ont
+ * filtré. La ligne affiche un profil, pas une correspondance — marquer les
+ * compétences cochées serait le surlignage du plus qualifié que la fiche
+ * interdit.
  */
-export function listTeam(scope: ScopedDb): Promise<TeamMemberRow[]> {
+export function listTeam(
+  scope: ScopedDb,
+  filters: TeamFilters = {},
+): Promise<TeamMemberRow[]> {
   return scope.joinedRead(async (database, { filter }) => {
+    /**
+     * « Cette personne porte cette compétence », en un `exists`.
+     *
+     * **Un `exists` par compétence cochée** : c'est la seule forme qui dise
+     * « les deux » sans `group by` ni `having count(*)` — donc sans décompte,
+     * que le garde-fou 2 interdit. Une jointure les doublerait ; un `or` dirait
+     * l'inverse de ce qu'on demande.
+     *
+     * Le `innerJoin` sur `skill_levels` est **toujours** posé, même sans seuil :
+     * toute table jointe porte son `filter()`, et une liaison dont le niveau
+     * serait d'un autre domaine ne prouve aucune compétence.
+     *
+     * `skillId` absent vaut « n'importe laquelle » : c'est le cas du seuil de
+     * niveau posé seul.
+     */
+    const carries = (skillId: string | undefined) =>
+      exists(
+        database
+          .select({ one: sql`1` })
+          .from(personSkills)
+          .innerJoin(
+            skillLevels,
+            and(eq(skillLevels.id, personSkills.levelId), filter(skillLevels)),
+          )
+          .where(
+            and(
+              filter(personSkills),
+              eq(personSkills.personId, persons.id),
+              ...(skillId ? [eq(personSkills.skillId, skillId)] : []),
+              ...(filters.minRank !== undefined
+                ? [gte(skillLevels.rank, filters.minRank)]
+                : []),
+            ),
+          ),
+      );
+
+    const conditions = [filter(persons), isNull(persons.archivedAt)];
+
+    if (filters.search) {
+      conditions.push(ilike(persons.fullName, likePattern(filters.search)));
+    }
+    if (filters.jobId) conditions.push(eq(persons.jobId, filters.jobId));
+    if (filters.availability) {
+      conditions.push(eq(persons.availability, filters.availability));
+    }
+
+    if (filters.skillIds?.length) {
+      for (const skillId of filters.skillIds) conditions.push(carries(skillId));
+    } else if (filters.minRank !== undefined) {
+      conditions.push(carries(undefined));
+    }
+
     // `leftJoin` : `job_id` est facultatif, une personne hors centre n'a pas de
     // métier design (docs/04 §2). Une jointure interne la ferait disparaître.
     const rows = await database
@@ -101,7 +214,7 @@ export function listTeam(scope: ScopedDb): Promise<TeamMemberRow[]> {
       })
       .from(persons)
       .leftJoin(jobs, and(eq(jobs.id, persons.jobId), filter(jobs)))
-      .where(and(filter(persons), isNull(persons.archivedAt)))
+      .where(and(...conditions))
       .orderBy(asc(persons.fullName), asc(persons.id));
 
     if (rows.length === 0) return [];
@@ -147,4 +260,118 @@ export function listTeam(scope: ScopedDb): Promise<TeamMemberRow[]> {
       skills: byPerson.get(row.id) ?? [],
     }));
   });
+}
+
+/* ==========================================================================
+   Les options de la barre de filtres
+   ========================================================================== */
+
+/** Une valeur proposée au filtrage. Jumelle de celle de `projects.ts`. */
+export type TeamFilterOption = { id: string; label: string };
+
+/** Un échelon de l'échelle, avec le rang qui porte le seuil. */
+export type TeamLevelOption = TeamFilterOption & { rank: number };
+
+/** Les trois listes de la barre de filtres. `dispo` n'en est pas : c'est un énuméré. */
+export type TeamFilterOptions = {
+  jobs: TeamFilterOption[];
+  skills: TeamFilterOption[];
+  levels: TeamLevelOption[];
+};
+
+/**
+ * Ce que la barre de filtres propose au choix.
+ *
+ * **Métiers et compétences : les seules valeurs qu'une personne vivante porte.**
+ * Le référentiel en compte davantage — proposer un filtre qui ne ramène rien
+ * serait offrir un chemin vers le vide, la règle posée par la liste des produits
+ * et tenue par `listProjectFilterOptions`. Les autres valeurs restent
+ * atteignables par l'URL, et l'écran sait alors dire qu'il n'a rien trouvé.
+ *
+ * **L'échelle, elle, est proposée entière** (non archivée), et la raison est sa
+ * sémantique : « au moins ce niveau » est un **seuil**, pas une valeur. Un
+ * échelon que personne n'occupe exactement reste un seuil qui a du sens, et une
+ * échelle tronquée se lirait comme un référentiel amputé. Elle sort par `rank`
+ * croissant : c'est l'ordre de l'échelle, et non celui du domaine.
+ *
+ * **L'exception d'archivage nominative n'est pas reprise** — `includeArchived`
+ * accompagné d'un `or(is null, celles-ci)` protège une valeur qu'une ligne
+ * *édite* et qu'il faut garder sélectionnable. Un filtre n'édite rien : il n'a
+ * aucune valeur à conserver.
+ */
+export async function listTeamFilterOptions(
+  scope: ScopedDb,
+): Promise<TeamFilterOptions> {
+  const [joined, levelRows] = await Promise.all([
+    scope.joinedRead(async (database, { filter }) => {
+      const jobRows = await database
+        .selectDistinct({
+          id: jobs.id,
+          label: jobs.label,
+          position: jobs.position,
+        })
+        .from(jobs)
+        .innerJoin(persons, and(eq(persons.jobId, jobs.id), filter(persons)))
+        .where(
+          and(
+            filter(jobs),
+            isNull(jobs.archivedAt),
+            isNull(persons.archivedAt),
+          ),
+        )
+        .orderBy(asc(jobs.position), asc(jobs.label));
+
+      const skillRows = await database
+        .selectDistinct({
+          id: skills.id,
+          label: skills.label,
+          position: skills.position,
+        })
+        .from(skills)
+        .innerJoin(
+          personSkills,
+          and(eq(personSkills.skillId, skills.id), filter(personSkills)),
+        )
+        .innerJoin(
+          persons,
+          and(eq(persons.id, personSkills.personId), filter(persons)),
+        )
+        // Le niveau est joint sans être lu : une liaison que la liste
+        // n'honorerait pas — son niveau venant d'un autre domaine — ne doit pas
+        // faire paraître sa compétence dans les options. Les deux requêtes
+        // disent alors la même chose de la même ligne.
+        .innerJoin(
+          skillLevels,
+          and(eq(skillLevels.id, personSkills.levelId), filter(skillLevels)),
+        )
+        .where(
+          and(
+            filter(skills),
+            isNull(skills.archivedAt),
+            isNull(persons.archivedAt),
+          ),
+        )
+        .orderBy(asc(skills.position), asc(skills.label));
+
+      return { jobRows, skillRows };
+    }),
+    // Aucune jointure : la couche filtre d'elle-même le domaine **et**
+    // `archived_at`. C'est le chemin le plus sûr, et il suffit ici.
+    scope.list(skillLevels, {
+      orderBy: [asc(skillLevels.rank), asc(skillLevels.label)],
+    }),
+  ]);
+
+  const strip = (rows: { id: string; label: string }[]): TeamFilterOption[] =>
+    rows.map((row) => ({ id: row.id, label: row.label }));
+
+  return {
+    jobs: strip(joined.jobRows),
+    skills: strip(joined.skillRows),
+    levels: levelRows.map((row) => ({
+      id: row.id,
+      label: row.label,
+      rank: row.rank,
+    })),
+  };
 }
