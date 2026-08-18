@@ -30,6 +30,7 @@ import {
   formatIndicatorDirection,
   formatMonthTick,
   formatPeriodShort,
+  formatComplementaryIndicators,
   formatReadings,
   formatResultValue,
 } from "./format";
@@ -179,6 +180,29 @@ describe("formatReadings", () => {
 
   test("au-delà, le pluriel", () => {
     expect(formatReadings(3)).toBe("3 relevés");
+  });
+});
+
+describe("formatComplementaryIndicators", () => {
+  test("zéro s'écrit en toutes lettres", () => {
+    // Une North Star sans indicateur autour d'elle n'est pas un produit en
+    // défaut : « 0 indicateur » se lirait comme un manque à combler.
+    expect(formatComplementaryIndicators(0)).toBe(
+      "Aucun indicateur complémentaire",
+    );
+  });
+
+  test("un indicateur reste au singulier", () => {
+    expect(formatComplementaryIndicators(1)).toBe("1 indicateur complémentaire");
+  });
+
+  test("au-delà, les deux mots prennent le pluriel", () => {
+    // Le piège de cette fonction, et la raison de ce test : l'adjectif
+    // s'accorde avec le nom, et un `s` posé sur le seul nom rendrait
+    // « 3 indicateurs complémentaire ».
+    expect(formatComplementaryIndicators(3)).toBe(
+      "3 indicateurs complémentaires",
+    );
   });
 });
 

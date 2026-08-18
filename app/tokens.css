@@ -260,9 +260,16 @@
 
   /* §3.1 Familles. --font-poppins est fournie par next/font depuis
      app/layout.tsx : la police est auto-hébergée, jamais chargée depuis
-     un domaine tiers au runtime. */
+     un domaine tiers au runtime.
+
+     **Les deux familles sont Poppins** (18/08/2026) : c'est la typographie de
+     référence de ce domaine, et le document §3.1 ne donnait à la secondaire
+     qu'un repli système. Le jeton reste, et c'est tout l'enjeu — Poppins est
+     écrite **ici**, dans la couche de thème, à l'endroit exact où un autre
+     domaine posera la sienne. Rien ne la fige dans un composant, et elle ne se
+     propage donc pas au domaine suivant. */
   --font-family-primary: var(--font-poppins), Arial, sans-serif;
-  --font-family-secondary: Arial, sans-serif;
+  --font-family-secondary: var(--font-poppins), Arial, sans-serif;
 
   /* §3.2 Tailles */
   --font-size-2xs: 10px;

@@ -2,7 +2,7 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 18/08/2026 — hors ticket : l'ordre et le nom des trois blocs de la page produit.
+**Dernière mise à jour :** 18/08/2026 — hors ticket : le bloc « Vision produit » sur la maquette `northstar-v2`.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
 **Ticket suivant :** **T5bis.3** — les filtres de la liste (`tickets-C5bis.md`)
 
@@ -92,6 +92,16 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   `docs/06` §6 la place qu'il réclamait ; le nom et le cadrage restent hors document. Sa leçon :
   **`timelineWindow` borne, il n'écarte pas** — sans repli hors-axe, un produit terminé en 2024
   s'ouvrirait sur une fenêtre d'un seul mois, mesuré à `firstMonth: '2026-02'`.
+- **Le bloc « Vision produit » sur `northstar-v2` — hors ticket, le 18/08/2026.** Surtitre en
+  capitales et kebab en absolu à la place de `BlockHeader`, barre d'accent en dégradé, vision en 30
+  pixels, **North Star dans une carte blanche**, décompte sur l'intertitre du rang 3, pastille de
+  cible passée à gauche et crochet d'écart « +14 pts » sur la courbe. Poppins passe aussi en famille
+  secondaire, dans `tokens.css` et nulle part ailleurs. Le bloc **quitte le langage d'en-tête
+  commun** que le 17/08 lui avait donné : écart assumé, les deux blocs voisins gardent
+  `BlockHeader`. Sa leçon : **une carte qui change de fond emporte tout ce qui se peignait du fond
+  d'avant** — deux pastilles de cible et l'anneau des points se peignaient en
+  `surface-primary-lighter` pour rester lisibles par-dessus les filets, et auraient dessiné trois
+  rectangles bleus sur la carte blanche.
 
 ---
 
@@ -170,6 +180,21 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   qui n'existe plus n'a plus d'objet. → **T5bis.7.**
 
 ### c. Dettes assumées, sans échéance
+
+- **La page produit porte deux langages d'en-tête.** « Vision produit » a pris le surtitre en
+  capitales et le kebab en absolu de `northstar-v2` (18/08/2026) ; « Accompagnements en cours » et
+  « Tous les accompagnements » gardent `BlockHeader` — titre de plein rang, note dessous, action à
+  droite. C'est l'unification du 17/08 défaite pour un bloc sur trois, sur demande et en
+  connaissance de cause. Le jour où un second bloc reprend le surtitre, `Eyebrow` quitte
+  `indicators.tsx` pour `components/ui/block.tsx`. → **arbitrage humain, pas un ticket.**
+
+- **La carte blanche de la North Star se détache à peine de son bloc.** La maquette sépare la carte
+  (`#ffffff`) du bloc (`#eef2fb`) à 1,12:1 ; nos jetons donnent 1,04:1, `surface-primary-lightest`
+  étant presque blanc (`midnight-100`, `#f5f9ff`). **C'est la bordure qui rend la carte lisible**,
+  et elle est plus franche que celle de la maquette : 1,33:1 contre l'intérieur, 1,28:1 contre le
+  bloc. Aucun jeton ne porte le bleu intermédiaire — `midnight-150` (`#e4ecf8`) est une primitive
+  que la couche sémantique §2.1 n'utilise nulle part. Le combler serait ajouter un jeton au design
+  system, hors du périmètre d'une reprise de bloc. → **arbitrage humain, sinon C7.**
 
 - **Sans JavaScript, les gestes d'une carte de roadmap ne sont plus atteignables.** Le menu « … »
   décide lui-même de son ouverture (`useState`), seule exception arbitrée à D30 — élargie le

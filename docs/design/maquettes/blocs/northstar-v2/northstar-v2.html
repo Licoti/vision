@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>North Star V2</title>
+<link rel="stylesheet" href="northstar-v2.css">
+</head>
+<body>
+<div class="ns-page">
+  <div class="ns-block">
+
+    <!-- Block options menu -->
+    <div class="ns-block-kebab ns-kebab-wrap">
+      <button class="ns-kebab" aria-label="Options du bloc" title="Options">
+        <span class="ns-dots"><span></span><span></span><span></span></span>
+      </button>
+      <div class="ns-menu" hidden>
+        <button type="button">Modifier la vision produit</button>
+        <button type="button">Modifier la North Star</button>
+        <button type="button">Paramètres de la cible</button>
+        <button type="button">Exporter les indicateurs</button>
+      </div>
+    </div>
+
+    <!-- Tier 1 · Vision produit -->
+    <div class="ns-eyebrow is-vision"><span class="bar"></span><span>Vision produit</span></div>
+    <div class="ns-vision">
+      <div class="accent"></div>
+      <div>
+        <div class="ns-vision-text">Hello, ceci est une vision produit</div>
+        <p class="ns-vision-sub">La raison d'être de ce produit, et la direction qu'il se donne. Tous les indicateurs ci-dessous servent cette vision.</p>
+      </div>
+    </div>
+
+    <div class="ns-divider"></div>
+
+    <!-- Tier 2 · North Star -->
+    <div class="ns-eyebrow is-northstar"><span class="star">★</span><span>North Star · métrique principale</span></div>
+    <div class="ns-card">
+      <div class="ns-card-grid">
+        <!-- Left : target emphasis -->
+        <div>
+          <div class="ns-metric-name">Part des virements réalisés sans contact support</div>
+          <div class="ns-metric-value"><span class="big">71 %</span><span class="date">juin 2026</span></div>
+          <div class="ns-gauge-wrap">
+            <div class="ns-gauge">
+              <div class="fill" style="width: 71%;"></div>
+              <div class="target" style="left: 85%;"></div>
+              <div class="target-label" style="left: 85%;">★ Cible 85 %</div>
+            </div>
+            <div class="ns-gauge-scale"><span>0 %</span><span>100 %</span></div>
+          </div>
+          <div class="ns-gap-text">Encore 14 points pour atteindre la cible.</div>
+        </div>
+
+        <!-- Right : trend -->
+        <div>
+          <div class="ns-chart">
+            <span class="y-label y-100">100 %</span>
+            <span class="y-label y-50">50 %</span>
+            <span class="y-label y-0">0 %</span>
+            <div class="ns-plot">
+              <div class="guide g-top"></div>
+              <div class="guide g-mid"></div>
+              <div class="guide g-bot"></div>
+              <div class="target-line" style="top: 25.5px;"></div>
+              <div class="target-chip" style="top: 25.5px;">★ Cible 85 %</div>
+              <div class="gap-bracket" style="left: 86%; top: 25.5px; height: 23.8px;"></div>
+              <div class="gap-pill" style="left: 86%; top: 37.4px;">+14 pts</div>
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+                <path d="M4,46 L44,37 L86,29" fill="none" stroke="#211c5e" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>
+              </svg>
+              <div class="pt" style="left: 4%; top: 78.2px;"><div class="dot"></div><div class="pt-label">54 %</div></div>
+              <div class="pt" style="left: 44%; top: 62.9px;"><div class="dot"></div><div class="pt-label">63 %</div></div>
+              <div class="pt" style="left: 86%; top: 49.3px;"><div class="dot"></div><div class="pt-label">71 %</div></div>
+            </div>
+          </div>
+          <div class="ns-xaxis">
+            <div class="tick" style="left: 4%;">sept. '24</div>
+            <div class="tick" style="left: 26%;">mars '25</div>
+            <div class="tick" style="left: 48%;">sept. '25</div>
+            <div class="tick" style="left: 70%;">mars '26</div>
+            <div class="tick" style="left: 86%;">juin '26</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tier 3 · Indicateurs associés -->
+    <div class="ns-section-head">
+      <span class="title">Indicateurs associés</span>
+      <span class="count">1 indicateur complémentaire</span>
+      <span class="rule"></span>
+    </div>
+
+
+  </div>
+</div>
+</body>
+</html>

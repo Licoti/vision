@@ -1,0 +1,231 @@
+/* North Star V2 — bloc Vision produit / indicateurs */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #ececed;
+  font-family: 'Poppins', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: #1c1c34;
+}
+a { color: #211c5e; }
+a:hover { color: #3a33a0; }
+
+.ns-page {
+  min-height: 100%;
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+/* ---- Block ---- */
+.ns-block {
+  position: relative;
+  width: 100%;
+  max-width: 1200px;
+  background: #eef2fb;
+  border-radius: 22px;
+  border: 1px solid #d7e0f2;
+  box-shadow: 0 1px 2px rgba(20,20,40,0.05);
+  padding: 34px 40px 40px;
+}
+
+/* ---- Kebab buttons + menus ---- */
+.ns-kebab-wrap { position: relative; }
+.ns-block-kebab { position: absolute; top: 26px; right: 30px; }
+.ns-kebab {
+  width: 36px; height: 36px;
+  border-radius: 9px;
+  border: 1px solid #c5d1ea;
+  background: rgba(255,255,255,0.6);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.ns-kebab:hover { background: #ffffff; }
+.ns-kebab-sm {
+  width: 32px; height: 32px;
+  border: 1px solid transparent;
+  background: transparent;
+}
+.ns-kebab-sm:hover { background: #f1f3f9; }
+.ns-dots { display: flex; flex-direction: column; gap: 3px; align-items: center; }
+.ns-dots span { width: 4px; height: 4px; border-radius: 50%; background: #211c5e; display: block; }
+.ns-kebab-sm .ns-dots span { width: 3.5px; height: 3.5px; background: #6a6a77; }
+
+.ns-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  min-width: 220px;
+  background: #ffffff;
+  border: 1px solid #e6e6e9;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(20,20,40,0.16);
+  padding: 6px;
+}
+.ns-menu[hidden] { display: none; }
+.ns-menu button {
+  display: block; width: 100%;
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  color: #33334a;
+}
+.ns-menu button:hover { background: #f4f4f6; }
+.ns-menu button.is-danger { color: #9c360c; }
+
+/* ---- Tier labels ---- */
+.ns-eyebrow {
+  display: flex; align-items: center; gap: 9px;
+  font-size: 12px; font-weight: 700;
+  letter-spacing: 0.16em; text-transform: uppercase;
+}
+.ns-eyebrow .bar { width: 22px; height: 3px; border-radius: 2px; background: #211c5e; }
+.ns-eyebrow.is-vision { margin-bottom: 16px; color: #211c5e; }
+.ns-eyebrow.is-northstar { margin-bottom: 14px; color: #9c360c; }
+.ns-eyebrow .star { font-size: 15px; }
+
+/* ---- Tier 1 · Vision ---- */
+.ns-vision { display: flex; gap: 20px; align-items: stretch; max-width: 860px; }
+.ns-vision .accent { width: 4px; border-radius: 3px; background: linear-gradient(#211c5e,#9c360c); flex: none; }
+.ns-vision-text {
+  font-size: 27px; font-weight: 600;
+  color: #17172b; line-height: 1.35;
+  letter-spacing: -0.01em; text-wrap: pretty;
+}
+.ns-vision-sub { margin: 12px 0 0; font-size: 14px; color: #55556e; line-height: 1.55; }
+
+.ns-divider { height: 1px; background: #d7e0f2; margin: 30px 0 26px; }
+
+/* ---- Tier 2 · North Star card ---- */
+.ns-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f4;
+  border-radius: 16px;
+  box-shadow: 0 6px 20px rgba(30,40,80,0.06);
+  padding: 26px 28px;
+}
+.ns-card-grid { display: grid; grid-template-columns: 320px 1fr; column-gap: 44px; align-items: center; }
+.ns-metric-name { font-size: 17px; font-weight: 600; color: #23233a; line-height: 1.3; }
+.ns-metric-value { display: flex; align-items: baseline; gap: 10px; margin-top: 18px; }
+.ns-metric-value .big { font-size: 52px; font-weight: 700; color: #17172b; line-height: 1; }
+.ns-metric-value .date { font-size: 14px; color: #4f4f66; }
+
+.ns-gauge-wrap { margin-top: 24px; }
+.ns-gauge {
+  position: relative; height: 12px; border-radius: 6px;
+  background: #dbe3f3; overflow: visible;
+}
+.ns-gauge .fill {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  border-radius: 6px;
+  background: linear-gradient(90deg,#211c5e,#4b45ab);
+}
+.ns-gauge .target {
+  position: absolute; top: -7px; bottom: -7px;
+  width: 2px; background: #9c360c;
+}
+.ns-gauge .target-label {
+  position: absolute; top: -30px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 12px; font-weight: 700; color: #9c360c;
+}
+.ns-gauge-scale {
+  display: flex; justify-content: space-between;
+  margin-top: 8px; font-size: 12px; color: #8a8a97;
+}
+.ns-gap-text { margin-top: 22px; font-size: 14px; color: #414157; }
+
+/* ---- Trend chart ---- */
+.ns-chart { position: relative; height: 170px; padding-left: 44px; }
+.ns-chart .y-label { position: absolute; left: 0; font-size: 12px; color: #4f4f66; }
+.ns-chart .y-100 { top: -6px; }
+.ns-chart .y-50  { top: 79px; }
+.ns-chart .y-0   { bottom: -6px; }
+.ns-plot { position: relative; height: 100%; }
+.ns-plot .guide { position: absolute; left: 0; right: 0; height: 1px; background: rgba(28,28,52,0.10); }
+.ns-plot .guide.g-top { top: 0; }
+.ns-plot .guide.g-mid { top: 50%; }
+.ns-plot .guide.g-bot { bottom: 0; }
+.ns-plot .target-line { position: absolute; left: 0; right: 0; border-top: 2px dashed #9c360c; }
+.ns-plot .target-chip {
+  position: absolute; left: 2px;
+  font-size: 12px; font-weight: 700; color: #9c360c;
+  background: #ffffff; padding: 0 6px;
+  transform: translateY(-50%);
+}
+.ns-plot .gap-bracket { position: absolute; width: 0; border-left: 2px dotted #9c360c; }
+.ns-plot .gap-pill {
+  position: absolute;
+  transform: translate(-120%,-50%);
+  font-size: 12px; font-weight: 700; color: #ffffff;
+  background: #9c360c; border-radius: 20px;
+  padding: 3px 9px; white-space: nowrap;
+}
+.ns-plot svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.ns-plot .pt { position: absolute; transform: translate(-50%,-50%); }
+.ns-plot .pt .dot {
+  width: 11px; height: 11px; border-radius: 50%;
+  background: #211c5e; border: 2px solid #ffffff;
+  box-shadow: 0 0 0 3px rgba(33,28,94,0.18);
+}
+.ns-plot .pt .pt-label {
+  position: absolute; left: 50%; bottom: 16px;
+  transform: translate(-50%,0);
+  white-space: nowrap;
+  font-size: 12px; font-weight: 600; color: #211c5e;
+}
+.ns-xaxis { position: relative; height: 18px; margin-top: 8px; margin-left: 44px; }
+.ns-xaxis .tick {
+  position: absolute; transform: translateX(-50%);
+  font-size: 12px; color: #4f4f66; white-space: nowrap;
+}
+
+/* ---- Tier 3 · Secondary indicators ---- */
+.ns-section-head { display: flex; align-items: center; gap: 14px; margin: 34px 0 16px; }
+.ns-section-head .title {
+  font-size: 12px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase; color: #5a5a72;
+}
+.ns-section-head .count { font-size: 12px; color: #8a8a97; }
+.ns-section-head .rule { flex: 1; height: 1px; background: #d7e0f2; }
+
+.ns-list { display: flex; flex-direction: column; gap: 10px; }
+.ns-row {
+  position: relative;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 16px;
+  background: #ffffff; border: 1px solid #e6ebf6;
+  border-radius: 12px; padding: 14px 16px;
+}
+.ns-row .info { flex: 1 1 240px; min-width: 200px; }
+.ns-row .info .name { font-size: 15px; font-weight: 600; color: #23233a; line-height: 1.25; }
+.ns-row .info .sub { font-size: 12px; color: #6a6a77; margin-top: 3px; }
+.ns-row .dir {
+  font-size: 11px; font-weight: 600;
+  border-radius: 999px; padding: 3px 10px;
+  background: #eef1f8; color: #414157; white-space: nowrap;
+}
+.ns-row .value { text-align: right; min-width: 96px; }
+.ns-row .value .num { font-size: 24px; font-weight: 700; color: #17172b; line-height: 1; }
+.ns-row .value .meta { font-size: 12px; color: #6a6a77; margin-top: 3px; }
+
+.ns-add {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 13px;
+  background: transparent;
+  border: 1.5px dashed #b1c1e2; border-radius: 12px;
+  cursor: pointer;
+  font-family: inherit; font-size: 14px; font-weight: 600; color: #211c5e;
+}
+.ns-add:hover { background: rgba(255,255,255,0.6); border-color: #7f97cb; }
+.ns-add .plus { font-size: 17px; line-height: 1; }

@@ -261,6 +261,26 @@ export function formatReadings(count: number): string {
 }
 
 /**
+ * « 3 indicateurs complémentaires » · « 1 indicateur complémentaire » ·
+ * « Aucun indicateur complémentaire ».
+ *
+ * Le décompte posé à côté de l'intertitre « Indicateurs associés » du bloc de
+ * la vision produit (maquette `northstar-v2`). **« Complémentaire » et non
+ * « associé »** : le mot dit ce que le décompte compte — ce qui vient *en plus*
+ * de la North Star —, là où l'intertitre nomme la famille entière. Répéter
+ * « associé » à dix centimètres de l'intertitre n'aurait rien ajouté.
+ *
+ * Zéro s'écrit en toutes lettres, la règle des trois fonctions ci-dessus : une
+ * North Star sans indicateur autour d'elle n'est pas un produit en défaut.
+ */
+export function formatComplementaryIndicators(count: number): string {
+  if (count === 0) return "Aucun indicateur complémentaire";
+  return `${count} indicateur${count > 1 ? "s" : ""} complémentaire${
+    count > 1 ? "s" : ""
+  }`;
+}
+
+/**
  * Le type d'une ressource, en toutes lettres : « PowerPoint », « PDF », « Lien ».
  *
  * Les sept valeurs de l'énuméré `resource_type`, saisies et jamais déduites de

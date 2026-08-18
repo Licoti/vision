@@ -130,10 +130,18 @@ export function BlockHeader({
  * Le filet reprend le filet du bloc qui le contient, passé en `rule` : sur la
  * surface bleue ce n'est pas le même que sur la pâle, et un séparateur qui ne
  * suivrait pas sa carte se verrait.
+ *
+ * **La note s'intercale entre le titre et le filet** (18/08/2026, maquette
+ * `northstar-v2`) : c'est la place que la maquette lui donne, et elle vaut
+ * mieux que la fin de ligne — après le filet, un décompte se lirait comme la
+ * légende du rang suivant plutôt que comme celle de l'intertitre. Elle reste
+ * dans le flux du texte, jamais en `aria-hidden` : « 3 indicateurs
+ * complémentaires » est une information, pas un ornement.
  */
 export function BlockDivider({
   mark,
   title,
+  note,
   rule,
 }: {
   /**
@@ -142,6 +150,8 @@ export function BlockDivider({
    */
   mark?: ReactNode;
   title: string;
+  /** Un décompte à côté du titre, quand il y a quelque chose à compter. */
+  note?: string;
   /** La classe de fond du filet, accordée à la tonalité du bloc. */
   rule: string;
 }) {
@@ -151,6 +161,9 @@ export function BlockDivider({
         {mark ? <span aria-hidden="true">{mark}</span> : null}
         {title}
       </h3>
+      {note ? (
+        <p className="text-xs text-content-neutral-dark">{note}</p>
+      ) : null}
       <span aria-hidden="true" className={`h-px flex-1 ${rule}`} />
     </div>
   );

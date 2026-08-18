@@ -3675,3 +3675,102 @@ vérifiée par `grep` avant de relire le rendu.
 dépassement est celui qu'a consigné l'entrée « Vision produit » le matin même, et un travail hors
 ticket ne balaie pas plus qu'un ticket — `CLAUDE.md` réserve ce geste à la session de découpage.
 La ligne ajoutée est celle qu'exige l'étape 5, pas une de plus.
+
+---
+
+## Hors ticket — le bloc « Vision produit » sur `northstar-v2`, 18/08/2026
+
+Reprise de `docs/design/maquettes/blocs/northstar-v2/` — structure, ergonomie, style — plus le
+passage de toutes les typographies à Poppins. Les cartes d'indicateurs associés sont **hors
+périmètre par consigne** : la maquette ne les porte plus, ce qui est une omission de la maquette et
+non une suppression demandée.
+
+**Trois arbitrages rendus avant écriture, dont deux élargissent une dérogation.**
+
+1. **Le bloc quitte le langage d'en-tête commun.** `BlockHeader` — titre de plein rang, note
+   dessous, action à droite — cède au surtitre de 12 pixels en capitales et au kebab en absolu de la
+   maquette. C'est **l'unification du 17/08 défaite pour un bloc sur trois** : « Accompagnements en
+   cours » et « Tous les accompagnements » gardent `BlockHeader`. Arbitré, consigné en dette
+   `ETAT.md` §c. Le surtitre vit dans `indicators.tsx` sous le nom `Eyebrow` et **non** dans
+   `components/ui/block.tsx`, précisément parce qu'il n'est pas partagé ; il déménagera le jour où
+   un second bloc le reprend, pas avant.
+2. **Le crochet d'écart et sa pastille « +14 pts » sont repris.** Ils redisent en image l'indice
+   calculé que la phrase « Encore 14 points… » dit déjà en mots, et tombent sous la dérogation à D39
+   arbitrée le 17/08 — laquelle s'élargit donc d'un élément. Aucun calcul neuf : `targetGap` rendait
+   déjà `{ reached, distance }`, `topOf` rendait déjà les deux ordonnées.
+3. **La vision s'écrit en `text-3xl`.** La maquette demande 27 pixels ; l'échelle §3.2 porte 24 puis
+   30, et rien ne s'invente entre les deux.
+
+**Le piège du chantier, et il ne s'est pas vu à la lecture du diff.** La North Star entre dans une
+carte blanche. Trois éléments se peignaient jusque-là **avec le fond du bloc** pour rester lisibles
+par-dessus les filets de la courbe : la pastille de cible du produit, celles des adoptions, et
+l'anneau des points. Posés tels quels sur la carte, ils y auraient dessiné trois rectangles bleus.
+`bg-surface-primary-lighter` → `bg-surface-neutral-pale`, `border-surface-primary-lighter` →
+`border-surface-neutral-pale`. **Leçon transportable : un conteneur qui change de fond emporte tout
+ce qui se peignait du fond d'avant**, et ces peintures-là ne se déclarent nulle part — elles ne se
+retrouvent qu'en cherchant le nom du fond quitté dans les descendants.
+
+**La carte se détache moins que dans la maquette, et c'est mesuré.** Maquette : carte `#ffffff` sur
+bloc `#eef2fb`, 1,12:1. Nos jetons : `surface-neutral-pale` sur `surface-primary-lightest`,
+**1,04:1** — `midnight-100` est presque blanc. En revanche **notre bordure est plus franche que la
+sienne** : 1,33:1 contre l'intérieur de la carte et 1,28:1 contre le bloc, là où la maquette pose
+1,23:1 et 1,10:1. La carte se lit donc par son trait plutôt que par son fond. Le bleu intermédiaire
+n'existe pas en jeton : `midnight-150` (`#e4ecf8`) est une primitive que la couche sémantique §2.1
+n'utilise nulle part, et lui donner un jeton serait modifier le design system, hors du périmètre
+d'une reprise de bloc. Consigné en dette `ETAT.md` §c.
+
+**Le dégradé, lui, est rendu — contrairement à celui de la jauge, et la différence tient aux
+stops.** Le 17/08 avait refusé le dégradé de la jauge parce que `#4b45ab` n'a pas de jeton et que
+`tokens.css` §9 nomme les gradients sans les définir. La barre d'accent du rang 1 va de `#211c5e` à
+`#9c360c`, qui **sont** `content-primary-dark` et `content-warning-darker`. Le CSS servi le
+confirme : `--tw-gradient-from: var(--content-primary-dark)`. Aucune valeur ne s'invente ; seule la
+construction est structurelle, comme l'est un `flex`.
+
+**Toutes les mesures d'espacement neuves passent par le jeton, vérifié dans la feuille servie** —
+`.mt-7\.5 { margin-top: calc(var(--number-4) * 7.5) }`, et de même pour `mb-6.5`, `mt-8.5`,
+`h-0.75`, `w-5.5`, `gap-2.25`, `right-8`, `max-w-215`. La règle 2 tient : le rythme 16/30-26/14/34-16
+de la maquette s'obtient en multiples du pas de 4 pixels, sans une valeur littérale.
+
+**Un rythme propre revient là où le 17/08 l'avait retiré.** Le `gap-5` de `Block` mettait la même
+valeur entre tous les rangs ; la maquette rythme. Tout le contenu tient donc dans **un seul enfant
+de `Block`** — le `gap-5` ne s'applique plus qu'à lui — et les marges se portent élément par
+élément. Ce même enfant est `relative`, ce qui ancre le kebab sans toucher une ligne de `block.tsx` :
+`ActionMenu` refuse tout `className`, sa racine portant elle-même le `relative` dont son déroulant a
+besoin.
+
+**Poppins passe en famille secondaire, et le fait qu'elle ne se propage pas tient à un seul
+endroit.** `--font-family-secondary` valait `Arial, sans-serif` et n'avait qu'un lecteur
+(`app/dev/session/page.tsx`). Le jeton est **conservé** plutôt qu'effacé : c'est le point où un autre
+domaine posera sa seconde famille. Poppins n'est écrite nulle part ailleurs — vérifié par `grep` sur
+`app/`, `components/` et `lib/`, qui ne rend que `tokens.css`, `globals.css` et le `next/font` de
+`app/layout.tsx`.
+
+**La gouttière du tracé se resserre de 96 à 32 pixels.** Elle protégeait le libellé de cible, qui
+vivait au bord droit depuis le correctif du 17/08 ; la maquette le passe à gauche, la raison tombe.
+Il en reste de quoi laisser respirer la valeur du dernier point et sa pastille d'écart. **Le risque
+change de côté sans disparaître** : le libellé de cible peut désormais rencontrer le premier point
+plutôt que le dernier, quand la cible vaut à peu près le plus ancien relevé. `monthMark` pose le
+premier point au milieu de sa tranche, jamais à 0 %, ce qui laisse un peu d'air ; la maquette accepte
+la même géométrie et n'oppose aucun mécanisme. Non traité, signalé.
+
+**La mise en défaut du décompte a demandé deux neutralisations, pas une.** `formatComplementaryIndicators`
+accorde **deux** mots. Forcé au pluriel constant, seuls « zéro » et « singulier » tombent — le test
+du pluriel passe encore, et l'accord de l'adjectif n'aurait jamais été éprouvé. Forcé à
+`indicateur${s} complémentaire`, ce sont « zéro » et « pluriel » qui tombent. **Une seule
+neutralisation aurait déclaré la règle couverte alors qu'un `s` manquant sur l'adjectif serait passé.**
+Les deux neutralisations ont été défaites et les 27 tests du fichier revérifiés au vert.
+
+**Un piège de mesure, encore, et de la même famille que les trois déjà consignés.** La matrice des
+droits a d'abord montré le responsable de domaine **sans** kebab et deux membres **avec** — soit
+l'inverse de la règle. Le code n'y était pour rien : les premières requêtes de la boucle couraient
+contre une compilation à la demande et rendaient une page partielle. Relancée à chaud, la matrice
+donne Camille (responsable) `1/1/1`, Awa (membre non contributrice) `0/0/0`, Inès et Léa (membres
+contributrices) `1/0/1` — les deux points d'entrée tombant bien séparément. **Quatrième variante de
+« l'outil de mesure ment plus souvent que le code » : sur un serveur de développement, la première
+lecture d'une route ne mesure pas la route.**
+
+**`ETAT.md` passe de 263 à 288 lignes**, seuil de 250 franchi de plus belle. Les 25 lignes sont
+celles qu'exigent les étapes 5 et 6 — une ligne de journal et deux dettes mesurées, chacune avec sa
+destination. Le dépassement préexiste depuis le 18/08 au matin, et un travail hors ticket ne balaie
+pas plus qu'un ticket : `CLAUDE.md` réserve ce geste à la session de découpage, qui devra le faire
+avant d'ouvrir C6.
