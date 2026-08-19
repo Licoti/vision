@@ -69,7 +69,7 @@ import Link from "next/link";
 
 import { Block, BlockHeader } from "@/components/ui/block";
 import { BlockNote } from "@/components/ui/empty-state";
-import { BAND_BG, STATUS_PILL } from "@/components/ui/status-dot";
+import { BAND_BG, StatusPill } from "@/components/ui/status-pill";
 import {
   formatDay,
   formatMonthTick,
@@ -501,11 +501,10 @@ export function Roadmap({
                   « septembre 2024 », qui poussait la période sous la pastille
                   dans une colonne de 280 px. */}
               <span className="flex items-center gap-2">
-                <span
-                  className={`flex-none rounded-full px-3 py-0.5 text-xs font-semibold ${STATUS_PILL[band.project.statusNature]}`}
-                >
-                  {band.project.statusLabel}
-                </span>
+                <StatusPill
+                  nature={band.project.statusNature}
+                  label={band.project.statusLabel}
+                />
                 <span className="truncate text-sm text-content-neutral-base">
                   {formatPeriodShort(
                     band.project.startedOn,

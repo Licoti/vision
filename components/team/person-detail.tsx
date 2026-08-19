@@ -37,7 +37,7 @@ import Link from "next/link";
 import { PersonCard } from "@/components/team/person-card";
 import { Avatar } from "@/components/ui/avatar";
 import { BlockNote } from "@/components/ui/empty-state";
-import { StatusDot } from "@/components/ui/status-dot";
+import { StatusPill } from "@/components/ui/status-pill";
 import { formatPeriod } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
 import type { PersonDetail as PersonDetailRow } from "@/lib/queries/team";
@@ -102,16 +102,10 @@ export function PersonDetail({ person }: { person: PersonDetailRow }) {
                   className="flex min-w-0 flex-col gap-1 rounded-xl border border-surface-neutral-lighter px-4 py-3"
                 >
                   <span className="flex flex-wrap items-center gap-2 text-xs">
-                    <span className="flex items-center gap-2 font-semibold text-content-neutral-dark">
-                      <StatusDot nature={project.statusNature} />
-                      {project.statusLabel}
-                    </span>
-                    <span
-                      aria-hidden="true"
-                      className="text-content-neutral-light"
-                    >
-                      ·
-                    </span>
+                    <StatusPill
+                      nature={project.statusNature}
+                      label={project.statusLabel}
+                    />
                     <span className="text-content-neutral-base">
                       {formatPeriod(project.startedOn, project.expectedEndOn)}
                     </span>

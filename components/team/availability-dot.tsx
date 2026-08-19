@@ -1,11 +1,13 @@
 /**
  * La disponibilité d'une personne du centre : une pastille, et le mot.
  *
- * Écrit sur le patron de `components/ui/status-dot.tsx`, avec **une différence
- * assumée** : celle-ci rend la pastille *et* le libellé, quand `StatusDot`
- * laisse le mot à son appelant. La couleur ne peut alors pas voyager seule par
- * construction plutôt que par convention (`docs/06` §11) — trois appelants
- * viendront d'ici à la fin du chantier, et l'un d'eux oublierait le mot.
+ * Écrit sur le patron de `components/ui/status-pill.tsx`, avec **une différence
+ * assumée** : la disponibilité garde le point de 8 px là où le statut d'un
+ * accompagnement est passé à la pastille pleine. Ce ne sont pas les mêmes
+ * objets, et rien n'oblige les deux à se dessiner de la même façon. Ce qui
+ * compte leur est commun : ni l'un ni l'autre ne laisse la couleur voyager
+ * seule (`docs/06` §11) — ici parce que le composant rend la pastille *et* le
+ * mot, quand son appelant pourrait l'oublier.
  *
  * La pastille est `aria-hidden` : c'est le texte qui porte l'information.
  *
@@ -15,7 +17,7 @@
  *
  * **Trois littéraux de classe, et c'est structurel** : Tailwind ne voit que les
  * classes écrites en toutes lettres, et `` `bg-${…}` `` ne produirait aucune
- * règle — la raison déjà consignée dans `status-dot.tsx`.
+ * règle — la raison déjà consignée dans `status-pill.tsx`.
  *
  * Les couleurs sont **mesurées** sur `surface-neutral-pale`, le fond de la
  * ligne : `surface-success-base` 4,53:1 · `surface-warning-base` 3,11:1 ·

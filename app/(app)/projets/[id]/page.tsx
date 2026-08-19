@@ -88,7 +88,7 @@ import { BlockNote } from "@/components/ui/empty-state";
 import { Field, FieldRow } from "@/components/ui/field";
 import { Page, PageHeader } from "@/components/ui/page";
 import { Section, SectionHeader } from "@/components/ui/section";
-import { StatusDot } from "@/components/ui/status-dot";
+import { StatusPill } from "@/components/ui/status-pill";
 import { Tag } from "@/components/ui/tag";
 import { loadProjectDrawer } from "./drawers";
 import { requireSession } from "@/lib/auth/provider";
@@ -245,13 +245,10 @@ export default async function ProjectPage({
 
         <div className="rounded-xl border border-surface-neutral-lighter bg-surface-neutral-pale px-7 py-6">
           <p className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-            <span className="flex items-center gap-2 font-semibold text-content-neutral-dark">
-              <StatusDot nature={project.statusNature} />
-              {project.statusLabel}
-            </span>
-            <span aria-hidden="true" className="text-content-neutral-light">
-              ·
-            </span>
+            <StatusPill
+              nature={project.statusNature}
+              label={project.statusLabel}
+            />
             <span className="text-content-neutral-base">
               {formatPeriod(project.startedOn, project.expectedEndOn)}
             </span>

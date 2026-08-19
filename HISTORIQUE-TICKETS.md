@@ -2662,3 +2662,51 @@ liseré de focus** de chaque carte.
 
 **Ce que le ticket ne fait pas** : aucune table de méga-parcours, aucune de fonctionnalité, aucun
 lien vers les activités, aucune colonne de rang, aucun écran hors de la page produit.
+
+---
+
+## Hors ticket — la pastille de statut, seule forme du statut, 19/08/2026
+
+**La demande.** Que tous les tags de statut — « En cours », « Terminé » — aient le style de ceux du
+bloc « Accompagnements en cours » de la page produit.
+
+**Le constat qui la justifie.** La page produit affichait `statusLabel` de **deux façons dans deux
+blocs consécutifs** : pastille pleine teintée par la nature dans la frise
+(`components/products/roadmap.tsx`), point de 8 px suivi du mot dans « Tous les accompagnements »
+(`app/(app)/produits/[id]/page.tsx`). Le second dessin était repris à l'identique par trois autres
+écrans — la liste transverse `/projets`, l'en-tête de la page projet, la fiche personne en panneau.
+La pastille est la seule des deux formes que la maquette dessine
+(`docs/design/maquettes/blocs/roadmap/Roadmap.dc.html:107`) et la seule dont les quatre contrastes
+étaient consignés.
+
+**Le périmètre, arbitré avec l'humain avant écriture.** Les statuts d'accompagnement **seuls**. Le
+dépôt porte cinq autres grammaires de pastille — la puce `Tag` (approches, « Principal »,
+compétences), le sens d'un indicateur, `AvailabilityDot`, les chips de filtre de `/produits`, les
+badges de droit de `/dev/session`. Aucune ne bouge (règle 3). Deux autres arbitrages : `StatusDot`
+**se retire** plutôt que de rester sans appelant, et l'extraction **reçoit sa clause `socleLock`**,
+comme chacune de celles de TD.3 à TD.6.
+
+**Le socle.** `components/ui/status-dot.tsx` → `components/ui/status-pill.tsx`. `DOT` et `StatusDot`
+disparaissent ; `BAND_BG` ne bouge pas ; `STATUS_PILL` devient `PILL`, **non exporté** — une table
+de couleurs exportée est une pastille qu'on récrit, et son seul consommateur est désormais le
+composant qui la porte. `flex-none` passe de l'appelant au composant : c'est ce qui garde le HTML de
+la frise identique, et il est inerte partout où le parent n'est pas un conteneur flex. Les deux
+`Record` restent exhaustifs à la compilation, ce qui justifie l'`import type` que `uiLayerSeal`
+autorise nommément.
+
+**Les cinq appelants.** La frise passe à `<StatusPill>` sans autre changement. Les quatre autres
+perdent le point médian `·` : il séparait deux suites de texte, il ne sépare plus rien entre une
+pastille et une période, et la forme de référence ne l'a jamais porté. `/projets` garde son
+`sr-only` « Statut : », posé **hors** de la pastille, et sa colonne garde `flex items-center` pour
+que la pastille reste un élément flex — un `<span>` en ligne aurait rendu son `py-0.5` inopérant.
+
+**La vérification, en quatre disciplines.** Le HTML servi a été relevé sur les quatre adresses,
+`<script>` retirés (méthode de TD.3), **avant et après** par `git stash` : huit hunks, tous sur
+l'élément de statut, et **le bloc de la frise absent du diff**. La clause a été mise en défaut par
+quatre témoins — la chaîne recopiée tombe en littéral *et* en gabarit, les trois écritures voisines
+qui ne sont pas des pastilles restent muettes — et le piège de TD.6 remesuré : les trois clauses de
+TD.5 tombent toujours hors du socle. Les contrastes ont été recalculés et **aucun couple n'est neuf
+par la position** : les quatre hôtes sont tous en `surface-neutral-pale`, le fond même de la frise.
+Le droit n'était pas en cause : aucun point d'entrée, aucune action, aucun `can`.
+
+**Le résultat.** `npm run lint` (`--max-warnings=0`), `npx tsc --noEmit` et les **821 tests** passent.

@@ -197,6 +197,16 @@ const SOCLE_CLAUSES = [
     String.raw`bg-surface-neutral-pale.*px-7.*py-4`,
     "Bandeau d'archivage recopié : employer `ArchivedNotice` de `components/ui/archived-notice.tsx` (TD.4).",
   ),
+  /* La pastille de statut, seule forme du statut d'un accompagnement depuis
+     qu'elle a remplacé le point de 8 px. Le motif tient au rythme — `px-3` et
+     `py-0.5` —, ce qui laisse hors de portée les trois écritures voisines qui
+     ne sont pas des pastilles de statut : le badge de droit de `/dev/session`
+     (`py-1`), le sens d'un indicateur (`px-2`), le chip de filtre des produits
+     (`px-4 py-1.5`). */
+  ...classNameRule(
+    String.raw`rounded-full.*px-3.*py-0\.5.*font-semibold`,
+    "Pastille de statut recopiée : employer `StatusPill` de `components/ui/status-pill.tsx` (TD.3 → TD.6).",
+  ),
 ];
 
 const socleLock = {
@@ -219,7 +229,7 @@ const socleLock = {
  * l'atomic design. Une frontière qu'on dit vérifiable doit être vérifiée.
  *
  * `allowTypeImports` sur les requêtes, et l'unique usage légitime le justifie :
- * `status-dot.tsx` importe `ProjectStatusNature` pour rendre ses trois `Record`
+ * `status-pill.tsx` importe `ProjectStatusNature` pour rendre ses deux `Record`
  * **exhaustifs à la compilation**. C'est un bénéfice, pas une entorse — le
  * retirer coûterait la garantie.
  *

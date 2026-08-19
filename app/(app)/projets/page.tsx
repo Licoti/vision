@@ -34,7 +34,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { borderOf, CONTROL, CONTROL_TEXT } from "@/components/ui/form-field";
 import { List, ListHeader, ListRow } from "@/components/ui/list";
 import { Page, PageHeader } from "@/components/ui/page";
-import { StatusDot } from "@/components/ui/status-dot";
+import { StatusPill } from "@/components/ui/status-pill";
 import { requireSession } from "@/lib/auth/provider";
 import { approaches, projectStatuses } from "@/lib/db/schema";
 import { formatMonth, formatProjects } from "@/lib/format";
@@ -203,12 +203,9 @@ export default async function ProjectsPage({
                 </Link>
               </span>
 
-              <span className={`${COLUMN.status} flex items-center gap-2`}>
-                <StatusDot nature={row.statusNature} />
-                <span>
-                  <span className="sr-only">Statut : </span>
-                  {row.statusLabel}
-                </span>
+              <span className={`${COLUMN.status} flex items-center`}>
+                <span className="sr-only">Statut : </span>
+                <StatusPill nature={row.statusNature} label={row.statusLabel} />
               </span>
 
               <span className={COLUMN.team}>

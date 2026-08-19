@@ -5010,3 +5010,63 @@ existant de la base de développement. Semer des personae aurait été ouvrir le
 « Sonde detournee », écrites par les sondes HTTP du droit, sont **archivées et non supprimées** —
 la pratique posée par TD.1. Elles n'apparaissent nulle part à l'écran ; `db:seed` ne les connaît pas
 et ne les nettoiera pas. La dérive de la base de développement, déjà actée, s'allonge de deux lignes.
+
+---
+
+## La pastille de statut, seule forme du statut — hors ticket, 19/08/2026
+
+**La page produit dessinait la même donnée de deux façons, dans deux blocs consécutifs.** La frise
+« Accompagnements en cours » rendait `statusLabel` en pastille pleine teintée par la nature ; la
+liste « Tous les accompagnements », dix lignes de JSX plus bas, le rendait en point de 8 px suivi du
+mot. Trois autres écrans reprenaient le second dessin. Le premier est celui que la maquette dessine
+(`docs/design/maquettes/blocs/roadmap/Roadmap.dc.html:107`) et le seul dont les contrastes étaient
+consignés ; c'est lui qui reste. `StatusDot` et sa table `DOT` disparaissent, `status-dot.tsx`
+devient `status-pill.tsx`, et `STATUS_PILL` **se dé-exporte** en `PILL` — une table de couleurs
+exportée est une pastille qu'on récrit, et son seul consommateur est désormais le composant.
+
+**La seule preuve qu'un remplacement n'a rien déplacé d'autre est le diff avant/après du DOM
+servi.** Cinq appelants changent, dont un — la frise — dont le HTML devait rester identique au
+caractère près. Aucune lecture du code ne l'établit : `flex-none` déplacé de l'appelant vers le
+composant, un `<span>` devenu `<StatusPill>`, l'ordre des classes dans le gabarit, chacun de ces
+gestes peut faire bouger un attribut sans qu'on le voie. La mesure a donc été faite par
+`git stash` : capture des quatre adresses, remisage, seconde capture, `git stash pop`. Résultat —
+**huit hunks, tous sur l'élément de statut, et le bloc de la frise absent du diff**. La méthode de
+TD.3 s'applique telle quelle : `<script>` retirés avant comparaison, la charge RSC embarquée
+n'étant pas déterministe en développement.
+
+**Le point médian tombe, et c'est un écart annoncé.** Trois des quatre écrans écrivaient
+`statut · période`. Le `·` séparait deux suites de texte ; entre une pastille et une période il ne
+sépare plus rien, et la frise — la forme de référence — ne l'a jamais porté. Les trois `<span
+aria-hidden="true">·</span>` sont donc retirés, le `gap-2` du conteneur suffisant.
+
+**Un libellé de statut renommé peut déborder la colonne de `/projets`.** `COLUMN.status` vaut
+`w-28 flex-none`, soit 112 px. La pastille est plus large que le point qu'elle remplace : « En
+cadrage », le plus long des quatre libellés de la fixture, y entre encore ; un domaine qui renomme
+son statut en quelque chose de plus long débordera. **Aucun garde-fou** — la colonne est un choix de
+mise en page de T2.3, et l'élargir serait rouvrir cette page hors périmètre.
+→ **à constater le jour où un domaine renommera ses statuts.**
+
+**Les contrastes ont été mesurés, et la mesure dit qu'aucun couple n'est neuf.** Les quatre couples
+texte/pastille voyagent avec la pastille et sont retrouvés à l'identique — 9,17 · 11,83 · 6,52 ·
+6,42:1. Le fond de la pastille sur son hôte semblait neuf par la position ; il ne l'est pas : les
+quatre hôtes — `Block`, `List`, `Drawer`, la carte d'en-tête de la page projet — sont **tous** en
+`surface-neutral-pale` (`#fdfdfd`), le fond même sur lequel la frise posait déjà sa pastille. Les
+ratios pastille/fond vont de **1,11:1** (`done`) à **1,33:1** (`active`), sous le seuil de 3:1 et
+légitimement : c'est un cerne décoratif autour d'un texte lisible, le précédent étant écrit dans
+`components/ui/tag.tsx:7-11`. **Le droit n'a rien à éprouver ici** — aucun point d'entrée HTTP,
+aucune action serveur, aucun `can` touché ; à dire plutôt qu'à passer sous silence.
+
+**La septième clause de `socleLock` a été mise en défaut en quatre témoins.** Positif : la chaîne
+recopiée dans `app/(app)/projets/page.tsx` fait tomber **une** erreur, sur ce seul nœud — et la
+forme gabarit (`` className={`…${…}`} ``) la fait tomber aussi, ce qui vérifie le second sélecteur
+de `classNameRule`. Négatifs : les trois écritures voisines qui ne sont pas des pastilles de statut
+restent muettes — le badge de droit de `/dev/session` (`py-1`), le sens d'un indicateur (`px-2`),
+le chip de filtre des produits (`px-4 py-1.5`). Le piège de TD.6 a été remesuré au passage : un
+témoin d'espacement posé dans le même fichier fait bien tomber les **trois** clauses de TD.5, ce qui
+prouve que `SPACING_CLAUSES` reste porté hors du socle après l'ajout.
+
+**`ETAT.md` est à 498 lignes, soit près du double de son plafond.** Le seuil de 250 lignes est
+dépassé depuis T4bis.6, et l'incohérence entre l'étape 5 (« au-delà, le balayer avant de
+continuer ») et la session de découpage (« elle est le seul moment où `ETAT.md` se balaie ») est
+déjà consignée deux fois. Rien de neuf ici, sinon que ce ticket hors chantier y ajoute onze lignes.
+→ **le repliage reste dû au découpage de C6.**

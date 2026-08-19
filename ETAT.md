@@ -2,7 +2,7 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 19/08/2026 — le bloc « Use Cases » de la page produit, hors ticket.
+**Dernière mise à jour :** 19/08/2026 — la pastille de statut, seule forme du statut, hors ticket.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
 **Ticket suivant :** **T5bis.5** — le radar des compétences (`tickets-C5bis.md`).
 
@@ -217,6 +217,17 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   taxonomie de l'atomic design écartés, les dossiers ne bougent pas. Sa leçon est celle de T4.2,
   vérifiée cette fois contre le dépôt lui-même : **le coût n'est pas le balisage dupliqué mais les
   choix mesurés qu'il porte** — et un socle qu'on ne voit nulle part ne protège personne.
+
+- **La pastille de statut, seule forme du statut — hors ticket, le 19/08/2026.** La page produit
+  dessinait la même donnée de deux façons dans deux blocs consécutifs : pastille pleine dans la
+  frise, point de 8 px dans la liste. `StatusDot` et sa table `DOT` disparaissent,
+  `components/ui/status-dot.tsx` devient `status-pill.tsx` et porte `StatusPill` ; quatre écrans
+  s'y alignent et **perdent le point médian** qui séparait deux suites de texte et n'a plus de rôle
+  entre une pastille et une période. Septième clause de `socleLock`. Le périmètre est arbitré :
+  `Tag`, `AvailabilityDot`, le sens d'un indicateur et les chips de filtre **ne bougent pas**. Sa
+  leçon est dans la mesure : **le diff avant/après du DOM servi est la seule preuve qu'un
+  remplacement n'a rien déplacé d'autre** — huit hunks sur quatre adresses, et le bloc de la frise
+  **absent du diff**, ce qu'aucune lecture du code n'aurait établi.
 
 ---
 
