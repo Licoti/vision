@@ -50,6 +50,13 @@
       "when": 1787065070827,
       "tag": "0006_legal_epoch",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787160222161,
+      "tag": "0007_lucky_ultimo",
+      "breakpoints": true
     }
   ]
 }

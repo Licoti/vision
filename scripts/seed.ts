@@ -65,6 +65,7 @@ import {
   skills,
   toolKind,
   tools,
+  useCases,
 } from "../lib/db/schema";
 
 /* ==========================================================================
@@ -636,6 +637,38 @@ const INDICATOR = {
   ],
   adoption: { project: "Autonomie des opérations courantes", targetValue: "85" },
 };
+
+/**
+ * Les use cases du produit — **une troisième source, et c'est un écart**.
+ *
+ * L'en-tête de ce fichier pose « deux sources, et pas une de plus » : les
+ * référentiels des `docs/`, les données factices du brief §7. Le brief ne dit
+ * rien des scénarios d'usage. Ces deux lignes viennent donc de la demande
+ * humaine du 19/08/2026, qui les rédige mot pour mot — elles ne sont pas
+ * inventées ici, mais elles ne viennent pas d'un document non plus. L'écart est
+ * consigné dans `JOURNAL-TECHNIQUE.md` (règle 6).
+ *
+ * **Aucun rattachement de persona**, et ce n'est pas un oubli : `personas` n'est
+ * pas amorcée — la table n'apparaît nulle part dans ce fichier. Le rattachement
+ * est facultatif (arbitrage du 19/08/2026), si bien que ces deux lignes sont
+ * des use cases complets ; il se saisit par l'interface sur un persona créé à la
+ * main. Semer des personae aurait été ouvrir le bloc voisin, hors du périmètre
+ * de la demande (règle 3).
+ */
+const USE_CASES: { product: string; title: string; summary: string }[] = [
+  {
+    product: "Espace client web",
+    title: "Démarrer, reprendre un projet",
+    summary:
+      "Créer ou retrouver un environnement de travail prêt à l'emploi (outils, données, compute…), avec réutilisation automatique des ressources existantes, afin de commencer l'analyse rapidement.",
+  },
+  {
+    product: "Espace client web",
+    title: "Gérer les droits d'accès",
+    summary:
+      "Donner et configurer facilement les accès pour consulter, modifier ou publier les éléments d'un projet, afin de collaborer en toute sécurité.",
+  },
+];
 
 /* ==========================================================================
    Types dérivés du schéma — jamais réécrits à la main
@@ -1234,6 +1267,30 @@ async function seed(): Promise<void> {
         },
       },
     ],
+  );
+
+  /* --- Les use cases ------------------------------------------------------ */
+
+  /* La clé naturelle est le couple produit · titre, et non le titre seul :
+     deux produits peuvent légitimement porter « Gérer les droits d'accès ».
+     C'est la forme de la clé des relevés juste au-dessus, pour la même raison.
+
+     **Le renommage recrée**, comme partout ailleurs dans ce fichier : c'est la
+     dette de la clé naturelle, déjà consignée dans `ETAT.md`, et sans
+     conséquence en production où l'amorçage ne tourne pas. */
+  await ensureAll(
+    scope,
+    useCases,
+    "use_cases",
+    (row) => `${row.productId}·${row.title}`,
+    USE_CASES.map((useCase) => ({
+      key: `${idOf(productIndex, useCase.product, "Produit")}·${useCase.title}`,
+      values: {
+        productId: idOf(productIndex, useCase.product, "Produit"),
+        title: useCase.title,
+        summary: useCase.summary,
+      },
+    })),
   );
 
   /* --- La fraîcheur ------------------------------------------------------- */

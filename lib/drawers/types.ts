@@ -26,13 +26,17 @@
 import type { ReactNode } from "react";
 
 /**
- * Les sept panneaux de la page produit.
+ * Les neuf panneaux de la page produit.
  *
  * `id` est facultatif là où la valeur portait le cas dans l'URL (`nouvel`
  * contre un identifiant) : son absence dit « créer ». Là où la valeur désignait
- * toujours une cible — `reading`, `readings`, `personaDetail` —, il est requis.
- * `archive` et `vision` n'en prennent aucun : l'objet visé est le produit de la
- * page, comme leur clé d'URL le disait déjà.
+ * toujours une cible — `reading`, `readings`, `personaDetail`, `useCaseDetail`
+ * —, il est requis. `archive` et `vision` n'en prennent aucun : l'objet visé est
+ * le produit de la page, comme leur clé d'URL le disait déjà.
+ *
+ * **Les deux derniers sont la paire du use case** (19/08/2026), et ils
+ * reprennent la séparation des deux précédents sans l'inventer : la fiche se lit
+ * par tout le domaine, la saisie demande le droit d'écrire.
  */
 export type ProductDrawerRequest =
   | { kind: "archive" }
@@ -42,7 +46,9 @@ export type ProductDrawerRequest =
   | { kind: "readings"; id: string }
   | { kind: "vision" }
   | { kind: "persona"; id?: string | undefined }
-  | { kind: "personaDetail"; id: string };
+  | { kind: "personaDetail"; id: string }
+  | { kind: "useCase"; id?: string | undefined }
+  | { kind: "useCaseDetail"; id: string };
 
 /** Les six panneaux de la page projet, sur la même forme. */
 export type ProjectDrawerRequest =
@@ -130,6 +136,8 @@ const PRODUCT_KINDS = [
   "vision",
   "persona",
   "personaDetail",
+  "useCase",
+  "useCaseDetail",
 ] as const;
 
 const PROJECT_KINDS = [

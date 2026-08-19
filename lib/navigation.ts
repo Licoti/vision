@@ -263,6 +263,45 @@ export const PERSONA_PANEL_NEW = "nouveau";
 export const PERSONA_DETAIL_PARAM = "fiche";
 
 /**
+ * Le panneau de **saisie d'un use case** (19/08/2026), huitième clé d'ouverture
+ * de la page produit.
+ *
+ * **La forme de `persona`, à la lettre** : une seule clé dont la valeur porte
+ * le cas — `nouveau` ouvre le panneau vide, un identifiant l'ouvre sur la ligne
+ * à corriger —, et le même droit dérivé des accompagnements du produit
+ * (arbitrage (b) de `tickets-C5.md`). Un use case sort du travail
+ * d'accompagnement comme un persona : inventer un troisième niveau de droit
+ * pour lui serait ce que D9 refuse.
+ *
+ * **La clé est en anglais**, seule de la page à l'être, et c'est le prix de
+ * l'intitulé « Use Cases » arbitré le 19/08/2026 : traduire l'adresse d'un
+ * bloc que l'écran nomme en anglais aurait donné deux vocabulaires pour un
+ * objet. L'écart à « interface en français » est consigné dans
+ * `JOURNAL-TECHNIQUE.md`, une fois, pour les deux.
+ */
+export const USE_CASE_PANEL_PARAM = "usecase";
+
+/** La valeur qui ouvre le panneau vide. Un identifiant ouvre la correction. */
+export const USE_CASE_PANEL_NEW = "nouveau";
+
+/**
+ * Le panneau de **lecture d'un use case** (19/08/2026), neuvième et dernière
+ * clé d'ouverture de la page produit. Sa valeur est **toujours** un identifiant
+ * de use case, jamais polymorphe.
+ *
+ * **Deux clés pour un même objet**, et c'est la raison qu'avait déjà
+ * `PERSONA_DETAIL_PARAM` : ce sont deux **droits**. La fiche se lit par tout le
+ * domaine (D9), comme le bloc qui la porte ; la saisie demande le droit
+ * d'écrire.
+ *
+ * `scenario` plutôt que `fiche`, qui est prise par le persona, et plutôt qu'un
+ * `usecase-detail` qui aurait fait deux clés d'une même famille : un use case
+ * **est** un scénario, c'est le mot de la demande, et il se lit sans accent
+ * comme `releve`.
+ */
+export const USE_CASE_DETAIL_PARAM = "scenario";
+
+/**
  * Le panneau de la **fiche d'une personne** (T5bis.4), seule clé d'ouverture de
  * la page Équipe — et la première d'une page qui n'a pas d'objet à elle.
  *
@@ -396,6 +435,25 @@ export const ROUTES = {
    */
   productPersona: (id: string, personaId: string) =>
     `/produits/${id}?${PERSONA_DETAIL_PARAM}=${personaId}`,
+  /**
+   * La page du produit, panneau de saisie d'un use case ouvert sur le vide.
+   * Même mécanique que `productPersonaNew` jusqu'au nom de la clé.
+   */
+  productUseCaseNew: (id: string) =>
+    `/produits/${id}?${USE_CASE_PANEL_PARAM}=${USE_CASE_PANEL_NEW}`,
+  /**
+   * La même page, le même panneau, ouvert sur un use case à corriger : la
+   * valeur porte le cas, et c'est la seule différence avec l'entrée ci-dessus.
+   */
+  productUseCaseEdit: (id: string, useCaseId: string) =>
+    `/produits/${id}?${USE_CASE_PANEL_PARAM}=${useCaseId}`,
+  /**
+   * La page du produit, **fiche** d'un use case ouverte en lecture. Elle ne
+   * demande aucun droit : c'est le détail que la carte résume, et il se lit par
+   * tout le domaine (D9). Les gestes *dans* la fiche tombent avec le droit.
+   */
+  productUseCase: (id: string, useCaseId: string) =>
+    `/produits/${id}?${USE_CASE_DETAIL_PARAM}=${useCaseId}`,
   /**
    * La page du produit, roadmap resserrée sur une fenêtre de mois.
    *

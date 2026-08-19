@@ -4938,3 +4938,75 @@ TD.2, TD.3 et maintenant TD.5 et TD.6 en ont une. **Le groupe TD se clôt donc a
 propre récit.** La ligne de TD.6 s'insère après celle de TD.5, en laissant le trou où il est : règle
 3, et l'arbitrage de TD.5 tient toujours — l'écrire serait un ajout sur le récit d'un autre ticket.
 → **à combler au prochain balayage, c'est-à-dire au découpage de C6.**
+
+## Le bloc « Use Cases » — hors ticket, 19/08/2026
+
+**Un helper dont l'objet s'appelle `useX` doit mettre le verbe devant, et la règle a mordu deux
+fois.** `react-hooks/rules-of-hooks` reconnaît un crochet React à `use` suivi d'une **majuscule**,
+et refuse alors tout appel depuis une fonction qui n'est ni un composant ni un crochet.
+`useCaseRefusal` et `useCaseScopeRefusal` dans `actions.ts` ont donné cinq erreurs de lint, sur
+leurs cinq appels ; `useCaseForm` et `useCasesOf` dans `actions.test.ts` en ont donné deux de plus,
+après coup — la seconde fois alors que la leçon était déjà écrite dans le fichier voisin. Les
+quatre s'appellent désormais `refuseUseCase`, `refuseUseCaseScope`, `formForUseCase` et
+`liveUseCasesOf`. **La convention `objetPuisAction` du dépôt cède devant la règle**, et elle cédera
+pour tout objet futur dont le nom commence par `use` — ce qui, sur un produit qui parle de use
+cases, arrivera encore. Rien de tout cela n'apparaît au typage : seul `npm run lint` le dit.
+
+**`now()` est le temps de la transaction, pas celui de la ligne : un lot d'insertion ne conserve
+pas l'ordre du fichier.** `listProductUseCases` ordonne par `created_at` puis `id`, faute de
+colonne de rang (voir plus bas). Les deux use cases de la fixture, écrits par un même `insertMany`,
+portent **le même horodatage à la milliseconde** — mesuré : `2026-08-19T17:41:36.339Z` pour les
+deux —, si bien que c'est l'identifiant, un UUID tiré au hasard, qui les départage. Ils se lisent à
+l'écran dans l'ordre inverse du fichier. **L'ordre reste stable**, ce qui est la propriété que la
+lecture doit garantir et que les tests vérifient ; il n'est simplement pas celui qu'on croit. Les
+commentaires de `lib/queries/use-cases.ts` et de `lib/db/schema.ts` ont été **corrigés après
+mesure** — ils affirmaient « l'ordre où ils ont été déclarés ». Vaut pour toute table future qu'on
+ordonnera par `created_at` sans colonne de rang.
+
+**L'unicité de `use_case_personas` rend un doublon inter-domaines non représentable, et cela a
+changé le test.** La première écriture de `lib/queries/use-cases.test.ts` forgeait un second
+rattachement `(zéro, Alice)` sous un autre `domain_id`, pour éprouver qu'un persona n'y soit pas
+compté deux fois. La base l'a refusé :
+`use_case_personas_use_case_persona_unique` porte sur `(use_case_id, persona_id)` **sans**
+`domain_id`. C'est une propriété, pas un obstacle, et elle rend le test plus fort — ce qui fuirait
+n'est pas un doublon mais un persona **de plus**. La ligne forgée vise donc Carole, un profil
+vivant du même produit et délibérément non rattaché. **Sans cette ligne, le filtre de domaine de la
+seconde lecture ne serait éprouvé par rien** : la leçon de T5bis.3, resservie.
+
+**Un test d'étanchéité vu du mauvais côté n'énonce pas ce qu'on croit.** Le miroir de
+« le domaine `a` ne voit pas la ligne forgée » avait été écrit
+`expect(listProductUseCases(b.scope, a.productId)).toEqual([])`. Il a échoué, et il avait tort : la
+ligne forgée appartient au domaine `b` et vit sur le produit de `a`, donc `b` la voit — c'est
+exactement ce que « forger » voulait dire. L'énoncé juste est que `b` ne voit **aucun des use cases
+de `a`**, ce qu'aucune ligne forgée ne peut masquer.
+
+**Le droit dérivé rend un membre ordinaire capable d'écrire sur un produit dont la page ne lui
+proposait rien, et c'est la règle.** Sonde HTTP du 19/08/2026 : Awa Diallo, `member`, a réécrit le
+`productId` **lié** dans le champ `$ACTION_1:1` du formulaire servi — il y est en clair, comme le
+`Rappel de contexte` d'`ETAT.md` le dit — et la création est passée sur l'autre produit. Vérification
+faite, elle y est `contributor = true` sur un accompagnement vivant : `openProductWrite` répond sur
+le `productId` **reçu**, l'arbitrage (b) de `tickets-C5.md` le veut ainsi, et le refus n'aurait pas
+eu lieu d'être. **La sonde était fausse, pas le code** — reprise sur un troisième produit où elle
+n'est contributrice de rien, elle refuse. À retenir pour toute sonde de droit à venir : **choisir
+l'identité en lisant ses rattachements, jamais son rôle de domaine seul.**
+
+**Trois écarts documentaires assumés, tous arbitrés par l'humain le 19/08/2026.**
+(1) **L'intitulé « Use Cases » est en anglais**, contre « interface en français » de `CLAUDE.md`,
+et la clé d'URL `usecase` avec lui — traduire l'adresse d'un bloc que l'écran nomme en anglais
+aurait donné deux vocabulaires pour un objet. (2) **`use_cases` et `use_case_personas` n'existent
+dans aucun `docs/`**, comme `products.vision`, `indicators.is_north_star` et `personas` avant elles
+(règle 6). (3) **La fixture reçoit une troisième source** : l'en-tête de `scripts/seed.ts` pose
+« deux sources, et pas une de plus » — les `docs/` et le brief §7 —, et les deux use cases amorcés
+viennent de la demande humaine, qui les rédige mot pour mot.
+
+**La fixture ne sème aucun persona, si bien que le rattachement n'est pas amorçable.**
+`scripts/seed.ts` ne connaît pas la table `personas` — le bloc du 18/08/2026 n'y est jamais entré.
+Les deux use cases amorcés n'ont donc **aucun rattachement**, ce qui reste un état valide, le
+rattachement étant facultatif. Le lien a été éprouvé à la main, par sonde scopée, sur un persona
+existant de la base de développement. Semer des personae aurait été ouvrir le bloc voisin (règle 3).
+→ **le jour où la fixture sèmera des personae, y joindre deux rattachements.**
+
+**Deux lignes de sonde restent dans la base de développement, archivées.** « Sonde temoin » et
+« Sonde detournee », écrites par les sondes HTTP du droit, sont **archivées et non supprimées** —
+la pratique posée par TD.1. Elles n'apparaissent nulle part à l'écran ; `db:seed` ne les connaît pas
+et ne les nettoiera pas. La dérive de la base de développement, déjà actée, s'allonge de deux lignes.

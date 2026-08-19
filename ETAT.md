@@ -2,8 +2,7 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 19/08/2026 — TD.6 terminé : le socle est gardé par `socleLock`,
-`components/ui/` est scellé, et `npm run lint` finit à zéro. Le groupe TD est clos.
+**Dernière mise à jour :** 19/08/2026 — le bloc « Use Cases » de la page produit, hors ticket.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
 **Ticket suivant :** **T5bis.5** — le radar des compétences (`tickets-C5bis.md`).
 
@@ -120,6 +119,23 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   le modèle : **les trois zones de texte arrivent en base comme des lignes identifiées**, et le
   `syncTraits` rapproche sur `(kind, label)` plutôt que de remplacer — sans ce diff, un use case
   qui désignera un irritant désignerait une ligne que la correction suivante efface.
+- **Le bloc « Use Cases » — hors ticket, le 19/08/2026.** La page disait pourquoi le produit
+  existe, ce qu'il mesure et pour qui ; elle ne disait pas **comment il est construit** :
+  `use_cases` et `use_case_personas` (migration **0007**), cartes compactes en **ligne défilante**
+  sous « Personae », fiche en panneau (`?scenario=<id>`) et saisie en panneau
+  (`?usecase=nouveau|<id>`) — **deux clés pour deux droits**, la séparation de `persona`/`fiche`
+  reprise sans l'inventer. Le décompte d'exclusivité passe de sept à neuf clés sans qu'un caractère
+  change, pour la troisième fois. **Le modèle tient la promesse écrite le 18/08** : rien n'a été
+  repris, le rattachement passe par une table de liaison — jamais une colonne — pour qu'une
+  fonctionnalité ou un méga-parcours soit demain **une table de plus**, et aucune n'est créée
+  aujourd'hui (leçon de T5.2). Sa porte propre est la troisième : **les `personaIds` viennent du
+  formulaire, pas d'une liaison serveur**, donc ils se confrontent aux personae vivants du produit
+  reçu — et avant toute écriture, faute de transaction. Sa leçon est double, et les deux se
+  mesurent : **`react-hooks/rules-of-hooks` prend tout `useX` pour un crochet**, ce qui a fait
+  céder la convention de nom du dépôt en deux fichiers ; et **`now()` est le temps de la
+  transaction**, si bien qu'un `insertMany` donne le même horodatage à toutes ses lignes et laisse
+  l'UUID trancher — les deux use cases de la fixture se lisent dans l'ordre inverse du fichier, et
+  deux commentaires ont été corrigés après mesure.
 - **T5bis.3 — 18/08/2026 — les filtres de la liste.** Cinq clés dans l'URL, sans une ligne de
   JavaScript : `q`, `metier`, `competence` (répétable), `niveau`, `dispo`. La conjonction est **un
   `exists` par compétence cochée** — la seule forme qui dise « les deux » sans `group by` ni
@@ -314,6 +330,12 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   et rien n'empêcherait `components/ui/` de l'importer. La propriété est vraie aujourd'hui, donc ce
   n'est pas une régression : c'est un trou dans le scellement, et il se comble en une ligne.
   → **au prochain ticket qui ouvre `eslint.config.mjs`.**
+- **Les deux use cases de la fixture n'ont aucun persona rattaché.** `scripts/seed.ts` ne sème
+  aucun persona — la table n'y figure pas depuis le bloc du 18/08/2026 —, si bien que le
+  rattachement d'un use case n'est pas amorçable. Ce n'est pas un défaut : le rattachement est
+  facultatif (arbitrage du 19/08/2026), et le lien a été éprouvé à la main par sonde scopée. Ce qui
+  manque est un **jeu d'essai**, pas du code. Semer des personae aurait ouvert le bloc voisin
+  (règle 3). → **au prochain ticket qui sème des personae, y joindre deux rattachements.**
 - **Cinq états vides ne se lisent dans aucun HTML servi, faute de données qui les atteignent.**
   Relevé en mesurant TD.4 : le relevé absent d'une North Star et sa cible absente
   (`indicators.tsx`), la carte d'indicateur sans relevé, le panneau « Gérer les relevés » vide, et la

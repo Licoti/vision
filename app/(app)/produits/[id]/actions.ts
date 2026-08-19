@@ -83,6 +83,8 @@ import {
   products,
   projectIndicators,
   projects,
+  useCasePersonas,
+  useCases,
 } from "@/lib/db/schema";
 import { DomainScopeError, type Row } from "@/lib/db/scoped";
 import {
@@ -101,7 +103,13 @@ import {
   readReadingForm,
   type ReadingFormState,
 } from "@/lib/forms/reading";
+import {
+  parseUseCaseForm,
+  readUseCaseForm,
+  type UseCaseFormState,
+} from "@/lib/forms/use-case";
 import { ROUTES } from "@/lib/navigation";
+import { listProductPersonas } from "@/lib/queries/personas";
 
 /**
  * Un refus qui n'appartient à aucun champ — un droit, une ligne disparue.
@@ -1025,6 +1033,349 @@ export async function archivePersona(
   if ("message" in gate) return;
 
   await session.db.archive(personas, personaId);
+
+  revalidatePath(ROUTES.product(productId));
+}
+
+/* ==========================================================================
+   Les use cases — les grands scénarios d'usage du produit (19/08/2026)
+
+   **Le même droit que les personae et les indicateurs**, dérivé des
+   accompagnements du produit (arbitrage (b) de `tickets-C5.md`), et pour la
+   même raison : un use case sort du travail d'accompagnement, et inventer un
+   troisième niveau de droit serait ce que D9 refuse.
+
+   **Deux tables par geste**, comme le groupe persona : une ligne de
+   `use_cases`, et la liste de ses rattachements. `syncUseCasePersonas` fait le
+   second temps.
+
+   **Une porte de plus que le groupe persona, et elle est le cœur du groupe.**
+   Les identifiants de personae arrivent par le formulaire, pas par une liaison
+   côté serveur : ils sont saisis, donc réécrivables, donc ils ne prouvent rien.
+   `attachablePersonas` les confronte aux personae **vivants du produit reçu**.
+   ========================================================================== */
+
+/**
+ * Un refus qui n'appartient à aucun champ, sur la saisie d'un use case.
+ *
+ * **Le verbe passe devant, et ce n'est pas un caprice de nom** : les six
+ * jumelles de ce fichier s'appellent `refusal`, `personaRefusal`,
+ * `readingRefusal` — objet d'abord. `useCaseRefusal` aurait suivi la règle, et
+ * `react-hooks/rules-of-hooks` l'aurait pris pour un **crochet React** : la
+ * règle reconnaît un crochet à `use` suivi d'une majuscule, et refuse alors tout
+ * appel depuis une fonction qui n'est ni un composant ni un crochet. Mesuré, pas
+ * supposé — cinq erreurs de lint, sur les cinq appels. Le nom cède, la
+ * convention est notée : **tout helper de ce dépôt dont l'objet s'appelle
+ * `useX` devra passer le verbe devant.**
+ */
+function refuseUseCase(formData: FormData, message: string): UseCaseFormState {
+  return { values: readUseCaseForm(formData), errors: {}, message };
+}
+
+/** Le même filet de dernier recours, sur la saisie d'un use case. */
+function refuseUseCaseScope(
+  error: unknown,
+  formData: FormData,
+): UseCaseFormState {
+  if (error instanceof DomainScopeError) {
+    return refuseUseCase(
+      formData,
+      "Une référence de ce formulaire n'appartient pas au domaine : la saisie n'a pas été enregistrée.",
+    );
+  }
+  throw error;
+}
+
+/**
+ * Le use case reçu, rapproché du produit reçu — sur le modèle exact
+ * d'`openPersona`.
+ *
+ * Deux contrôles, et chacun ferme une porte :
+ *
+ * 1. `openProductWrite` sur le `productId` **reçu** — le droit dérivé,
+ *    l'appartenance au domaine et la lecture seule d'un produit archivé, d'un
+ *    seul appel ;
+ * 2. le use case reçu **appartient à ce produit** et n'est pas déjà archivé.
+ *    Sans ce second contrôle, une soumission forgée corrigerait ou rangerait le
+ *    use case d'un autre produit, les identifiants liés étant sérialisés en
+ *    clair dans un champ `$ACTION_…`.
+ *
+ * Le message n'est utilisé que par `updateUseCase` : `archiveUseCase` refuse en
+ * silence, n'ayant aucune saisie à rendre.
+ */
+async function openUseCase(
+  session: Session,
+  productId: string,
+  useCaseId: string,
+  refused: string,
+): Promise<{ useCase: Row<typeof useCases> } | { message: string }> {
+  const gate = await openProductWrite(session, productId, refused);
+  if ("message" in gate) return gate;
+
+  const useCase = await session.db.find(useCases, useCaseId);
+  if (
+    !useCase ||
+    useCase.productId !== productId ||
+    useCase.archivedAt !== null
+  ) {
+    return { message: "Ce use case n'existe plus sur ce produit." };
+  }
+
+  return { useCase };
+}
+
+/**
+ * Les identifiants de personae reçus, confrontés au produit — **la troisième
+ * porte**, et celle que ce groupe d'actions ajoute aux précédents.
+ *
+ * Les cases à cocher du panneau ne sont pas une garantie : elles sont un
+ * confort de saisie, rendues sur une page servie à quelqu'un d'autre, et une
+ * soumission poste ce qu'elle veut sous le nom `personaIds`. Sans ce contrôle,
+ * un scénario rattacherait le persona **d'un autre produit** — la fiche
+ * afficherait alors un profil que le bloc « Personae » de la page ne montre pas.
+ *
+ * La liste de référence est **relue** par `listProductPersonas` sur le produit
+ * reçu, jamais tirée du formulaire ni d'un argument lié. Elle écarte d'elle-même
+ * les personae archivés : rattacher un profil rangé serait faire réapparaître
+ * dans un use case ce qui a quitté le bloc voisin.
+ *
+ * **Le refus est global, pas par champ**, et c'est délibéré : en usage normal
+ * cette branche est inatteignable — les cases ne proposent que des identifiants
+ * valides. Elle n'est franchie que par une soumission forgée, à laquelle on ne
+ * doit ni un message de champ ni le détail de ce qui a été refusé.
+ *
+ * Le domaine, lui, est déjà tenu : `listProductPersonas` ne rend que des lignes
+ * du domaine courant, et `assertPreconditions` rattraperait de toute façon un
+ * identifiant étranger — mais trop tard, en `DomainScopeError`, et sans message
+ * lisible.
+ */
+async function attachablePersonas(
+  session: Session,
+  productId: string,
+  wanted: readonly string[],
+): Promise<{ personaIds: string[] } | { message: string }> {
+  if (wanted.length === 0) return { personaIds: [] };
+
+  const available = await listProductPersonas(session.db, productId);
+  const known = new Set(available.map((persona) => persona.id));
+
+  if (wanted.some((personaId) => !known.has(personaId))) {
+    return {
+      message:
+        "Un des personae rattachés n'appartient pas à ce produit : la saisie n'a pas été enregistrée.",
+    };
+  }
+
+  return { personaIds: [...wanted] };
+}
+
+/**
+ * Le second temps de l'écriture : les rattachements, mis à jour **par
+ * différence**.
+ *
+ * C'est `syncTraits` transposé, et le diff n'est pas une économie de requêtes :
+ * c'est ce qui garde **l'identifiant d'un rattachement stable** d'une correction
+ * à l'autre. Un remplacement récrirait des lignes neuves à chaque
+ * enregistrement, et le jour où un méga-parcours désignera « le use case que
+ * cette étape emprunte pour ce profil », il désignerait une ligne effacée par la
+ * correction suivante. Le rapprochement se fait sur `persona_id`, qui **est**
+ * l'identité du lien — à la différence des traits, rapprochés sur un couple
+ * `(kind, label)` faute d'identifiant naturel.
+ *
+ * **Les ajouts avant les retraits** (T3.6) : `neon-http` n'a pas de transaction
+ * interactive, et un échec au milieu doit laisser trop de rattachements plutôt
+ * que pas assez. Aucune position à mettre à jour entre les deux — la table n'en
+ * porte pas.
+ *
+ * `unlink` est une vraie suppression, et le typage la réserve aux tables sans
+ * `archived_at` : `use_case_personas` en est une, délibérément (voir le schéma).
+ * Décocher une case n'est pas l'archivage que la règle 4 proscrit — c'est la
+ * correction d'un champ.
+ */
+async function syncUseCasePersonas(
+  session: Session,
+  useCaseId: string,
+  wanted: readonly string[],
+): Promise<void> {
+  const current = await session.db.list(useCasePersonas, {
+    where: eq(useCasePersonas.useCaseId, useCaseId),
+  });
+
+  const held = new Set(current.map((row) => row.personaId));
+
+  const added = wanted.filter((personaId) => !held.has(personaId));
+  if (added.length > 0) {
+    await session.db.insertMany(
+      useCasePersonas,
+      added.map((personaId) => ({ useCaseId, personaId })),
+    );
+  }
+
+  const target = new Set(wanted);
+  for (const row of current) {
+    if (!target.has(row.personaId)) {
+      await session.db.unlink(useCasePersonas, row.id);
+    }
+  }
+}
+
+/**
+ * Saisir un use case sur un produit.
+ *
+ * `productId` est lié côté serveur ; `previous` est l'état que `useActionState`
+ * fait circuler, dont l'action n'a pas besoin — la saisie repart du `FormData` à
+ * chaque soumission.
+ *
+ * **La création n'est pas atomique, et ne peut pas l'être** : `neon-http` n'a
+ * pas de transaction interactive. Un use case dont les rattachements
+ * échoueraient resterait sans persona — soit exactement l'état d'un use case
+ * qu'on vient de créer sans en cocher, donc un état que l'écran sait rendre et
+ * que la correction répare. C'est la dette déjà consignée pour la création d'un
+ * projet.
+ */
+export async function createUseCase(
+  productId: string,
+  _previous: UseCaseFormState,
+  formData: FormData,
+): Promise<UseCaseFormState> {
+  const session = await requireSession();
+
+  const gate = await openProductWrite(
+    session,
+    productId,
+    "La saisie d'un use case est réservée au responsable de domaine et aux contributeurs désignés d'un accompagnement de ce produit.",
+  );
+  if ("message" in gate) return refuseUseCase(formData, gate.message);
+
+  const { values, errors, input } = parseUseCaseForm(formData);
+  if (!input) return { values, errors };
+
+  /* La troisième porte, **avant** la moindre écriture : un rattachement refusé
+     ne doit pas laisser derrière lui un use case à demi écrit. C'est la règle
+     de T3.6 — tout confronter au domaine avant d'écrire, faute de transaction. */
+  const attachable = await attachablePersonas(
+    session,
+    productId,
+    input.personaIds,
+  );
+  if ("message" in attachable) {
+    return { values, errors: {}, message: attachable.message };
+  }
+
+  try {
+    /* Un objet littéral, jamais un étalement de `FormData` : un champ caché
+       ajouté par n'importe qui deviendrait une colonne écrite. */
+    const created = await session.db.insert(useCases, {
+      productId,
+      ...input.useCase,
+    });
+    await syncUseCasePersonas(session, created.id, attachable.personaIds);
+  } catch (error) {
+    return refuseUseCaseScope(error, formData);
+  }
+
+  /* **Cette page-là, et elle seule.** Aucun autre écran ne porte de use case. */
+  revalidatePath(ROUTES.product(productId));
+
+  /* Le panneau se referme sur ce succès, et non sur une navigation (TD.2) :
+     `revalidatePath` porte l'arbre réactualisé, ce qui a été écrit paraît dans
+     son bloc, et c'est toute la confirmation (`docs/06` §9). */
+  return { values, errors: {}, ok: true };
+}
+
+/**
+ * Corriger un use case déjà saisi : **le même formulaire, la même validation,
+ * les mêmes refus** qu'à la création — la propriété qui fait qu'un seul panneau
+ * sert les deux gestes.
+ *
+ * `productId` et `useCaseId` sont liés côté serveur. **Ce ne sont pas des
+ * secrets** : Next les sérialise en clair dans un champ `$ACTION_…`, et une
+ * soumission peut les réécrire. Ce qui protège est `openUseCase`, qui interroge
+ * le droit sur le produit **reçu** puis rapproche le use case **reçu** de ce
+ * produit.
+ *
+ * **Le produit ne se corrige pas ici** : `use_cases.product_id` n'est pas un
+ * champ du formulaire et ne le devient pas. Déplacer un scénario d'un produit à
+ * l'autre serait un geste que rien ne demande — et qui laisserait derrière lui
+ * des rattachements vers les personae de l'ancien produit.
+ */
+export async function updateUseCase(
+  productId: string,
+  useCaseId: string,
+  _previous: UseCaseFormState,
+  formData: FormData,
+): Promise<UseCaseFormState> {
+  const session = await requireSession();
+
+  const gate = await openUseCase(
+    session,
+    productId,
+    useCaseId,
+    "La modification d'un use case est réservée au responsable de domaine et aux contributeurs désignés d'un accompagnement de ce produit.",
+  );
+  if ("message" in gate) return refuseUseCase(formData, gate.message);
+
+  const { values, errors, input } = parseUseCaseForm(formData);
+  if (!input) return { values, errors };
+
+  const attachable = await attachablePersonas(
+    session,
+    productId,
+    input.personaIds,
+  );
+  if ("message" in attachable) {
+    return { values, errors: {}, message: attachable.message };
+  }
+
+  try {
+    const updated = await session.db.update(useCases, useCaseId, input.useCase);
+    if (!updated) {
+      return refuseUseCase(formData, "Ce use case n'existe plus sur ce produit.");
+    }
+    await syncUseCasePersonas(session, useCaseId, attachable.personaIds);
+  } catch (error) {
+    return refuseUseCaseScope(error, formData);
+  }
+
+  revalidatePath(ROUTES.product(productId));
+
+  return { values, errors: {}, ok: true };
+}
+
+/**
+ * Ranger un use case : il quitte le bloc, rien n'est supprimé (règle 4).
+ *
+ * **Sans confirmation** — arbitrage (c) de `tickets-C4bis.md` : elle se justifie
+ * là où le geste retire de la lecture tout un ensemble. Un use case ne porte que
+ * ses propres rattachements, et `docs/06` §9 proscrit la confirmation partout où
+ * elle ne protège rien.
+ *
+ * **Aucun rétablissement** — arbitrage (b) de `tickets-C4bis.md` : le
+ * rétablissement existe pour les deux objets qui ont une page, et un use case
+ * n'en a pas. Ses rattachements restent en base avec lui : archiver le parent ne
+ * cascade sur rien (arbitrage (f)), et la fiche redeviendrait entière le jour où
+ * un écran la rétablirait.
+ *
+ * **Le refus est muet**, comme `archivePersona` : ce geste n'a aucune saisie à
+ * rendre. Ce n'est pas le rendu qui protège — la porte redérive le droit sur les
+ * identifiants reçus.
+ */
+export async function archiveUseCase(
+  productId: string,
+  useCaseId: string,
+): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openUseCase(
+    session,
+    productId,
+    useCaseId,
+    // Jamais rendu : ce geste n'affiche aucun refus.
+    "Le rangement d'un use case est réservé au responsable de domaine et aux contributeurs désignés d'un accompagnement de ce produit.",
+  );
+  if ("message" in gate) return;
+
+  await session.db.archive(useCases, useCaseId);
 
   revalidatePath(ROUTES.product(productId));
 }

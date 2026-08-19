@@ -1,5 +1,6 @@
 /**
- * La résolution des sept panneaux de la page produit — TD.2.
+ * La résolution des neuf panneaux de la page produit — TD.2, puis les deux
+ * du use case (19/08/2026).
  *
  * **Ce fichier n'invente rien.** Tout ce qu'il contient vient de
  * `app/(app)/produits/[id]/page.tsx`, où il vivait entre le décompte
@@ -31,14 +32,22 @@ import {
   PersonaDetailHeader,
 } from "@/components/products/persona-detail";
 import { PersonaPanel } from "@/components/products/persona-panel";
+import { UseCaseDetail } from "@/components/products/use-case-detail";
+import { UseCasePanel } from "@/components/products/use-case-panel";
 import { ReadingPanel } from "@/components/products/reading-panel";
 import { ReadingsPanel } from "@/components/products/readings-panel";
 import { VisionPanel } from "@/components/products/vision-panel";
 import type { Session } from "@/lib/auth/session";
-import { indicatorReadings, indicators, personas } from "@/lib/db/schema";
+import {
+  indicatorReadings,
+  indicators,
+  personas,
+  useCases,
+} from "@/lib/db/schema";
 import { toIndicatorFormValues } from "@/lib/forms/indicator";
 import { toPersonaFormValues } from "@/lib/forms/persona";
 import { toReadingFormValues } from "@/lib/forms/reading";
+import { toUseCaseFormValues } from "@/lib/forms/use-case";
 import { toVisionFormValues } from "@/lib/forms/vision";
 import {
   ARCHIVE_PANEL_CONFIRM,
@@ -51,6 +60,9 @@ import {
   READING_PANEL_PARAM,
   READINGS_PANEL_PARAM,
   ROUTES,
+  USE_CASE_DETAIL_PARAM,
+  USE_CASE_PANEL_NEW,
+  USE_CASE_PANEL_PARAM,
   VISION_PANEL_EDIT,
   VISION_PANEL_PARAM,
 } from "@/lib/navigation";
@@ -61,6 +73,8 @@ import type {
 } from "@/lib/queries/indicators";
 import { listPersonaTraits, listProductPersonas } from "@/lib/queries/personas";
 import type { ProductPersona } from "@/lib/queries/personas";
+import { listProductUseCases, personasOf } from "@/lib/queries/use-cases";
+import type { ProductUseCase } from "@/lib/queries/use-cases";
 import {
   listProductIndicators,
   listProductReadings,
@@ -76,12 +90,15 @@ import {
 import {
   archivePersona,
   archiveReading,
+  archiveUseCase,
   createIndicator,
   createPersona,
   createReading,
+  createUseCase,
   updateIndicator,
   updatePersona,
   updateReading,
+  updateUseCase,
 } from "@/app/(app)/produits/[id]/actions";
 
 /**
@@ -104,6 +121,7 @@ export type ProductDrawerContext = {
   indicators: readonly ProductIndicator[];
   readings: readonly ProductReading[];
   personas: readonly ProductPersona[];
+  useCases: readonly ProductUseCase[];
 };
 
 /** Le droit d'écrire, dérivé une fois pour les deux chemins. */
@@ -140,6 +158,7 @@ export async function loadProductDrawerContext(
       indicators: productIndicators,
       readings: productReadings,
       personas: [],
+      useCases: [],
     };
   }
 
@@ -149,10 +168,39 @@ export async function loadProductDrawerContext(
       indicators: [],
       readings: [],
       personas: await listProductPersonas(session.db, product.id),
+      useCases: [],
     };
   }
 
-  return { canWrite, indicators: [], readings: [], personas: [] };
+  /* La fiche d'un use case a besoin des deux : le use case lui-même, et les
+     personae dont il rend les noms. Le panneau de **saisie**, lui, n'a besoin
+     que des personae — ses cases à cocher —, et se résout sur la ligne qu'il
+     relit lui-même. */
+  if (request.kind === "useCaseDetail") {
+    const [productPersonas, productUseCases] = await Promise.all([
+      listProductPersonas(session.db, product.id),
+      listProductUseCases(session.db, product.id),
+    ]);
+    return {
+      canWrite,
+      indicators: [],
+      readings: [],
+      personas: productPersonas,
+      useCases: productUseCases,
+    };
+  }
+
+  if (request.kind === "useCase") {
+    return {
+      canWrite,
+      indicators: [],
+      readings: [],
+      personas: await listProductPersonas(session.db, product.id),
+      useCases: [],
+    };
+  }
+
+  return { canWrite, indicators: [], readings: [], personas: [], useCases: [] };
 }
 
 export async function resolveProductDrawer(
@@ -451,6 +499,94 @@ export async function resolveProductDrawer(
         ),
       };
     }
+
+    /* ------------------------------------------------------------------ */
+    case "useCase": {
+      if (!context.canWrite) return null;
+
+      /* La forme avant la base, puis la confrontation au produit et à
+         l'archivage : le bloc n'affiche aucun lien vers un use case archivé,
+         mais une demande se forge. Le patron de `persona`, à la lettre. */
+      const row =
+        request.id && isUuid(request.id)
+          ? await session.db.find(useCases, request.id)
+          : undefined;
+      const useCase =
+        row && row.productId === product.id && row.archivedAt === null
+          ? row
+          : null;
+
+      if (request.id && !useCase) return null;
+
+      /* Les rattachements en place ne se relisent que pour une correction : à
+         la création, il n'y a rien à cocher d'avance. */
+      const attached = useCase
+        ? (
+            await listProductUseCases(session.db, product.id)
+          ).find((entry) => entry.id === useCase.id)?.personaIds ?? []
+        : [];
+
+      return {
+        titleId: "panneau-usecase-saisie-titre",
+        title: useCase ? "Modifier le use case" : "Ajouter un use case",
+        subtitles: [product.name],
+        body: (
+          <UseCasePanel
+            action={
+              useCase
+                ? updateUseCase.bind(null, product.id, useCase.id)
+                : createUseCase.bind(null, product.id)
+            }
+            personas={context.personas}
+            {...(useCase
+              ? {
+                  submitLabel: "Enregistrer les modifications",
+                  initial: toUseCaseFormValues(useCase, attached),
+                }
+              : {})}
+          />
+        ),
+      };
+    }
+
+    /* ------------------------------------------------------------------ */
+    case "useCaseDetail": {
+      /* **La fiche se lit par tout le domaine** (D9), à la différence de la
+         saisie : son ouverture ne passe par aucun droit. Ce sont ses deux
+         gestes qui tombent avec lui, chacun à `null`. Elle se résout sur la
+         liste déjà lue plutôt que par une lecture de plus — un use case archivé
+         ou d'un autre produit n'y est pas, et c'est ce qui remplace ici la
+         confrontation en deux temps. La règle de `personaDetail`. */
+      if (!isUuid(request.id)) return null;
+      const useCase =
+        context.useCases.find((entry) => entry.id === request.id) ?? null;
+      if (!useCase) return null;
+
+      return {
+        titleId: "panneau-usecase-titre",
+        title: useCase.title,
+        subtitles: [product.name],
+        body: (
+          <UseCaseDetail
+            useCase={useCase}
+            personas={personasOf(useCase, context.personas)}
+            personaHref={(personaId) =>
+              ROUTES.productPersona(product.id, personaId)
+            }
+            editHref={
+              context.canWrite
+                ? ROUTES.productUseCaseEdit(product.id, useCase.id)
+                : null
+            }
+            archiveUseCase={
+              context.canWrite
+                ? archiveUseCase.bind(null, product.id, useCase.id)
+                : null
+            }
+          />
+        ),
+      };
+    }
   }
 }
 
@@ -476,6 +612,8 @@ export function productRequestFromParams(asked: {
   vision?: string | undefined;
   persona?: string | undefined;
   fiche?: string | undefined;
+  usecase?: string | undefined;
+  scenario?: string | undefined;
 }): ProductDrawerRequest | null {
   if (asked.archiver === ARCHIVE_PANEL_CONFIRM) return { kind: "archive" };
 
@@ -501,6 +639,16 @@ export function productRequestFromParams(asked: {
     return { kind: "personaDetail", id: asked.fiche };
   }
 
+  if (asked.usecase !== undefined) {
+    return asked.usecase === USE_CASE_PANEL_NEW
+      ? { kind: "useCase" }
+      : { kind: "useCase", id: asked.usecase };
+  }
+
+  if (asked.scenario !== undefined) {
+    return { kind: "useCaseDetail", id: asked.scenario };
+  }
+
   return null;
 }
 
@@ -520,4 +668,6 @@ export const PRODUCT_PANEL_PARAMS = [
   VISION_PANEL_PARAM,
   PERSONA_PANEL_PARAM,
   PERSONA_DETAIL_PARAM,
+  USE_CASE_PANEL_PARAM,
+  USE_CASE_DETAIL_PARAM,
 ] as const;

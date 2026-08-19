@@ -44,8 +44,11 @@ import {
   projectMembers,
   projectStatuses,
   projects,
+  useCasePersonas,
+  useCases,
 } from "@/lib/db/schema";
 import { EMPTY_PERSONA_VALUES } from "@/lib/forms/persona";
+import { EMPTY_USE_CASE_VALUES } from "@/lib/forms/use-case";
 
 /** Qui la requête prétend être. Chaque test la pose avant d'appeler l'action. */
 let currentPerson: string | null = null;
@@ -92,8 +95,15 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-const { archivePersona, createPersona, setNorthStar, updatePersona } =
-  await import("./actions");
+const {
+  archivePersona,
+  archiveUseCase,
+  createPersona,
+  createUseCase,
+  setNorthStar,
+  updatePersona,
+  updateUseCase,
+} = await import("./actions");
 
 const suffix = Math.random().toString(36).slice(2, 10);
 
@@ -208,6 +218,8 @@ beforeAll(async () => {
 afterAll(async () => {
   if (!f?.domainId) return;
   const tables = [
+    useCasePersonas,
+    useCases,
     personaTraits,
     personas,
     projectMembers,
@@ -757,6 +769,428 @@ describe("archivePersona — le rangement", () => {
       expect(await personasOf(f.productId)).toHaveLength(1);
     } finally {
       await clearPersonas();
+    }
+  });
+});
+
+/* ==========================================================================
+   Les trois gestes du use case — le droit s'éprouve par l'action
+
+   Mêmes portes que le groupe persona — `openProductWrite` puis `openUseCase` —,
+   et **une de plus qui n'a pas d'équivalent** : `attachablePersonas`, qui
+   confronte les identifiants **saisis** aux personae vivants du produit reçu.
+
+   C'est celle-là qui compte le plus, et pour une raison de nature : les
+   identifiants d'un persona n'arrivent pas par une liaison côté serveur mais
+   par le **formulaire**. Les cases à cocher du panneau sont rendues sur une page
+   servie à quelqu'un d'autre ; une soumission poste ce qu'elle veut sous le nom
+   `personaIds`. Sans cette porte, un use case afficherait le profil d'un autre
+   produit — un profil que le bloc « Personae » de la même page ne montre pas.
+
+   Deux mesures par refus, et pas une : **la ligne n'est pas écrite** en base, et
+   l'action **rend son refus**. Une action refusée qui rendrait un état sans
+   message serait indiscernable d'une action qui a écrit.
+   ========================================================================== */
+
+/**
+ * Le `FormData` d'un use case valide, dont chaque test ne change que le sien.
+ *
+ * **`formForUseCase` et non `useCaseForm`**, et `liveUseCasesOf` et non
+ * `useCasesOf` : `react-hooks/rules-of-hooks` reconnaît un crochet React à
+ * `use` suivi d'une majuscule, et refuse alors tout appel depuis une fonction
+ * qui n'est ni un composant ni un crochet. La règle a mordu **deux fois** dans
+ * ce ticket — ici, et sur `refuseUseCase` dans `actions.ts`. La convention
+ * vaut donc pour tout le dépôt : **un helper dont l'objet s'appelle `useX` met
+ * le verbe devant.**
+ */
+function formForUseCase(overrides: Record<string, string | string[]> = {}): FormData {
+  const data = new FormData();
+  const values: Record<string, string | string[]> = {
+    title: `Démarrer un projet ${suffix}`,
+    summary: "Retrouver un environnement de travail prêt à l'emploi.",
+    ...overrides,
+  };
+  for (const [key, value] of Object.entries(values)) {
+    if (Array.isArray(value)) {
+      for (const entry of value) data.append(key, entry);
+    } else {
+      data.set(key, value);
+    }
+  }
+  return data;
+}
+
+/** L'état vide qu'`useActionState` passe en premier argument. */
+const NO_USE_CASE_STATE = { values: EMPTY_USE_CASE_VALUES, errors: {} };
+
+/** Les use cases d'un produit, lus **en base** et non par un écran. */
+async function liveUseCasesOf(productId: string) {
+  return db
+    .select({
+      id: useCases.id,
+      title: useCases.title,
+      summary: useCases.summary,
+    })
+    .from(useCases)
+    .where(
+      and(eq(useCases.productId, productId), isNull(useCases.archivedAt)),
+    );
+}
+
+/** Les rattachements d'un use case, lus en base. */
+async function attachedTo(useCaseId: string): Promise<string[]> {
+  const rows = await db
+    .select({ personaId: useCasePersonas.personaId })
+    .from(useCasePersonas)
+    .where(eq(useCasePersonas.useCaseId, useCaseId));
+  return rows.map((row) => row.personaId).sort();
+}
+
+/** Écrit un use case par le chemin normal, et rend son identifiant. */
+async function givenUseCase(
+  overrides: Record<string, string | string[]> = {},
+): Promise<string> {
+  currentPerson = f.managerId;
+  await expectWritten(
+    createUseCase(f.productId, NO_USE_CASE_STATE, formForUseCase(overrides)),
+  );
+  const rows = await liveUseCasesOf(f.productId);
+  return rows[rows.length - 1]!.id;
+}
+
+/** Un persona vivant sur le produit visé, écrit par le chemin normal. */
+async function givenPersonaOn(productId: string): Promise<string> {
+  const created = await f.scope.insert(personas, {
+    productId,
+    name: `Profil ${Math.random().toString(36).slice(2, 8)}`,
+    kind: "secondary",
+  });
+  return created.id;
+}
+
+/** Remet le produit à zéro entre deux tests : la fixture est partagée. */
+async function clearUseCases(): Promise<void> {
+  await db
+    .delete(useCasePersonas)
+    .where(eq(useCasePersonas.domainId, f.domainId));
+  await db.delete(useCases).where(eq(useCases.domainId, f.domainId));
+  await db.delete(personas).where(eq(personas.domainId, f.domainId));
+}
+
+describe("createUseCase — ce que le geste écrit", () => {
+  test("le responsable de domaine écrit la ligne", async () => {
+    try {
+      const useCaseId = await givenUseCase();
+      const rows = await liveUseCasesOf(f.productId);
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.id).toBe(useCaseId);
+      expect(rows[0]!.summary).toBe(
+        "Retrouver un environnement de travail prêt à l'emploi.",
+      );
+      expect(await attachedTo(useCaseId)).toEqual([]);
+    } finally {
+      await clearUseCases();
+    }
+  });
+
+  test("un contributeur désigné écrit aussi — c'est le droit dérivé", async () => {
+    try {
+      currentPerson = f.contributorId;
+      await expectWritten(
+        createUseCase(f.productId, NO_USE_CASE_STATE, formForUseCase()),
+      );
+      expect(await liveUseCasesOf(f.productId)).toHaveLength(1);
+    } finally {
+      await clearUseCases();
+    }
+  });
+
+  test("les personae cochés sont rattachés", async () => {
+    try {
+      const alice = await givenPersonaOn(f.productId);
+      const bruno = await givenPersonaOn(f.productId);
+      const useCaseId = await givenUseCase({ personaIds: [alice, bruno] });
+
+      expect(await attachedTo(useCaseId)).toEqual([alice, bruno].sort());
+    } finally {
+      await clearUseCases();
+    }
+  });
+});
+
+describe("createUseCase — ce que le geste refuse", () => {
+  test("un membre sans accompagnement n'écrit rien", async () => {
+    try {
+      currentPerson = f.outsiderId;
+      const state = await createUseCase(
+        f.productId,
+        NO_USE_CASE_STATE,
+        formForUseCase(),
+      );
+
+      expect(state.message).toBeDefined();
+      expect(state.ok).toBeUndefined();
+      expect(await liveUseCasesOf(f.productId)).toHaveLength(0);
+    } finally {
+      await clearUseCases();
+    }
+  });
+
+  test("un produit archivé ne reçoit plus de saisie", async () => {
+    try {
+      currentPerson = f.managerId;
+      const state = await createUseCase(
+        f.archivedProductId,
+        NO_USE_CASE_STATE,
+        formForUseCase(),
+      );
+
+      expect(state.message).toContain("archivé");
+      expect(await liveUseCasesOf(f.archivedProductId)).toHaveLength(0);
+    } finally {
+      await clearUseCases();
+    }
+  });
+
+  test("une saisie sans description rend ses erreurs, et n'écrit rien", async () => {
+    try {
+      currentPerson = f.managerId;
+      const state = await createUseCase(
+        f.productId,
+        NO_USE_CASE_STATE,
+        formForUseCase({ summary: "" }),
+      );
+
+      expect(state.errors.summary).toBeDefined();
+      expect(state.ok).toBeUndefined();
+      expect(await liveUseCasesOf(f.productId)).toHaveLength(0);
+    } finally {
+      await clearUseCases();
+    }
+  });
+
+  /* **La porte propre à ce groupe.** Le persona existe, il est vivant, il
+     appartient au domaine — et il est sur un **autre produit**. Rien dans le
+     panneau ne l'aurait proposé ; une soumission forgée le poste. */
+  test("le persona d'un autre produit ne se rattache pas", async () => {
+    try {
+      const intrus = await givenPersonaOn(f.otherProductId);
+      currentPerson = f.managerId;
+
+      const state = await createUseCase(
+        f.productId,
+        NO_USE_CASE_STATE,
+        formForUseCase({ personaIds: [intrus] }),
+      );
+
+      expect(state.message).toBeDefined();
+      expect(state.ok).toBeUndefined();
+      /* **Aucune ligne à demi écrite** : le refus tombe avant l'insertion du
+         use case, ce que la règle de T3.6 demandait — tout confronter au
+         domaine avant d'écrire, faute de transaction. */
+      expect(await liveUseCasesOf(f.productId)).toHaveLength(0);
+    } finally {
+      await clearUseCases();
+    }
+  });
+
+  test("un persona archivé ne se rattache pas non plus", async () => {
+    try {
+      const range = await givenPersonaOn(f.productId);
+      await f.scope.archive(personas, range);
+      currentPerson = f.managerId;
+
+      const state = await createUseCase(
+        f.productId,
+        NO_USE_CASE_STATE,
+        formForUseCase({ personaIds: [range] }),
+      );
+
+      expect(state.message).toBeDefined();
+      expect(await liveUseCasesOf(f.productId)).toHaveLength(0);
+    } finally {
+      await clearUseCases();
+    }
+  });
+});
+
+describe("updateUseCase — la porte `openUseCase`", () => {
+  test("le rattachement se corrige par différence, et le reste ne bouge pas", async () => {
+    try {
+      const alice = await givenPersonaOn(f.productId);
+      const bruno = await givenPersonaOn(f.productId);
+      const useCaseId = await givenUseCase({ personaIds: [alice] });
+
+      currentPerson = f.managerId;
+      await expectWritten(
+        updateUseCase(
+          f.productId,
+          useCaseId,
+          NO_USE_CASE_STATE,
+          formForUseCase({ personaIds: [alice, bruno] }),
+        ),
+      );
+
+      expect(await attachedTo(useCaseId)).toEqual([alice, bruno].sort());
+    } finally {
+      await clearUseCases();
+    }
+  });
+
+  /* Le diff plutôt que le remplacement : **l'identifiant d'un rattachement
+     survit** à une correction qui ne le touche pas. C'est ce qui permettra à un
+     méga-parcours de désigner un lien sans qu'il s'efface à la correction
+     suivante — la raison pour laquelle `syncTraits` avait été écrit ainsi. */
+  test("un rattachement conservé garde son identifiant", async () => {
+    try {
+      const alice = await givenPersonaOn(f.productId);
+      const useCaseId = await givenUseCase({ personaIds: [alice] });
+
+      const before = await db
+        .select({ id: useCasePersonas.id })
+        .from(useCasePersonas)
+        .where(eq(useCasePersonas.useCaseId, useCaseId));
+
+      currentPerson = f.managerId;
+      await expectWritten(
+        updateUseCase(
+          f.productId,
+          useCaseId,
+          NO_USE_CASE_STATE,
+          formForUseCase({ title: "Un autre titre", personaIds: [alice] }),
+        ),
+      );
+
+      const after = await db
+        .select({ id: useCasePersonas.id })
+        .from(useCasePersonas)
+        .where(eq(useCasePersonas.useCaseId, useCaseId));
+
+      expect(after).toEqual(before);
+    } finally {
+      await clearUseCases();
+    }
+  });
+
+  test("une case décochée retire le rattachement", async () => {
+    try {
+      const alice = await givenPersonaOn(f.productId);
+      const useCaseId = await givenUseCase({ personaIds: [alice] });
+
+      currentPerson = f.managerId;
+      await expectWritten(
+        updateUseCase(
+          f.productId,
+          useCaseId,
+          NO_USE_CASE_STATE,
+          formForUseCase(),
+        ),
+      );
+
+      expect(await attachedTo(useCaseId)).toEqual([]);
+    } finally {
+      await clearUseCases();
+    }
+  });
+
+  test("le use case d'un autre produit ne se corrige pas depuis celui-ci", async () => {
+    try {
+      currentPerson = f.managerId;
+      await expectWritten(
+        createUseCase(
+          f.otherProductId,
+          NO_USE_CASE_STATE,
+          formForUseCase({ title: `Voisin ${suffix}` }),
+        ),
+      );
+      const voisin = (await liveUseCasesOf(f.otherProductId))[0]!;
+
+      const state = await updateUseCase(
+        f.productId,
+        voisin.id,
+        NO_USE_CASE_STATE,
+        formForUseCase({ title: "Détourné" }),
+      );
+
+      expect(state.message).toBeDefined();
+      expect((await liveUseCasesOf(f.otherProductId))[0]!.title).toBe(voisin.title);
+    } finally {
+      await clearUseCases();
+    }
+  });
+
+  test("un membre sans accompagnement ne corrige rien", async () => {
+    try {
+      const useCaseId = await givenUseCase();
+
+      currentPerson = f.outsiderId;
+      const state = await updateUseCase(
+        f.productId,
+        useCaseId,
+        NO_USE_CASE_STATE,
+        formForUseCase({ title: "Détourné" }),
+      );
+
+      expect(state.message).toBeDefined();
+      expect((await liveUseCasesOf(f.productId))[0]!.title).toContain("Démarrer");
+    } finally {
+      await clearUseCases();
+    }
+  });
+});
+
+describe("archiveUseCase — le rangement", () => {
+  test("le use case quitte le bloc, ses rattachements restent avec lui", async () => {
+    try {
+      const alice = await givenPersonaOn(f.productId);
+      const useCaseId = await givenUseCase({ personaIds: [alice] });
+
+      currentPerson = f.managerId;
+      await archiveUseCase(f.productId, useCaseId);
+
+      expect(await liveUseCasesOf(f.productId)).toHaveLength(0);
+      /* Règle 4 : rien n'est supprimé. Archiver le parent ne cascade sur rien
+         (arbitrage (f)), et la fiche redeviendrait entière si un écran la
+         rétablissait. */
+      expect(await attachedTo(useCaseId)).toEqual([alice]);
+    } finally {
+      await clearUseCases();
+    }
+  });
+
+  test("un membre sans accompagnement ne range rien — et le refus est muet", async () => {
+    try {
+      const useCaseId = await givenUseCase();
+
+      currentPerson = f.outsiderId;
+      await expect(
+        archiveUseCase(f.productId, useCaseId),
+      ).resolves.toBeUndefined();
+
+      expect(await liveUseCasesOf(f.productId)).toHaveLength(1);
+    } finally {
+      await clearUseCases();
+    }
+  });
+
+  test("le use case d'un autre produit ne se range pas depuis celui-ci", async () => {
+    try {
+      currentPerson = f.managerId;
+      await expectWritten(
+        createUseCase(
+          f.otherProductId,
+          NO_USE_CASE_STATE,
+          formForUseCase({ title: `Voisin ${suffix}` }),
+        ),
+      );
+      const voisin = (await liveUseCasesOf(f.otherProductId))[0]!;
+
+      await archiveUseCase(f.productId, voisin.id);
+
+      expect(await liveUseCasesOf(f.otherProductId)).toHaveLength(1);
+    } finally {
+      await clearUseCases();
     }
   });
 });

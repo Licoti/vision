@@ -557,11 +557,13 @@ export const products = pgTable(
  * rapport, dont les noms ne diffèrent que d'une lettre.
  *
  * **Un référentiel, pas un contenu éditorial.** La ligne porte un identifiant
- * stable, et c'est sa raison d'être : un parcours, un use case ou une
- * fonctionnalité pourra la désigner le jour où ces objets existeront, sans
- * reprise de données. **Aucune table de liaison n'est créée aujourd'hui** —
- * une table sans écrivain ni lecteur est une table qu'on relit un jour sans
- * savoir pourquoi (la leçon de T5.2).
+ * stable, et c'est sa raison d'être : le 19/08/2026, `use_case_personas` l'a
+ * désignée pour la première fois — sans reprise de données, ce que cette phrase
+ * annonçait. **C'est la seule table de liaison qui pointe ici**, et les autres
+ * ne s'écrivent pas d'avance : une fonctionnalité, une étape de méga-parcours
+ * ou le rattachement d'un `persona_traits` à un use case seront des tables de
+ * plus, le jour où un écran les lira. Une table sans écrivain ni lecteur est
+ * une table qu'on relit un jour sans savoir pourquoi (la leçon de T5.2).
  *
  * `on delete cascade` sur le produit, comme `indicators` : un persona n'existe
  * pas hors du produit qu'il décrit. La cascade ne se déclenche jamais en usage
@@ -644,6 +646,111 @@ export const personaTraits = pgTable(
   (t) => [
     index("persona_traits_domain_id_idx").on(t.domainId),
     index("persona_traits_persona_id_idx").on(t.personaId),
+  ],
+);
+
+/**
+ * Un **use case** du produit : le grand scénario d'usage qui en structure la
+ * lecture (19/08/2026).
+ *
+ * **Concept ajouté hors des `docs/`**, comme `products.vision`,
+ * `indicators.is_north_star` et `personas` avant lui. L'écart au modèle
+ * documenté est consigné dans `JOURNAL-TECHNIQUE.md` (règle 6), et son
+ * intitulé d'interface reste **« Use Cases »**, en anglais, contre la règle
+ * « interface en français » de `CLAUDE.md` — arbitrage humain du 19/08/2026,
+ * consigné au même endroit.
+ *
+ * **Le niveau de lecture du milieu.** La page produit disait pourquoi le
+ * produit existe, ce qu'il mesure et pour qui il est conçu ; elle ne disait
+ * pas **comment il est construit**. Un use case regroupe ce qui sert un même
+ * objectif : `personas` → `use_cases` → fonctionnalités, dont seuls les deux
+ * premiers rangs existent aujourd'hui.
+ *
+ * **`summary` est `not null`**, à la différence de `personas.summary` : la
+ * demande pose le titre *et* la description courte comme le minimum d'un use
+ * case. Le rattachement d'un persona, lui, est **facultatif** (arbitrage
+ * humain du 19/08/2026) — un produit peut porter ses scénarios avant d'avoir
+ * décrit ses profils.
+ *
+ * **Aucune colonne de rang, et c'est un choix.** L'ordre d'affichage est celui
+ * de l'écriture (`created_at`, puis `id` pour départager) : **stable**, lisible
+ * dans la lecture, et sans écran pour le réordonner. Une colonne `position` sans
+ * geste qui l'écrive serait la colonne qu'on relit un jour sans savoir pourquoi
+ * (la leçon de T5.2) ; elle viendra avec le réordonnancement, ou avec les
+ * méga-parcours qui séquenceront des use cases de plusieurs produits. **Sa
+ * limite est mesurée et notée dans `listProductUseCases`** : un lot d'écriture
+ * partage un horodatage, et l'ordre y est alors celui des identifiants.
+ *
+ * `on delete cascade` sur le produit, comme `personas` et `indicators` : un use
+ * case n'existe pas hors du produit qu'il décrit. La cascade ne se déclenche
+ * jamais en usage — rien ne supprime un produit (règle 4).
+ */
+export const useCases = pgTable(
+  "use_cases",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    domainId: domainRef(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    /** « Démarrer, reprendre un projet ». */
+    title: text("title").notNull(),
+    /** Ce que le scénario permet, et pourquoi. Obligatoire (voir l'en-tête). */
+    summary: text("summary").notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    ...stamps,
+  },
+  (t) => [
+    index("use_cases_domain_id_idx").on(t.domainId),
+    index("use_cases_product_id_idx").on(t.productId),
+  ],
+);
+
+/**
+ * Le rattachement d'un **persona** à un **use case** — « pour qui ce scénario
+ * existe ».
+ *
+ * **Une table de liaison, jamais une colonne**, et c'est ici que vit la
+ * souplesse demandée. Un use case sert de zéro à plusieurs profils, un profil
+ * traverse plusieurs scénarios : une colonne aurait figé le rapport à un seul
+ * sens et interdit le second. Le jour où un use case devra désigner une
+ * fonctionnalité, un irritant précis de `persona_traits` — dont l'identifiant
+ * est stable par construction, c'est la raison d'être du diff de `syncTraits` —
+ * ou une étape de méga-parcours, ce sera **une table de plus**, sans qu'une
+ * ligne existante bouge.
+ *
+ * **Aucun `archived_at`, délibérément.** C'est une `LinkTable` au sens de
+ * `lib/db/scoped.ts`, ce qui rend `unlink` disponible **à la compilation** :
+ * décocher une case n'est pas la suppression de donnée métier que la règle 4
+ * proscrit — c'est la correction d'un champ, la règle de `persona_traits`, de
+ * `project_jobs` et d'`activity_participants`.
+ *
+ * L'unicité est portée par la base ici, à la différence de `persona_traits` :
+ * une case à cocher ne se coche pas deux fois, et le couple est un
+ * **identifiant**, pas un libellé qu'on récrit. Le dédoublonnage de la saisie
+ * (`lib/forms/use-case.ts`) la double sans la remplacer.
+ */
+export const useCasePersonas = pgTable(
+  "use_case_personas",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    domainId: domainRef(),
+    useCaseId: uuid("use_case_id")
+      .notNull()
+      .references(() => useCases.id, { onDelete: "cascade" }),
+    personaId: uuid("persona_id")
+      .notNull()
+      .references(() => personas.id, { onDelete: "cascade" }),
+    ...stamps,
+  },
+  (t) => [
+    index("use_case_personas_domain_id_idx").on(t.domainId),
+    index("use_case_personas_use_case_id_idx").on(t.useCaseId),
+    index("use_case_personas_persona_id_idx").on(t.personaId),
+    unique("use_case_personas_use_case_persona_unique").on(
+      t.useCaseId,
+      t.personaId,
+    ),
   ],
 );
 

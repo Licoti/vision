@@ -85,6 +85,7 @@ import { archiveIndicator, setNorthStar } from "./actions";
 import { restoreProduct } from "../actions";
 import { Indicators } from "@/components/products/indicators";
 import { Personas } from "@/components/products/personas";
+import { UseCases } from "@/components/products/use-cases";
 import { Roadmap } from "@/components/products/roadmap";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
 import {
@@ -115,6 +116,7 @@ import {
   listProductReadings,
 } from "@/lib/queries/indicators";
 import { listProductPersonas } from "@/lib/queries/personas";
+import { listProductUseCases } from "@/lib/queries/use-cases";
 import { findProductDetail, listProductProjects } from "@/lib/queries/products";
 import { listProductMilestones } from "@/lib/queries/timeline";
 import { isUuid } from "@/lib/uuid";
@@ -155,6 +157,23 @@ export default async function ProductPage({
      */
     fiche?: string;
     /**
+     * Le panneau de **saisie d'un use case** (19/08/2026). Une seule clé, dont
+     * la **valeur** porte le cas — la forme de `persona` : `nouveau` ouvre le
+     * panneau vide, un identifiant l'ouvre sur la ligne à corriger.
+     *
+     * **La seule clé de la page en anglais**, et c'est le prix de l'intitulé
+     * « Use Cases » arbitré le 19/08/2026 : traduire l'adresse d'un bloc que
+     * l'écran nomme en anglais aurait donné deux vocabulaires pour un objet.
+     */
+    usecase?: string;
+    /**
+     * La **fiche** d'un use case, en lecture (19/08/2026). Sa valeur est
+     * toujours un identifiant. **Deux clés pour un même objet**, parce que ce
+     * sont deux droits différents — la séparation que `persona` et `fiche`
+     * tiennent déjà.
+     */
+    scenario?: string;
+    /**
      * Les deux bornes de la fenêtre de la roadmap. **Elles ne rejoignent pas le
      * décompte d'exclusivité** des trois clés au-dessus : elles n'ouvrent aucun
      * panneau, et leur absence est l'état sans filtre plutôt qu'une fermeture.
@@ -192,6 +211,7 @@ export default async function ProductPage({
     milestones,
     adoptions,
     productPersonas,
+    productUseCases,
   ] = await Promise.all([
     listProductProjects(session.db, product.id),
     listProductIndicators(session.db, product.id),
@@ -199,6 +219,7 @@ export default async function ProductPage({
     listProductMilestones(session.db, product.id),
     listProductAdoptions(session.db, product.id),
     listProductPersonas(session.db, product.id),
+    listProductUseCases(session.db, product.id),
   ]);
 
   const archived = product.archivedAt !== null;
@@ -226,6 +247,8 @@ export default async function ProductPage({
     vision,
     persona,
     fiche,
+    usecase,
+    scenario,
     de,
     a,
   } = await searchParams;
@@ -252,6 +275,8 @@ export default async function ProductPage({
     vision,
     persona,
     fiche,
+    usecase,
+    scenario,
   };
   const conflict =
     Object.values(keys).filter((value) => value !== undefined).length > 1;
@@ -271,6 +296,7 @@ export default async function ProductPage({
           indicators: productIndicators,
           readings: productReadings,
           personas: productPersonas,
+          useCases: productUseCases,
         },
         request,
       )
@@ -415,6 +441,37 @@ export default async function ProductPage({
           }
           addHref={
             canWriteIndicators ? ROUTES.productPersonaNew(product.id) : null
+          }
+        />
+
+        {/* **Le quatrième bloc de la page** (19/08/2026), sous « Personae » et
+              avant les accompagnements. « Vision produit » dit pourquoi ce
+              produit existe et ce qu'il mesure, « Personae » dit pour qui,
+              celui-ci dit **comment il est construit** — les grands scénarios
+              qui le structurent. C'est le niveau de lecture du milieu,
+              `Personae → Use Cases → Features`, dont les deux premiers rangs
+              existent.
+
+              Il **reçoit les personae que le bloc voisin affiche déjà**, plutôt
+              que de les relire : le rattachement arrive en identifiants, et
+              c'est le bloc qui leur rend des noms. Aucune lecture par carte —
+              la discipline de la page depuis T5.5.
+
+              Le bloc se lit par tout le domaine (D9) — d'où le lien de fiche,
+              jamais nul. Son seul point d'entrée d'écriture tombe avec
+              `canWriteIndicators` : **le même droit que les indicateurs et les
+              personae**, dérivé des accompagnements du produit, et la lecture
+              seule d'un produit archivé avec lui. Ce n'est pas ce rendu qui
+              protège — les trois actions redérivent le droit sur les
+              identifiants reçus. */}
+        <UseCases
+          useCases={productUseCases}
+          personas={productPersonas}
+          detailHref={(useCaseId) =>
+            ROUTES.productUseCase(product.id, useCaseId)
+          }
+          addHref={
+            canWriteIndicators ? ROUTES.productUseCaseNew(product.id) : null
           }
         />
 

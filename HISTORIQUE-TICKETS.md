@@ -2569,3 +2569,96 @@ montrant ni groupe « Annulé » ni motif forgé. Le chemin nominal a été jou�
 développement : 303, panneau refermé, groupe « Annulé » replié portant son motif. Le contraste a été
 mesuré, pas supposé. La mise en défaut de `validateCancellationReason` fait tomber **un** test et
 rien d'autre — après une première exécution trompeuse dont dix échecs venaient du réseau.
+
+---
+
+## Hors ticket — le bloc « Use Cases », 19/08/2026
+
+**La demande.** Un bloc « Use Cases » sur la page produit, sous « Personae » : des cartes
+compactes sur **une seule ligne**, défilable horizontalement quand il y en a beaucoup, chacune
+ouvrant un panneau de détail. Un use case porte un titre, une description courte et des personae
+associés. Il constitue le niveau de lecture du milieu — **Personae → Use Cases → Features** — et sa
+structure doit rester assez souple pour recevoir un jour des **méga-parcours** traversant plusieurs
+produits.
+
+**Ce qui existait déjà pour lui.** Le ticket n'a rien eu à inventer sur le modèle : trois fichiers
+du 18/08/2026 le nommaient et avaient tranché en sa faveur. `lib/db/schema.ts` posait qu'un persona
+porte « un identifiant stable […] qu'un parcours, un use case ou une fonctionnalité pourra désigner
+le jour où ces objets existeront, **sans reprise de données** » ; `persona_traits` existait pour que
+« rattacher un use case à l'irritant qu'il adresse » ne l'impose pas non plus ; et `syncTraits`
+faisait un **diff** plutôt qu'un remplacement, pour que l'identifiant d'un trait survive à une
+correction. La promesse a été tenue : aucune ligne existante n'a bougé.
+
+**Trois arbitrages rendus avant écriture.** (1) L'intitulé reste **« Use Cases »**, en anglais, avec
+la clé d'URL `usecase` — écart assumé à « interface en français ». (2) Le rattachement d'un persona
+est **facultatif** : le bloc est utilisable avant qu'un profil ait été décrit. (3) Deux use cases
+entrent dans la fixture — mais **sans rattachement**, `scripts/seed.ts` ne semant aucun persona, ce
+qui a été signalé avant d'écrire plutôt que découvert après.
+
+**Le modèle — migration `0007`.** `use_cases` (titre, `summary` **`not null`** à la différence de
+`personas.summary`, `archived_at`, cascade sur le produit) et `use_case_personas`, table de liaison
+**sans `archived_at`** — donc une `LinkTable`, donc `unlink` disponible **à la compilation**.
+**C'est la table de liaison qui porte la souplesse demandée** : un use case sert de zéro à plusieurs
+profils et un profil traverse plusieurs scénarios, ce qu'une colonne aurait interdit. Le jour où un
+use case devra désigner une fonctionnalité, un irritant précis ou une étape de méga-parcours, ce
+sera **une table de plus**. Aucune n'est créée aujourd'hui — la leçon de T5.2, celle-là même que le
+commentaire de `personas` invoquait, et qui a dû être récrit puisqu'il affirmait « aucune table de
+liaison n'est créée aujourd'hui ».
+
+**Aucune colonne de rang**, et c'est la même leçon : une colonne `position` sans geste qui l'écrive
+est une colonne qu'on relit un jour sans savoir pourquoi. L'ordre est `created_at` puis `id`.
+
+**Les lectures.** `listProductUseCases` fait **deux `list` et aucune jointure** — la forme de
+`lib/queries/personas.ts` —, et rend `personaIds` **sans les noms** : la page a déjà lu ses personae
+pour le bloc voisin, et le bloc les rapproche par `personasOf`. Aucun bloc n'ajoute une lecture par
+objet, la discipline de la page depuis T5.5. Conséquence, assumée : **un persona archivé disparaît
+des use cases qui le désignaient**, sans qu'une ligne de liaison ne bouge (règle 4).
+
+**Deux clés d'URL, parce que ce sont deux droits** — la séparation que `persona` et `fiche`
+tenaient déjà. `?usecase=nouveau|<id>` écrit, sous le droit dérivé des accompagnements ;
+`?scenario=<id>` lit, par tout le domaine (D9). Le décompte d'exclusivité passe de sept à neuf clés
+**sans qu'un caractère de sa logique change** — la propriété pour laquelle il avait été écrit en
+décompte le 17/08/2026, vérifiée pour la troisième fois.
+
+**Une porte de plus que le groupe persona, et c'est le cœur du ticket.** Les identifiants de
+personae n'arrivent pas par une liaison côté serveur mais par le **formulaire** : ils sont saisis,
+donc réécrivables. `attachablePersonas` les confronte aux personae **vivants du produit reçu**,
+relus dans l'action, **avant la moindre écriture** — la règle de T3.6, faute de transaction : un
+rattachement refusé ne doit pas laisser un use case à demi écrit.
+
+**La ligne défilante n'est pas une variation de style.** Une grille grandit vers le bas, et douze
+scénarios auraient repoussé les accompagnements hors de l'écran ; la ligne garde au bloc une hauteur
+constante. Le défilement au clavier est acquis **sans attribut** — chaque carte est un lien, donc
+la tabulation amène la suivante dans le champ. Un retrait négatif compense quatre pixels de marge
+intérieure, sans quoi `overflow-x` non visible fait calculer `overflow-y` en `auto` et **rogne le
+liseré de focus** de chaque carte.
+
+**Les quatre disciplines.**
+
+- **Le critère se lit dans le HTML servi.** Les cinq `<h2>` de bloc sortent dans l'ordre voulu —
+  Vision produit, Personae, **Use Cases**, Accompagnements en cours, Tous les accompagnements —, les
+  deux cartes de la fixture avec leur titre, leur description et le conteneur `overflow-x-auto`.
+  **Sept adresses mesurées** : la fiche et les deux formes de saisie s'ouvrent (`role="dialog"`,
+  titre attendu) ; deux clés ensemble n'ouvrent **rien** ; l'identifiant d'un produit passé en
+  `?scenario=` et une valeur fantaisiste rendent la page nue en **200**, jamais un 404 ni un 500.
+- **Les tests se mettent en défaut.** 14 tests de lecture, 18 de saisie, 12 d'action. Cinq
+  neutralisations, chacune tombant sur ses seuls tests : le filtre de produit (3), le filtre de
+  domaine de `list` (6, dont les deux lignes forgées), `attachablePersonas` (2), l'obligation de la
+  description (3), la confrontation du use case à son produit (2). Suite complète : **821 tests**.
+- **Le contraste se mesure.** Le relevé est un **constat de reprise, vérifié et non affirmé** :
+  l'inventaire des jetons de couleur des trois composants neufs est **rigoureusement identique** à
+  celui des trois composants de persona — `border-surface-neutral-lighter`,
+  `text-content-neutral-{base,dark,darkest}`, `text-content-danger-dark` —, sur les mêmes fonds
+  (`surface-neutral-pale` pour le bloc comme pour le tiroir). **Aucun couple de couleurs neuf par la
+  position**, donc rien à mesurer que `ETAT.md` §c ne consigne déjà.
+- **Le droit s'éprouve par l'action.** Six sondes **HTTP**, en `multipart/form-data` — l'encodage
+  que le formulaire déclare, la leçon de TD.1 —, avec **étape témoin** : le responsable de domaine
+  écrit (2 → 3 lignes), ce qui prouve que le harnais atteint l'action. Puis les refus, mesurés **en
+  base et non sur le code de réponse**, tous à 200 : un membre non contributeur sur ce produit, le
+  même avec le `productId` **lié réécrit** vers un produit dont il n'est contributeur de rien, un
+  `personaIds` désignant le persona d'un autre produit, une description vide. Une septième sonde a
+  **écrit**, et l'analyse a montré que le code avait raison et la sonde tort — voir
+  `JOURNAL-TECHNIQUE.md`.
+
+**Ce que le ticket ne fait pas** : aucune table de méga-parcours, aucune de fonctionnalité, aucun
+lien vers les activités, aucune colonne de rang, aucun écran hors de la page produit.
