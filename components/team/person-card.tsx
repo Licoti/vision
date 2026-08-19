@@ -29,6 +29,7 @@
  */
 
 import { AvailabilityDot } from "@/components/team/availability-dot";
+import { BlockNote } from "@/components/ui/empty-state";
 import type { PersonDetail } from "@/lib/queries/team";
 
 export function PersonCard({ person }: { person: PersonDetail }) {
@@ -39,9 +40,7 @@ export function PersonCard({ person }: { person: PersonDetail }) {
           {person.bio}
         </p>
       ) : (
-        <p className="text-sm leading-175 text-content-neutral-base">
-          Aucune présentation saisie pour l&apos;instant.
-        </p>
+        <BlockNote>Aucune présentation saisie pour l&apos;instant.</BlockNote>
       )}
 
       {/* Un intervenant côté entité n'a pas de disponibilité : c'est une
@@ -84,9 +83,7 @@ export function PersonCard({ person }: { person: PersonDetail }) {
           /* Une phrase, pas un `EmptyState` : un état vide dans un panneau n'a
              pas de titre à porter, le panneau en a déjà un. Et ce n'est pas une
              erreur — une personne peut n'avoir rien déclaré. */
-          <p className="text-sm leading-175 text-content-neutral-base">
-            Aucune compétence déclarée pour l&apos;instant.
-          </p>
+          <BlockNote>Aucune compétence déclarée pour l&apos;instant.</BlockNote>
         )}
       </div>
     </section>

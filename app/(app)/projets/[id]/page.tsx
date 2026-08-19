@@ -82,7 +82,9 @@ import { Roadmap } from "@/components/projects/roadmap";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
 import { Button, BUTTON_SECONDARY } from "@/components/ui/button";
 import { DrawerHost, DrawerLink } from "@/components/ui/drawer";
+import { ArchivedNotice } from "@/components/ui/archived-notice";
 import { Avatar } from "@/components/ui/avatar";
+import { BlockNote } from "@/components/ui/empty-state";
 import { Field, FieldRow } from "@/components/ui/field";
 import { Page, PageHeader } from "@/components/ui/page";
 import { Section, SectionHeader } from "@/components/ui/section";
@@ -95,7 +97,7 @@ import {
   PROJECT_PANEL_PARAMS,
   resolveProjectDrawer,
 } from "@/lib/drawers/project";
-import { formatMonth, formatPeriod, formatRank } from "@/lib/format";
+import { formatPeriod, formatRank } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
 import { listProjectRoadmap } from "@/lib/queries/activities";
 import { listProjectAdoptions } from "@/lib/queries/indicators";
@@ -233,15 +235,12 @@ export default async function ProjectPage({
         ]}
       />
       <Page>
-        {/* La mention datée, au mois (D13) : c'est une date de rangement, pas
-              un horodatage — le jour n'apprendrait rien de plus. Le trio de
-              jetons est celui de la page produit, mesuré en T2.4 et repris sans
-              qu'un couple neuf apparaisse. */}
         {project.archivedAt ? (
-          <p className="rounded-xl border border-surface-neutral-lighter bg-surface-neutral-pale px-7 py-4 text-sm text-content-neutral-dark">
-            <span className="font-semibold">Accompagnement archivé</span>
-            {` en ${formatMonth(project.archivedAt)}. Il n'apparaît plus dans la liste des projets ni sur la page de son produit, et ne reçoit plus de saisie ; sa page, sa roadmap et ses ressources restent lisibles.`}
-          </p>
+          <ArchivedNotice
+            label="Accompagnement archivé"
+            archivedAt={project.archivedAt}
+            sentence="Il n'apparaît plus dans la liste des projets ni sur la page de son produit, et ne reçoit plus de saisie ; sa page, sa roadmap et ses ressources restent lisibles."
+          />
         ) : null}
 
         <div className="rounded-xl border border-surface-neutral-lighter bg-surface-neutral-pale px-7 py-6">
@@ -445,9 +444,7 @@ export default async function ProjectPage({
           {REFERENCE_BLOCKS.map((block) => (
             <Section key={block.title}>
               <SectionHeader title={block.title} />
-              <p className="text-sm leading-175 text-content-neutral-base">
-                {block.description}
-              </p>
+              <BlockNote>{block.description}</BlockNote>
             </Section>
           ))}
         </div>

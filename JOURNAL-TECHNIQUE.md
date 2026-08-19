@@ -4665,3 +4665,68 @@ de nature : le balayage reste réservé à la session de découpage de C6. Il fa
 **la section « Journal des tickets » a repris trois lignes en deux jours** après avoir été repliée le
 17/08, et que le repliage suivant devra sortir les entrées hors chantier autant que celles des
 chantiers clos.
+
+
+---
+
+## TD.4 — l'état vide dans un bloc, et le bandeau d'archivage, 19/08/2026
+
+**Un audit qui `grep` ne sait pas ce que le code veut dire — cinq faux positifs sur quinze.** Le
+tableau (a) de `tickets-TD.md` groupait les états vides par **chaîne CSS**. Quatre des sites listés
+dans `components/projects/roadmap.tsx` (:410, :568, :576, :598) sont le résultat, l'objectif, les
+participants et le motif d'annulation d'une carte d'activité : des lignes **présentes quand la donnée
+existe**, c'est-à-dire l'exact inverse d'une absence. Le cinquième, `products/roadmap.tsx:573`, est
+l'avis de troncature « 1 accompagnement est masqué hors de cette période », lu tel quel dans le HTML
+servi pendant la mesure. **Les convertir aurait changé le rendu de cinq lignes de métadonnées pour
+les faire ressembler à des états vides.** Symétriquement, le même `grep` avait manqué trois vraies
+absences que leur préfixe de classe (`mt-3.5`, `border-t`) soustrayait à la recherche exacte.
+*Transportable : une chaîne de classes identique ne prouve pas une intention identique, et
+l'inverse non plus. Le prochain audit de duplication doit lire les branches, pas seulement les
+attributs.*
+
+**Écart au plan, assumé : `components/products/roadmap.tsx` est entré au périmètre.** Le plan validé
+le déclarait hors périmètre, ses deux sites listés s'étant révélés être l'un un faux positif, l'autre
+« structurellement différent ». La lecture du fichier pendant l'écriture a montré un **troisième**
+site (:390) — une vraie absence, portant déjà la variante retenue —, et a montré que le second (:566)
+se compose **à diff nul** avec le préfixe `className`. Les deux sont entrés : les laisser aurait
+donné à TD.6 deux chaînes à garder sans logement, dans un ticket dont le critère est de finir à zéro.
+Coût réel : nul au rendu, vérifié.
+
+**Une décision de composant prise à contre-pied de TD.3, par la même méthode.** `BlockNote` compose
+`className` en **préfixe**, `Button` le compose en **suffixe**. Ce n'est pas une incohérence : TD.3
+avait lu ses neuf points d'appel et constaté `className` écrit en dernier ; TD.4 a lu les siens et
+constaté la marge écrite en tête. Les deux règles sortent de la même discipline — *lu dans le HTML
+servi, pas supposé* — appliquée à des données opposées. **Le jour où un point d'appel voudra les
+deux**, la composition en préfixe ne suffira plus et il faudra trancher entre deux props ou un
+`tailwind-merge` que le dépôt s'interdit. Aucun n'en veut aujourd'hui.
+
+**La décision du jeton était déjà écrite dans le dépôt, sans pouvoir s'imposer.**
+`components/products/roadmap.tsx:386` portait, en commentaire, **le raisonnement exact et les trois
+ratios exacts** qui ont départagé `content-neutral-base` et `content-neutral-dark` — 8,12:1, 6,11:1,
+3,75:1. Quelqu'un avait donc déjà tranché, dans un fichier, pour un paragraphe, sans moyen d'imposer
+la conclusion aux quatorze autres. *C'est la meilleure illustration qu'on ait de ce à quoi sert un
+socle : non pas trouver la bonne valeur — elle était trouvée — mais empêcher qu'on la retrouve
+quatorze fois et qu'on se trompe cinq fois sur quatorze.*
+
+**Cinq branches d'état vide n'existent dans aucune donnée du domaine.** Le relevé absent d'une North
+Star, sa cible absente, la carte d'indicateur sans relevé, le panneau « Gérer les relevés » vide et
+la personne sans équipe. Les deux seuls indicateurs vivants portent relevés **et** cible ; le seul
+indicateur sans relevé est archivé, donc refusé par la résolution de panneau ; la seule personne sans
+équipe n'entre pas dans la liste Équipe. Leur code a changé comme celui des autres, **leur rendu n'a
+pas été vu**, et c'est dit plutôt que supposé. Dette de jeu d'essai, pas dette de code — consignée
+dans `ETAT.md`.
+
+**Deux pièges de mesure, coûteux en temps, à savoir pour le prochain harnais.** Le paramètre
+d'ouverture de la fiche d'un persona est **`fiche`** sur la page produit, tandis que `persona`
+désigne le panneau de **saisie** — et `fiche` est aussi le nom que j'avais supposé pour la fiche
+d'une personne, qui est en réalité **`personne`**. Une adresse d'ouverture mal devinée ne rend pas
+d'erreur : elle rend la page sans son panneau, et une capture silencieusement amputée passe pour une
+capture valide. *Les onze noms de paramètres se lisent en une commande dans `lib/navigation` ; les
+deviner coûte plus cher que les lire.* Second piège : `?releves=<id>` sur un indicateur **archivé**
+rend la page sans panneau, pour la même raison invisible.
+
+**`ETAT.md` passe de 420 à 428 lignes, soit 178 au-dessus du seuil de 250.** Un point refermé en est
+sorti vers `HISTORIQUE-TICKETS.md`, un point ouvert a été récrit plutôt que d'empiler, et un point
+neuf est entré. Le balayage reste réservé à la session de découpage de C6, comme le protocole le
+veut — mais le fichier a désormais crû à chacun des trois derniers tickets, et le seuil n'est plus
+un seuil : c'est un chiffre qu'on rapporte.

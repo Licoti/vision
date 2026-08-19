@@ -1,5 +1,13 @@
 /**
- * L'état vide — un écran à part entière, jamais un cas d'erreur (règle 5).
+ * Les deux états vides — un écran à part entière, jamais un cas d'erreur
+ * (règle 5).
+ *
+ * **Ils sont deux, et ils vivent dans le même fichier** (TD.4) : `EmptyState`
+ * est l'état vide **d'écran** — bordure tiretée, titre de rang 2 ou 3, une
+ * action ; `BlockNote` est le paragraphe d'absence posé **dans un bloc déjà
+ * rempli par ailleurs** — « aucun relevé », « aucune ressource reliée ». Les
+ * séparer en deux fichiers aurait fait chercher le second à qui a trouvé le
+ * premier, et c'est ainsi que l'un d'eux se réécrit à la main.
  *
  * Au démarrage, tout Vision sera vide : c'est la première impression du
  * produit (docs/06 §9). Un état vide dit donc deux choses et pas une de
@@ -45,5 +53,65 @@ export function EmptyState({
       </p>
       {action}
     </div>
+  );
+}
+
+/**
+ * Le paragraphe d'absence dans un bloc — « Aucun relevé pour l'instant »,
+ * « Les liens vers les documents s'afficheront ici ».
+ *
+ * **Un seul exemplaire, après quatorze**, et l'audit du 18/08/2026 en avait
+ * relevé **cinq variantes** pour une seule intention : `content-neutral-base`
+ * contre `-dark`, trois tailles de texte, avec ou sans marge. La règle 5 dit
+ * qu'un état vide est un écran à part entière ; cinq façons de l'écrire est la
+ * manière la plus discrète de le traiter comme un reste.
+ *
+ * **Ce n'est pas `EmptyState`, et le critère entre les deux est le rang.** Un
+ * bloc qui n'a que son absence à montrer prend `EmptyState`, qui porte un titre
+ * et une action. Un bloc **déjà rempli par ailleurs** — un panneau qui a son
+ * en-tête, une section qui a son `SectionHeader` — n'a pas de titre à redonner
+ * à son quart vide : il prend celui-ci. Les points d'appel gardent le
+ * commentaire qui dit ce choix, que le composant ne peut pas dire à leur place.
+ *
+ * **`content-neutral-dark`, et c'est une mesure qui l'impose.** Les deux jetons
+ * en présence passent sur les deux tonalités où ce paragraphe se rend
+ * aujourd'hui — `-base` donne 4,79:1 sur `surface-primary-lightest` et 4,98:1
+ * sur `surface-neutral-pale`. Mais `-base` tombe à **3,75:1** sur
+ * `surface-primary-lighter`, sous la limite du texte courant, là où `-dark`
+ * tient à 6,11:1. Le même paragraphe devant pouvoir tenir sur toute surface de
+ * bloc, c'est le jeton qui passe **partout** qui gagne — exactement l'arbitrage
+ * qui avait donné sa note à `BlockHeader` (`block.tsx`), et le seul des deux
+ * qu'un bloc bleu de demain ne mettra pas en défaut.
+ *
+ * **Aucune variante de taille.** Une fois les cinq faux positifs de l'audit
+ * écartés — le résultat, l'objectif, les participants et le motif d'annulation
+ * d'une carte de roadmap ne sont pas des absences, ils sont l'inverse —, il
+ * restait **un** point d'appel en `text-xs`. Un composant de socle qui porte une
+ * variante à un seul appelant est une variante que le suivant emploiera de
+ * travers (doctrine TD.3).
+ *
+ * **`className` se compose en préfixe, et c'est l'inverse de `Button`.** Les
+ * trois seuls points d'appel qui portent une classe lui donnent une marge haute,
+ * et tous trois l'écrivent **en tête** de l'attribut servi. En suffixe, deux
+ * d'entre eux — qui portaient déjà la variante retenue — auraient vu leur
+ * `class` réordonné pour rien. C'est la méthode de `Button` appliquée à
+ * d'autres données, avec un résultat opposé : lu dans le HTML servi, pas
+ * supposé. Le ternaire, jamais `${className ?? ""}` — TD.1 a mesuré ce que
+ * coûte la seconde forme.
+ */
+const BLOCK_NOTE = "text-sm leading-175 text-content-neutral-dark";
+
+export function BlockNote({
+  className,
+  children,
+}: {
+  /** Une marge haute, quand le rythme du bloc la demande. Rien d'autre. */
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <p className={className ? `${className} ${BLOCK_NOTE}` : BLOCK_NOTE}>
+      {children}
+    </p>
   );
 }

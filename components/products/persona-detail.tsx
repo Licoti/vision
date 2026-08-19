@@ -37,6 +37,7 @@
 import { ACTION_LINK } from "@/components/ui/action-link";
 import { Avatar } from "@/components/ui/avatar";
 import { DrawerLink } from "@/components/ui/drawer";
+import { BlockNote } from "@/components/ui/empty-state";
 import { Tag } from "@/components/ui/tag";
 import type {
   PersonaTrait,
@@ -209,7 +210,7 @@ function Family({
           ))}
         </ul>
       ) : (
-        <p className="text-sm leading-175 text-content-neutral-base">{empty}</p>
+        <BlockNote>{empty}</BlockNote>
       )}
     </section>
   );

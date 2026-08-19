@@ -42,6 +42,7 @@
 import { DrawerLink } from "@/components/ui/drawer";
 
 import { ACTION_LINK } from "@/components/ui/action-link";
+import { BlockNote } from "@/components/ui/empty-state";
 import { ExternalLink } from "@/components/ui/external-link";
 import { Section, SectionHeader } from "@/components/ui/section";
 import { formatResourceType } from "@/lib/format";
@@ -171,12 +172,12 @@ export function Resources({
         </ul>
       ) : (
         <div className="flex flex-col items-start gap-4">
-          <p className="text-sm leading-175 text-content-neutral-base">
+          <BlockNote>
             Les liens vers les documents de l&apos;accompagnement
             s&apos;afficheront ici, avec leur type et l&apos;activité qui les a
             produits. Vision n&apos;héberge aucun fichier : elle renvoie vers
             l&apos;outil qui le porte.
-          </p>
+          </BlockNote>
           {addHref ? (
             <LinkResource
               href={addHref}

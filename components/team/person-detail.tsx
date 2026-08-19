@@ -36,6 +36,7 @@ import Link from "next/link";
 
 import { PersonCard } from "@/components/team/person-card";
 import { Avatar } from "@/components/ui/avatar";
+import { BlockNote } from "@/components/ui/empty-state";
 import { StatusDot } from "@/components/ui/status-dot";
 import { formatPeriod } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
@@ -127,10 +128,10 @@ export function PersonDetail({ person }: { person: PersonDetailRow }) {
              `readings-panel.tsx` — un état vide dans un panneau n'a pas de titre
              à porter, le panneau en a déjà un. Ce n'est pas un défaut de saisie,
              c'est un état normal du référentiel (règle 5). */
-          <p className="text-sm leading-175 text-content-neutral-base">
+          <BlockNote>
             Cette personne n&apos;est encore dans l&apos;équipe d&apos;aucun
             accompagnement.
-          </p>
+          </BlockNote>
         )}
       </section>
     </div>

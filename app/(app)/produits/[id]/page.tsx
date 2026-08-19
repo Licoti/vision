@@ -93,6 +93,7 @@ import {
   BUTTON_SECONDARY,
 } from "@/components/ui/button";
 import { DrawerHost, DrawerLink } from "@/components/ui/drawer";
+import { ArchivedNotice } from "@/components/ui/archived-notice";
 import { AvatarGroup } from "@/components/ui/avatar";
 import { Block, BlockHeader } from "@/components/ui/block";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -106,7 +107,7 @@ import {
   PRODUCT_PANEL_PARAMS,
   resolveProductDrawer,
 } from "@/lib/drawers/product";
-import { formatAccompaniments, formatMonth, formatPeriod } from "@/lib/format";
+import { formatAccompaniments, formatPeriod } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
 import {
   listProductAdoptions,
@@ -289,15 +290,12 @@ export default async function ProductPage({
         ]}
       />
       <Page>
-        {/* La mention datée, au mois (D13) : c'est une date de rangement, pas
-              un horodatage — le jour n'apprendrait rien de plus. Le trio de
-              jetons est celui de l'en-tête de la page projet, mesuré en T2.4 et
-              repris sans qu'un couple neuf apparaisse. */}
         {product.archivedAt ? (
-          <p className="rounded-xl border border-surface-neutral-lighter bg-surface-neutral-pale px-7 py-4 text-sm text-content-neutral-dark">
-            <span className="font-semibold">Produit archivé</span>
-            {` en ${formatMonth(product.archivedAt)}. Il n'apparaît plus dans la liste des produits ; sa page et ses accompagnements passés restent lisibles.`}
-          </p>
+          <ArchivedNotice
+            label="Produit archivé"
+            archivedAt={product.archivedAt}
+            sentence="Il n'apparaît plus dans la liste des produits ; sa page et ses accompagnements passés restent lisibles."
+          />
         ) : null}
 
         <PageHeader

@@ -68,6 +68,7 @@
 import Link from "next/link";
 
 import { Block, BlockHeader } from "@/components/ui/block";
+import { BlockNote } from "@/components/ui/empty-state";
 import { BAND_BG, STATUS_PILL } from "@/components/ui/status-dot";
 import {
   formatDay,
@@ -387,11 +388,11 @@ export function Roadmap({
             blocs : c'est le jeton d'état vide de la page, et il passe sur les
             deux tonalités de `Block` — 8,12:1 sur la pâle, 6,11:1 sur la bleue,
             là où `content-neutral-base` tombe à 3,75:1 sur la seconde. */}
-        <p className="text-sm leading-175 text-content-neutral-dark">
+        <BlockNote>
           {projects.length === 0
             ? "Les accompagnements de ce produit s'afficheront ici dès que l'un d'eux sera daté : leurs périodes en barres, sur l'axe de l'année en cours."
             : "Aucun accompagnement de ce produit ne porte de date : il n'y a rien à situer sur un axe. Le bloc « Tous les accompagnements », ci-dessous, les porte tous."}
-        </p>
+        </BlockNote>
       </Block>
     );
   }
@@ -563,9 +564,9 @@ export function Roadmap({
         ) : null}
 
         {bands.length === 0 ? (
-          <p className="border-t border-surface-neutral-lighter py-6 text-center text-sm leading-175 text-content-neutral-dark">
+          <BlockNote className="border-t border-surface-neutral-lighter py-6 text-center">
             Aucun accompagnement sur cette période.
-          </p>
+          </BlockNote>
         ) : null}
       </div>
 

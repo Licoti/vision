@@ -34,6 +34,7 @@
 
 import { ACTION_LINK } from "@/components/ui/action-link";
 import { DrawerLink } from "@/components/ui/drawer";
+import { BlockNote } from "@/components/ui/empty-state";
 import { formatDateMonth, formatResultValue } from "@/lib/format";
 import type {
   ProductIndicator,
@@ -84,10 +85,10 @@ export function ReadingsPanel({
         /* Un paragraphe et non un `EmptyState` — la règle de `Resources` et
              d'`Indicators` : un état vide dans un panneau n'a pas de titre à
              porter, le panneau en a déjà un. */
-        <p className="text-sm leading-175 text-content-neutral-base">
+        <BlockNote>
           Aucun relevé pour l&apos;instant. Un indicateur sans relevé n&apos;est
           pas situé sur l&apos;axe du temps.
-        </p>
+        </BlockNote>
       )}
     </div>
   );

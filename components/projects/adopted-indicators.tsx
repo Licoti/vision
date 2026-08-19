@@ -45,6 +45,7 @@ import Link from "next/link";
 import { DrawerLink } from "@/components/ui/drawer";
 
 import { ACTION_LINK } from "@/components/ui/action-link";
+import { BlockNote } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Section, SectionHeader } from "@/components/ui/section";
 import { formatDateMonth, formatResultValue } from "@/lib/format";
@@ -178,7 +179,7 @@ export function AdoptedIndicators({
         </ul>
       ) : (
         <div className="flex flex-col items-start gap-4">
-          <p className="text-sm leading-175 text-content-neutral-base">
+          <BlockNote>
             Les indicateurs du produit que cet accompagnement reprend à son
             compte s&apos;afficheront ici, avec leur valeur de référence, la
             cible fixée et le dernier relevé. Un indicateur se crée sur{" "}
@@ -189,7 +190,7 @@ export function AdoptedIndicators({
               la page du produit
             </Link>
             , puis s&apos;adopte ici.
-          </p>
+          </BlockNote>
           {addHref ? (
             <AdoptIndicator
               href={addHref}

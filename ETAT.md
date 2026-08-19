@@ -2,11 +2,12 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 19/08/2026 — TD.3 terminé : le bouton et le lien d'action entrent au
-socle.
+**Dernière mise à jour :** 19/08/2026 — TD.4 terminé : l'état vide dans un bloc, le bandeau
+d'archivage, et la note perdue de `SectionHeader` rendue.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
 **Ticket suivant :** **T5bis.5** — le radar des compétences (`tickets-C5bis.md`). **TD.5 est
-disponible et ne dépend de rien** (`tickets-TD.md`) : l'ordre entre les deux revient à l'humain.
+disponible et ne dépend de rien** (`tickets-TD.md`) ; **TD.6 est désormais déverrouillé**, son
+point (c) attendait l'arbitrage que TD.4 a rendu. L'ordre entre les trois revient à l'humain.
 
 ---
 
@@ -21,7 +22,7 @@ disponible et ne dépend de rien** (`tickets-TD.md`) : l'ordre entre les deux re
 | C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **terminé** |
 | C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **terminé** |
 | TD — Dette technique | TD.1, TD.2 | **terminé** |
-| TD — Couche de présentation | TD.3 → TD.6 | **en cours** — TD.3 terminé (`tickets-TD.md`) |
+| TD — Couche de présentation | TD.3 → TD.6 | **en cours** — TD.3 et TD.4 terminés (`tickets-TD.md`) |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **en cours** — T5bis.4 terminé |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
@@ -210,13 +211,6 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   n'a pas changé d'une ligne depuis. Ce qui reste à confirmer est donc que `/equipe` s'y branche
   comme les deux autres, ce qu'un clic sur une ligne suffit à voir. → **action humaine, un clic.**
 
-- **`SectionHeader` déclare une note et ne la rend jamais.** `components/ui/section.tsx:26` accepte
-  une prop `note` qu'aucune ligne n'affiche ; `components/projects/roadmap.tsx:171` lui passe « Le
-  récit de l'accompagnement, au mois. », et **cette phrase n'est dans aucun HTML servi**. TypeScript
-  se tait, la prop étant déclarée — mais **`npm run lint` le signale depuis toujours**, en unique
-  avertissement permanent du dépôt. Deux issues, et le choix est éditorial : **rendre la note**, ce qui
-  change le HTML et aligne le composant sur `BlockHeader` ; ou **retirer la prop**, ce qui perd la
-  phrase volontairement et fait tomber l'appel à la compilation. → **arbitrage humain avant TD.4.**
 
 ### b. Assignés à un ticket
 
@@ -277,17 +271,31 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   l'arbitrage (g) sort la création d'une personne du formulaire de projet, et une limite sur un bloc
   qui n'existe plus n'a plus d'objet. → **T5bis.7.**
 
-- **Le socle couvre dix-huit des quarante composants du design system.** Détail et mesures dans
-  `JOURNAL-TECHNIQUE.md` (18/08/2026). **Le bouton est refermé** — TD.3, 19/08/2026 : `Button`,
-  `BUTTON_PRIMARY`, `BUTTON_SECONDARY`, `ACTION_LINK_SM`, vingt-sept copies retirées et
-  `readings-panel.tsx` ramené au socle. Restent l'**état vide dans un bloc** en **cinq variantes** et
-  le **bandeau d'archivage** dupliqué entre les deux pages de détail. La doctrine est tranchée : ce
-  qui manque n'est plus une décision, c'est du travail.
-  → **TD.5, puis TD.4, puis TD.6 (`tickets-TD.md`).** TD.6 est le seul qui ne retire rien : il
-  **empêche la copie suivante**, faute de quoi les autres ne sont qu'un nettoyage — `ACTION_LINK`,
-  extrait en TD.1, a redivergé six jours plus tard. **Sa liste de signatures est à corriger** : la
-  fiche annonce onze copies du bouton primaire et neuf du lien `sm`, le dépôt en portait douze et
-  onze.
+- **Le socle couvre vingt et un des quarante composants du design system.** Détail et mesures dans
+  `JOURNAL-TECHNIQUE.md` (18/08/2026). **Les trois logements que TD.6 doit garder existent** :
+  `Button` / `BUTTON_PRIMARY` / `BUTTON_SECONDARY` / `ACTION_LINK_SM` (TD.3), puis `BlockNote` et
+  `ArchivedNotice` (TD.4) — quarante-trois copies retirées en deux tickets. La doctrine est tranchée :
+  ce qui manque n'est plus une décision, c'est du travail.
+  → **TD.5, puis TD.6 (`tickets-TD.md`).** TD.6 est le seul qui ne retire rien : il **empêche la
+  copie suivante**, faute de quoi les autres ne sont qu'un nettoyage — `ACTION_LINK`, extrait en
+  TD.1, a redivergé six jours plus tard, et l'état vide a redivergé **trois fois** dans
+  `components/team/` pendant que TD.4 était en attente. **Sa liste de signatures est à corriger sur
+  deux points** : la fiche annonce onze copies du bouton primaire et neuf du lien `sm`, le dépôt en
+  portait douze et onze ; et la signature « état vide dans un bloc » **ne peut pas être la chaîne
+  seule** — `text-sm leading-175 text-content-neutral-dark` reste porté légitimement par cinq
+  paragraphes qui ne sont pas des absences (une bio, un résumé de persona, une note de vision, un
+  écart chiffré). Un motif calqué sur elle ferait cinq faux positifs dans un ticket dont le critère
+  est de finir à zéro.
+- **Cinq états vides ne se lisent dans aucun HTML servi, faute de données qui les atteignent.**
+  Relevé en mesurant TD.4 : le relevé absent d'une North Star et sa cible absente
+  (`indicators.tsx`), la carte d'indicateur sans relevé, le panneau « Gérer les relevés » vide, et la
+  personne qui n'est dans aucune équipe (`person-detail.tsx`). Les deux indicateurs vivants du
+  domaine portent des relevés et une cible ; le seul indicateur sans relevé est archivé, et la seule
+  personne sans équipe n'entre pas dans la liste Équipe. **Le code de ces cinq branches a changé
+  comme les autres, mais leur rendu n'a pas été vu** — ce n'est pas une dette de code, c'est un trou
+  de jeu d'essai. → **à couvrir par la fixture, ou par une sonde assumée, au prochain ticket qui
+  écrit en base.**
+
 - **La règle 2 n'est pas surveillée sur les espacements.** `--spacing` est un pas et non une échelle :
   Tailwind en dérive n'importe quel multiplicateur, et **une soixantaine de valeurs hors `--number-*`**
   se sont accumulées (`gap-2.5`, `px-2.25`, `mt-3.5`, `top-7.5`…), plus deux dimensions en dur dans

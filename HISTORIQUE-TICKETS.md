@@ -1939,6 +1939,83 @@ dans l'alphabet, délibérément.
 
 ---
 
+### TD.4 — l'état vide dans un bloc, et le bandeau d'archivage — 19/08/2026
+
+**Pourquoi ce ticket maintenant, et l'ordre enfreint.** La fiche prescrit TD.5 avant TD.4, pour que
+le garde-fou des espacements précède l'élargissement de la surface. TD.4 a été pris en premier sur
+demande. Conséquence unique et bornée, tenue : **aucune marge hors échelle n'a été créée**, les trois
+qui existaient (`mt-3.5`, `mt-4`, `mt-2`) sont passées telles quelles au point d'appel, et TD.5 les
+arrondira là où elles étaient déjà.
+
+**Trois arbitrages tranchés avant écriture, comme la fiche l'exigeait.** (1) La note de
+`SectionHeader` **se rend** — la page projet gagne une ligne, et l'unique avertissement permanent du
+dépôt disparaît. (2) `components/team/` **entre au périmètre** : trois copies neuves y avaient été
+écrites par T5bis.3 et T5bis.4 le jour même, exactement comme `equipe/page.tsx` en TD.3, et le motif
+n'est pas esthétique — `socleLock` s'applique hors de `components/ui/**`, et les y laisser ferait
+échouer TD.6, dont le critère est de finir à zéro. (3) `BlockNote` a **une taille unique**.
+
+**Le tableau (a) de la fiche était faux sur cinq de ses quinze lignes, et c'est le résultat le plus
+transportable du ticket.** L'audit avait groupé par **chaîne CSS**, pas par **intention** :
+`projects/roadmap.tsx:410/568/576/598` sont le résultat, l'objectif, les participants et le motif
+d'annulation d'une carte — des lignes **présentes quand la donnée existe**, l'exact inverse d'une
+absence ; `products/roadmap.tsx:573` est l'avis « 1 accompagnement est masqué hors de cette période »,
+lu tel quel dans le HTML servi. Les convertir aurait fait passer cinq lignes de métadonnées pour des
+états vides et changé leur rendu sans raison. *Une factorisation se décide sur ce que le code veut
+dire, jamais sur ce qu'il porte comme classes — et un audit qui `grep` ne sait pas faire la
+différence.*
+
+**Trois sites que le même `grep` avait manqués, pour la raison symétrique.** `indicators.tsx:444`,
+`products/roadmap.tsx:390` et `:566` sont de vraies absences que leur préfixe de classe
+(`mt-3.5`, une marge, un `border-t`) soustrayait à la recherche exacte. Les deux derniers sont dans
+un fichier que le ticket déclarait hors périmètre — ils y sont entrés parce que leur conversion est
+**à diff nul** et que les laisser aurait rendu TD.6 impossible à finir à zéro. Écart au plan, assumé
+et rapporté. Bilan réel : **16 points d'appel dans 9 fichiers**, contre les 15 annoncés dont 5 faux
+positifs.
+
+**Le jeton s'est choisi à la mesure, et la mesure était déjà écrite dans le dépôt.**
+`content-neutral-base` et `content-neutral-dark` passent tous deux sur les deux tonalités où ce
+paragraphe se rend — 4,79:1 et 7,82:1 sur `surface-primary-lightest`, 4,98:1 et 8,12:1 sur
+`surface-neutral-pale`. Le départage est le critère de la fiche, « celui qui passe **partout** » :
+`-base` tombe à **3,75:1** sur `surface-primary-lighter`, `-dark` tient à 6,11:1. Le calcul reproduit
+au centième les chiffres que `block.tsx` cite depuis le 17/08, ce qui valait contrôle de
+l'instrument — et `products/roadmap.tsx:390` portait déjà, en commentaire, **le même raisonnement et
+les mêmes trois ratios**. La décision avait donc déjà été prise une fois, dans un fichier, par
+quelqu'un qui ne pouvait pas l'imposer aux autres. C'est très exactement ce qu'un socle sert à faire.
+
+**Une décision de composant, contraire à celle de TD.3 et pour la même raison.** `className` se
+compose en **préfixe** dans `BlockNote`, là où `Button` le compose en suffixe. TD.3 avait lu ses neuf
+points d'appel et vu `className` écrit en dernier ; TD.4 a lu les siens et vu la marge écrite en
+**tête**. Même méthode, données opposées, conclusion opposée — et le gain se mesure : les trois points
+d'appel qui portent une marge, plus le `border-t` de `roadmap.tsx:566`, rendent un attribut `class`
+**identique au caractère près**. Un suffixe les aurait tous réordonnés pour rien.
+
+**Vérification — 25 adresses, instrument reconstruit, mis en défaut, et remis.** Le harnais de TD.3
+a été refait : capture des 25 adresses avec tout `<script>` neutralisé, déterminisme prouvé sur deux
+captures successives **avant** toute mesure, puis avant/après à base immobile — aucune écriture,
+aucune sonde, les fixtures de TD.1 ont suffi. **Le témoin :** une classe `TEMOIN-TD4` posée dans
+`BLOCK_NOTE` a bougé **exactement les 14 adresses** qui portent un `BlockNote`, **zéro ligne sans le
+témoin**, et les 11 autres n'ont pas bougé ; retiré, retour **exact** à l'état mesuré.
+
+**Les écarts, tous annoncés avant d'être vus, et le compte tombe juste.** 45 lignes ajoutées, 39
+retirées : **34 rendus** passent de `-base` à `-dark`, **5 rendus** du `text-md` au `text-sm`
+(`indicators.tsx:378`), et **6 rendus** gagnent la note « Le récit de l'accompagnement, au mois. ».
+Aucune ligne inexpliquée, aucun réordonnancement de classe, aucun changement de structure. **Le
+bandeau d'archivage donne un diff strictement vide** sur les trois pages archivées, comme la fiche
+l'annonçait.
+
+**Cinq branches n'ont pas pu être lues, et c'est dit plutôt que supposé.** Le relevé absent d'une
+North Star, sa cible absente, la carte d'indicateur sans relevé, le panneau de relevés vide et la
+personne sans équipe n'existent dans aucune donnée du domaine — les deux indicateurs vivants portent
+relevés et cible, le seul sans relevé est archivé. Leur code a changé comme celui des autres ; leur
+rendu n'a pas été vu. Le point est ouvert dans `ETAT.md` comme un trou de jeu d'essai, pas comme une
+dette de code.
+
+**`npm run lint` finit à zéro pour la première fois du projet** — c'est le ticket qui a retiré
+l'unique avertissement permanent du dépôt, et TD.6 (c) n'attend plus rien. `npx tsc --noEmit` propre,
+**773 tests sur 23 fichiers verts sans qu'un fichier de test soit touché**.
+
+---
+
 ### TD.3 — le bouton et le lien d'action — 19/08/2026
 
 **Pourquoi ce ticket, et pourquoi maintenant.** Premier des quatre tickets tirés de l'audit de la
@@ -2018,6 +2095,18 @@ supprimées. La règle 4 a rendu ce ticket gratuit en données.
 *(archivés depuis `ETAT.md` le 14/08/2026 — ils étaient barrés dans la section « Points ouverts »,
 où ils occupaient encore la place. Conservés tels quels : un point refermé documente comment il
 l%s été.)*
+
+- ~~**`SectionHeader` déclare une note et ne la rend jamais.**~~ **Refermé le 19/08/2026 par TD.4**,
+  sur arbitrage humain rendu avant écriture : **la note se rend**. La prop était déclarée depuis T2.3
+  et affichée nulle part ; `roadmap.tsx:171` lui passait « Le récit de l'accompagnement, au mois. »,
+  phrase qui n'était **dans aucun HTML servi** et que `docs/06` §5 corrobore pourtant — « c'est le
+  récit du projet ». Elle se lit désormais sur six rendus. **Elle a pris `basis-full` plutôt qu'un
+  conteneur autour du titre** : l'en-tête est déjà une boîte `flex-wrap`, et l'envelopper aurait
+  donné un `<div>` de plus aux trois appelants qui ne passent pas de note — un écart de rendu sur des
+  écrans que le ticket ne visait pas. **Ce point valait plus que sa ligne** : il est la démonstration
+  que le dépôt s'est faite contre lui-même du principe de TD.6 (c). L'unique avertissement permanent
+  du dépôt était un **vrai défaut**, resté lisible et non lu à côté des quatre faux positifs que
+  `underscoreIsIntentional` avait été écrite pour taire. `npm run lint` finit à zéro depuis.
 
 - ~~**`createProject` accepte encore un produit archivé.**~~ **Refermé le 17/08/2026 par TD.1**, à
   qui `ETAT.md` l'assignait — « le prochain ticket qui ouvre `app/(app)/projets/actions.ts` sans que

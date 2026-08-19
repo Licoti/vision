@@ -108,6 +108,7 @@ import {
   MENU_ITEM_DANGER,
 } from "@/components/ui/action-menu";
 import { Block, BlockDivider } from "@/components/ui/block";
+import { BlockNote } from "@/components/ui/empty-state";
 import { Tag } from "@/components/ui/tag";
 import { ACTION_LINK } from "@/components/ui/action-link";
 import {
@@ -375,7 +376,7 @@ export function Indicators({
                  Le lien n'apparaît qu'au responsable de domaine — et ce n'est
                  pas ce rendu qui protège : `updateProductVision` redérive le
                  droit sur l'identifiant reçu. */
-              <p className="text-md leading-175 text-content-neutral-dark">
+              <BlockNote>
                 Aucune vision pour l&apos;instant. Ce bloc dira pourquoi ce
                 produit existe et vers quoi il va — la question que la North
                 Star mesure.
@@ -391,7 +392,7 @@ export function Indicators({
                     </DrawerLink>
                   </>
                 ) : null}
-              </p>
+              </BlockNote>
             )}
           </div>
         </div>
@@ -441,11 +442,11 @@ export function Indicators({
              blanche vide dirait qu'il manque quelque chose à l'endroit où il
              n'y a rien à encadrer. Un état vide est un écran à part entière
              (règle 5), pas la version creuse de l'écran plein. */
-          <p className="mt-3.5 text-sm leading-175 text-content-neutral-dark">
+          <BlockNote className="mt-3.5">
             {indicators.length === 0
               ? "Aucun indicateur pour l'instant. Le premier que ce produit portera pourra être désigné North Star : celui qui dit où le produit veut aller."
               : "Aucune North Star désignée. Le menu de ce bloc permet de choisir lequel de ces indicateurs porte l'objectif global du produit."}
-          </p>
+          </BlockNote>
         )}
 
         {/* ---- Rang 3 · les indicateurs associés ----------------------- */}
@@ -519,9 +520,7 @@ export function Indicators({
             ) : null}
 
             {others.length === 0 && !addHref ? (
-              <p className="text-sm leading-175 text-content-neutral-dark">
-                Aucun indicateur associé sur ce produit.
-              </p>
+              <BlockNote>Aucun indicateur associé sur ce produit.</BlockNote>
             ) : null}
           </div>
         </details>
@@ -603,10 +602,10 @@ function NorthStar({
             </span>
           </p>
         ) : (
-          <p className="mt-4 text-sm leading-175 text-content-neutral-dark">
+          <BlockNote className="mt-4">
             Aucun relevé pour l&apos;instant : cette mesure n&apos;est pas
             encore située dans le temps.
-          </p>
+          </BlockNote>
         )}
 
         {scale ? (
@@ -626,10 +625,10 @@ function NorthStar({
         ) : null}
 
         {indicator.targetValue === null ? (
-          <p className="text-sm leading-175 text-content-neutral-dark">
+          <BlockNote>
             Aucune cible de produit. Le panneau de correction de
             l&apos;indicateur permet d&apos;en poser une.
-          </p>
+          </BlockNote>
         ) : null}
       </div>
 
@@ -1135,9 +1134,7 @@ function IndicatorCard({
           </span>
         </p>
       ) : (
-        <p className="mt-2 text-xs text-content-neutral-base">
-          Aucun relevé pour l&apos;instant.
-        </p>
+        <BlockNote className="mt-2">Aucun relevé pour l&apos;instant.</BlockNote>
       )}
 
       <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-content-neutral-base">
