@@ -263,6 +263,26 @@ export const PERSONA_PANEL_NEW = "nouveau";
 export const PERSONA_DETAIL_PARAM = "fiche";
 
 /**
+ * Le panneau de la **fiche d'une personne** (T5bis.4), seule clé d'ouverture de
+ * la page Équipe — et la première d'une page qui n'a pas d'objet à elle.
+ *
+ * **Sa valeur est toujours un identifiant de personne**, jamais polymorphe et
+ * jamais une valeur fixe : c'est la forme de `PERSONA_DETAIL_PARAM`, pour la
+ * même raison — la fiche détaille une ligne, et il n'y a rien à créer ici.
+ *
+ * **Elle reste une adresse, elle n'est plus le mécanisme** (TD.2) :
+ * `/equipe?personne=<identifiant>` rend encore la fiche au rendu serveur, mais
+ * le clic passe par `DrawerHost` et n'écrit plus l'URL. Les deux chemins
+ * traversent la **même** résolution — `lib/drawers/team.tsx`.
+ *
+ * **Aucun droit ne la garde** : la fiche se lit par tout le domaine (D9), comme
+ * la liste qui la porte. T5bis.6 ajoutera deux clés d'écriture — `personne` y
+ * prendra une seconde valeur, `nouvelle`, et `competence` viendra à côté —, qui
+ * demanderont `manageDomain` (arbitrage (c)).
+ */
+export const PERSON_PANEL_PARAM = "personne";
+
+/**
  * Les deux bornes de la fenêtre de la **roadmap**, sur la page du produit.
  *
  * **Ce ne sont pas des clés d'ouverture**, et elles ne rejoignent donc pas le
@@ -481,11 +501,26 @@ export const ROUTES = {
   /**
    * Le référentiel des personnes (T5bis.2).
    *
-   * **Une adresse, et aucune fonction de route à côté d'elle** : cet écran n'a
-   * pas de page de détail. D29 tient — la fiche d'une personne s'ouvrira en
-   * T5bis.4 par un paramètre sur cette même URL, jamais par `/equipe/<id>`.
+   * **Cet écran n'a pas de page de détail**, et n'en aura pas : D29 tient. La
+   * fonction ci-dessous n'en est donc pas une — c'est la même adresse, avec un
+   * paramètre.
    */
   team: "/equipe",
+  /**
+   * La page Équipe, **fiche d'une personne ouverte** en lecture (T5bis.4).
+   *
+   * **Ce n'est pas un écran de plus** : c'est le même, avec un paramètre — la
+   * forme de `productPersona` jusqu'au nom de la clé, et la fermeture est donc
+   * `team`, qui n'a pas besoin d'entrée à elle. Elle ne demande aucun droit :
+   * la fiche se lit par tout le domaine (D9), comme la liste qui la porte.
+   *
+   * **La forme canonique, et non celle qu'emploie la liste** : une ligne
+   * filtrée y ajoute les filtres courants pour que la sortie du panneau les retrouve
+   * sans JavaScript. Cette recomposition appartient à l'écran, qui seul a lu et
+   * confronté ces valeurs — une route ne recopie pas des paramètres qu'elle n'a
+   * pas vérifiés.
+   */
+  teamPerson: (personId: string) => `/equipe?${PERSON_PANEL_PARAM}=${personId}`,
   about: "/a-propos",
 } as const;
 

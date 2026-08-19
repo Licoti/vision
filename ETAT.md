@@ -2,10 +2,10 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 18/08/2026 — T5bis.3 terminé : les cinq filtres de la liste Équipe, dont
-la conjonction des compétences.
+**Dernière mise à jour :** 19/08/2026 — T5bis.4 terminé : la fiche d'une personne, en panneau sur
+la page Équipe.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
-**Ticket suivant :** **T5bis.4** — la fiche, en panneau (`tickets-C5bis.md`). **TD.3 est
+**Ticket suivant :** **T5bis.5** — le radar des compétences (`tickets-C5bis.md`). **TD.3 est
 disponible et ne dépend de rien** (`tickets-TD.md`) : l'ordre entre les deux revient à l'humain.
 
 ---
@@ -22,7 +22,7 @@ disponible et ne dépend de rien** (`tickets-TD.md`) : l'ordre entre les deux re
 | C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **terminé** |
 | TD — Dette technique | TD.1, TD.2 | **terminé** |
 | TD — Couche de présentation | TD.3 → TD.6 | **découpé**, non entamé (`tickets-TD.md`) |
-| C5bis — Équipe | T5bis.1 → T5bis.7 | **en cours** — T5bis.3 terminé |
+| C5bis — Équipe | T5bis.1 → T5bis.7 | **en cours** — T5bis.4 terminé |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
@@ -132,6 +132,17 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   retirer ne fait tomber aucun test. Deux lignes forgées de plus (une personne d'un autre domaine
   portant une liaison du domaine, une autre portant un de ses métiers) rendent les **onze**
   neutralisations concluantes, chacune sur son seul test.
+- **T5bis.4 — 19/08/2026 — la fiche, en panneau.** `/equipe` devient la **troisième page hôte** :
+  `<DrawerHost>`, `lib/drawers/team.tsx`, `loadTeamDrawer`, et une carte dont la ligne entière est
+  un `DrawerLink`. `findPersonDetail` rend le profil, les compétences par rang décroissant et les
+  accompagnements du plus récent au plus ancien. **Un accompagnement d'un produit archivé y reste**,
+  là où `listProjects` l'écarte : divergence assumée, la personne l'a mené. Sa singularité est
+  l'adresse de repli — seule des trois pages hôtes, elle **reconduit les cinq filtres** dans
+  `closeHref` et dans chaque lien de ligne, parce qu'ici l'URL nue effacerait la recherche que le
+  panneau vient de servir (`docs/06` §9). Sa leçon est dans le harnais : **une fonction serveur se
+  frappe en `text/plain`, jamais en urlencodé** — la charge est le tableau d'arguments encodé en
+  Flight, et l'urlencodé rend un **404** là où TD.1 avait connu un 200 muet ; sans étape témoin, ni
+  l'un ni l'autre ne prouve un refus.
 
 - **Les indicateurs associés repliés par défaut — hors ticket, le 18/08/2026.** Le rang 3 du bloc
   « Vision produit » devient un `<details>` fermé, dont `BlockDivider` sait être le `<summary>` — la
@@ -173,6 +184,16 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   → **ticket propre, C7 au plus tard** — vérifié aux découpages de C5 puis de C5bis : aucune de leurs
   fiches n'ouvre `archiveProject` ni `restoreProject`. T5bis.6 archive une **personne**, ce qui ne
   cascade sur rien (arbitrage (e)) et laisse ce point où il est.
+
+- **Le chemin du clic de `/equipe` n'a pas été parcouru au navigateur.** T5bis.4 demandait deux
+  vérifications séparées, et une seule a pu être faite : le chemin de l'**adresse** est lu dans le
+  HTML servi, le chemin du **clic** ne l'est pas — aucun navigateur pilotable n'était disponible
+  dans la session du 19/08/2026. Les cinq propriétés en attente sont celles de `DrawerHost` et non
+  de ce ticket — coquille présente avant le corps, une seule requête réseau, URL immobile,
+  défilement conservé, focus qui entre sur la croix et revient au déclencheur —, et **TD.2 les a
+  toutes éprouvées** le 18/08/2026 sur les deux premières pages hôtes ; `components/ui/drawer.tsx`
+  n'a pas changé d'une ligne depuis. Ce qui reste à confirmer est donc que `/equipe` s'y branche
+  comme les deux autres, ce qu'un clic sur une ligne suffit à voir. → **action humaine, un clic.**
 
 - **`SectionHeader` déclare une note et ne la rend jamais.** `components/ui/section.tsx:26` accepte
   une prop `note` qu'aucune ligne n'affiche ; `components/projects/roadmap.tsx:171` lui passe « Le
@@ -265,19 +286,23 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   connaissance de cause. Le jour où un second bloc reprend le surtitre, `Eyebrow` quitte
   `indicators.tsx` pour `components/ui/block.tsx`. → **arbitrage humain, pas un ticket.**
 
-- **Une carte dans un bloc ne se détache d'aucun fond, et c'est le design system qui manque.** La
-  North Star d'abord : la maquette sépare la carte (`#ffffff`) du bloc (`#eef2fb`) à 1,12:1, nos
-  jetons donnent 1,04:1, et **c'est la bordure qui la rend lisible** — 1,33:1 contre l'intérieur,
-  1,28:1 contre le bloc. Les cartes de personae ensuite (18/08/2026), qui posent le même problème
-  sur la tonalité neutre : **aucun fond disponible ne les détache** — `surface-neutral-lightest`
-  sur `surface-neutral-pale` donne 1,05:1 —, si bien qu'elles n'en portent aucun et que **le filet
-  seul fait la carte**, à 1,17:1. C'est le couple de `Section`, de `Block` et d'`EmptyState`, à sa
-  position habituelle : rien de neuf n'a été introduit, et rien de plus sombre n'existe — le plus
-  franc des `surface-neutral-*` plafonne à 2,22:1, toujours sous la limite de 3:1. Aucun jeton ne
-  porte le bleu intermédiaire non plus : `midnight-150` (`#e4ecf8`) est une primitive que la couche
-  sémantique §2.1 n'utilise nulle part. Le combler serait ajouter des jetons au design system, hors
-  du périmètre d'une reprise de bloc. **Tous les couples de texte, eux, sont mesurés au-dessus de
-  4,5:1** — le plus bas est à 4,98:1. → **arbitrage humain, sinon C7.**
+- **Une carte ne se détache d'aucun fond, et c'est le design system qui manque.** Trois positions,
+  un seul manque. La North Star d'abord : la maquette sépare la carte (`#ffffff`) du bloc
+  (`#eef2fb`) à 1,12:1, nos jetons donnent 1,04:1, et **c'est la bordure qui la rend lisible** —
+  1,33:1 contre l'intérieur, 1,28:1 contre le bloc. Les cartes de personae ensuite (18/08/2026), qui
+  posent le même problème sur la tonalité neutre : **aucun fond disponible ne les détache** —
+  `surface-neutral-lightest` sur `surface-neutral-pale` donne 1,05:1 —, si bien qu'elles n'en
+  portent aucun et que **le filet seul fait la carte**, à 1,17:1. **Le panneau enfin** (T5bis.4,
+  19/08/2026) : sur `surface-neutral-pale` (`#fdfdfd`), le fond du tiroir, le filet
+  `surface-neutral-lighter` mesure **1,24:1** — la même situation, à sa troisième position, et le
+  fond le plus franc que le panneau pourrait porter n'y changerait rien. C'est le couple de
+  `Section`, de `Block` et d'`EmptyState` : rien de neuf n'a été introduit, et rien de plus sombre
+  n'existe — le plus franc des `surface-neutral-*` plafonne à 2,22:1, toujours sous la limite de
+  3:1. Aucun jeton ne porte le bleu intermédiaire non plus : `midnight-150` (`#e4ecf8`) est une
+  primitive que la couche sémantique §2.1 n'utilise nulle part. Le combler serait ajouter des jetons
+  au design system, hors du périmètre d'une reprise de bloc comme d'une fiche. **Tous les couples de
+  texte, eux, sont mesurés au-dessus de 4,5:1** — le plus bas, dans le panneau de T5bis.4, est à
+  4,98:1. → **arbitrage humain, sinon C7.**
 
 - **Sans JavaScript, les gestes d'une carte de roadmap ne sont plus atteignables.** Le menu « … »
   décide lui-même de son ouverture (`useState`), seule exception arbitrée à D30 — élargie le

@@ -1,11 +1,13 @@
 /**
- * Les lectures de l'écran Équipe.
+ * Les lectures de l'écran Équipe : la liste et ses filtres (T5bis.2, T5bis.3),
+ * puis la **fiche** d'une personne (T5bis.4).
  *
- * Elle joint quatre tables, elle passe donc par `joinedRead` — le seul chemin
- * que la couche d'accès ouvre à une jointure. **Toute table jointe porte
- * `filter(table)`** : c'est la condition posée par l'en-tête de `joinedRead`, et
- * un oubli serait une fuite de domaine que rien d'autre ne rattraperait. La
- * leçon que T5.5 a resservie : les filtres de domaine se rattrapent.
+ * Elles joignent plusieurs tables, elles passent donc par `joinedRead` — le
+ * seul chemin que la couche d'accès ouvre à une jointure. **Toute table jointe
+ * porte `filter(table)`** : c'est la condition posée par l'en-tête de
+ * `joinedRead`, et un oubli serait une fuite de domaine que rien d'autre ne
+ * rattraperait. La leçon que T5.5 a resservie : les filtres de domaine se
+ * rattrapent.
  *
  * Ce module n'importe pas `db` : il reçoit un `ScopedDb` déjà lié au domaine
  * courant. Règle 1.
@@ -31,9 +33,13 @@ import {
   personKind,
   personSkills,
   persons,
+  projectMembers,
+  projectStatuses,
+  projects,
   skillLevels,
   skills,
 } from "@/lib/db/schema";
+import type { ProjectStatusNature } from "@/lib/queries/projects";
 
 /** Le côté d'où vient la personne — centre de compétence ou entité (docs/04 §2). */
 export type PersonKind = (typeof personKind.enumValues)[number];
@@ -374,4 +380,167 @@ export async function listTeamFilterOptions(
       rank: row.rank,
     })),
   };
+}
+
+/* ==========================================================================
+   La fiche d'une personne — T5bis.4
+   ========================================================================== */
+
+/**
+ * Un accompagnement auquel la personne a participé.
+ *
+ * **Aucun rôle, aucun droit** : `is_contributor` n'est pas lu. D9 sépare
+ * l'appartenance à l'équipe du droit d'écrire, et la fiche raconte une
+ * participation — c'est déjà la règle de `listProjects`.
+ */
+export type PersonProject = {
+  id: string;
+  name: string;
+  statusLabel: string;
+  statusNature: ProjectStatusNature;
+  /** `date` en base : une période se dit au jour, jamais en horodatage. */
+  startedOn: string | null;
+  expectedEndOn: string | null;
+};
+
+/** Tout ce que la fiche affiche d'une personne, et rien de plus. */
+export type PersonDetail = {
+  id: string;
+  fullName: string;
+  kind: PersonKind;
+  /** Nul pour qui n'a pas de métier design : une personne hors centre. */
+  jobLabel: string | null;
+  /** La courte présentation. Nulle : elle est facultative. */
+  bio: string | null;
+  /** Toujours nulle pour un intervenant côté entité (arbitrage (d) de C5bis). */
+  availability: PersonAvailability | null;
+  skills: TeamSkill[];
+  projects: PersonProject[];
+};
+
+/**
+ * La fiche d'une personne : son profil, ses compétences, ses accompagnements.
+ *
+ * **Trois lectures fixes, jamais une par compétence ni par accompagnement** —
+ * la discipline de `listTeam`, et la raison est la même : le nombre de requêtes
+ * ne doit dépendre d'aucun décompte.
+ *
+ * **Une personne archivée ne rend rien** : l'écran Équipe est un référentiel,
+ * et la fiche en est le détail. Elle reste affichée dans l'équipe des
+ * accompagnements qu'elle a menés (arbitrage (e)), et c'est `findProjectDetail`
+ * qui le fait — une autre lecture, sur un autre écran.
+ *
+ * **Les compétences sortent dans l'ordre de la liste** : rang décroissant, puis
+ * libellé. Un ordre de lecture **à l'intérieur** d'un profil, jamais un
+ * classement entre personnes (garde-fou 3) — et deux écrans qui montreraient le
+ * même profil dans deux ordres seraient un défaut.
+ *
+ * **Seuls les accompagnements archivés sont écartés.** Ceux d'un produit
+ * archivé restent : la personne les a menés, et un produit rangé ne fait pas
+ * disparaître ce qu'elle a fait. C'est l'esprit de l'arbitrage (e), et la
+ * divergence avec `listProjects` — qui écarte les projets d'un produit archivé
+ * parce qu'elle répond à « où en sont nos accompagnements » — est assumée.
+ *
+ * **Aucun décompte n'est rendu** : ni nombre d'accompagnements, ni nombre de
+ * compétences, ni moyenne de niveau. La liste se lit, elle ne se totalise pas
+ * (garde-fou 2).
+ */
+export function findPersonDetail(
+  scope: ScopedDb,
+  personId: string,
+): Promise<PersonDetail | null> {
+  return scope.joinedRead(async (database, { filter }) => {
+    // `leftJoin` : le métier est facultatif (docs/04 §2). Une jointure interne
+    // ferait disparaître la fiche d'une personne hors centre.
+    const found = await database
+      .select({
+        id: persons.id,
+        fullName: persons.fullName,
+        jobLabel: jobs.label,
+        kind: persons.kind,
+        bio: persons.bio,
+        availability: persons.availability,
+      })
+      .from(persons)
+      .leftJoin(jobs, and(eq(jobs.id, persons.jobId), filter(jobs)))
+      .where(
+        and(
+          filter(persons),
+          eq(persons.id, personId),
+          isNull(persons.archivedAt),
+        ),
+      )
+      .limit(1);
+
+    const person = found[0];
+    if (!person) return null;
+
+    /* Les deux lectures suivantes sont indépendantes : un seul temps d'attente,
+       la discipline de la page projet depuis T4.1. */
+    const [skillRows, projectRows] = await Promise.all([
+      database
+        .select({
+          id: personSkills.id,
+          label: skills.label,
+          levelLabel: skillLevels.label,
+          levelRank: skillLevels.rank,
+        })
+        .from(personSkills)
+        .innerJoin(
+          skills,
+          and(eq(skills.id, personSkills.skillId), filter(skills)),
+        )
+        .innerJoin(
+          skillLevels,
+          and(eq(skillLevels.id, personSkills.levelId), filter(skillLevels)),
+        )
+        .where(and(filter(personSkills), eq(personSkills.personId, person.id)))
+        .orderBy(desc(skillLevels.rank), asc(skills.label)),
+
+      database
+        .select({
+          id: projects.id,
+          name: projects.name,
+          statusLabel: projectStatuses.label,
+          statusNature: projectStatuses.nature,
+          startedOn: projects.startedOn,
+          expectedEndOn: projects.expectedEndOn,
+        })
+        .from(projectMembers)
+        .innerJoin(
+          projects,
+          and(eq(projects.id, projectMembers.projectId), filter(projects)),
+        )
+        .innerJoin(
+          projectStatuses,
+          and(
+            eq(projectStatuses.id, projects.statusId),
+            filter(projectStatuses),
+          ),
+        )
+        .where(
+          and(
+            filter(projectMembers),
+            eq(projectMembers.personId, person.id),
+            isNull(projects.archivedAt),
+          ),
+        )
+        /* Le plus récent d'abord, comme la liste des accompagnements d'un
+           produit. Un projet sans date de début vient en dernier plutôt que de
+           passer devant tout le monde ; le nom départage, et l'identifiant en
+           dernier — un ordre qui varierait d'un affichage à l'autre serait un
+           défaut. */
+        .orderBy(
+          sql`${projects.startedOn} desc nulls last`,
+          asc(projects.name),
+          asc(projects.id),
+        ),
+    ]);
+
+    return {
+      ...person,
+      skills: skillRows,
+      projects: projectRows,
+    };
+  });
 }

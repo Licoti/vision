@@ -26,6 +26,13 @@
  * Les constats se lisent par identifiant et non par position — sauf le test du
  * tri, qui compare des rangs relatifs. Un défaut d'ordre ne doit pas faire
  * tomber les autres.
+ *
+ * **T5bis.4 ajoute la fiche**, et avec elle trois tables jointes de plus —
+ * `project_members`, `projects`, `project_statuses` —, donc **trois lignes
+ * forgées de plus**, sur la même règle : chacune ne franchit la frontière que
+ * sur *une* colonne. Sans elles, retirer le `filter()` de l'une de ces trois
+ * jointures ne ferait tomber aucun test — la leçon de T5bis.3, où un filtre
+ * qu'aucune ligne forgée ne vise n'est pas éprouvé.
  */
 
 import { inArray } from "drizzle-orm";
@@ -35,17 +42,33 @@ import { db } from "@/lib/db/client";
 import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
 import {
   domains,
+  entities,
   jobs,
   personSkills,
   persons,
+  products,
+  projectMembers,
+  projectStatuses,
+  projects,
   skillLevels,
   skills,
 } from "@/lib/db/schema";
 
-import { listTeam, listTeamFilterOptions } from "./team";
+import { findPersonDetail, listTeam, listTeamFilterOptions } from "./team";
 
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
-const teardownOrder = [personSkills, persons, skillLevels, skills, jobs];
+const teardownOrder = [
+  projectMembers,
+  projects,
+  products,
+  entities,
+  projectStatuses,
+  personSkills,
+  persons,
+  skillLevels,
+  skills,
+  jobs,
+];
 
 type Fixture = {
   domainId: string;
@@ -81,6 +104,21 @@ type Fixture = {
   probeLinkSkillId: string;
   probeSkillId: string;
   probeLevelSkillId: string;
+  /* --- Ce que la fiche ajoute (T5bis.4) : les accompagnements d'Alice. --- */
+  productId: string;
+  activeStatusId: string;
+  /** Le plus récent : il ouvre la liste. */
+  freshProjectId: string;
+  /** Sous un produit **archivé** : il reste, la personne l'a mené. */
+  underArchivedProjectId: string;
+  /** Le plus ancien des datés. */
+  oldProjectId: string;
+  /** Sans date de début : il ferme la liste (`nulls last`). */
+  undatedProjectId: string;
+  /** Archivé : hors de la fiche. */
+  archivedProjectId: string;
+  /** Aucun membre légitime : c'est sur lui que la liaison forgée porte. */
+  probeLinkProjectId: string;
 };
 
 const suffix = Math.random().toString(36).slice(2, 10);
@@ -88,6 +126,10 @@ let a: Fixture;
 let b: Fixture;
 /** La personne de `a` dont le métier pointe, par forgeage, un métier de `b`. */
 let forgedJobPersonId: string;
+/** Le projet de `b` dont le statut est de `a` — il n'est écarté que par `filter(projects)`. */
+let forgedCrossProjectId: string;
+/** Le projet de `a` dont le statut est de `b` — écarté par `filter(projectStatuses)` seul. */
+let forgedStatusProjectId: string;
 
 async function seedDomain(label: string): Promise<Fixture> {
   const domain = await superAdmin.createDomain({
@@ -184,6 +226,8 @@ async function seedDomain(label: string): Promise<Fixture> {
     kind: "center",
     jobId: job.id,
     availability: "available",
+    // La présentation : lue par la fiche seule, jamais par la liste.
+    bio: `Conçoit les parcours de bout en bout ${label}.`,
   });
 
   /* Deux compétences au rang 4 et une au rang 3, saisies dans le désordre :
@@ -222,6 +266,86 @@ async function seedDomain(label: string): Promise<Fixture> {
     levelId: advanced.id,
   });
 
+  /* ------------------------------------------------------------------
+     Les accompagnements d'Alice (T5bis.4). Un produit, deux statuts, cinq
+     projets : le récent, celui d'un produit archivé, l'ancien, celui sans
+     date, et l'archivé. Plus un projet-sonde sans membre légitime.
+     ------------------------------------------------------------------ */
+  const entity = await scope.insert(entities, { label: `Entité ${label}` });
+  const product = await scope.insert(products, {
+    name: `Produit ${label}`,
+    entityId: entity.id,
+  });
+  const archivedProduct = await scope.insert(products, {
+    name: `Produit rangé ${label}`,
+    entityId: entity.id,
+  });
+  await scope.archive(products, archivedProduct.id);
+
+  const active = await scope.insert(projectStatuses, {
+    label: `En cours ${label}`,
+    nature: "active",
+    position: "2",
+  });
+  const done = await scope.insert(projectStatuses, {
+    label: `Terminé ${label}`,
+    nature: "done",
+    position: "1",
+  });
+
+  const fresh = await scope.insert(projects, {
+    name: `Refonte ${label}`,
+    productId: product.id,
+    statusId: active.id,
+    startedOn: "2026-02-01",
+    expectedEndOn: "2026-07-31",
+  });
+  /* Sous un produit archivé : la fiche le garde (arbitrage du ticket), là où
+     `listProjects` l'écarterait. Un produit rangé ne fait pas disparaître ce
+     que la personne a fait. */
+  const underArchived = await scope.insert(projects, {
+    name: `Reprise ${label}`,
+    productId: archivedProduct.id,
+    statusId: active.id,
+    startedOn: "2025-05-01",
+  });
+  const old = await scope.insert(projects, {
+    name: `Audit ${label}`,
+    productId: product.id,
+    statusId: done.id,
+    startedOn: "2024-03-01",
+    expectedEndOn: "2024-09-30",
+  });
+  // Sans date : il doit fermer la liste, jamais l'ouvrir (`nulls last`).
+  const undated = await scope.insert(projects, {
+    name: `Cadrage ${label}`,
+    productId: product.id,
+    statusId: active.id,
+  });
+  const archivedProject = await scope.insert(projects, {
+    name: `Rangé ${label}`,
+    productId: product.id,
+    statusId: done.id,
+    startedOn: "2023-01-01",
+  });
+  const probeLinkProject = await scope.insert(projects, {
+    name: `Sonde liaison projet ${label}`,
+    productId: product.id,
+    statusId: active.id,
+    startedOn: "2022-01-01",
+  });
+
+  for (const projectId of [
+    fresh.id,
+    underArchived.id,
+    old.id,
+    undated.id,
+    archivedProject.id,
+  ]) {
+    await scope.insert(projectMembers, { projectId, personId: alice.id });
+  }
+  await scope.archive(projects, archivedProject.id);
+
   return {
     domainId: domain.id,
     scope,
@@ -245,6 +369,14 @@ async function seedDomain(label: string): Promise<Fixture> {
     probeLinkSkillId: probeLink.id,
     probeSkillId: probeSkill.id,
     probeLevelSkillId: probeLevel.id,
+    productId: product.id,
+    activeStatusId: active.id,
+    freshProjectId: fresh.id,
+    underArchivedProjectId: underArchived.id,
+    oldProjectId: old.id,
+    undatedProjectId: undated.id,
+    archivedProjectId: archivedProject.id,
+    probeLinkProjectId: probeLinkProject.id,
   };
 }
 
@@ -312,6 +444,57 @@ async function forgeLeaks(): Promise<void> {
     source: "manual",
     kind: "center",
     jobId: a.ghostJobId,
+  });
+
+  /* ------------------------------------------------------------------------
+     Les trois jointures de la fiche (T5bis.4). Chacune ne franchit la
+     frontière que sur **une** table : c'est ce qui fait qu'un seul filtre
+     l'écarte, et donc qu'un seul test tombe quand on le retire.
+     ------------------------------------------------------------------------ */
+
+  // (7) La liaison est d'un autre domaine — le projet, la personne et le statut
+  //     sont de `a`. Seul `filter(projectMembers)` l'écarte.
+  await db.insert(projectMembers).values({
+    domainId: b.domainId,
+    projectId: a.probeLinkProjectId,
+    personId: a.aliceId,
+  });
+
+  /* (8) Le **projet** est d'un autre domaine, et il porte un statut de `a` : sans
+         ce détail, `filter(projectStatuses)` l'écarterait aussi et le test ne
+         désignerait plus un seul filtre. La liaison, elle, est de `a`. Seul
+         `filter(projects)` l'écarte. */
+  const cross = await db
+    .insert(projects)
+    .values({
+      domainId: b.domainId,
+      productId: b.productId,
+      statusId: a.activeStatusId,
+      name: `Sonde projet croisé ${suffix}`,
+    })
+    .returning({ id: projects.id });
+  forgedCrossProjectId = cross[0]!.id;
+  await db.insert(projectMembers).values({
+    domainId: a.domainId,
+    projectId: forgedCrossProjectId,
+    personId: a.aliceId,
+  });
+
+  // (9) L'inverse : un projet de `a` dont le **statut** est de `b`. La liaison et
+  //     le projet sont de `a` ; seul `filter(projectStatuses)` l'écarte.
+  const crossStatus = await db
+    .insert(projects)
+    .values({
+      domainId: a.domainId,
+      productId: a.productId,
+      statusId: b.activeStatusId,
+      name: `Sonde statut ${suffix}`,
+    })
+    .returning({ id: projects.id });
+  forgedStatusProjectId = crossStatus[0]!.id;
+  await a.scope.insert(projectMembers, {
+    projectId: forgedStatusProjectId,
+    personId: a.aliceId,
   });
 }
 
@@ -645,6 +828,158 @@ describe("listTeamFilterOptions — étanchéité", () => {
     // La liaison (4) est de `a` en tout point, sauf la personne.
     expect(options.skills.map((skill) => skill.label)).not.toContain(
       "Sonde compétence a",
+    );
+  });
+});
+
+/* ==========================================================================
+   La fiche — T5bis.4
+
+   Elle ne se lit pas par la liste : trois lectures de plus, dont deux tables
+   que `listTeam` ne joint jamais.
+   ========================================================================== */
+
+describe("findPersonDetail", () => {
+  test("l'identité, le métier, la présentation et la disponibilité", async () => {
+    const person = await findPersonDetail(a.scope, a.aliceId);
+
+    expect(person?.fullName).toBe(`Alice Martin a`);
+    expect(person?.jobLabel).toBe("Product Design a");
+    expect(person?.kind).toBe("center");
+    expect(person?.bio).toBe("Conçoit les parcours de bout en bout a.");
+    expect(person?.availability).toBe("available");
+  });
+
+  test("les compétences sortent par rang décroissant puis libellé", async () => {
+    const person = await findPersonDetail(a.scope, a.aliceId);
+
+    // Le même profil, dans le même ordre que sur la ligne de la liste : deux
+    // écrans qui montreraient l'un le contraire de l'autre seraient un défaut.
+    expect(person?.skills.map((skill) => skill.label)).toEqual([
+      "Accessibilité a",
+      "UX Design a",
+      "Design System a",
+      "Prototypage a",
+    ]);
+    expect(person?.skills.map((skill) => skill.levelRank)).toEqual([4, 4, 3, 3]);
+  });
+
+  test("les accompagnements, du plus récent au plus ancien, sans date en dernier", async () => {
+    const person = await findPersonDetail(a.scope, a.aliceId);
+
+    expect(person?.projects.map((project) => project.id)).toEqual([
+      a.freshProjectId,
+      a.underArchivedProjectId,
+      a.oldProjectId,
+      // Sans date de début : en dernier, jamais en tête.
+      a.undatedProjectId,
+    ]);
+  });
+
+  test("un accompagnement porte son statut et sa période", async () => {
+    const person = await findPersonDetail(a.scope, a.aliceId);
+    const fresh = person?.projects.find(
+      (project) => project.id === a.freshProjectId,
+    );
+
+    expect(fresh?.name).toBe("Refonte a");
+    expect(fresh?.statusLabel).toBe("En cours a");
+    expect(fresh?.statusNature).toBe("active");
+    expect(fresh?.startedOn).toBe("2026-02-01");
+    expect(fresh?.expectedEndOn).toBe("2026-07-31");
+  });
+
+  test("un accompagnement archivé n'est pas dans la fiche", async () => {
+    const person = await findPersonDetail(a.scope, a.aliceId);
+    expect(person?.projects.map((project) => project.id)).not.toContain(
+      a.archivedProjectId,
+    );
+  });
+
+  test("un accompagnement d'un produit archivé y reste", async () => {
+    const person = await findPersonDetail(a.scope, a.aliceId);
+    // La personne l'a mené : ranger le produit ne l'efface pas de son parcours.
+    expect(person?.projects.map((project) => project.id)).toContain(
+      a.underArchivedProjectId,
+    );
+  });
+
+  test("sans métier, sans présentation, sans compétence et sans accompagnement", async () => {
+    const person = await findPersonDetail(a.scope, a.brunoId);
+
+    // Le `leftJoin` est là pour lui : une jointure interne rendrait `null`.
+    expect(person?.jobLabel).toBeNull();
+    expect(person?.bio).toBeNull();
+    expect(person?.skills).toEqual([]);
+    expect(person?.projects).toEqual([]);
+  });
+
+  test("un intervenant côté entité n'a pas de disponibilité", async () => {
+    const person = await findPersonDetail(a.scope, a.zoeId);
+    expect(person?.kind).toBe("stakeholder");
+    expect(person?.availability).toBeNull();
+  });
+
+  test("un identifiant inconnu n'ouvre rien", async () => {
+    expect(await findPersonDetail(a.scope, crypto.randomUUID())).toBeNull();
+  });
+
+  test("une personne archivée n'ouvre rien", async () => {
+    expect(await findPersonDetail(a.scope, a.yvesId)).toBeNull();
+  });
+});
+
+describe("findPersonDetail — étanchéité", () => {
+  test("aucune personne d'un autre domaine — `filter(persons)`", async () => {
+    // Elle n'existe pas dans ce domaine ; elle ne « manque » pas.
+    expect(await findPersonDetail(a.scope, b.aliceId)).toBeNull();
+  });
+
+  test("aucun métier d'un autre domaine — `filter(jobs)`", async () => {
+    const person = await findPersonDetail(a.scope, forgedJobPersonId);
+    expect(person).not.toBeNull();
+    expect(person?.jobLabel).toBeNull();
+  });
+
+  test("aucune liaison de compétence d'un autre domaine — `filter(personSkills)`", async () => {
+    const person = await findPersonDetail(a.scope, a.damienId);
+    expect(person?.skills.map((skill) => skill.label)).not.toContain(
+      "Sonde liaison a",
+    );
+  });
+
+  test("aucune compétence d'un autre domaine — `filter(skills)`", async () => {
+    const person = await findPersonDetail(a.scope, a.damienId);
+    expect(person?.skills.map((skill) => skill.label)).not.toContain(
+      "Sonde compétence b",
+    );
+  });
+
+  test("aucun niveau d'un autre domaine — `filter(skillLevels)`", async () => {
+    const person = await findPersonDetail(a.scope, a.damienId);
+    expect(person?.skills.map((skill) => skill.label)).not.toContain(
+      "Sonde niveau a",
+    );
+  });
+
+  test("aucune liaison d'équipe d'un autre domaine — `filter(projectMembers)`", async () => {
+    const person = await findPersonDetail(a.scope, a.aliceId);
+    expect(person?.projects.map((project) => project.id)).not.toContain(
+      a.probeLinkProjectId,
+    );
+  });
+
+  test("aucun accompagnement d'un autre domaine — `filter(projects)`", async () => {
+    const person = await findPersonDetail(a.scope, a.aliceId);
+    expect(person?.projects.map((project) => project.id)).not.toContain(
+      forgedCrossProjectId,
+    );
+  });
+
+  test("aucun statut d'un autre domaine — `filter(projectStatuses)`", async () => {
+    const person = await findPersonDetail(a.scope, a.aliceId);
+    expect(person?.projects.map((project) => project.id)).not.toContain(
+      forgedStatusProjectId,
     );
   });
 });

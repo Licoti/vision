@@ -24,12 +24,32 @@
  * l'ordre reste le nom quelle que soit la recherche, et une ligne retenue
  * affiche son profil entier — jamais les seules compétences qui ont filtré.
  *
- * **Les lignes ne mènent nulle part** (D29) : il n'y a pas de page personne, et
- * il n'y en aura pas — la fiche s'ouvrira en T5bis.4 en panneau sur cette même
- * page.
+ * **Une ligne ouvre la fiche, et n'emmène sur aucun écran** (D29, T5bis.4) : il
+ * n'y a pas de page personne et il n'y en aura pas — la fiche est un panneau sur
+ * cette même page, qui reste rendue derrière lui et porte alors `inert`.
+ *
+ * **Troisième page hôte de panneaux** après le produit et le projet. Depuis
+ * TD.2, l'ouverture est un **état client** : `DrawerHost` monte la coquille
+ * avant tout aller-retour, et `loadTeamDrawer` renvoie le corps **rendu sur le
+ * serveur**. `?personne=<identifiant>` reste une **adresse** valide, et les deux
+ * chemins traversent la même résolution — `lib/drawers/team.tsx` —, si bien
+ * qu'aucune règle ne vit à deux endroits.
+ *
+ * **Le décompte d'exclusivité ne porte que sur les clés de panneau.** Les cinq
+ * clés de filtre n'en sont pas : les faire compter fermerait la fiche dès qu'on
+ * filtre, et les balayer à la fermeture défairait la recherche. Le décompte est
+ * écrit d'avance pour les deux clés que T5bis.6 ajoutera, comme celui de la page
+ * produit l'avait été pour `releve`.
+ *
+ * **Les sorties du panneau conservent les filtres**, à la différence des deux
+ * autres pages hôtes, dont l'URL nue n'efface rien : ici elle effacerait la
+ * recherche, et `docs/06` §9 veut les filtres conservés. Elles sont recomposées
+ * à partir des valeurs **déjà confrontées au domaine**, jamais des paramètres
+ * reçus.
  *
  * **Aucune écriture ici** : ni bouton, ni action, ni point d'entrée. Les trois
- * gestes arrivent en T5bis.6, et cet écran ne lit donc aucun droit.
+ * gestes arrivent en T5bis.6, et cet écran ne lit donc aucun droit — la fiche
+ * elle-même se lit par tout le domaine (D9).
  *
  * Aucune requête directe : tout passe par `session.db`, déjà scopé sur le
  * domaine courant. Règle 1.
@@ -44,15 +64,22 @@ import {
   AvailabilityDot,
 } from "@/components/team/availability-dot";
 import { Avatar } from "@/components/ui/avatar";
+import { DrawerHost, DrawerLink } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { borderOf, CONTROL, CONTROL_TEXT } from "@/components/ui/form-field";
 import { List, ListHeader, ListRow } from "@/components/ui/list";
 import { Page, PageHeader } from "@/components/ui/page";
 import { Tag } from "@/components/ui/tag";
+import { loadTeamDrawer } from "./drawers";
 import { requireSession } from "@/lib/auth/provider";
 import { jobs, personAvailability, skillLevels, skills } from "@/lib/db/schema";
+import {
+  resolveTeamDrawer,
+  TEAM_PANEL_PARAMS,
+  teamRequestFromParams,
+} from "@/lib/drawers/team";
 import { formatPersons } from "@/lib/format";
-import { ROUTES } from "@/lib/navigation";
+import { PERSON_PANEL_PARAM, ROUTES } from "@/lib/navigation";
 import {
   listTeam,
   listTeamFilterOptions,
@@ -94,9 +121,16 @@ const PARAM = {
  * `string | string[]` est **structurel** : `competence` est répétable, et Next
  * rend un tableau dès la seconde occurrence. Le typer en `string` seul ferait
  * mentir le compilateur sur le cas qui est justement l'objet du ticket.
+ *
+ * `personne` s'y ajoute en T5bis.4 : c'est une clé de **panneau** et non de
+ * filtre, ce que le décompte d'exclusivité et `TEAM_PANEL_PARAMS` tiennent
+ * séparément.
  */
 type SearchParams = Partial<
-  Record<(typeof PARAM)[keyof typeof PARAM], string | string[]>
+  Record<
+    (typeof PARAM)[keyof typeof PARAM] | typeof PERSON_PANEL_PARAM,
+    string | string[]
+  >
 >;
 
 /** La première valeur d'un paramètre qu'on n'attend qu'une fois. */
@@ -131,6 +165,45 @@ const AVAILABILITY_OPTIONS: TeamFilterOption[] =
     id: value,
     label: AVAILABILITY_LABEL[value],
   }));
+
+/** Les cinq filtres actifs, **déjà confrontés au domaine**. */
+type AppliedFilters = {
+  search: string;
+  jobId: string | undefined;
+  skillIds: readonly string[];
+  levelId: string | undefined;
+  availability: PersonAvailability | undefined;
+};
+
+/**
+ * L'adresse de la liste, ses filtres conservés — et sa fiche ouverte, au besoin.
+ *
+ * **Elle recompose depuis les valeurs lues, jamais depuis les paramètres
+ * reçus** : un identifiant d'un autre domaine a déjà été écarté, et le
+ * réinjecter dans un lien serait redonner du crédit à ce qu'on n'a pas cru.
+ *
+ * C'est ce qui distingue cette page des deux autres pages hôtes, dont la
+ * fermeture est l'URL nue : là-bas elle n'efface rien, ici elle effacerait la
+ * recherche. `docs/06` §9 veut les filtres conservés.
+ */
+function teamHref(filters: AppliedFilters, personId?: string): string {
+  const query = new URLSearchParams();
+
+  if (filters.search) query.set(PARAM.search, filters.search);
+  if (filters.jobId) query.set(PARAM.job, filters.jobId);
+  // Répétable : c'est la forme que la conjonction de T5bis.3 attend.
+  for (const skillId of filters.skillIds) query.append(PARAM.skill, skillId);
+  if (filters.levelId) query.set(PARAM.level, filters.levelId);
+  if (filters.availability) {
+    query.set(PARAM.availability, filters.availability);
+  }
+
+  // La clé du panneau vient de `ROUTES`, et d'aucun autre endroit.
+  const base = personId ? ROUTES.teamPerson(personId) : ROUTES.team;
+  const suffix = query.toString();
+  if (!suffix) return base;
+  return `${base}${base.includes("?") ? "&" : "?"}${suffix}`;
+}
 
 export default async function TeamPage({
   searchParams,
@@ -203,143 +276,198 @@ export default async function TeamPage({
 
   const checked = new Set(activeSkills.map((skill) => skill.id));
 
+  /* Les cinq filtres actifs, tels que les liens de repli les reconduisent : les
+     valeurs lues en base, jamais les paramètres reçus. */
+  const activeFilters: AppliedFilters = {
+    search,
+    jobId: activeJob?.id,
+    skillIds: activeSkills.map((skill) => skill.id),
+    levelId: activeLevel?.id,
+    availability,
+  };
+
+  /* **L'URL reste une adresse, elle n'est plus le mécanisme** (TD.2). Coller
+     `?personne=<identifiant>` ouvre encore la fiche, ici, au rendu serveur ; le
+     clic, lui, passe par `DrawerHost` et n'écrit plus rien. Les deux chemins
+     traversent ensuite la **même** résolution — `resolveTeamDrawer`.
+
+     L'exclusivité ne vaut donc que pour ce chemin-ci : plusieurs clés de panneau
+     présentes ensemble n'ouvrent **rien**. Elle est écrite en **décompte** pour
+     que les deux clés de T5bis.6 l'absorbent sans que son énoncé change — la
+     forme de la page produit depuis T5.2. Côté clic, elle est structurelle :
+     l'état ne porte qu'une demande à la fois.
+
+     **Les cinq clés de filtre n'y entrent pas** : ce ne sont pas des clés
+     d'ouverture, et les faire compter fermerait la fiche dès qu'on filtre. */
+  const panelKeys = {
+    [PERSON_PANEL_PARAM]: one(params[PERSON_PANEL_PARAM]),
+  };
+  const conflict =
+    Object.values(panelKeys).filter((value) => value !== undefined).length > 1;
+  const request = teamRequestFromParams(conflict ? {} : panelKeys);
+
+  const drawer = request ? await resolveTeamDrawer(session, request) : null;
+
   return (
-    <Page>
-      <PageHeader
-        title="Équipe"
-        lead="Qui compose le centre de compétence, et que sait faire chacun ?"
-      />
-
-      {showFilters ? (
-        <TeamFilters
-          options={options}
-          search={search}
-          jobId={activeJob?.id}
-          checkedSkills={checked}
-          levelId={activeLevel?.id}
-          availability={availability}
+    <DrawerHost
+      initial={drawer}
+      load={loadTeamDrawer}
+      panelParams={TEAM_PANEL_PARAMS}
+      closeHref={teamHref(activeFilters)}
+    >
+      <Page>
+        <PageHeader
+          title="Équipe"
+          lead="Qui compose le centre de compétence, et que sait faire chacun ?"
         />
-      ) : null}
 
-      {showFilters ? (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p
-            // Le compteur et les filtres changent sans rechargement de page
-            // perceptible : l'assistance doit l'entendre.
-            aria-live="polite"
-            className="flex flex-wrap items-center gap-2 text-sm text-content-neutral-dark"
-          >
-            <span className="font-semibold text-content-neutral-darkest">
-              {formatPersons(rows.length)}
-            </span>
-            {applied.map((filter) => (
-              <span key={filter.field} className="flex items-center gap-2">
-                <span aria-hidden="true" className="text-content-neutral-light">
-                  ·
-                </span>
-                {filter.field} : {filter.value}
+        {showFilters ? (
+          <TeamFilters
+            options={options}
+            search={search}
+            jobId={activeJob?.id}
+            checkedSkills={checked}
+            levelId={activeLevel?.id}
+            availability={availability}
+          />
+        ) : null}
+
+        {showFilters ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p
+              // Le compteur et les filtres changent sans rechargement de page
+              // perceptible : l'assistance doit l'entendre.
+              aria-live="polite"
+              className="flex flex-wrap items-center gap-2 text-sm text-content-neutral-dark"
+            >
+              <span className="font-semibold text-content-neutral-darkest">
+                {formatPersons(rows.length)}
               </span>
+              {applied.map((filter) => (
+                <span key={filter.field} className="flex items-center gap-2">
+                  <span aria-hidden="true" className="text-content-neutral-light">
+                    ·
+                  </span>
+                  {filter.field} : {filter.value}
+                </span>
+              ))}
+            </p>
+
+            {applied.length > 0 ? (
+              <Link
+                href={ROUTES.team}
+                className="text-sm font-semibold text-content-primary-dark underline"
+              >
+                Retirer tous les filtres
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
+
+        {rows.length > 0 ? (
+          <List label="Les personnes du domaine">
+            <ListHeader>
+              <span className={COLUMN.person}>Personne</span>
+              <span className={COLUMN.job}>Métier</span>
+              <span className={COLUMN.availability}>Disponibilité</span>
+              <span className={COLUMN.skills}>Compétences</span>
+            </ListHeader>
+
+            {rows.map((row) => (
+              /* **La ligne entière ouvre la fiche** (T5bis.4), et n'emmène sur
+                 aucun écran : il n'y a pas de page personne (D29). Le lien est
+                 posé *dans* la `ListRow` plutôt que par son `href` — `ListRow`
+                 rend un `<Link>` de navigation, et `components/ui/list.tsx` est
+                 hors du périmètre de ce ticket. Le résultat est le même : un seul
+                 arrêt de tabulation par personne, et une cible large.
+
+                 **C'est un vrai `<a href>`**, dont seul le clic gauche est
+                 intercepté : le `⌘`+clic, le clic milieu et l'absence de
+                 JavaScript retombent sur l'adresse, qui rend la même fiche au
+                 rendu serveur. Elle reconduit les filtres courants, pour que la
+                 sortie du panneau ne défasse pas la recherche. */
+              <ListRow key={row.id}>
+                <DrawerLink
+                  href={teamHref(activeFilters, row.id)}
+                  request={{ kind: "personDetail", id: row.id }}
+                  className="flex min-w-0 flex-1 items-center gap-4"
+                >
+                  <span className={`${COLUMN.person} flex items-center gap-2`}>
+                    <Avatar name={row.fullName} tone={row.kind} />
+                    <span className="truncate font-semibold text-content-neutral-darkest">
+                      {row.fullName}
+                    </span>
+                    {row.kind === "stakeholder" ? (
+                      <span className="flex-none text-xs text-content-neutral-base">
+                        · côté entité
+                      </span>
+                    ) : null}
+                  </span>
+
+                  <span className={COLUMN.job}>
+                    <span className="sr-only">Métier : </span>
+                    {row.jobLabel ?? (
+                      <span className="text-content-neutral-base">Non renseigné</span>
+                    )}
+                  </span>
+
+                  {/* Un intervenant côté entité n'a pas de disponibilité : c'est une
+                      propriété du centre, et la colonne reste vide plutôt que
+                      d'inventer une valeur absente (arbitrage (d)). */}
+                  <span className={COLUMN.availability}>
+                    {row.availability ? (
+                      <>
+                        <span className="sr-only">Disponibilité : </span>
+                        <AvailabilityDot availability={row.availability} />
+                      </>
+                    ) : null}
+                  </span>
+
+                  {/* Le profil entier, et non les seules compétences qui ont
+                      filtré : une ligne affiche ce que la personne déclare, jamais
+                      une correspondance (garde-fou 2). */}
+                  <span className={COLUMN.skills}>
+                    <span className="sr-only">Compétences : </span>
+                    {row.skills.length > 0 ? (
+                      <span className="flex flex-wrap gap-1.5">
+                        {row.skills.map((skill) => (
+                          <Tag
+                            key={skill.id}
+                            label={`${skill.label} · ${skill.levelLabel}`}
+                          />
+                        ))}
+                      </span>
+                    ) : (
+                      <span className="text-content-neutral-base">
+                        Aucune compétence déclarée
+                      </span>
+                    )}
+                  </span>
+                </DrawerLink>
+              </ListRow>
             ))}
-          </p>
-
-          {applied.length > 0 ? (
-            <Link
-              href={ROUTES.team}
-              className="text-sm font-semibold text-content-primary-dark underline"
-            >
-              Retirer tous les filtres
-            </Link>
-          ) : null}
-        </div>
-      ) : null}
-
-      {rows.length > 0 ? (
-        <List label="Les personnes du domaine">
-          <ListHeader>
-            <span className={COLUMN.person}>Personne</span>
-            <span className={COLUMN.job}>Métier</span>
-            <span className={COLUMN.availability}>Disponibilité</span>
-            <span className={COLUMN.skills}>Compétences</span>
-          </ListHeader>
-
-          {rows.map((row) => (
-            // Sans `href` : une ligne ne mène nulle part, il n'y a pas de page
-            // personne (D29).
-            <ListRow key={row.id}>
-              <span className={`${COLUMN.person} flex items-center gap-2`}>
-                <Avatar name={row.fullName} tone={row.kind} />
-                <span className="truncate font-semibold text-content-neutral-darkest">
-                  {row.fullName}
-                </span>
-                {row.kind === "stakeholder" ? (
-                  <span className="flex-none text-xs text-content-neutral-base">
-                    · côté entité
-                  </span>
-                ) : null}
-              </span>
-
-              <span className={COLUMN.job}>
-                <span className="sr-only">Métier : </span>
-                {row.jobLabel ?? (
-                  <span className="text-content-neutral-base">Non renseigné</span>
-                )}
-              </span>
-
-              {/* Un intervenant côté entité n'a pas de disponibilité : c'est une
-                  propriété du centre, et la colonne reste vide plutôt que
-                  d'inventer une valeur absente (arbitrage (d)). */}
-              <span className={COLUMN.availability}>
-                {row.availability ? (
-                  <>
-                    <span className="sr-only">Disponibilité : </span>
-                    <AvailabilityDot availability={row.availability} />
-                  </>
-                ) : null}
-              </span>
-
-              {/* Le profil entier, et non les seules compétences qui ont
-                  filtré : une ligne affiche ce que la personne déclare, jamais
-                  une correspondance (garde-fou 2). */}
-              <span className={COLUMN.skills}>
-                <span className="sr-only">Compétences : </span>
-                {row.skills.length > 0 ? (
-                  <span className="flex flex-wrap gap-1.5">
-                    {row.skills.map((skill) => (
-                      <Tag
-                        key={skill.id}
-                        label={`${skill.label} · ${skill.levelLabel}`}
-                      />
-                    ))}
-                  </span>
-                ) : (
-                  <span className="text-content-neutral-base">
-                    Aucune compétence déclarée
-                  </span>
-                )}
-              </span>
-            </ListRow>
-          ))}
-        </List>
-      ) : applied.length > 0 ? (
-        <EmptyState
-          title="Aucune personne ne répond à ces critères"
-          description="Les filtres se combinent : chacun restreint le résultat du précédent, et les compétences cochées se cumulent — une personne doit les porter toutes. En décocher une suffit peut-être à retrouver ce que vous cherchez."
-          action={
-            <Link
-              href={ROUTES.team}
-              className="text-sm font-semibold text-content-primary-dark underline"
-            >
-              Voir toutes les personnes
-            </Link>
-          }
-        />
-      ) : (
-        <EmptyState
-          title="Aucune personne pour l'instant"
-          description="Cette liste réunira les membres du centre de compétence et les intervenants côté entité — leur métier, leur disponibilité, et les compétences que chacun déclare. C'est ce référentiel qui dira un jour qui pourrait intervenir sur un accompagnement."
-        />
-      )}
-    </Page>
+          </List>
+        ) : applied.length > 0 ? (
+          <EmptyState
+            title="Aucune personne ne répond à ces critères"
+            description="Les filtres se combinent : chacun restreint le résultat du précédent, et les compétences cochées se cumulent — une personne doit les porter toutes. En décocher une suffit peut-être à retrouver ce que vous cherchez."
+            action={
+              <Link
+                href={ROUTES.team}
+                className="text-sm font-semibold text-content-primary-dark underline"
+              >
+                Voir toutes les personnes
+              </Link>
+            }
+          />
+        ) : (
+          <EmptyState
+            title="Aucune personne pour l'instant"
+            description="Cette liste réunira les membres du centre de compétence et les intervenants côté entité — leur métier, leur disponibilité, et les compétences que chacun déclare. C'est ce référentiel qui dira un jour qui pourrait intervenir sur un accompagnement."
+          />
+        )}
+      </Page>
+    </DrawerHost>
   );
 }
 

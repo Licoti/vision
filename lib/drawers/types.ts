@@ -53,7 +53,26 @@ export type ProjectDrawerRequest =
   | { kind: "resource"; id?: string | undefined }
   | { kind: "activity"; id?: string | undefined };
 
-export type DrawerRequest = ProductDrawerRequest | ProjectDrawerRequest;
+/**
+ * Le panneau de la page **Équipe** — T5bis.4.
+ *
+ * **Un seul pour l'instant, et l'union est écrite pour trois de plus** :
+ * T5bis.6 y ajoutera `person`, `skill` et `archive`, qui sont des écritures et
+ * demandent donc un droit. La fiche, elle, se lit par tout le domaine (D9) —
+ * c'est la séparation que la page produit tient déjà entre `personaDetail` et
+ * `persona`.
+ *
+ * `personDetail` ne se confond pas avec le `personaDetail` du produit, et le
+ * piège de nom est celui du schéma : `persons` porte les membres du centre,
+ * `personas` les profils pour lesquels on conçoit. Deux tables sans rapport,
+ * deux panneaux sans rapport.
+ */
+export type TeamDrawerRequest = { kind: "personDetail"; id: string };
+
+export type DrawerRequest =
+  | ProductDrawerRequest
+  | ProjectDrawerRequest
+  | TeamDrawerRequest;
 
 /**
  * Ce que le serveur renvoie, et ce que la coquille sait afficher.
@@ -122,6 +141,8 @@ const PROJECT_KINDS = [
   "activity",
 ] as const;
 
+const TEAM_KINDS = ["personDetail"] as const;
+
 export function asProductRequest(
   request: DrawerRequest,
 ): ProductDrawerRequest | null {
@@ -136,5 +157,21 @@ export function asProjectRequest(
 ): ProjectDrawerRequest | null {
   return (PROJECT_KINDS as readonly string[]).includes(request.kind)
     ? (request as ProjectDrawerRequest)
+    : null;
+}
+
+/**
+ * Le troisième jumeau, pour la page Équipe (T5bis.4).
+ *
+ * Il n'a aucune clé en commun avec les deux autres : une demande de la page
+ * produit — `personaDetail`, dont le nom ne diffère que d'une lettre — n'ouvre
+ * donc rien ici, et c'est ce que le point d'entrée serveur doit garantir avant
+ * la moindre lecture.
+ */
+export function asTeamRequest(
+  request: DrawerRequest,
+): TeamDrawerRequest | null {
+  return (TEAM_KINDS as readonly string[]).includes(request.kind)
+    ? (request as TeamDrawerRequest)
     : null;
 }

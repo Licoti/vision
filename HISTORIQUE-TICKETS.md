@@ -1891,6 +1891,55 @@ de mise en défaut ont été retirés avant le commit.
 
 ---
 
+### T5bis.4 — la fiche d'une personne, en panneau — 19/08/2026
+
+**Ce que le ticket livre.** `/equipe` devient la **troisième page hôte** de panneaux : son contenu
+s'enveloppe dans `<DrawerHost>`, `app/(app)/equipe/drawers.tsx` porte `loadTeamDrawer`, et
+`lib/drawers/team.tsx` résout la seule demande de la page, `{ kind: "personDetail", id }`. La ligne
+entière de la liste devient un `DrawerLink`. `findPersonDetail` rend, en trois lectures fixes,
+l'identité et le profil, les compétences par rang décroissant puis libellé, et les accompagnements
+du plus récent au plus ancien. Il n'y a **aucune route `/equipe/[id]`** : D29 tient.
+
+**Le code était écrit, la vérification ne l'était pas.** Les neuf fichiers existaient au début de la
+session, sans qu'aucune des quatre disciplines ait été jouée. C'est ce que cette session a fait, et
+c'est tout ce qu'elle a fait — hors quatre corrections de forme.
+
+**Une divergence assumée avec `listProjects`.** Un accompagnement porté par un **produit archivé**
+reste dans la fiche, là où la liste transverse l'écarte. Les deux répondent à deux questions : « où
+en sont nos accompagnements » écarte ce qui est rangé ; « qu'a fait cette personne » ne peut pas
+effacer ce qu'elle a mené. C'est l'esprit de l'arbitrage (e), et un test le nomme.
+
+**La seule chose que cette page hôte fait autrement, c'est l'adresse de repli.** Les deux premières
+ferment sur leur URL nue, qui n'efface rien ; ici elle effacerait la recherche que le panneau vient
+de servir. `teamHref` reconduit donc les cinq filtres dans `closeHref` comme dans chaque lien de
+ligne — **à partir des valeurs déjà confrontées au domaine**, jamais des paramètres reçus.
+
+**Vérification.** *Par l'adresse :* `/equipe?personne=<uuid>` porte le panneau dans le HTML servi —
+un `role="dialog"`, un `aria-labelledby="panneau-personne-titre"`, la page derrière en `inert`, et
+les deux sorties en `<a href>` vers l'adresse filtrée. Un UUID inconnu, une valeur non-UUID, une
+valeur vide, une chaîne d'injection, une personne archivée et une personne d'un autre domaine
+rendent chacun **200 sans panneau** — jamais un 500, `isUuid` tranchant avant la base. *Par
+l'action :* `loadTeamDrawer` est un point d'entrée HTTP à part entière, frappé sous l'identité d'un
+simple membre après une **étape témoin** qui rend 7 756 octets ; **onze charges forgées rendent 70
+octets**, corps `1:null` — dont quatre `kind` d'autres pages, `personaDetail` compris. *Mise en
+défaut :* **treize neutralisations, treize fois le compte exact**, chacune ne faisant tomber que les
+tests qu'elle vise. *Contraste :* les trois couples de texte du panneau mesurés à 8,12:1, 4,98:1 et
+17,87:1 ; le filet des cartes à 1,24:1, qui est la dette de design system récrite dans `ETAT.md`.
+
+**Ce qui n'a pas pu être fait.** Le chemin du **clic** n'a pas été parcouru : aucun navigateur
+pilotable dans la session. Le point est ouvert dans `ETAT.md`, borné par le fait que les cinq
+propriétés en attente appartiennent à `DrawerHost`, éprouvé par TD.2 et inchangé depuis.
+
+**Sondes.** Un second domaine, une personne étrangère et l'archivage temporaire de Yanis Bertin,
+pour éprouver les deux refus qui n'avaient aucune matière en base. Yanis est rétabli et la liste a
+retrouvé ses neuf lignes ; la personne-sonde est archivée et les deux domaines-sonde **suspendus et
+archivés**, leur suppression ayant été refusée par le bac à sable. Ils sont inertes — un domaine
+suspendu n'est jamais rendu par `resolveDomainId` —, et leur nom vient après « Groupe Meridian »
+dans l'alphabet, délibérément.
+
+---
+
+
 ## Points ouverts refermés
 
 *(archivés depuis `ETAT.md` le 14/08/2026 — ils étaient barrés dans la section « Points ouverts »,

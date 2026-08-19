@@ -4415,3 +4415,153 @@ c'est une fixture locale, pas de la donnée métier (règle du 14/08).
 
 `ETAT.md` passe de 366 à 378 lignes, soit **128 au-dessus du seuil de 250**. Le constat du
 18/08/2026 tient sans être récrit : le balayage reste réservé à la session de découpage de C6.
+
+---
+
+## T5bis.4 — la fiche d'une personne, en panneau, 19/08/2026
+
+### Le ticket était écrit, il restait à l'éprouver
+
+Le code de la fiche était **déjà dans l'arbre de travail** au début de cette session — neuf fichiers,
+dont quatre neufs — sans qu'aucune des quatre disciplines de l'étape 4 ait été jouée. C'est le cas
+le plus glissant du protocole : un ticket qui compile, dont les tests passent et dont l'écran a l'air
+juste **n'a rien démontré**. Tout ce qui suit est le travail de vérification, plus quatre corrections
+de forme (indentation du corps de `<DrawerHost>`, quatre lignes de commentaire re-justifiées).
+
+### Le harnais d'une fonction serveur, qui n'est pas celui d'une action
+
+`loadTeamDrawer` est le premier point d'entrée frappé à la main **qui ne soit pas une action de
+formulaire**, et la leçon de TD.1 ne s'y transporte pas telle quelle.
+
+- **L'identifiant se lit dans le manifeste**, et non dans le balisage : une fonction serveur
+  n'apparaît dans aucun champ `$ACTION_…`, puisqu'aucun `<form>` ne la porte.
+  `.next/dev/server/server-reference-manifest.json` en donne un seul pour `app/(app)/equipe/page` —
+  `408f8627…` —, ce qui est en soi un constat : la page n'a **qu'un** point d'entrée serveur, et
+  T5bis.6 en ajoutera d'autres qui se compteront là.
+- **La charge est le tableau d'arguments, en `text/plain`.** `[{"kind":"personDetail","id":"…"}]`
+  avec `Content-Type: text/plain;charset=UTF-8` atteint la fonction. **En urlencodé, le serveur rend
+  un 404** — pas le 200 muet de TD.1, mais une seconde manière de se tromper de refus tout aussi
+  indiscernable sans témoin. Et **sans l'en-tête `next-action`, la même requête rend la page
+  entière en 78 ko**, ce qui ressemble à un succès et n'en est pas un.
+- **L'étape témoin est ce qui rend le reste lisible**, et elle tient en un nombre d'octets : la
+  charge légitime rend **7 756 octets** portant `panneau-personne-titre` ; chacune des onze charges
+  forgées rend **70 octets**, dont le corps est littéralement `1:null`. Deux ordres de grandeur
+  séparent le panneau du refus ; aucune interprétation n'est nécessaire.
+
+**Onze charges forgées, toutes refusées** sous l'identité d'un simple membre : quatre `kind`
+appartenant à d'autres pages — dont `personaDetail`, **qui ne diffère de `personDetail` que d'une
+lettre** —, un `kind` sans `id`, un `id` absent, un `id` qui n'est pas un UUID, une chaîne
+d'injection, un UUID inconnu, une personne d'un autre domaine, une personne archivée.
+
+### Le refus se rétrécit deux fois, et les deux fois avant la base
+
+`asTeamRequest` écarte les `kind` étrangers **avant la session**, et `isUuid` écarte les
+identifiants malformés **avant la requête**. Le second n'est pas un ornement : une colonne `uuid`
+interrogée avec `'pas-un-uuid'` rend une erreur PostgreSQL, donc un 500, là où l'on attend la page
+nue. Mesuré : `/equipe?personne=bonjour` rend **200 sans panneau**, comme `?personne=` vide et comme
+la chaîne d'injection.
+
+### Ce que la mise en défaut a établi
+
+**Treize neutralisations, treize fois le compte exact.** Chacune a été appliquée sur une seule
+ligne, suivie d'un `vitest run` dont les tests tombés ont été relevés, puis défaite. Aucune n'a
+laissé la suite verte, et aucune n'a fait tomber un test qu'elle ne visait pas :
+
+- les **neuf `filter()`** de la fiche font tomber chacun son propre cas d'étanchéité ;
+- `isNull(persons.archivedAt)` fait tomber « une personne archivée n'ouvre rien », seule ;
+- `isNull(projects.archivedAt)` fait tomber « un accompagnement archivé n'est pas dans la fiche » ;
+- l'ordre des compétences et le `nulls last` des accompagnements font tomber leur seul test d'ordre ;
+- `leftJoin(jobs)` passé en `innerJoin` en fait tomber **trois**, et c'est juste : il fait disparaître
+  la fiche entière d'une personne sans métier.
+
+**Quatre des neutralisations entraînent un second test avec elles**, celui qui compare la liste des
+accompagnements par `toEqual`. Ce n'est pas un défaut de découpage mais la propriété d'une
+comparaison exacte : toute ligne forgée qui entre dans la liste la fait tomber, en plus du cas
+d'étanchéité qui la nomme. Le cas nommé, lui, reste **seul à tomber pour son propre filtre**, ce qui
+est la condition posée par T5bis.3.
+
+**Trois lignes forgées de plus** ont été nécessaires, sur la règle de T5bis.2 — franchir la
+frontière sur *une seule* colonne. La plus instructive est la deuxième : un projet de `b` **portant
+un statut de `a`**. Sans ce détail, `filter(projectStatuses)` l'aurait écarté lui aussi, et la chute
+du test n'aurait plus désigné `filter(projects)`.
+
+### Une sonde en base de développement, et ce qu'elle a coûté
+
+Deux refus ne se lisaient dans aucun HTML servi, faute de matière : la base de développement n'a
+**qu'un domaine** et **aucune personne archivée**. La sonde a donc créé un second domaine avec une
+personne, et archivé Yanis Bertin le temps de la mesure. Les deux refus se lisent : `HTTP 200`, zéro
+`role="dialog"`, zéro `inert`, et la même chose côté fonction serveur — 70 octets contre 7 756.
+Yanis a **quitté la liste** pendant l'archivage (0 occurrence dans `/equipe`) et l'a retrouvée après
+(9 lignes, comme avant).
+
+**Le nom de la sonde a été choisi contre `resolveDomainId`**, qui rend le premier domaine actif *par
+nom* : `Sonde T5bis.4 …` vient après `Groupe Meridian` dans l'alphabet, comme le `Zzz Domaine sonde`
+de T5bis.3. Le défaire a en revanche été **partiel** : Yanis est rétabli, la personne-sonde est
+archivée et les deux domaines-sonde sont **suspendus et archivés**, mais leur suppression a été
+refusée par le bac à sable. Ils sont inertes — un domaine suspendu n'est jamais rendu par
+`resolveDomainId` — et cette forme est celle que TD.1 avait déjà laissée à ses propres sondes. Deux
+domaines ont été créés au lieu d'un, deux essais ayant échoué sur la signature de `forDomain`, qui
+prend un `Scope` et non une chaîne.
+
+### Ce que le contraste a donné
+
+Le panneau introduit **une position neuve** : le fond du tiroir, `surface-neutral-pale` (`#fdfdfd`),
+n'avait encore porté ni carte ni intertitre. Tous les couples ont donc été mesurés plutôt que
+supposés :
+
+| Couple | Mesure | Limite |
+|---|---|---|
+| Présentation et intertitres · `content-neutral-dark` | **8,12:1** | 4,5 |
+| Niveaux et phrases d'état vide · `content-neutral-base` | **4,98:1** | 4,5 |
+| Libellés · `content-neutral-darkest` | **17,87:1** | 4,5 |
+| Filet des cartes · `surface-neutral-lighter` | **1,24:1** | 3 |
+| Séparateur « · » · `content-neutral-light` | **2,22:1** | 3 |
+
+Les trois couples de texte passent. Les deux autres ne passent pas, et **aucun des deux n'est une
+décision de ce ticket** : le filet est la dette « une carte ne se détache d'aucun fond », récrite
+dans `ETAT.md` avec sa troisième position ; le séparateur est `aria-hidden`, absent de l'arbre
+d'accessibilité, et porte le même jeton aux **six** autres endroits où l'application sépare deux
+mentions — fil d'Ariane, liste des projets, ligne de la liste Équipe, page projet. **Aucun septième
+substitut n'a été inventé** (règle 2).
+
+### Trois écarts assumés
+
+**La fiche a deux sorties, pas trois.** La fiche du ticket annonce « les trois sorties sont des liens
+vers `/equipe` » ; un panneau de **lecture** n'en a que deux — le voile et la croix. La troisième,
+« Annuler », est le bouton d'un panneau de saisie, et `PersonDetail` n'a pas de `<form>`. Les deux
+sorties présentes sont bien des `<a href>`, et elles portent l'adresse de repli attendue.
+
+**Le décompte d'exclusivité ne peut pas être mis en défaut aujourd'hui.** `TEAM_PANEL_PARAMS` n'a
+qu'une clé, si bien que la condition `> 1` n'est atteignable par aucune URL. Il est écrit d'avance
+pour les deux clés de T5bis.6, exactement comme la fiche le demande, et c'est **la première fois
+qu'une règle de ce dépôt est posée sans pouvoir être éprouvée le jour où on l'écrit**. Elle le sera
+au ticket qui la rend atteignable ; d'ici là, elle est une intention, pas une garantie.
+
+**Le chemin du clic n'a pas été parcouru.** Aucun navigateur pilotable dans la session. Le point est
+ouvert dans `ETAT.md` avec ce qu'il reste précisément à voir, et ce qui le borne : les cinq
+propriétés en attente appartiennent à `DrawerHost`, que TD.2 a éprouvé le 18/08 et qui n'a pas
+changé d'une ligne.
+
+### Un piège de conception, qui n'en est pas devenu un
+
+**`ListRow` rend un `<Link>` quand on lui donne un `href`**, et un panneau ne doit pas naviguer. Le
+`DrawerLink` a donc été posé **à l'intérieur** de la ligne plutôt qu'à sa place, `components/ui/list.tsx`
+étant hors périmètre (règle 3). Le HTML servi montre que le résultat est celui qu'on voulait : un
+seul `<a>` couvre les quatre colonnes, donc **un seul arrêt de tabulation par personne** et une
+cible large. Le jour où une seconde liste voudra ouvrir un panneau, c'est `ListRow` qui devra
+apprendre à recevoir une demande — pas ce contournement qui devra être recopié.
+
+### L'adresse de repli, la seule chose que cette page hôte fait autrement
+
+Les deux premières pages hôtes ferment sur leur URL nue, qui n'efface rien. Ici elle effacerait la
+recherche : `docs/06` §9 veut les filtres conservés. `teamHref` les recompose donc, **à partir des
+valeurs déjà confrontées au domaine** et jamais des paramètres reçus — réinjecter un identifiant
+d'un autre domaine dans un lien serait redonner du crédit à ce qu'on vient de refuser. Lu dans le
+HTML servi de `/equipe?dispo=available&q=fontaine&personne=<id>` : les deux sorties portent
+`?q=fontaine&dispo=available`, et le lien de la ligne porte les trois clés.
+
+### Le compte des lignes
+
+`ETAT.md` passe de 378 à 403 lignes, soit **153 au-dessus du seuil de 250**. Le constat du 18/08/2026
+tient sans être récrit : le balayage reste réservé à la session de découpage de C6, qui est le seul
+moment où le protocole l'autorise.
