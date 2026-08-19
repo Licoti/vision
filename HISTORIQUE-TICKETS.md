@@ -2158,11 +2158,139 @@ supprimées. La règle 4 a rendu ce ticket gratuit en données.
 ---
 
 
+### TD.6 — le garde-fou du socle — 19/08/2026
+
+**Pourquoi ce ticket, et pourquoi en dernier.** Dernier des quatre tickets tirés de l'audit de la
+couche de présentation. Il est le seul qui **ne retire rien** : TD.3, TD.4 et TD.5 ont refermé
+quarante-trois copies, celui-ci empêche la quarante-quatrième. Sans lui, les trois précédents sont un
+nettoyage, et la démonstration du contraire est faite dans ce dépôt — `ACTION_LINK`, extrait en TD.1
+« un seul exemplaire, après quatre », a redivergé six jours plus tard dans un fichier qui importait
+déjà `components/ui/`. Il vient en dernier par nécessité : il garde des signatures que TD.3 et TD.4
+créent, et son point (c) dépendait de l'arbitrage de TD.4 sur la prop `note`.
+
+**Le piège que la fiche ne voyait pas, et qui aurait annulé TD.5 en silence.** Le format plat
+d'ESLint **écrase** la valeur d'une règle, il ne la fusionne pas. `spacingScaleLock` posait
+`no-restricted-syntax` sur `**/*.tsx` ; un `socleLock` posant la même règle sur le même ensemble
+aurait **désactivé les trois clauses de TD.5 partout hors de `components/ui/`**, sans qu'aucun
+message ne le dise — une règle écrite la veille, perdue le lendemain, et perdue précisément là où
+elle sert. La parade tient en trois gestes dans le fichier : les clauses de TD.5 sortent dans un
+`SPACING_CLAUSES` nommé ; `socleLock` porte `["error", ...SPACING_CLAUSES, ...SOCLE_CLAUSES]` ;
+`spacingScaleLock` se restreint à `components/ui/**/*.tsx`, le seul ensemble que `socleLock` ignore.
+`spacingRule` devient `classNameRule`, les deux blocs s'en servant désormais. **La non-régression se
+mesure** (voir plus bas) : c'est la seule manière de savoir qu'on n'a pas laissé le trou.
+
+**Deux arbitrages rendus avant écriture.**
+
+- **Le périmètre s'ouvre à `app/(app)/projets/page.tsx`**, comme celui de TD.3 s'était ouvert à
+  `equipe/page.tsx`, et pour la même raison exactement. Ses lignes 305 et 381 portaient des copies à
+  la main de `CONTROL_TEXT` et de `CONTROL` — la recherche et les listes déroulantes du bandeau de
+  filtres —, que TD.1 n'avait pas ouvertes parce qu'elles n'étaient pas à son périmètre. Laissées là,
+  `socleLock` les faisait tomber et `npm run lint` ne finissait pas à zéro. Le contrôle de saisie
+  était la signature la plus recopiée du dépôt (huit copies en TD.1) : la laisser sans garde-fou pour
+  préserver un périmètre aurait vidé le ticket de son objet.
+- **La signature de `BlockNote` porte sur les variantes retirées, pas sur celle qui reste.**
+  `text-sm leading-175 text-content-neutral-dark` est porté légitimement par **quatre** paragraphes
+  qui disent l'inverse d'une absence — une bio, un résumé de persona, la note de vision, l'écart
+  chiffré —, dont un (`person-card.tsx:39`) voisin immédiat d'un vrai `<BlockNote>` dans le même
+  ternaire. Un motif calqué sur elle aurait fait quatre faux positifs dans un ticket dont le critère
+  est de finir à zéro. Le motif retenu porte sur les trois écritures que TD.4 a fait disparaître : il
+  garde la **divergence**, qui est le défaut que l'audit a nommé, et non la duplication. La limite est
+  réelle et se rapporte — une copie à l'identique de la chaîne retenue passe.
+
+**Les six signatures, et leurs déclenchements mesurés hors `components/ui/`.**
+
+| Signature | Motif | Au dépôt | Renvoie vers |
+|---|---|---|---|
+| bouton primaire | `bg-surface-primary-base.*px-4.*py-2` | 0 | `Button` / `BUTTON_PRIMARY` |
+| bouton secondaire | `border-content-neutral-normal.*px-4.*py-2` | 0 | `BUTTON_SECONDARY` |
+| lien-action `xs`/`sm` | `font-semibold.*text-content-primary-dark.*underline` | 0 | `ACTION_LINK` / `ACTION_LINK_SM` |
+| contrôle de saisie | `rounded-lg\sborder.*bg-surface-neutral-pale.*px-3.*py-2` | **2** | `CONTROL` / `CONTROL_TEXT` |
+| état vide dans un bloc | les 3 variantes retirées par TD.4 | 0 | `BlockNote` |
+| bandeau d'archivage | `bg-surface-neutral-pale.*px-7.*py-4` | 0 | `ArchivedNotice` |
+
+**Aucun motif ne porte d'espace littéral.** `\s` est employé partout : la grammaire d'esquery ne
+garantit pas qu'un espace traverse l'analyse d'un sélecteur d'attribut, et les trois motifs de TD.5
+n'en portaient aucun — la question n'avait donc jamais été posée. Elle l'est ici, où quatre motifs
+sur six en auraient voulu un.
+
+**La mise en défaut, dans les deux sens, signature par signature.** Neuf témoins positifs, neuf
+témoins négatifs proches, dans deux fichiers jetables retirés après mesure. **Chaque témoin positif
+fait tomber exactement une erreur, celle de sa signature ; chaque témoin négatif n'en fait tomber
+aucune.** Les témoins négatifs ne sont pas inventés : ce sont des écritures **vivantes du dépôt** —
+`text-content-primary-dark underline` sans `font-semibold` (`projets/page.tsx:199`),
+`bg-surface-neutral-pale px-7 py-6` (`projets/[id]/page.tsx:246`), les quatre non-absences en
+`-neutral-dark` et les cinq de roadmap en `text-xs -base`. Un témoin négatif que le dépôt ne porte
+pas ne prouve rien sur le dépôt.
+
+**Le leurre de fond a été rejoué.** La copie *dérivée* de `/dev/session` — `rounded-sm`,
+`text-surface-neutral-lightest` — tombe sous le motif lâche, alors qu'une regex calquée sur la chaîne
+exacte l'aurait manquée. C'est la mesure de la sonde du 18/08/2026, refaite sur la règle réelle :
+**le motif porte sur ce qui fait la signature — le fond, le rythme —, jamais sur la chaîne entière.**
+
+**La non-régression de TD.5, mesurée des deux côtés de la frontière.** Un `gap-2.5` témoin tombe
+**hors** de `components/ui/` — preuve que `SPACING_CLAUSES` a bien été repris dans `socleLock` — et
+tombe **dans** `components/ui/` — preuve que `spacingScaleLock` couvre encore le socle. Et un bouton
+primaire écrit **dans** `components/ui/` ne tombe pas : le socle garde le droit de se définir
+lui-même, faute de quoi la règle serait désactivée au premier usage.
+
+**(b) `uiLayerSeal`.** Le greffon `@typescript-eslint` est enregistré globalement par
+`eslint-config-next/typescript` — vérifié en énumérant le config plat avant d'écrire, plutôt qu'en
+espérant. Aucune dépendance ajoutée. Éprouvé en quatre gestes : un import de valeur depuis
+`@/lib/queries/projects` est refusé, le **même en `import type` est accepté**, un composant métier est
+refusé, une action serveur est refusée.
+
+**(c) `--max-warnings=0`.** Mesuré avant d'écrire : 123 fichiers lintés, 0 erreur, **0
+avertissement**. L'unique avertissement permanent du dépôt était la prop `note` morte de
+`section.tsx`, que TD.4 a refermée en la rendant. Le point dépendait de lui ; il ne dépendait plus de
+rien.
+
+**Les deux écarts de rendu, annoncés d'avance et lus dans le HTML servi.** Sur `/projets`, et nulle
+part ailleurs. Les 124 attributs `class` de l'écran sont comparés un à un : **six lignes changent,
+trois attributs, et le DOM hors `class` est identique au caractère près.**
+
+- La recherche passe à `` `${CONTROL_TEXT} ${borderOf(undefined)}` `` : **mêmes neuf classes, ordre
+  différent** — `border-content-neutral-normal` passe en fin de chaîne. Rendu inchangé, largeur et
+  couleur de bordure étant deux propriétés distinctes que l'ordre ne départage pas.
+- Les **deux** listes déroulantes rendues passent à `` `${CONTROL} ${borderOf(undefined)}` `` et
+  **gagnent `w-full`** : elles s'étirent à la largeur de leur `Field`. C'est déjà ce que `/equipe`
+  sert depuis T5bis.3. Écart réel, et le seul du ticket.
+
+**Le harnais s'est mis en défaut avant d'être cru, comme en TD.3.** Le déterminisme est prouvé sur
+deux captures successives avant la mesure ; les deux captures « avant » — celle du début et celle
+refaite par `git stash` **après** l'exécution des 773 tests — sont identiques, ce qui établit que la
+base n'a pas bougé. Puis un `rounded-xl` témoin posé dans le skip-link d'`app/(app)/layout.tsx` fait
+bouger **les huit** captures : les sept silences sont donc des silences, pas une panne d'instrument.
+
+**Vérification.** `npm run lint` finit à zéro sur le dépôt entier, avertissements compris.
+`npx tsc --noEmit` propre. **23 fichiers de test, 773 tests verts sans modification.** Diff du HTML
+servi vide sur sept des huit adresses mesurées, et portant sur `/projets` les deux seuls écarts
+annoncés. Aucune écriture en base, aucune sonde.
+
+**Ce que le ticket ne fait pas, et qu'il ne faut pas croire acquis.** La règle garde les signatures
+qu'elle connaît : un composant inventé demain avec une chaîne neuve ne sera pas rattrapé. C'est un
+**cliquet sur la duplication constatée**, pas une preuve de cohérence. Trois limites mesurées sont
+consignées au journal, dont la plus coûteuse : **un geste dont les classes sont réparties sur deux
+attributs `className` échappe à tous les motifs.**
+
+---
+
+
 ## Points ouverts refermés
 
 *(archivés depuis `ETAT.md` le 14/08/2026 — ils étaient barrés dans la section « Points ouverts »,
 où ils occupaient encore la place. Conservés tels quels : un point refermé documente comment il
 l%s été.)*
+
+- ~~**Le socle couvre vingt et un des quarante composants du design system.**~~ **Refermé le
+  19/08/2026 par TD.6.** Les logements créés par TD.3 et TD.4 — `Button` / `BUTTON_PRIMARY` /
+  `BUTTON_SECONDARY`, `ACTION_LINK_SM`, `BlockNote`, `ArchivedNotice` — sont désormais **gardés** :
+  `socleLock` interdit de les récrire à la main hors de `components/ui/`, et `uiLayerSeal` scelle la
+  couche contre les requêtes en valeur, les composants métier et les actions serveur. Les deux
+  corrections que le point annonçait ont été faites : la liste de signatures de la fiche était fausse
+  sur deux points, et la signature « état vide dans un bloc » **ne pouvait pas** être la chaîne
+  retenue — elle porte donc sur les trois variantes que TD.4 a retirées. Ce qui reste ouvert n'est
+  plus la couverture du socle mais deux angles morts nommés, versés aux points ouverts d'`ETAT.md` :
+  le bouton écrit en deux attributs, et `components/shell/` hors du scellement.
 
 - ~~**La règle 2 n'est pas surveillée sur les espacements.**~~ **Refermé le 19/08/2026 par TD.5.**
   `--spacing` était un pas et non une échelle, et Tailwind en dérivait n'importe quel multiplicateur.

@@ -4842,3 +4842,99 @@ TD.4 n'a **pas** de ligne dans « Journal des tickets », là où TD.1, TD.2 et 
 l'en-tête de dernière mise à jour le mentionnait. La ligne de TD.5 s'insère donc après celle de TD.3,
 en laissant le trou. **Règle 3** : l'écrire aurait été un ajout « pendant que j'y suis » sur le récit
 d'un autre ticket. → **une ligne à ajouter par qui a écrit TD.4, ou au prochain balayage.**
+
+---
+
+## TD.6 — le garde-fou du socle, 19/08/2026
+
+### Le format plat d'ESLint écrase une règle, il ne la fusionne pas — et TD.5 a failli disparaître
+
+C'est le piège central du ticket, et il ne se voit dans aucun message. `spacingScaleLock` (TD.5)
+posait `no-restricted-syntax` sur `**/*.tsx`. Un second bloc posant **la même règle** sur le même
+ensemble de fichiers ne s'y ajoute pas : **le dernier gagne, en entier.** Écrit naïvement, `socleLock`
+aurait donc **désactivé les trois clauses de TD.5 partout hors de `components/ui/`** — c'est-à-dire
+partout où elles servent, et le lendemain du jour où elles ont été écrites. Rien n'aurait signalé la
+perte : `npm run lint` serait resté vert, pour la mauvaise raison.
+
+La parade tient en trois gestes : `SPACING_CLAUSES` devient une constante nommée ; `socleLock` porte
+`["error", ...SPACING_CLAUSES, ...SOCLE_CLAUSES]` ; `spacingScaleLock` se restreint à
+`components/ui/**/*.tsx`, le seul ensemble que `socleLock` ignore. La couverture est complète et
+sans recouvrement, mais elle **repose sur une reprise manuelle** : quiconque ajoutera un troisième
+bloc `no-restricted-syntax` devra reprendre les deux tableaux, ou perdre celui qu'il n'a pas repris.
+→ **piège à connaître avant d'ajouter une règle de syntaxe ; il n'y a pas de garde-fou du garde-fou.**
+
+**La non-régression se mesure, elle ne se raisonne pas.** Un `gap-2.5` témoin doit tomber des deux
+côtés de la frontière — hors du socle (preuve de la reprise) et dedans (preuve de la couverture
+restante). Les deux mesures ont été faites ; sans elles, l'erreur serait indiscernable du succès.
+
+### Aucun motif esquery ne porte d'espace littéral, et c'est une précaution non éprouvée
+
+Les quatre motifs de signature qui décrivent une suite de classes emploient `\s` là où un espace
+serait naturel (`rounded-lg\sborder`, `text-sm\sleading-175\s…`). La raison : la grammaire d'esquery
+ne garantit pas qu'un espace traverse l'analyse d'un sélecteur d'attribut, et **les trois motifs de
+TD.5 n'en portaient aucun** — la question n'avait donc jamais été posée au dépôt. Elle n'a pas été
+tranchée ici non plus : `\s` fonctionne, et l'espace littéral n'a pas été essayé. C'est une
+précaution qui coûte un caractère et évite une classe de panne silencieuse.
+→ **sans échéance ; à ne pas « simplifier » sans mesure.**
+
+### Un geste dont les classes vivent dans deux attributs échappe à toutes les signatures
+
+C'est la limite la plus coûteuse du ticket, et elle est structurelle. `components/projects/roadmap.tsx:235`,
+`components/projects/resources.tsx:215` et `components/projects/adopted-indicators.tsx:285` portent
+tous trois `inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold ${className}`,
+et l'appelant fournit la couleur : `roadmap.tsx:209` passe
+`bg-surface-primary-base text-content-neutral-pale`, `:177` passe
+`border border-content-neutral-normal bg-surface-neutral-pale text-content-primary-dark`.
+
+**C'est le bouton primaire, et le secondaire, en deux morceaux** — invisibles à `socleLock`, dont
+chaque motif ne voit qu'un attribut à la fois. Les rattraper demanderait un motif portant sur la
+couleur seule (`bg-surface-primary-base`), ce que les interdits du ticket refusent — et à raison :
+les couleurs sont déjà protégées structurellement par `--color-*: initial`, et une règle redondante
+est une règle qu'on désactive. La vraie réponse est que ces trois coquilles **devraient être
+`Button` / `BUTTON_PRIMARY`**, ce qui les ferait rentrer sous la règle par disparition plutôt que
+par détection. Hors périmètre (règle 3) : la fiche de TD.3 ne les listait pas, et ce ticket ne
+touche aucun composant. → **ticket propre, consigné en point ouvert dans `ETAT.md`.**
+
+C'est la parente de la limite mesurée en TD.5 — *une classe écrite hors d'un attribut `className`
+échappe aux clauses* —, et elle vaut identiquement ici : les deux garde-fous partagent le mécanisme,
+donc l'angle mort.
+
+### `uiLayerSeal` ne scelle pas `components/shell/`, et la fiche ne le demandait pas
+
+Les trois groupes interdits sont ceux que la fiche énumère : `@/lib/queries/*` (en valeur),
+`@/components/{products,projects,team}/*`, `@/app/*`. **`@/components/shell/*` n'y est pas** —
+`breadcrumb.tsx`, `main-nav.tsx` et la coquille applicative sont hors du socle au même titre que les
+composants métier, et rien n'empêcherait aujourd'hui `components/ui/` de les importer. L'ajouter
+aurait été un quatrième groupe que la fiche ne demande pas (règle 3), et la propriété est vraie
+aujourd'hui : le socle n'importe rien de `shell/`. Ce n'est donc pas une régression, c'est un trou
+dans le scellement. → **une ligne à ajouter au prochain ticket qui ouvre `eslint.config.mjs`.**
+
+### La signature de `BlockNote` ne se laisse pas écrire, et le ticket l'assume
+
+`text-sm leading-175 text-content-neutral-dark` — la variante que TD.4 a retenue — est **indiscernable
+au motif de classes** de quatre paragraphes qui disent l'inverse d'une absence : la bio de
+`person-card.tsx:39`, le résumé de `persona-detail.tsx:131`, la note de vision d'`indicators.tsx:361`,
+l'écart chiffré d'`indicators.tsx:622`. Le premier est le **voisin immédiat d'un vrai `<BlockNote>`
+dans le même ternaire** : le même fichier, la même balise, la même chaîne, deux intentions opposées.
+
+Ce qui distingue les deux est l'intention, et ESLint ne la lit pas. Le motif retenu porte donc sur
+les trois écritures que TD.4 a **fait disparaître** — il garde la divergence, pas la duplication.
+Conséquence assumée et à ne pas oublier : **une copie à l'identique de la chaîne retenue passe
+sous le garde-fou.** C'est la seule des six signatures dans ce cas.
+→ **sans échéance ; ce serait une propriété de composant, pas de chaîne.**
+
+### `ETAT.md` passe de 451 à 465 lignes, soit 215 au-dessus du seuil de 250
+
+Un point ouvert est refermé et sorti vers `HISTORIQUE-TICKETS.md`, deux points neufs entrent — le
+bouton en deux attributs, et le trou de `shell/` dans le scellement. **La contradiction du protocole
+relevée par TD.5 n'a pas bougé** : l'étape 5 dit « au-delà, le balayer avant de continuer », la
+session de découpage dit qu'elle en est « le seul moment ». → **le balayage attend le découpage de
+C6, et le seuil n'est plus un seuil.**
+
+### La ligne manquante de TD.4 dans `ETAT.md` n'a toujours pas été ajoutée
+
+TD.5 l'avait relevée et laissée : TD.4 n'a pas de ligne dans « Journal des tickets », là où TD.1,
+TD.2, TD.3 et maintenant TD.5 et TD.6 en ont une. **Le groupe TD se clôt donc avec un trou dans son
+propre récit.** La ligne de TD.6 s'insère après celle de TD.5, en laissant le trou où il est : règle
+3, et l'arbitrage de TD.5 tient toujours — l'écrire serait un ajout sur le récit d'un autre ticket.
+→ **à combler au prochain balayage, c'est-à-dire au découpage de C6.**

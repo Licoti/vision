@@ -2,12 +2,10 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 19/08/2026 — TD.5 terminé : la règle 2 est surveillée sur les
-espacements, et les 39 valeurs hors échelle sont arrondies.
+**Dernière mise à jour :** 19/08/2026 — TD.6 terminé : le socle est gardé par `socleLock`,
+`components/ui/` est scellé, et `npm run lint` finit à zéro. Le groupe TD est clos.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
-**Ticket suivant :** **T5bis.5** — le radar des compétences (`tickets-C5bis.md`), ou **TD.6**, le
-garde-fou du socle, dont les trois logements existent et dont TD.4 a rendu l'arbitrage du point (c)
-(`tickets-TD.md`). L'ordre entre les deux revient à l'humain.
+**Ticket suivant :** **T5bis.5** — le radar des compétences (`tickets-C5bis.md`).
 
 ---
 
@@ -22,7 +20,7 @@ garde-fou du socle, dont les trois logements existent et dont TD.4 a rendu l'arb
 | C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **terminé** |
 | C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **terminé** |
 | TD — Dette technique | TD.1, TD.2 | **terminé** |
-| TD — Couche de présentation | TD.3 → TD.6 | **en cours** — TD.3, TD.4 et TD.5 terminés ; reste TD.6 (`tickets-TD.md`) |
+| TD — Couche de présentation | TD.3 → TD.6 | **terminé** |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **en cours** — T5bis.4 terminé |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
@@ -174,6 +172,21 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   sélecteur : **une classe écrite hors d'un attribut `className` échappe aux trois clauses**, mesuré
   par sonde — la même limite attend `socleLock` en TD.6.
 
+- **TD.6 — 19/08/2026 — le garde-fou du socle.** Ticket **hors chantier**, dernier des quatre et le
+  seul qui ne retire rien : `socleLock` garde **six signatures** hors de `components/ui/`,
+  `uiLayerSeal` scelle le socle contre les requêtes en valeur, les composants métier et les actions,
+  et `--max-warnings=0` ferme le script `lint`. Deux arbitrages rendus avant écriture :
+  `app/(app)/projets/page.tsx` **entre au périmètre** — ses deux contrôles recopiés faisaient échouer
+  la règle, exactement le cas que TD.3 avait tranché sur `equipe/page.tsx` —, et la signature de
+  `BlockNote` porte sur les **variantes retirées** par TD.4 et non sur celle qui reste, indiscernable
+  de quatre paragraphes qui disent l'inverse d'une absence. **Son piège vaut pour toute règle à
+  venir : le format plat d'ESLint écrase la valeur d'une règle, il ne la fusionne pas** — écrit
+  naïvement, `socleLock` désactivait les trois clauses de TD.5 partout hors du socle, sans qu'aucun
+  message ne le dise ; la reprise de `SPACING_CLAUSES` est mesurée des deux côtés de la frontière.
+  Neuf témoins positifs, neuf témoins négatifs **tirés du dépôt vivant**, tous concluants. Deux
+  écarts de rendu, sur `/projets` seulement et annoncés d'avance : un attribut `class` réordonné,
+  et `w-full` gagné par les deux listes déroulantes de filtre — le rendu que `/equipe` sert déjà.
+
 - **Les indicateurs associés repliés par défaut — hors ticket, le 18/08/2026.** Le rang 3 du bloc
   « Vision produit » devient un `<details>` fermé, dont `BlockDivider` sait être le `<summary>` — la
   question du produit reste seule à l'écran, ses cartes tiennent à un clic. Sa leçon :
@@ -285,21 +298,22 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   l'arbitrage (g) sort la création d'une personne du formulaire de projet, et une limite sur un bloc
   qui n'existe plus n'a plus d'objet. → **T5bis.7.**
 
-- **Le socle couvre vingt et un des quarante composants du design system.** Détail et mesures dans
-  `JOURNAL-TECHNIQUE.md` (18/08/2026). **Les trois logements que TD.6 doit garder existent** :
-  `Button` / `BUTTON_PRIMARY` / `BUTTON_SECONDARY` / `ACTION_LINK_SM` (TD.3), puis `BlockNote` et
-  `ArchivedNotice` (TD.4) — quarante-trois copies retirées en deux tickets. La doctrine est tranchée :
-  ce qui manque n'est plus une décision, c'est du travail.
-  → **TD.6 (`tickets-TD.md`), dernier des quatre.** Il est le seul qui ne retire rien : il **empêche la
-  copie suivante**, faute de quoi les autres ne sont qu'un nettoyage — `ACTION_LINK`, extrait en
-  TD.1, a redivergé six jours plus tard, et l'état vide a redivergé **trois fois** dans
-  `components/team/` pendant que TD.4 était en attente. **Sa liste de signatures est à corriger sur
-  deux points** : la fiche annonce onze copies du bouton primaire et neuf du lien `sm`, le dépôt en
-  portait douze et onze ; et la signature « état vide dans un bloc » **ne peut pas être la chaîne
-  seule** — `text-sm leading-175 text-content-neutral-dark` reste porté légitimement par cinq
-  paragraphes qui ne sont pas des absences (une bio, un résumé de persona, une note de vision, un
-  écart chiffré). Un motif calqué sur elle ferait cinq faux positifs dans un ticket dont le critère
-  est de finir à zéro.
+- **Le bouton primaire et le secondaire s'écrivent aussi en deux attributs, hors de portée de
+  `socleLock`.** `components/projects/roadmap.tsx:235`, `resources.tsx:215` et
+  `adopted-indicators.tsx:285` portent une coquille
+  `inline-flex … rounded-lg px-4 py-2 text-sm font-semibold ${className}` dont l'appelant fournit la
+  couleur (`roadmap.tsx:209` et `:177`). C'est le bouton du socle, en deux morceaux, et **chaque
+  motif de `socleLock` ne voit qu'un attribut à la fois** : la limite est structurelle, pas un
+  réglage. La rattraper par un motif de couleur est refusé — les couleurs sont déjà protégées par
+  `--color-*: initial`, et une règle redondante est une règle qu'on désactive. La réponse est de
+  faire de ces trois coquilles des `Button` / `BUTTON_PRIMARY`, ce qui les ferait rentrer sous la
+  règle par disparition. Hors du périmètre de TD.6, qui ne touche aucun composant (règle 3).
+  → **ticket propre, C7 au plus tard.**
+- **`uiLayerSeal` ne scelle pas `components/shell/`.** Les trois groupes interdits sont ceux que la
+  fiche de TD.6 énumère ; la coquille applicative — `breadcrumb.tsx`, `main-nav.tsx` — n'y est pas,
+  et rien n'empêcherait `components/ui/` de l'importer. La propriété est vraie aujourd'hui, donc ce
+  n'est pas une régression : c'est un trou dans le scellement, et il se comble en une ligne.
+  → **au prochain ticket qui ouvre `eslint.config.mjs`.**
 - **Cinq états vides ne se lisent dans aucun HTML servi, faute de données qui les atteignent.**
   Relevé en mesurant TD.4 : le relevé absent d'une North Star et sa cible absente
   (`indicators.tsx`), la carte d'indicateur sans relevé, le panneau « Gérer les relevés » vide, et la

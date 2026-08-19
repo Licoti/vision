@@ -31,6 +31,7 @@ import { ACTION_LINK_SM } from "@/components/ui/action-link";
 import { AvatarGroup } from "@/components/ui/avatar";
 import { Button, BUTTON_PRIMARY } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { borderOf, CONTROL, CONTROL_TEXT } from "@/components/ui/form-field";
 import { List, ListHeader, ListRow } from "@/components/ui/list";
 import { Page, PageHeader } from "@/components/ui/page";
 import { StatusDot } from "@/components/ui/status-dot";
@@ -302,7 +303,7 @@ function ProjectFilters({
           name={PARAM.search}
           defaultValue={search}
           placeholder="Un nom, un objectif, un membre…"
-          className="w-full rounded-lg border border-content-neutral-normal bg-surface-neutral-pale px-3 py-2 text-sm text-content-neutral-darkest placeholder:text-content-neutral-base"
+          className={`${CONTROL_TEXT} ${borderOf(undefined)}`}
         />
       </Field>
 
@@ -378,7 +379,7 @@ function Select({
         id={id}
         name={name}
         defaultValue={value ?? ""}
-        className="rounded-lg border border-content-neutral-normal bg-surface-neutral-pale px-3 py-2 text-sm text-content-neutral-darkest"
+        className={`${CONTROL} ${borderOf(undefined)}`}
       >
         <option value="">{all}</option>
         {options.map((option) => (
