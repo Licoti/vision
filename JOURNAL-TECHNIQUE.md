@@ -5070,3 +5070,103 @@ dépassé depuis T4bis.6, et l'incohérence entre l'étape 5 (« au-delà, le ba
 continuer ») et la session de découpage (« elle est le seul moment où `ETAT.md` se balaie ») est
 déjà consignée deux fois. Rien de neuf ici, sinon que ce ticket hors chantier y ajoute onze lignes.
 → **le repliage reste dû au découpage de C6.**
+
+---
+
+## T5bis.5 — le radar des compétences, 19/08/2026
+
+**`<title>` est une balise de métadonnée pour React 19, y compris à l'intérieur d'un `<svg>`, et
+deux enfants la vident.** Écrit `<title>Radar des compétences déclarées de {fullName}</title>` — la
+forme JSX naturelle —, le HTML servi rend `<title></title>`, **vide**. Les enfants sont alors un
+tableau de deux nœuds ; React n'en accepte qu'un, chaîne ou convertible, parce qu'un navigateur
+traite tout enfant de `<title>` comme du texte. Le `<title>` du document, lui, n'a pas bougé : rien
+n'a été hoisté, seul le contenu a disparu. **Le défaut est le pire de sa famille** — un `role="img"`
+sans nom accessible est une image anonyme annoncée comme une image, ce qu'une absence de `<title>`
+n'aurait pas produit. La forme correcte est le gabarit :
+`` <title>{`Radar des compétences déclarées de ${fullName}`}</title> ``. Rien dans le typage ne
+l'exige, `tsc` et `eslint` passaient tous les deux ; **c'est la lecture du HTML servi qui l'a
+trouvé**, et le journal de développement portait l'avertissement exact — non lu jusque-là.
+→ **vaut pour tout `<title>` à venir, et il n'y en avait aucun dans le dépôt avant celui-ci.**
+
+**Le radar a besoin d'une échelle, et la fiche n'en donnait pas la source.** `polygonPoints(ranks,
+maxRank, radius)` est nommée dans le ticket, mais rien de ce que `PersonCard` reçoit ne porte
+`maxRank` : `PersonDetail.skills[].levelRank` ne donne que les rangs *de la personne*, et
+`resolveTeamDrawer` ne charge aucun contexte de page. **Écart de périmètre assumé, arbitré avant
+écriture** : `lib/queries/team.ts` et son test entrent, `findPersonDetail` remontant `levelScaleMax`
+— le `max(rank)` de `skill_levels` **du domaine** — en quatrième lecture fixe. `person-detail.tsx`
+et `lib/drawers/team.tsx` ne bougent pas. L'option qui restait dans le périmètre — rapporter les
+rangs au plus haut rang de la personne — a été **écartée** : un profil « Intermédiaire partout » y
+dessinerait un polygone plein, soit une normalisation calculée par Vision, exactement ce que D39
+interdit et ce que la dérogation de C5bis ne couvre pas.
+
+**Deux `filter(skillLevels)` cohabitent désormais dans `findPersonDetail`, et leur indépendance se
+mesure — elle ne se raisonne pas.** Le premier garde la jointure des compétences, le second la
+lecture de l'échelle. Un lecteur peut croire qu'un seul test les couvre tous les deux ; les deux
+neutralisations disent le contraire, et chacune a été jouée : retirer celui de la **jointure** fait
+tomber un seul cas, celui qui le nomme ; retirer celui de la **quatrième lecture** en fait tomber
+deux — le cas d'étanchéité neuf *et* le cas nominal, qui épingle la même valeur. Les 53 autres
+tiennent dans les deux cas. **Le second chiffre n'est pas un défaut de conception du test** : une
+fuite d'échelle fausse aussi la lecture ordinaire, et un jeu de tests où elle ne se verrait qu'au
+cas d'étanchéité serait un jeu qui ment sur la portée du défaut.
+
+**Un test d'étanchéité sur un maximum exige deux échelles différentes.** `seedDomain` amorce `a` et
+`b` à l'identique — deux niveaux, rangs 3 et 4. Sur cette base, `levelScaleMax` vaut 4 des deux
+côtés, et **retirer le filtre ne changerait rien** : le test passerait au vert dans les deux états,
+ce qui est le cas exact que la deuxième discipline interdit de croire. `b` reçoit donc un rang 5
+dans `beforeAll` — **le seul endroit du fichier où les deux domaines ne sont pas symétriques**, et
+c'est écrit sur place. La leçon est celle de T5bis.3 déplacée d'un cran : là, un filtre qu'aucune
+ligne forgée ne visait n'était pas éprouvé ; ici, c'est une **valeur agrégée que deux domaines
+identiques rendent indiscernable**.
+
+**Le seuil de trois axes vit dans l'écran, pas dans la géométrie.** `axisPoints(2, 50)` rend deux
+points parfaitement valides ; c'est `SkillRadar` qui rend `null` en dessous de trois, et le module
+pur ne connaît pas ce nombre. La séparation est celle de `timelineScale`, qui rend `null` faute de
+date et laisse l'état vide à l'écran (règle 5). **Aucune phrase ne remplace le dessin absent** : une
+déclaration à deux compétences n'est pas une saisie incomplète, et l'écrire en ferait un défaut.
+
+**Le calage des libellés est positionnel, et les comparaisons exactes tiennent parce que `round`
+normalise.** `x === 50` désigne la pointe du haut quel que soit le nombre d'axes, `y === 100` le bas
+des comptes pairs — vérifié : `Math.sin(Math.PI)` vaut `1,22 × 10⁻¹⁶`, ce qui donnerait `50,0000…`
+au chiffre près et casserait l'égalité sans l'arrondi à quatre décimales. Le même arrondi ramène le
+zéro négatif au zéro, faute de quoi un `-0` s'écrirait dans l'attribut `points`. C'est la règle de
+`timeline.ts`, dont les pourcentages n'étaient jamais négatifs et qui n'avait pas eu à la poser.
+
+**Les libellés d'axe sont `aria-hidden`, et c'est un choix.** Ils répètent mot pour mot la liste
+placée dix lignes plus bas, qui les dit **avec leur niveau**. Le SVG porte son `role="img"` et son
+`<title>` comme la fiche l'exige ; faire relire cinq libellés nus à la voix n'ajouterait rien et
+séparerait chaque compétence de son rang. C'est le garde-fou 6 lu dans le bon sens : le dessin
+accompagne la liste, il ne la double pas.
+
+**Les contrastes, mesurés sur le fond du tiroir `surface-neutral-pale` (`#fdfdfd`).** Ce qui porte
+l'information passe largement : le tracé `content-primary-dark` à **15,72:1** sur le fond et
+**11,83:1** par-dessus son propre remplissage ; les libellés `content-neutral-dark` à **8,12:1**, et
+**6,11:1** dans le cas où un axe viendrait les poser sur le remplissage. Ce qui ne porte rien reste
+sous 3:1, et c'est dit plutôt que corrigé : le remplissage `surface-primary-lighter` à **1,33:1** —
+la valeur même du cerne de pastille consigné le 19/08 —, la toile `surface-neutral-light` à
+**2,22:1**. Cette dernière est le **plus franc des `surface-neutral-*`**, et le journal chiffre déjà
+son plafond à 2,22:1 : le cadre du radar est donc la quatrième position du manque de jetons déjà
+consigné, pas un septième substitut inventé. La lecture ne repose sur aucune des deux : le tracé
+tient la forme, la liste tient les valeurs.
+
+**Le droit n'avait rien de neuf à éprouver, et c'est dit plutôt que passé sous silence.** Aucun
+`case` de résolveur, aucune action, aucun `can`, aucun point d'entrée HTTP : `loadTeamDrawer` est
+inchangé, et la quatrième lecture vit **dans** `findPersonDetail`, derrière le refus qui la précède.
+Les trois chemins de refus ont malgré tout été rejoués après coup — identifiant inconnu, chaîne qui
+n'est pas un UUID, page nue — et rendent tous un 200 sans `role="dialog"` ni radar. Le contrôle vaut
+pour ce qu'il écarte : le dessin n'a pas ouvert de chemin de lecture parallèle.
+
+**Le HTML servi et la fonction pure ont été comparés caractère par caractère.** Sur la personne à
+cinq compétences, les deux `points` du balisage — `50,0 97.5528,34.5492 79.3893,90.4508
+20.6107,90.4508 2.4472,34.5492` pour la toile, `50,0 85.6646,38.4119 72.0419,80.3381 35.3054,70.2254
+26.2236,42.2746` pour le profil — sont ceux qu'`axisPoints` et `polygonPoints` rendent en console.
+C'est le seul contrôle qui relie l'écran au test : sans lui, deux vérités séparées, l'une éprouvée
+et l'autre affichée.
+
+**La base de développement a dérivé, et la fixture n'a pas été touchée.** Le domaine porte neuf
+personnes vivantes là où `scripts/seed.ts` en sème huit — « Nadia Berthier » n'est dans aucun
+fichier du dépôt. Sans conséquence sur le critère : il se lit sur trois personnes que la fixture
+sème, à 4, 5 et 2 compétences. Rappel de la règle du 14/08/2026, la base de développement est
+jetable.
+
+**`ETAT.md` est à 498 lignes.** Le plafond de 250 est dépassé depuis T4bis.6 ; ce ticket y ajoute
+une ligne. → **le repliage reste dû au découpage de C6.**

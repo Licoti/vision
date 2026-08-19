@@ -7,16 +7,16 @@
  *
  * **Composant serveur**, comme `PersonaDetail` : aucun état, aucun droit, aucun
  * `<form>`. Il est rendu par la fonction serveur du panneau, ce qui lui laisse
- * la frontière du bundle du bon côté — c'est ce qui permettra à T5bis.5 d'y
+ * la frontière du bundle du bon côté — c'est ce qui a permis à T5bis.5 d'y
  * poser un radar sans embarquer une ligne de JavaScript.
  *
  * **Il n'existe pas pour être réutilisé par la liste** : le garde-fou 4 interdit
  * deux radars côte à côte sur un même écran, et c'est ici — un profil, un écran
- * — que le dessin de T5bis.5 aura sa place. La liste garde ses étiquettes.
+ * — que le dessin de T5bis.5 a sa place. La liste garde ses étiquettes.
  *
  * **La valeur se lit toujours en toutes lettres** (garde-fou 6) : chaque
- * compétence porte son niveau écrit, et c'est ce texte qui portera
- * l'information le jour où le dessin l'accompagnera.
+ * compétence porte son niveau écrit, et c'est ce texte qui porte
+ * l'information — le dessin l'accompagne, il ne la remplace pas.
  *
  * **Rien n'est calculé d'une ligne à l'autre** : ni décompte de compétences, ni
  * moyenne de niveau, ni indice de profil. On affiche ce que la personne
@@ -29,6 +29,7 @@
  */
 
 import { AvailabilityDot } from "@/components/team/availability-dot";
+import { SkillRadar } from "@/components/team/skill-radar";
 import { BlockNote } from "@/components/ui/empty-state";
 import type { PersonDetail } from "@/lib/queries/team";
 
@@ -57,6 +58,17 @@ export function PersonCard({ person }: { person: PersonDetail }) {
         <h3 className="text-2xs font-semibold text-content-neutral-dark uppercase">
           Compétences déclarées
         </h3>
+
+        {/* Le dessin **au-dessus** de la liste, pleine largeur, et non à côté
+            d'elle : le tiroir fait 440 px, ce qui laisse un peu plus de 350 px
+            ici — deux colonnes y écraseraient le radar et ses libellés
+            ensemble. Il ne se rend pas en dessous de trois compétences, et rien
+            ne remplace alors sa place : la liste tient seule l'écran. */}
+        <SkillRadar
+          fullName={person.fullName}
+          skills={person.skills}
+          levelScaleMax={person.levelScaleMax}
+        />
 
         {person.skills.length > 0 ? (
           /* Une **liste**, et non des étiquettes : la fiche a la place de dire

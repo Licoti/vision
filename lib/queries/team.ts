@@ -416,14 +416,31 @@ export type PersonDetail = {
   availability: PersonAvailability | null;
   skills: TeamSkill[];
   projects: PersonProject[];
+  /**
+   * Le rang le plus haut de l'échelle **du domaine** — `max(rank)` de
+   * `skill_levels` (T5bis.5).
+   *
+   * C'est l'échelle sur laquelle le radar rapporte les rangs déclarés, et elle
+   * est celle du référentiel, **jamais celle de la personne** : rapportée au
+   * plus haut rang qu'elle porte, un profil « Intermédiaire partout »
+   * dessinerait un polygone plein — une normalisation calculée par Vision, et
+   * un dessin qui ment.
+   *
+   * Vaut `0` si le domaine n'a aucun niveau : le dessin met alors tout au
+   * centre plutôt que de diviser par zéro (`polygonPoints`).
+   */
+  levelScaleMax: number;
 };
 
 /**
  * La fiche d'une personne : son profil, ses compétences, ses accompagnements.
  *
- * **Trois lectures fixes, jamais une par compétence ni par accompagnement** —
+ * **Quatre lectures fixes, jamais une par compétence ni par accompagnement** —
  * la discipline de `listTeam`, et la raison est la même : le nombre de requêtes
- * ne doit dépendre d'aucun décompte.
+ * ne doit dépendre d'aucun décompte. La quatrième est l'échelle de maîtrise du
+ * domaine (T5bis.5) : elle ne dépend d'aucune ligne de profil, et elle entre
+ * ici plutôt que dans le composant parce qu'un composant n'interroge pas la
+ * base.
  *
  * **Une personne archivée ne rend rien** : l'écran Équipe est un référentiel,
  * et la fiche en est le détail. Elle reste affichée dans l'équipe des
@@ -475,9 +492,9 @@ export function findPersonDetail(
     const person = found[0];
     if (!person) return null;
 
-    /* Les deux lectures suivantes sont indépendantes : un seul temps d'attente,
-       la discipline de la page projet depuis T4.1. */
-    const [skillRows, projectRows] = await Promise.all([
+    /* Les trois lectures suivantes sont indépendantes : un seul temps
+       d'attente, la discipline de la page projet depuis T4.1. */
+    const [skillRows, projectRows, scaleRows] = await Promise.all([
       database
         .select({
           id: personSkills.id,
@@ -535,12 +552,26 @@ export function findPersonDetail(
           asc(projects.name),
           asc(projects.id),
         ),
+
+      /* L'échelle de maîtrise du domaine, réduite à sa borne haute. Le `filter`
+         est ce qui la rend **sienne** : sans lui, l'échelle d'un autre domaine
+         écraserait la sienne et le radar rapporterait ses rangs à une règle
+         qui n'est pas la sienne. C'est le seul défaut que cette lecture peut
+         porter, et c'est celui que son test met en défaut. */
+      database
+        .select({ rank: skillLevels.rank })
+        .from(skillLevels)
+        .where(filter(skillLevels))
+        .orderBy(desc(skillLevels.rank))
+        .limit(1),
     ]);
 
     return {
       ...person,
       skills: skillRows,
       projects: projectRows,
+      /* Aucun niveau dans le domaine : `0`, et le dessin n'a rien à situer. */
+      levelScaleMax: scaleRows[0]?.rank ?? 0,
     };
   });
 }

@@ -2274,6 +2274,66 @@ attributs `className` échappe à tous les motifs.**
 
 ---
 
+### T5bis.5 — le radar des compétences — 19/08/2026
+
+**Ce que le ticket livre.** Le second dessin du projet, après la frise. `lib/queries/radar.ts` porte
+`axisPoints(count, radius)` et `polygonPoints(ranks, maxRank, radius)`, **pures et testées** comme
+`timelineScale` depuis T5.5 ; `components/team/skill-radar.tsx` les place dans un SVG à `viewBox`,
+rendu sur le serveur, sans dépendance ni JavaScript ; `PersonCard` le monte au-dessus de sa liste,
+qu'il ne modifie pas d'un caractère. Le premier axe pointe vers le haut, les suivants tournent dans
+le sens horaire, et **les axes sont les seules compétences que la personne déclare** — la
+superposition et la comparaison visuelle sont structurellement impossibles (garde-fou 5).
+
+**Le repère est celui du `viewBox`, et c'est ce qui vide le composant.** Boîte carrée de côté
+`2 × radius`, centre `(radius, radius)`, ordonnées vers le bas : les fonctions rendent des
+coordonnées prêtes à poser, et il n'y a **aucune trigonométrie** dans le fichier de rendu.
+`RADIUS = 50` dans un `viewBox` de 100 n'est pas un nombre arbitraire — les coordonnées **sont**
+alors les pourcentages dont les libellés se placent, si bien qu'aucune conversion ne vit entre le
+repère du SVG et celui du HTML posé dessus.
+
+**Un écart de périmètre, arbitré avant écriture.** La fiche nomme `maxRank` sans en donner la
+source, et rien de ce que `PersonCard` reçoit ne la porte. `lib/queries/team.ts` et son test entrent
+donc au périmètre : `findPersonDetail` remonte `levelScaleMax`, le `max(rank)` de `skill_levels` **du
+domaine**, en quatrième lecture fixe du `Promise.all` existant. `person-detail.tsx` et
+`lib/drawers/team.tsx` ne bougent pas. L'option qui restait dans le périmètre — rapporter les rangs
+au plus haut rang *de la personne* — a été écartée : un profil « Intermédiaire partout » y
+dessinerait un polygone plein, soit l'indice calculé que D39 interdit.
+
+**Le seuil de trois axes vit dans l'écran, pas dans la géométrie**, et **aucune phrase ne remplace
+le dessin absent** : une déclaration à deux compétences n'est pas une saisie incomplète. C'est le
+cas de l'indicateur sans relevé de T5.1, et la règle 5 lue à l'endroit.
+
+**Vérification.** *Dans le HTML servi, `<script>` retirés* — la personne à **quatre** compétences
+porte un `svg role="img"` nommé, quatre `<line>` d'axe, le contour, le profil et quatre libellés ;
+celle à **cinq** en porte cinq ; celle à **deux** n'en porte **aucun**, et sa liste enchaîne
+directement sur ses accompagnements ; `/equipe` sans panneau n'a **aucune trace de radar**
+(garde-fou 4). *Écran contre test :* les deux attributs `points` de la personne à cinq compétences
+sont comparés **caractère par caractère** à ce qu'`axisPoints` et `polygonPoints` rendent en
+console — le seul contrôle qui relie l'écran au test. *Mise en défaut :* décaler l'origine d'un
+quart de tour fait tomber **les six cas qui épinglent une orientation, et eux seuls** — les quatre
+qui n'en épinglent aucune restent verts ; retirer le `filter(skillLevels)` de la **quatrième**
+lecture en fait tomber deux, retirer celui de la **jointure** en fait tomber un autre, et les
+53 restants tiennent dans les deux états. *Contraste :* ce qui porte l'information passe largement —
+tracé à **15,72:1** sur le fond du tiroir et **11,83:1** sur son propre remplissage, libellés à
+**8,12:1** —, et ce qui ne porte rien reste sous 3:1 et se consigne : remplissage à **1,33:1**,
+toile à **2,22:1**, qui est le plafond déjà chiffré des `surface-neutral-*`. *Droit :* aucun `case`,
+aucune action, aucun `can`, aucun point d'entrée neuf ; les trois chemins de refus rejoués rendent
+200 sans `role="dialog"` ni radar. `npx tsc --noEmit` propre, `npm run lint` à zéro avertissement,
+**26 fichiers de test, 833 tests verts**.
+
+**La leçon, et rien d'autre ne l'aurait trouvée.** **React 19 traite `<title>` en balise de
+métadonnée jusque dans un `<svg>`, et deux enfants la vident.** La forme JSX naturelle —
+`<title>Radar des compétences déclarées de {fullName}</title>` — rend `<title></title>` dans le HTML
+servi : un `role="img"` **sans nom accessible**, ce qu'une absence de `<title>` n'aurait pas
+produit. `tsc` et `eslint` passaient tous les deux, et l'avertissement exact dormait dans le journal
+de développement. Seule la lecture du HTML servi l'a trouvé ; la forme correcte est le gabarit.
+
+**Sondes.** Aucune. Aucune écriture en base, aucune ligne forgée hors du fichier de test — dont la
+seule dissymétrie neuve est un rang 5 donné au second domaine, sans quoi un test d'étanchéité sur un
+**maximum** passerait au vert dans les deux états.
+
+---
+
 
 ## Points ouverts refermés
 

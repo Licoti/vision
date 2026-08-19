@@ -2,9 +2,10 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 19/08/2026 — la pastille de statut, seule forme du statut, hors ticket.
+**Dernière mise à jour :** 19/08/2026 — T5bis.5, le radar des compétences.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
-**Ticket suivant :** **T5bis.5** — le radar des compétences (`tickets-C5bis.md`).
+**Ticket suivant :** **T5bis.6** — l'écriture : créer une personne, corriger son profil, poser ses
+compétences (`tickets-C5bis.md`).
 
 ---
 
@@ -20,7 +21,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **terminé** |
 | TD — Dette technique | TD.1, TD.2 | **terminé** |
 | TD — Couche de présentation | TD.3 → TD.6 | **terminé** |
-| C5bis — Équipe | T5bis.1 → T5bis.7 | **en cours** — T5bis.4 terminé |
+| C5bis — Équipe | T5bis.1 → T5bis.7 | **en cours** — T5bis.5 terminé |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
@@ -217,6 +218,19 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   taxonomie de l'atomic design écartés, les dossiers ne bougent pas. Sa leçon est celle de T4.2,
   vérifiée cette fois contre le dépôt lui-même : **le coût n'est pas le balisage dupliqué mais les
   choix mesurés qu'il porte** — et un socle qu'on ne voit nulle part ne protège personne.
+
+- **T5bis.5 — 19/08/2026 — le radar des compétences.** Le second dessin du projet, après la frise :
+  `lib/queries/radar.ts` pur et testé, un SVG à `viewBox` rendu sur le serveur, et **le texte hors du
+  SVG** — les libellés d'axe sont du HTML posé aux coordonnées mêmes des axes, la séparation qui avait
+  rendu `path` possible à la courbe d'indicateurs. **Un écart de périmètre, arbitré avant écriture** :
+  `lib/queries/team.ts` et son test entrent, faute de quoi `maxRank` n'aurait eu d'autre source que le
+  plus haut rang **de la personne** — un profil « Intermédiaire partout » s'y dessinerait plein, soit
+  l'indice calculé que D39 interdit. En dessous de trois compétences, aucun radar, et **aucune phrase
+  ne le remplace**. Sa leçon est dans le balisage, et rien d'autre ne l'aurait trouvée : **React 19
+  traite `<title>` en balise de métadonnée jusque dans un `<svg>`, et deux enfants la vident** —
+  `<title>… de {fullName}</title>` rend `<title></title>`, donc un `role="img"` sans nom accessible,
+  avec `tsc` et `eslint` au vert. La seconde se mesure : **un test d'étanchéité sur un maximum exige
+  deux échelles différentes**, deux domaines amorcés à l'identique rendant la fuite indiscernable.
 
 - **La pastille de statut, seule forme du statut — hors ticket, le 19/08/2026.** La page produit
   dessinait la même donnée de deux façons dans deux blocs consécutifs : pastille pleine dans la

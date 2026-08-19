@@ -501,6 +501,12 @@ async function forgeLeaks(): Promise<void> {
 beforeAll(async () => {
   a = await seedDomain("a");
   b = await seedDomain("b");
+  /* **Le seul endroit du fichier où les deux domaines ne sont pas
+     symétriques** (T5bis.5). `levelScaleMax` est un maximum : deux échelles
+     qui plafonnent au même rang rendraient la même valeur qu'on lise le bon
+     domaine ou l'autre, et son test d'étanchéité ne prouverait rien. `b` monte
+     donc un cran plus haut que `a`. */
+  await b.scope.insert(skillLevels, { label: `Maître b`, rank: 5 });
   await forgeLeaks();
 }, 120_000);
 
@@ -920,6 +926,15 @@ describe("findPersonDetail", () => {
     expect(person?.availability).toBeNull();
   });
 
+  test("l'échelle rendue est celle du **référentiel**, pas celle de la personne", async () => {
+    /* Alice plafonne à `Expert a` (rang 4), qui est aussi la borne haute de
+       l'échelle de `a` : c'est Bruno qui sépare les deux lectures — il ne porte
+       **aucune** compétence, et rend pourtant l'échelle entière. Sans quoi le
+       radar d'un profil « Intermédiaire partout » se dessinerait plein. */
+    expect((await findPersonDetail(a.scope, a.aliceId))?.levelScaleMax).toBe(4);
+    expect((await findPersonDetail(a.scope, a.brunoId))?.levelScaleMax).toBe(4);
+  });
+
   test("un identifiant inconnu n'ouvre rien", async () => {
     expect(await findPersonDetail(a.scope, crypto.randomUUID())).toBeNull();
   });
@@ -981,5 +996,17 @@ describe("findPersonDetail — étanchéité", () => {
     expect(person?.projects.map((project) => project.id)).not.toContain(
       forgedStatusProjectId,
     );
+  });
+
+  test("l'échelle est celle du domaine — `filter(skillLevels)` de la **quatrième** lecture", async () => {
+    /* `b` porte un rang 5 que `a` n'a pas. Le filtre retiré, la borne haute de
+       `a` deviendrait celle de la table entière — ce qui rapporterait les rangs
+       déclarés d'Alice à une règle qui n'est pas la sienne.
+
+       **Ce filtre-ci n'est pas celui du test voisin** : le `filter(skillLevels)`
+       de la jointure des compétences est un autre appel, sur une autre lecture,
+       et retirer l'un ne fait pas tomber le cas de l'autre. */
+    expect((await findPersonDetail(a.scope, a.aliceId))?.levelScaleMax).toBe(4);
+    expect((await findPersonDetail(b.scope, b.aliceId))?.levelScaleMax).toBe(5);
   });
 });
