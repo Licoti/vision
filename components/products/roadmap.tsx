@@ -203,7 +203,7 @@ function MonthRange({
         id="roadmap-from"
         name={ROADMAP_FROM_PARAM}
         defaultValue={window.firstMonth}
-        className="rounded-lg border border-content-neutral-normal bg-surface-neutral-pale px-2.5 py-1.5 text-sm text-content-neutral-dark"
+        className="rounded-lg border border-content-neutral-normal bg-surface-neutral-pale px-2 py-1.5 text-sm text-content-neutral-dark"
       >
         {months.map((month) => (
           <option key={month} value={month}>
@@ -222,7 +222,7 @@ function MonthRange({
         id="roadmap-to"
         name={ROADMAP_TO_PARAM}
         defaultValue={window.lastMonth}
-        className="rounded-lg border border-content-neutral-normal bg-surface-neutral-pale px-2.5 py-1.5 text-sm text-content-neutral-dark"
+        className="rounded-lg border border-content-neutral-normal bg-surface-neutral-pale px-2 py-1.5 text-sm text-content-neutral-dark"
       >
         {months.map((month) => (
           <option key={month} value={month}>
@@ -519,7 +519,7 @@ export function Roadmap({
                 dans la colonne de gauche, et la couleur ne porte jamais seule. */}
             <div aria-hidden="true" className="relative h-4 min-w-0 flex-1">
               <div
-                className={`absolute top-1 h-2.5 rounded-full ${BAND_BG[band.project.statusNature]}`}
+                className={`absolute top-1 h-2 rounded-full ${BAND_BG[band.project.statusNature]}`}
                 style={{ left: `${band.left}%`, width: `${band.width}%` }}
               />
             </div>
@@ -551,7 +551,7 @@ export function Roadmap({
                 <span
                   key={milestone.id}
                   title={milestoneTitle(milestone)}
-                  className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-surface-secondary-dark"
+                  className="absolute top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-surface-secondary-dark"
                   style={{
                     left: `${monthMark(window, milestone.measuredOn)}%`,
                   }}

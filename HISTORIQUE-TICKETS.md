@@ -1939,6 +1939,74 @@ dans l'alphabet, délibérément.
 
 ---
 
+### TD.5 — le garde-fou de la règle 2 sur les espacements — 19/08/2026
+
+**Pourquoi ce ticket, et ce qu'il ferme.** Troisième des quatre tickets tirés de l'audit du
+18/08/2026, et le seul dont le critère n'est pas un diff HTML vide. La règle 2 est **structurelle**
+pour les couleurs, les tailles, les graisses, les interlignes et les rayons — `globals.css` efface les
+namespaces Tailwind, `bg-blue-500` ne compile pas — mais `--spacing: var(--number-4)` est un **pas**,
+pas une échelle : Tailwind en dérive n'importe quel multiplicateur. C'était le seul trou du
+dispositif, et il est refermé par une règle plutôt que par un nettoyage.
+
+**L'inventaire remesuré, et l'écart avec la fiche.** La fiche annonce « une soixantaine de valeurs
+hors échelle » ; le compte exact est **39 occurrences fautives dans 12 fichiers**, les 42 autres
+classes fractionnaires (`0.5` et `1.5`) retombant exactement sur `--number-2` et `--number-6`. La
+fiche comptait les deux ensembles. `indicators.tsx` en avait par ailleurs gagné **six depuis
+l'audit** — `h-4.5`, `h-42.5`, `mt-8.5`, `mb-6.5`, `h-0.75`, `gap-2.25` —, ce qui est la
+démonstration du ticket : une dette de présentation non surveillée croît entre l'audit et sa
+correction. `lib/**` était propre.
+
+**Trois arbitrages rendus avant écriture.**
+
+1. **Aucune exception pour le bloc « Vision produit »**, dont le journal du 18/08 défendait le rythme
+   16/30-26/14/34-16 comme conforme parce qu'obtenu « en multiples du pas de 4 pixels ». Un multiple
+   **fractionnaire** du pas n'est pas une valeur de l'échelle : le §4 ne nomme ni 30, ni 26, ni 34. Le
+   bloc passe à 16/28-24/12/32-16.
+2. **Les deux gabarits de grille restent hors règle** — `minmax(300px,1fr)` et `grid-cols-[20rem_1fr]`
+   sont des points d'arrêt de mise en page, arbitrage du journal de T1.6 que la fiche reprend déjà
+   pour `flex-[1.4]`. Écrit dans la **portée du motif**, pas dans un `ignores`.
+3. **Une troisième clause de plus que la fiche**, sur les épaisseurs de bordure brutes : sans elle,
+   `border-l-3` serait corrigé une fois et libre de rediverger — ce qu'`ACTION_LINK` a fait six jours
+   après TD.1.
+
+Et une convention d'arrondi, unique et rapportable : **au plus proche, à égalité vers le bas.** Seuls
+9 px (→ 8) et 11 px (→ 12) ne sont pas des égalités.
+
+**Ce que le ticket livre.** `spacingScaleLock` dans `eslint.config.mjs`, sur le patron de
+`dbClientLock` — un objet nommé, un commentaire qui dit la règle qu'il sert, un message qui renvoie à
+`CLAUDE.md` —, en `no-restricted-syntax`, trois clauses × deux sélecteurs. Puis **39 arrondis dans 12
+fichiers** et `border-l-3` → `border-l-[length:var(--border-width-2)]`, à rendu strictement identique
+(`--border-width-2` vaut 3px). Le commentaire d'`indicators.tsx:799` suit sa valeur : « 170 px de
+haut » devient « 168 px ».
+
+**La mise en défaut, et ce qu'elle a appris.** L'instrument n'est pas un témoin mais **l'inventaire**,
+établi au `grep` avant que la règle n'existe : elle devait tomber sur ces 12 fichiers et sur eux
+seuls. Elle l'a fait — **36 erreurs pour 40 occurrences**, et l'écart de quatre est une propriété
+d'ESLint, qui signale un **nœud** et non une occurrence ; quatre `className` portaient deux classes
+fautives. Les trois témoins classiques ont suivi : `gap-2.5` dans un fichier propre (37, sur lui
+seul, retiré → 36), `w-[300px]` pour la clause 2 qui n'a aucun appelant au dépôt, `border-2` en
+littéral pour la clause 3 dont le seul appelant réel vit dans un gabarit de chaîne — les deux
+sélecteurs sont donc éprouvés chacun par un cas réel. Six témoins négatifs, tous posés dans un
+`className` réel, n'ont rien déclenché.
+
+**Vérification — 28 adresses, 367 paires de lignes, zéro inexpliquée.** Harnais de TD.3 et TD.4
+repris : DOM seul, tout `<script>` neutralisé, **déterminisme prouvé sur deux captures successives
+avant la mesure et deux après**, base immobile (aucune écriture, aucune sonde). Le diff n'est pas
+vide et ne devait pas l'être : **408 rendus modifiés**, dont 152 `gap-2.5`, 27 `size-2.5` et 24
+`border-l-3`. Chaque ligne « avant » redonne **exactement** la ligne « après » quand on lui applique
+les 23 substitutions annoncées — vérifié mécaniquement, pas à l'œil. Aucun réordonnancement de
+classe, aucun changement de structure. `/dev/session` ne bouge pas d'un caractère, seule des 28 : elle
+vit hors du groupe `(app)`, donc sans barre latérale.
+
+**Deux branches ont changé sans que leur rendu soit vu**, et c'est dit plutôt que supposé : les deux
+`px-2.5` de la fenêtre libre au mois (`SHOW_MONTH_RANGE = false`) et la pastille de jalon
+(`h-2.5 w-2.5`), qu'aucun produit de la fixture n'atteint.
+
+`npm run lint` à **zéro erreur et zéro avertissement**, `npx tsc --noEmit` propre, **773 tests sur 23
+fichiers verts sans qu'un fichier de test soit touché**. 13 fichiers modifiés, aucun fichier neuf.
+
+---
+
 ### TD.4 — l'état vide dans un bloc, et le bandeau d'archivage — 19/08/2026
 
 **Pourquoi ce ticket maintenant, et l'ordre enfreint.** La fiche prescrit TD.5 avant TD.4, pour que
@@ -2095,6 +2163,17 @@ supprimées. La règle 4 a rendu ce ticket gratuit en données.
 *(archivés depuis `ETAT.md` le 14/08/2026 — ils étaient barrés dans la section « Points ouverts »,
 où ils occupaient encore la place. Conservés tels quels : un point refermé documente comment il
 l%s été.)*
+
+- ~~**La règle 2 n'est pas surveillée sur les espacements.**~~ **Refermé le 19/08/2026 par TD.5.**
+  `--spacing` était un pas et non une échelle, et Tailwind en dérivait n'importe quel multiplicateur.
+  Le relevé du point disait « une soixantaine de valeurs hors `--number-*` » ; le compte exact était
+  **39 occurrences fautives dans 12 fichiers**, le reste des classes fractionnaires (`0.5` et `1.5`)
+  étant conforme. `spacingScaleLock` interdit désormais le multiplicateur fractionnaire hors échelle,
+  la dimension arbitraire qui ne pointe aucun jeton, et l'épaisseur de bordure brute — cette dernière
+  clause étant une de plus que la fiche n'en prescrivait, sans quoi `border-l-3` aurait été corrigé
+  sans être gardé. **Ce qui reste ouvert n'est pas le trou mais sa bordure** : une chaîne de classes
+  rangée dans une constante échappe aux trois clauses, mesuré par sonde, et les `.ts` ne sont pas
+  surveillés — consigné dans `JOURNAL-TECHNIQUE.md`, à reprendre avec `socleLock` en TD.6.
 
 - ~~**`SectionHeader` déclare une note et ne la rend jamais.**~~ **Refermé le 19/08/2026 par TD.4**,
   sur arbitrage humain rendu avant écriture : **la note se rend**. La prop était déclarée depuis T2.3

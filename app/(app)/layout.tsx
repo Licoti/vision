@@ -38,11 +38,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <aside className="flex flex-none flex-col gap-8 bg-surface-primary-base px-4 py-6 md:sticky md:top-0 md:h-screen md:w-62">
         <Link
           href={ROUTES.overview}
-          className="flex items-center gap-2.5 px-1.5 text-xl font-bold text-content-neutral-pale focus-visible:outline-content-neutral-pale"
+          className="flex items-center gap-2 px-1.5 text-xl font-bold text-content-neutral-pale focus-visible:outline-content-neutral-pale"
         >
           <span
             aria-hidden="true"
-            className="size-2.5 rounded-full bg-surface-secondary-base"
+            className="size-2 rounded-full bg-surface-secondary-base"
           />
           Vision
         </Link>

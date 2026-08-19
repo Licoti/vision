@@ -188,7 +188,7 @@ function Eyebrow({
 
   return (
     <Heading
-      className={`flex items-center gap-2.25 text-xs font-bold uppercase ${tone}`}
+      className={`flex items-center gap-2 text-xs font-bold uppercase ${tone}`}
     >
       <span aria-hidden="true" className="flex items-center">
         {mark}
@@ -331,7 +331,7 @@ export function Indicators({
         <Eyebrow
           level="h2"
           mark={
-            <span className="block h-0.75 w-5.5 rounded-xs bg-content-primary-dark" />
+            <span className="block h-0.5 w-5 rounded-xs bg-content-primary-dark" />
           }
           title="Vision produit"
           tone="text-content-primary-dark"
@@ -405,7 +405,7 @@ export function Indicators({
             que ces deux-là sont l'un pour l'autre. */}
         <div
           aria-hidden="true"
-          className="mt-7.5 mb-6.5 h-px bg-border-primary-lighter"
+          className="mt-7 mb-6 h-px bg-border-primary-lighter"
         />
 
         {/* Le ★ suit la North Star : il titrait le bloc tant qu'elle le
@@ -425,7 +425,7 @@ export function Indicators({
              `#ffffff` n'a pas de jeton de surface ici, c'est la règle
              qu'`action-menu.tsx` posait déjà. Sans ombre : `tokens.css` §8
              nomme trois élévations sans leur donner de valeur. */
-          <div className="mt-3.5 rounded-2xl border border-border-primary-lighter bg-surface-neutral-pale p-6">
+          <div className="mt-3 rounded-2xl border border-border-primary-lighter bg-surface-neutral-pale p-6">
             <NorthStar
               indicator={northStar}
               series={series.get(northStar.id) ?? []}
@@ -442,7 +442,7 @@ export function Indicators({
              blanche vide dirait qu'il manque quelque chose à l'endroit où il
              n'y a rien à encadrer. Un état vide est un écran à part entière
              (règle 5), pas la version creuse de l'écran plein. */
-          <BlockNote className="mt-3.5">
+          <BlockNote className="mt-3">
             {indicators.length === 0
               ? "Aucun indicateur pour l'instant. Le premier que ce produit portera pourra être désigné North Star : celui qui dit où le produit veut aller."
               : "Aucune North Star désignée. Le menu de ce bloc permet de choisir lequel de ces indicateurs porte l'objectif global du produit."}
@@ -472,7 +472,7 @@ export function Indicators({
             la grille, et l'en sortir pour le garder visible aurait déplacé un
             point d'entrée que la maquette pose là. Il reste à un clic, et le
             menu du bloc n'est pas le seul chemin. */}
-        <details className="group mt-8.5">
+        <details className="group mt-8">
           <BlockDivider
             as="summary"
             /* Le chevron **remplace le triangle natif**, que `flex` retire à
@@ -589,7 +589,7 @@ function NorthStar({
         </p>
 
         {lastValue && indicator.lastReadOn ? (
-          <p className="mt-4 flex flex-wrap items-baseline gap-2.5">
+          <p className="mt-4 flex flex-wrap items-baseline gap-2">
             <span className="text-4xl font-bold leading-none text-content-neutral-darkest">
               {lastValue}
             </span>
@@ -690,11 +690,11 @@ function Gauge({
         />
         <div
           aria-hidden="true"
-          className="absolute -inset-y-1.75 w-0.5 bg-content-warning-darker"
+          className="absolute -inset-y-1.5 w-0.5 bg-content-warning-darker"
           style={{ left: `${mark}%` }}
         />
         <span
-          className="absolute -top-7.5 -translate-x-1/2 whitespace-nowrap text-xs font-bold text-content-warning-darker"
+          className="absolute -top-7 -translate-x-1/2 whitespace-nowrap text-xs font-bold text-content-warning-darker"
           style={{ left: `${mark}%` }}
         >
           <span aria-hidden="true">★ </span>
@@ -796,9 +796,9 @@ function Curve({
 
   return (
     <div>
-      {/* La boîte du tracé : 170 px de haut, 44 px réservés à gauche pour les
+      {/* La boîte du tracé : 168 px de haut, 44 px réservés à gauche pour les
           trois libellés d'axe. */}
-      <div className="relative h-42.5 pl-11">
+      <div className="relative h-42 pl-11">
         <span className="absolute left-0 -top-1.5 text-xs text-content-neutral-dark">
           {formatResultValue(String(scale.max), unit)}
         </span>
@@ -901,7 +901,7 @@ function Curve({
                   élévations sans leur donner de valeur (`tokens.css` §8). */}
                 <span
                   aria-hidden="true"
-                  className="block h-2.75 w-2.75 rounded-full border-[length:var(--border-width-1)] border-surface-neutral-pale bg-surface-primary-dark"
+                  className="block h-3 w-3 rounded-full border-[length:var(--border-width-1)] border-surface-neutral-pale bg-surface-primary-dark"
                 />
                 {/* La valeur écrite : c'est elle qui empêche la courbe d'être un
                   graphique décoratif. */}
@@ -943,7 +943,7 @@ function Curve({
                   }}
                 />
                 <span
-                  className="absolute -ml-2 -translate-x-full -translate-y-1/2 whitespace-nowrap rounded-full bg-content-warning-darker px-2.25 py-0.5 text-2xs font-bold text-content-neutral-pale"
+                  className="absolute -ml-2 -translate-x-full -translate-y-1/2 whitespace-nowrap rounded-full bg-content-warning-darker px-2 py-0.5 text-2xs font-bold text-content-neutral-pale"
                   style={{
                     left: `${bracket.left}%`,
                     top: `${bracket.top + bracket.height / 2}%`,
@@ -961,7 +961,7 @@ function Curve({
           retrait à gauche pour les libellés d'axe (`ml-11`) et même gouttière à
           droite (`mr-8`) que le tracé. Sans la seconde, la dernière graduation
           tomberait à droite du dernier point qu'elle situe. */}
-      <div className="relative ml-11 mr-8 mt-2 h-4.5">
+      <div className="relative ml-11 mr-8 mt-2 h-4">
         {ticks.map((tick) => (
           <span
             key={tick.month}
@@ -1038,7 +1038,7 @@ function IndicatorCard({
   const lastValue = formatResultValue(indicator.lastValue, indicator.unit);
 
   return (
-    <div className="relative rounded-2xl border border-surface-neutral-lighter bg-surface-neutral-pale p-3.5">
+    <div className="relative rounded-2xl border border-surface-neutral-lighter bg-surface-neutral-pale p-3">
       {editHref || addReadingHref || readingsHref || setNorthStar ? (
         /* **Le conteneur porte le positionnement, jamais le menu** : sa racine
            est `relative`, dont son déroulant a besoin pour s'ancrer. */
@@ -1138,7 +1138,7 @@ function IndicatorCard({
       )}
 
       <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-content-neutral-base">
-        <span className="rounded-full bg-surface-primary-lighter px-2.25 py-0.5 text-2xs font-semibold text-content-neutral-dark">
+        <span className="rounded-full bg-surface-primary-lighter px-2 py-0.5 text-2xs font-semibold text-content-neutral-dark">
           {formatIndicatorDirection(indicator.direction)}
         </span>
         {formatReadings(indicator.readingCount)}

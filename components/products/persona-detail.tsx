@@ -90,7 +90,7 @@ export function PersonaDetailHeader({
   persona: ProductPersona;
 }) {
   return (
-    <div className="flex min-w-0 items-start gap-3.5">
+    <div className="flex min-w-0 items-start gap-3">
       <PersonaImage persona={persona} />
       <div className="flex min-w-0 flex-col gap-1">
         <h2
@@ -200,7 +200,7 @@ function Family({
           className="flex flex-col gap-1.5 text-sm leading-175 text-content-neutral-darkest"
         >
           {items.map((trait) => (
-            <li key={trait.id} className="flex gap-2.5">
+            <li key={trait.id} className="flex gap-2">
               <span
                 aria-hidden="true"
                 className="mt-2 h-1 w-1 flex-none rounded-full bg-content-neutral-base"

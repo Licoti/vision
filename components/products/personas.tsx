@@ -133,7 +133,7 @@ function PersonaCard({
     <DrawerLink
       href={href}
       request={{ kind: "personaDetail", id: persona.id }}
-      className="flex h-full items-start gap-3.5 rounded-2xl border border-surface-neutral-lighter p-4"
+      className="flex h-full items-start gap-3 rounded-2xl border border-surface-neutral-lighter p-4"
     >
       <PersonaImage persona={persona} />
 

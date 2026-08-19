@@ -97,7 +97,7 @@ export function BlockHeader({
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div className="min-w-0">
-        <h2 className="flex items-center gap-2.5 text-xl font-bold text-content-neutral-darkest">
+        <h2 className="flex items-center gap-2 text-xl font-bold text-content-neutral-darkest">
           {mark ? <span aria-hidden="true">{mark}</span> : null}
           {title}
         </h2>

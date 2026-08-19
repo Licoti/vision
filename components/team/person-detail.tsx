@@ -49,7 +49,7 @@ import type { PersonDetail as PersonDetailRow } from "@/lib/queries/team";
  */
 export function PersonDetailHeader({ person }: { person: PersonDetailRow }) {
   return (
-    <div className="flex min-w-0 items-start gap-3.5">
+    <div className="flex min-w-0 items-start gap-3">
       {/* Le `tone` distingue le centre de l'entité accompagnée, exactement comme
           sur la ligne de la liste : la fiche ressemble à ce qu'elle détaille. */}
       <Avatar

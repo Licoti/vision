@@ -2,12 +2,12 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 19/08/2026 — TD.4 terminé : l'état vide dans un bloc, le bandeau
-d'archivage, et la note perdue de `SectionHeader` rendue.
+**Dernière mise à jour :** 19/08/2026 — TD.5 terminé : la règle 2 est surveillée sur les
+espacements, et les 39 valeurs hors échelle sont arrondies.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
-**Ticket suivant :** **T5bis.5** — le radar des compétences (`tickets-C5bis.md`). **TD.5 est
-disponible et ne dépend de rien** (`tickets-TD.md`) ; **TD.6 est désormais déverrouillé**, son
-point (c) attendait l'arbitrage que TD.4 a rendu. L'ordre entre les trois revient à l'humain.
+**Ticket suivant :** **T5bis.5** — le radar des compétences (`tickets-C5bis.md`), ou **TD.6**, le
+garde-fou du socle, dont les trois logements existent et dont TD.4 a rendu l'arbitrage du point (c)
+(`tickets-TD.md`). L'ordre entre les deux revient à l'humain.
 
 ---
 
@@ -22,7 +22,7 @@ point (c) attendait l'arbitrage que TD.4 a rendu. L'ordre entre les trois revien
 | C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **terminé** |
 | C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **terminé** |
 | TD — Dette technique | TD.1, TD.2 | **terminé** |
-| TD — Couche de présentation | TD.3 → TD.6 | **en cours** — TD.3 et TD.4 terminés (`tickets-TD.md`) |
+| TD — Couche de présentation | TD.3 → TD.6 | **en cours** — TD.3, TD.4 et TD.5 terminés ; reste TD.6 (`tickets-TD.md`) |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **en cours** — T5bis.4 terminé |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
@@ -160,6 +160,20 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   témoin dans la variante a fait bouger **les vingt captures** alors posées — chaque écran porte au
   moins le skip-link, si bien qu'aucune ne pouvait rester muette.
 
+- **TD.5 — 19/08/2026 — le garde-fou de la règle 2 sur les espacements.** Ticket **hors chantier**.
+  `spacingScaleLock` ferme le seul trou de la règle 2 — `--spacing` est un **pas**, pas une échelle —
+  en trois clauses : multiplicateur fractionnaire hors `0.5`/`1.5`, dimension arbitraire sans jeton,
+  épaisseur de bordure brute. **39 valeurs arrondies dans 12 fichiers**, au plus proche et à égalité
+  vers le bas, plus `border-l-3` → `border-l-[length:var(--border-width-2)]`, à rendu identique. Trois
+  arbitrages rendus avant écriture : aucune exception pour le rythme du bloc « Vision produit », les
+  gabarits de grille restent des **points d'arrêt de mise en page** (arbitrage de T1.6), et la clause
+  3 est une clause de plus que la fiche — sans elle, la correction rediverge. Sa mise en défaut n'est
+  pas un témoin mais **l'inventaire lui-même** : la règle devait tomber sur les 12 fichiers relevés au
+  `grep` et sur eux seuls, ce qu'elle a fait à quatre nœuds près — **ESLint signale un nœud, pas une
+  occurrence**, et quatre `className` portaient deux classes fautives. Sa leçon est dans la portée du
+  sélecteur : **une classe écrite hors d'un attribut `className` échappe aux trois clauses**, mesuré
+  par sonde — la même limite attend `socleLock` en TD.6.
+
 - **Les indicateurs associés repliés par défaut — hors ticket, le 18/08/2026.** Le rang 3 du bloc
   « Vision produit » devient un `<details>` fermé, dont `BlockDivider` sait être le `<summary>` — la
   question du produit reste seule à l'écran, ses cartes tiennent à un clic. Sa leçon :
@@ -276,7 +290,7 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   `Button` / `BUTTON_PRIMARY` / `BUTTON_SECONDARY` / `ACTION_LINK_SM` (TD.3), puis `BlockNote` et
   `ArchivedNotice` (TD.4) — quarante-trois copies retirées en deux tickets. La doctrine est tranchée :
   ce qui manque n'est plus une décision, c'est du travail.
-  → **TD.5, puis TD.6 (`tickets-TD.md`).** TD.6 est le seul qui ne retire rien : il **empêche la
+  → **TD.6 (`tickets-TD.md`), dernier des quatre.** Il est le seul qui ne retire rien : il **empêche la
   copie suivante**, faute de quoi les autres ne sont qu'un nettoyage — `ACTION_LINK`, extrait en
   TD.1, a redivergé six jours plus tard, et l'état vide a redivergé **trois fois** dans
   `components/team/` pendant que TD.4 était en attente. **Sa liste de signatures est à corriger sur
@@ -295,12 +309,6 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   comme les autres, mais leur rendu n'a pas été vu** — ce n'est pas une dette de code, c'est un trou
   de jeu d'essai. → **à couvrir par la fixture, ou par une sonde assumée, au prochain ticket qui
   écrit en base.**
-
-- **La règle 2 n'est pas surveillée sur les espacements.** `--spacing` est un pas et non une échelle :
-  Tailwind en dérive n'importe quel multiplicateur, et **une soixantaine de valeurs hors `--number-*`**
-  se sont accumulées (`gap-2.5`, `px-2.25`, `mt-3.5`, `top-7.5`…), plus deux dimensions en dur dans
-  `indicators.tsx` et un `border-l-3`. Les couleurs, elles, sont structurellement protégées et n'ont
-  **aucune** violation. → **TD.5.**
 
 ### c. Dettes assumées, sans échéance
 
@@ -353,7 +361,7 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   le typage d'`unlink` refusant une table à `archived_at`. Il n'existe **pas de `db:reset`**,
   `db:seed` ignorant ce qu'il n'a pas semé. → **sans échéance ; un ticket d'outillage si le besoin
   devient réel.**
-- **Le design system a six manques, et aucun n'a été inventé.** (1) Les trois **élévations** et les
+- **Le design system a huit manques, et aucun n'a été inventé.** (1) Les trois **élévations** et les
   deux **gradients** sont nommés sans valeur. (2) Aucun jeton de **bordure de contrôle** : le plus
   sombre des `border-*` ne dépasse pas 1,2:1 là où la limite d'un composant se mesure à 3:1.
   (3) Aucun jeton de **bordure d'erreur**. (4) Aucun jeton d'**interlettrage** : les capitales des
@@ -368,8 +376,23 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   une bordure de contrôle, `content-danger-base` (5,19:1) pour un champ en erreur,
   `content-neutral-dark` (3,05:1 contre le voile) pour le filet du panneau, `content-neutral-base`
   (4,98:1) pour un séparateur. **Règle : aucun septième substitut ne s'invente** ; elle tient depuis
-  T2.3 et il n'y a plus qu'un fichier où l'enfreindre. → **à faire remonter à qui maintient le design
+  T2.3 et il n'y a plus qu'un fichier où l'enfreindre. **(8) L'échelle `--number-*` s'arrête à
+  100 px**, relevé en mesurant TD.5 : le pas de 4 px se prolonge sans jeton nommé, et **dix-neuf
+  valeurs légitimes vivent au-delà**, de `w-28` (112 px) à `max-w-310` (1 240 px) — toutes les
+  largeurs de colonne, de panneau et de gouttière de l'application. Le pas est tenu, la liste ne va
+  pas jusque-là ; `spacingScaleLock` surveille donc le **pas**, pas l'appartenance à la liste. → **à faire remonter à qui maintient le design
   system.**
+
+- **Deux gabarits de grille portent une dimension en dur, et c'est un arbitrage, pas un oubli.**
+  `indicators.tsx:495` (`minmax(300px,1fr)`) et `:585` (`grid-cols-[20rem_1fr]`) disent à quelle
+  largeur une carte cesse de tenir — un **point d'arrêt de mise en page**, pas une valeur de thème
+  (arbitrage du journal de T1.6, que la fiche de TD.5 reprend déjà pour `flex-[1.4]`). Ils sont donc
+  hors de la clause 2 de `spacingScaleLock` **par construction** : elle ne porte que sur les
+  utilitaires de dimension, jamais sur `grid-cols-` ni sur `flex-`. **Le pas, lui, les atteindrait** —
+  300 px et 320 px valent 75 et 80 fois 4 px —, mais aucun jeton **nommé** ne va si loin (manque (8)
+  ci-dessus), et surtout la question n'est pas là : ce qu'on écrit ici n'est pas un espacement, c'est
+  la largeur sous laquelle une carte cesse de tenir. → **à reposer si le design system s'enrichit
+  d'une grille.**
 - **La création d'un projet n'est pas atomique, et ne peut pas l'être.** `neon-http` n'a pas de
   transaction interactive — la couche n'a que `batch`. La parade est de tout confronter au domaine
   **avant** d'écrire, et d'ordonner les ajouts avant les retraits (T3.6). Reste non refermé : une

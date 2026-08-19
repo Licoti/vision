@@ -354,11 +354,11 @@ function RoadmapSection({
 
   if (cancelled) {
     return (
-      <details className="flex flex-col gap-2.5">
+      <details className="flex flex-col gap-2">
         {/* Le triangle natif du navigateur est conservé : c'est le signal
             standard d'un contenu replié, et l'inventer autrement demanderait
             une valeur visuelle que le design system ne nomme pas (règle 2). */}
-        <summary className="flex cursor-pointer items-center gap-2.5">
+        <summary className="flex cursor-pointer items-center gap-2">
           {headerContent}
         </summary>
         <div className="mt-1">{list}</div>
@@ -367,8 +367,8 @@ function RoadmapSection({
   }
 
   return (
-    <div className="flex flex-col gap-2.5">
-      <div className="flex items-center gap-2.5">{headerContent}</div>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">{headerContent}</div>
       {list}
     </div>
   );
@@ -553,7 +553,7 @@ function RoadmapEntry({
 
   return (
     <li
-      className={`flex flex-wrap items-start justify-between gap-x-6 gap-y-2 rounded-lg border border-surface-neutral-lighter border-l-3 ${edge} bg-surface-neutral-pale px-5 py-4`}
+      className={`flex flex-wrap items-start justify-between gap-x-6 gap-y-2 rounded-lg border border-surface-neutral-lighter border-l-[length:var(--border-width-2)] ${edge} bg-surface-neutral-pale px-5 py-4`}
     >
       <div className="min-w-55 flex-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">

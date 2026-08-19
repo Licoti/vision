@@ -195,7 +195,7 @@ export function PersonaPanel({
             <label
               key={option.value}
               htmlFor={id(option.value)}
-              className="flex items-start gap-2.5 text-sm text-content-neutral-darkest"
+              className="flex items-start gap-2 text-sm text-content-neutral-darkest"
             >
               <input
                 id={id(option.value)}

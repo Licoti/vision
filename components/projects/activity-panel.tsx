@@ -196,7 +196,7 @@ export function ActivityPanel({
           masquage au clic de la maquette : sans JavaScript, un champ ne
           disparaît pas. Les deux ensemble sont **refusées**, la saisie
           revenant avec ses valeurs — plutôt que d'en jeter une des deux. */}
-      <fieldset className="flex flex-col gap-2.5">
+      <fieldset className="flex flex-col gap-2">
         <legend className="text-2xs font-semibold text-content-neutral-dark uppercase">
           Période
           <span className="font-normal text-content-neutral-base">
@@ -340,7 +340,7 @@ export function ActivityPanel({
           (T2.6) : les personnes viennent de la liste existante, aucune
           création à la volée (D19). Aucun rôle, aucune quotité : la case
           seule porte l'information. */}
-      <fieldset className="flex flex-col gap-2.5">
+      <fieldset className="flex flex-col gap-2">
         <legend className="text-2xs font-semibold text-content-neutral-dark uppercase">
           Participants
         </legend>

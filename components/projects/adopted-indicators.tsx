@@ -150,7 +150,7 @@ export function AdoptedIndicators({
                   ailleurs : « Modifier » répété quatre fois dans une liste de
                   liens ne dit pas laquelle. */}
               {editHref || removeAdoption ? (
-                <div className="mt-2.5 flex flex-wrap items-center gap-4">
+                <div className="mt-2 flex flex-wrap items-center gap-4">
                   {editHref ? (
                     <DrawerLink
                       href={editHref(adoption.id)}

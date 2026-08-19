@@ -4730,3 +4730,115 @@ sorti vers `HISTORIQUE-TICKETS.md`, un point ouvert a été récrit plutôt que 
 neuf est entré. Le balayage reste réservé à la session de découpage de C6, comme le protocole le
 veut — mais le fichier a désormais crû à chacun des trois derniers tickets, et le seuil n'est plus
 un seuil : c'est un chiffre qu'on rapporte.
+
+## TD.5 — le garde-fou de la règle 2 sur les espacements, 19/08/2026
+
+### La mise en défaut la plus forte n'est pas un témoin, c'est l'inventaire
+
+Un témoin prouve qu'une règle **peut** tomber ; il ne prouve pas qu'elle tombe **là où il faut**.
+L'inventaire, lui, est établi indépendamment de la règle — au `grep`, avant de l'écrire — et il donne
+un chiffre que la règle doit retrouver. Elle l'a retrouvé : **12 fichiers, exactement ceux du
+relevé**, et pas un de plus.
+
+**Mais le nombre, lui, ne tombait pas juste — 36 erreurs pour 40 occurrences —, et l'écart est une
+propriété d'ESLint qu'il faut connaître avant de conclure à un trou.** *ESLint signale un **nœud**, pas
+une occurrence.* Quatre `className` portaient deux classes fautives chacun — `h-0.75 w-5.5`,
+`mt-7.5 mb-6.5`, `h-2.75 w-2.75`, `h-2.5 w-2.5` —, comptés une fois. 40 − 4 = 36, et le compte tombe.
+*Sans cette vérification, un ticket pouvait conclure à quatre échappées et se mettre à élargir un
+motif déjà juste.*
+
+Les trois témoins classiques ont été passés ensuite, et les trois clauses en avaient besoin
+inégalement :
+
+- **Clause 1** — un `gap-2.5` posé dans `components/ui/avatar.tsx`, fichier propre : 37 erreurs, la
+  nouvelle sur lui et **sur lui seul** ; retiré, retour exact à 36.
+- **Clause 2** — elle n'a **aucun appelant au dépôt**, par l'arbitrage des gabarits de grille. Une
+  clause qu'aucune ligne ne déclenche est une clause qu'on croit sur parole : `w-[300px]` posé au même
+  endroit la fait tomber, `w-[calc(100%-var(--number-8))]` non.
+- **Clause 3** — éprouvée deux fois par construction : le seul appelant du dépôt (`border-l-3`) vit
+  dans un **gabarit de chaîne**, et le témoin dans un **littéral**. Les deux sélecteurs sont donc
+  nécessaires, mesuré plutôt que repris de la sonde de TD.6.
+
+Témoins négatifs, tous posés dans un attribut `className` réel : `gap-1.5`, `gap-0.5`, `flex-[1.4]`,
+`grid-cols-[20rem_1fr]`, `first:border-t-0`, `border-t-[length:var(--border-width-1)]` — aucun ne
+déclenche.
+
+### La limite du sélecteur, mesurée : une classe hors `className` échappe à tout
+
+`const PROBE = "gap-2.5 border-2 w-[300px]"` posé dans un fichier surveillé ne déclenche **aucune**
+des trois clauses — le seul retour d'ESLint est l'avertissement de variable inutilisée. Les
+sélecteurs sont ancrés sur `JSXAttribute[name.name="className"]`, et une chaîne de classes rangée
+dans une constante n'est pas dessous.
+
+**Le trou est vide aujourd'hui** — les 36 nœuds rendent compte des 40 occurrences du dépôt — mais le
+motif existe : `app/(app)/projets/page.tsx:56` (`"min-w-0 flex-[1.4]"`), `components/ui/button.tsx`,
+`components/ui/action-link.ts`. Ce dernier ajoute une seconde limite : **`files: ["**/*.tsx"]` ne voit
+pas les `.ts`**, où vivent justement deux constantes du socle. Aucune ne porte d'espacement
+aujourd'hui. → **la même limite attend `socleLock` en TD.6**, dont les signatures sont précisément des
+chaînes de classes que le socle range dans des constantes.
+
+### L'arbitrage qui défait une décision de la veille, et pourquoi il a quand même été rendu
+
+Le journal du 18/08 défend nommément `mt-7.5`, `mb-6.5`, `mt-8.5`, `h-0.75`, `w-5.5` et `gap-2.25` :
+« le rythme 16/30-26/14/34-16 de la maquette s'obtient en multiples du pas de 4 pixels, sans une
+valeur littérale ». C'est vrai et c'est insuffisant : **un multiple fractionnaire du pas n'est pas une
+valeur de l'échelle** — le §4 ne nomme ni 30, ni 26, ni 34, ni 9, ni 22, ni 3. Le bloc « Vision
+produit » passe donc à **16/28-24/12/32-16**, décision humaine prise avant écriture. L'autre issue —
+exempter le fichier — aurait demandé une dizaine d'`eslint-disable` dans le fichier le plus fautif du
+dépôt, c'est-à-dire désactiver la règle là où elle avait le plus à dire.
+
+### Ce que la règle ne vise pas, et pourquoi ce n'est pas une exception
+
+`minmax(300px,1fr)` et `grid-cols-[20rem_1fr]` disent à quelle largeur une carte cesse de tenir : un
+**point d'arrêt de mise en page**, pas une valeur de thème — l'arbitrage de T1.6 sur les points
+d'arrêt responsifs, que la fiche de TD.5 reprend déjà pour `flex-[1.4]`. Ils sont hors de la clause 2
+**par construction** : elle énumère les utilitaires de dimension et ne connaît ni `grid-cols-` ni
+`flex-`. *Correction d'une chose que j'ai dite trop vite en posant l'arbitrage* : le pas **atteint**
+ces deux valeurs — 300 px et 320 px sont 75 et 80 fois 4 px, et `--spacing(75)` les écrirait. Ce
+n'est donc pas l'impossibilité qui les met hors règle, c'est leur nature. *Une exception se désactive, une portée se lit* — et écrire l'arbitrage dans la forme du
+motif plutôt que dans un `ignores` est ce qui empêche la règle de se faire contourner par le geste
+qui la contournerait légitimement une fois.
+
+### Un huitième manque du design system, découvert par l'arrondi
+
+`h-42.5` (170 px) s'arrondit en `h-42` (168 px), et 168 n'est pas plus dans la liste `--number-*` que
+170 : **l'échelle nommée s'arrête à 100 px** alors que le pas de 4 px se prolonge. Le relevé donne
+**dix-neuf valeurs légitimes au-delà**, de `w-28` (112 px) à `max-w-310` (1 240 px) — c'est-à-dire
+toutes les largeurs de colonne, de panneau et de gouttière du dépôt, et non un cas isolé. Conséquence
+sur la règle, assumée : **`spacingScaleLock` surveille le pas, pas l'appartenance à la liste.** Inventer les
+jetons manquants aurait été toucher au design system, ce que la fiche interdit. Consigné en manque
+(8) dans `ETAT.md`.
+
+### Deux branches changent sans que leur rendu ait été vu
+
+`components/products/roadmap.tsx:206` et `:225` (`px-2.5`, la fenêtre libre au mois) sont derrière
+`SHOW_MONTH_RANGE = false` depuis le 18/08 ; `:554` (`h-2.5 w-2.5`, la pastille de jalon) attend un
+jalon qu'aucun produit de la fixture ne porte — la ligne « Activités porteuses d'un résultat » ne
+figure dans aucune des 28 captures. Leur code a changé comme celui des autres, **leur rendu n'a pas
+été vu**. Même nature que les cinq branches d'état vide relevées en TD.4 : dette de jeu d'essai, pas
+dette de code.
+
+### Le harnais, repris de TD.3 et TD.4 sans surprise
+
+28 adresses, tout `<script>` neutralisé, **déterminisme prouvé sur deux captures successives avant
+la mesure et deux après**, base immobile — aucune écriture, aucune sonde en base. **367 paires de
+lignes changent, 408 rendus modifiés, et zéro ligne inexpliquée** : chaque ligne « avant » redonne
+exactement la ligne « après » quand on lui applique les 23 substitutions annoncées, vérifié
+mécaniquement plutôt qu'à l'œil. `/dev/session` ne bouge pas d'un caractère — elle vit hors du groupe
+`(app)`, donc sans la barre latérale, seule adresse dans ce cas.
+
+### `ETAT.md` passe de 428 à 449 lignes, soit 199 au-dessus du seuil de 250
+
+Un point refermé en est sorti vers `HISTORIQUE-TICKETS.md`, un point ouvert a été récrit plutôt que
+d'empiler, et deux points neufs sont entrés — le manque (8) et l'arbitrage des gabarits de grille.
+**Le fichier a crû à chacun des quatre derniers tickets** (420 → 428 → 449), et le protocole se
+contredit sur qui doit le corriger : l'étape 5 dit « au-delà, le balayer avant de continuer », la
+session de découpage dit qu'elle en est « le seul moment ». Un ticket qui balaierait toucherait aux
+points de quinze autres. → **le balayage attend le découpage de C6, et le seuil n'est plus un seuil.**
+
+### Une ligne manque au journal des tickets d'`ETAT.md`, et elle n'a pas été ajoutée
+
+TD.4 n'a **pas** de ligne dans « Journal des tickets », là où TD.1, TD.2 et TD.3 en ont une ; seul
+l'en-tête de dernière mise à jour le mentionnait. La ligne de TD.5 s'insère donc après celle de TD.3,
+en laissant le trou. **Règle 3** : l'écrire aurait été un ajout « pendant que j'y suis » sur le récit
+d'un autre ticket. → **une ligne à ajouter par qui a écrit TD.4, ou au prochain balayage.**

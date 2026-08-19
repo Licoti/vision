@@ -58,7 +58,7 @@ export function SectionHeader({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex flex-wrap items-baseline gap-3">
-        <h2 className="flex items-center gap-2.5 text-xl font-bold text-content-neutral-darkest">{title}</h2>
+        <h2 className="flex items-center gap-2 text-xl font-bold text-content-neutral-darkest">{title}</h2>
         {note ? (
           <p className="basis-full max-w-160 text-sm leading-175 text-content-neutral-dark">
             {note}
