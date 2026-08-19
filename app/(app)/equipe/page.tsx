@@ -47,9 +47,16 @@
  * à partir des valeurs **déjà confrontées au domaine**, jamais des paramètres
  * reçus.
  *
- * **Aucune écriture ici** : ni bouton, ni action, ni point d'entrée. Les trois
- * gestes arrivent en T5bis.6, et cet écran ne lit donc aucun droit — la fiche
- * elle-même se lit par tout le domaine (D9).
+ * **Un seul geste sur cet écran** (T5bis.6) : « Ajouter une personne », rendu au
+ * seul `manageDomain` (arbitrage (c)). Les cinq autres vivent dans la fiche, et
+ * la lecture, elle, ne passe par aucun droit (D9). Ce n'est pas ce rendu qui
+ * protège : les six actions redérivent le droit sur l'identifiant **reçu**.
+ *
+ * **Trois clés d'ouverture de plus** — `profil`, `maitrise`, `archiver` —, et
+ * `personne` n'a pas bougé : ce sont **deux droits**, et une clé unique aurait
+ * fait tomber la fiche avec le droit d'écrire. `competence` reste une clé de
+ * filtre et n'est pas devenue une clé de panneau ; `lib/navigation.ts` dit
+ * pourquoi.
  *
  * Aucune requête directe : tout passe par `session.db`, déjà scopé sur le
  * domaine courant. Règle 1.
@@ -65,7 +72,7 @@ import {
 } from "@/components/team/availability-dot";
 import { ACTION_LINK_SM } from "@/components/ui/action-link";
 import { Avatar } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { Button, BUTTON_PRIMARY } from "@/components/ui/button";
 import { DrawerHost, DrawerLink } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { borderOf, CONTROL, CONTROL_TEXT } from "@/components/ui/form-field";
@@ -81,7 +88,14 @@ import {
   teamRequestFromParams,
 } from "@/lib/drawers/team";
 import { formatPersons } from "@/lib/format";
-import { PERSON_PANEL_PARAM, ROUTES } from "@/lib/navigation";
+import {
+  ARCHIVE_PANEL_PARAM,
+  PERSON_FORM_NEW,
+  PERSON_FORM_PARAM,
+  PERSON_PANEL_PARAM,
+  ROUTES,
+  SKILL_PANEL_PARAM,
+} from "@/lib/navigation";
 import {
   listTeam,
   listTeamFilterOptions,
@@ -122,17 +136,20 @@ const PARAM = {
 /**
  * `string | string[]` est **structurel** : `competence` est répétable, et Next
  * rend un tableau dès la seconde occurrence. Le typer en `string` seul ferait
- * mentir le compilateur sur le cas qui est justement l'objet du ticket.
+ * mentir le compilateur sur le cas qui est justement l'objet de T5bis.3.
  *
- * `personne` s'y ajoute en T5bis.4 : c'est une clé de **panneau** et non de
- * filtre, ce que le décompte d'exclusivité et `TEAM_PANEL_PARAMS` tiennent
- * séparément.
+ * Les **quatre** clés de panneau s'y ajoutent — `personne` en T5bis.4, puis
+ * `profil`, `maitrise` et `archiver` en T5bis.6. Ce ne sont pas des filtres, ce
+ * que le décompte d'exclusivité et `TEAM_PANEL_PARAMS` tiennent séparément.
  */
+type PanelParam =
+  | typeof PERSON_PANEL_PARAM
+  | typeof PERSON_FORM_PARAM
+  | typeof SKILL_PANEL_PARAM
+  | typeof ARCHIVE_PANEL_PARAM;
+
 type SearchParams = Partial<
-  Record<
-    (typeof PARAM)[keyof typeof PARAM] | typeof PERSON_PANEL_PARAM,
-    string | string[]
-  >
+  Record<(typeof PARAM)[keyof typeof PARAM] | PanelParam, string | string[]>
 >;
 
 /** La première valeur d'un paramètre qu'on n'attend qu'une fois. */
@@ -188,9 +205,18 @@ type AppliedFilters = {
  * fermeture est l'URL nue : là-bas elle n'efface rien, ici elle effacerait la
  * recherche. `docs/06` §9 veut les filtres conservés.
  */
-function teamHref(filters: AppliedFilters, personId?: string): string {
+function teamHref(
+  filters: AppliedFilters,
+  /**
+   * Le panneau à rouvrir sur cette adresse, s'il y en a un. La clé vient de
+   * `lib/navigation.ts`, et d'aucun autre endroit — elle est posée **avant** les
+   * filtres pour que l'adresse se lise dans l'ordre où elle se raconte.
+   */
+  panel?: { key: PanelParam; value: string },
+): string {
   const query = new URLSearchParams();
 
+  if (panel) query.set(panel.key, panel.value);
   if (filters.search) query.set(PARAM.search, filters.search);
   if (filters.jobId) query.set(PARAM.job, filters.jobId);
   // Répétable : c'est la forme que la conjonction de T5bis.3 attend.
@@ -200,11 +226,8 @@ function teamHref(filters: AppliedFilters, personId?: string): string {
     query.set(PARAM.availability, filters.availability);
   }
 
-  // La clé du panneau vient de `ROUTES`, et d'aucun autre endroit.
-  const base = personId ? ROUTES.teamPerson(personId) : ROUTES.team;
   const suffix = query.toString();
-  if (!suffix) return base;
-  return `${base}${base.includes("?") ? "&" : "?"}${suffix}`;
+  return suffix ? `${ROUTES.team}?${suffix}` : ROUTES.team;
 }
 
 export default async function TeamPage({
@@ -294,21 +317,49 @@ export default async function TeamPage({
      traversent ensuite la **même** résolution — `resolveTeamDrawer`.
 
      L'exclusivité ne vaut donc que pour ce chemin-ci : plusieurs clés de panneau
-     présentes ensemble n'ouvrent **rien**. Elle est écrite en **décompte** pour
-     que les deux clés de T5bis.6 l'absorbent sans que son énoncé change — la
-     forme de la page produit depuis T5.2. Côté clic, elle est structurelle :
-     l'état ne porte qu'une demande à la fois.
+     présentes ensemble n'ouvrent **rien**. Elle est écrite en **décompte**, et
+     elle est passée d'une clé à **quatre** en T5bis.6 sans qu'un caractère de
+     son énoncé change — c'est pour cela qu'elle avait été écrite ainsi, la forme
+     de la page produit depuis T5.2. Côté clic, elle est structurelle : l'état ne
+     porte qu'une demande à la fois.
 
      **Les cinq clés de filtre n'y entrent pas** : ce ne sont pas des clés
      d'ouverture, et les faire compter fermerait la fiche dès qu'on filtre. */
   const panelKeys = {
     [PERSON_PANEL_PARAM]: one(params[PERSON_PANEL_PARAM]),
+    [PERSON_FORM_PARAM]: one(params[PERSON_FORM_PARAM]),
+    [SKILL_PANEL_PARAM]: one(params[SKILL_PANEL_PARAM]),
+    [ARCHIVE_PANEL_PARAM]: one(params[ARCHIVE_PANEL_PARAM]),
   };
   const conflict =
     Object.values(panelKeys).filter((value) => value !== undefined).length > 1;
   const request = teamRequestFromParams(conflict ? {} : panelKeys);
 
   const drawer = request ? await resolveTeamDrawer(session, request) : null;
+
+  /* **Le seul geste de cet écran** (T5bis.6), et le seul droit qu'il lise :
+     `manageDomain` (arbitrage (c)). Il paraît à deux endroits — l'en-tête et
+     l'état vide initial —, et l'adresse **reconduit les filtres** comme les
+     liens de ligne : refermer le panneau ne doit pas défaire la recherche.
+
+     Ce n'est pas ce rendu qui protège : `createPerson` redérive le droit, et un
+     bouton masqué n'a jamais protégé le point d'entrée HTTP qui l'accompagne. */
+  const addPersonHref = session.can.manageDomain
+    ? teamHref(activeFilters, {
+        key: PERSON_FORM_PARAM,
+        value: PERSON_FORM_NEW,
+      })
+    : null;
+
+  const addPersonLink = addPersonHref ? (
+    <DrawerLink
+      href={addPersonHref}
+      request={{ kind: "person" }}
+      className={BUTTON_PRIMARY}
+    >
+      Ajouter une personne
+    </DrawerLink>
+  ) : null;
 
   return (
     <DrawerHost
@@ -321,6 +372,7 @@ export default async function TeamPage({
         <PageHeader
           title="Équipe"
           lead="Qui compose le centre de compétence, et que sait faire chacun ?"
+          {...(addPersonLink ? { action: addPersonLink } : {})}
         />
 
         {showFilters ? (
@@ -390,7 +442,10 @@ export default async function TeamPage({
                  sortie du panneau ne défasse pas la recherche. */
               <ListRow key={row.id}>
                 <DrawerLink
-                  href={teamHref(activeFilters, row.id)}
+                  href={teamHref(activeFilters, {
+                    key: PERSON_PANEL_PARAM,
+                    value: row.id,
+                  })}
                   request={{ kind: "personDetail", id: row.id }}
                   className="flex min-w-0 flex-1 items-center gap-4"
                 >
@@ -466,6 +521,7 @@ export default async function TeamPage({
           <EmptyState
             title="Aucune personne pour l'instant"
             description="Cette liste réunira les membres du centre de compétence et les intervenants côté entité — leur métier, leur disponibilité, et les compétences que chacun déclare. C'est ce référentiel qui dira un jour qui pourrait intervenir sur un accompagnement."
+            {...(addPersonLink ? { action: addPersonLink } : {})}
           />
         )}
       </Page>

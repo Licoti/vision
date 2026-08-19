@@ -2,10 +2,10 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 19/08/2026 — T5bis.5, le radar des compétences.
+**Dernière mise à jour :** 20/08/2026 — T5bis.6, l'écriture des personnes et des compétences.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
-**Ticket suivant :** **T5bis.6** — l'écriture : créer une personne, corriger son profil, poser ses
-compétences (`tickets-C5bis.md`).
+**Ticket suivant :** **T5bis.7** — la sélection d'équipe du formulaire de projet, refondue
+(`tickets-C5bis.md`).
 
 ---
 
@@ -21,7 +21,7 @@ compétences (`tickets-C5bis.md`).
 | C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **terminé** |
 | TD — Dette technique | TD.1, TD.2 | **terminé** |
 | TD — Couche de présentation | TD.3 → TD.6 | **terminé** |
-| C5bis — Équipe | T5bis.1 → T5bis.7 | **en cours** — T5bis.5 terminé |
+| C5bis — Équipe | T5bis.1 → T5bis.7 | **en cours** — T5bis.6 terminé |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
@@ -243,6 +243,24 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   remplacement n'a rien déplacé d'autre** — huit hunks sur quatre adresses, et le bloc de la frise
   **absent du diff**, ce qu'aucune lecture du code n'aurait établi.
 
+- **T5bis.6 — 20/08/2026 — l'écriture : créer une personne, corriger son profil, poser ses
+  compétences.** Les six gestes sur les deux objets, et C5bis cesse de livrer un référentiel qu'un
+  script seul alimente. **Deux clés de la fiche étaient devenues indisponibles**, le découpage ayant
+  précédé T5bis.3 et T5bis.4 : `personne=<uuid>` désigne la fiche en lecture, `competence` est le
+  filtre conjonctif répétable. Trois arbitrages rendus avant écriture — `profil` (`nouveau` |
+  identifiant) pour la saisie, parce que ce sont **deux droits** et qu'une clé unique aurait fait
+  tomber la fiche avec le droit d'écrire ; `maitrise` pour la compétence, sa valeur restant
+  polymorphe ; `archiver=<uuid>` plutôt que `=confirmation`, `/equipe` n'ayant pas d'objet de page.
+  Un quatrième écart, de périmètre : `person-detail.tsx` entre, le câblage des six gestes vers la
+  carte passant par lui (précédent de TD.3). Le décompte d'exclusivité passe **d'une clé à quatre
+  sans qu'un caractère change**, pour la quatrième fois. Sa propriété la mieux payée est un
+  non-geste : **une compétence ne se déplace pas** — le panneau de correction ne rend aucun contrôle
+  de compétence, et `lockedSkillId` ignore ce que le formulaire porterait plutôt que de le refuser,
+  la seule forme qui ne puisse pas se tromper. Sa leçon est dans le harnais, et c'est un **troisième
+  200 muet** après ceux de TD.1 et de T5bis.4 : `$ACTION_REF_1` est rendu **sans attribut `value`**,
+  un extracteur qui l'exige le saute, et Next répond `Failed to find Server Action` — un 500 que
+  seule l'étape témoin distingue d'un refus.
+
 ---
 
 ## Points ouverts
@@ -350,6 +368,21 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   faire de ces trois coquilles des `Button` / `BUTTON_PRIMARY`, ce qui les ferait rentrer sous la
   règle par disparition. Hors du périmètre de TD.6, qui ne touche aucun composant (règle 3).
   → **ticket propre, C7 au plus tard.**
+- **Corriger une personne du centre en intervenant côté entité lui laisse ses compétences.**
+  `parsePersonForm` efface la disponibilité quand le genre devient `stakeholder` — sans ce `null`
+  explicite, le `CHECK` `persons_availability_requires_center` refuserait l'écriture. Rien
+  d'équivalent n'existe pour `person_skills`, qui ne porte aucune contrainte sur le genre de sa
+  personne : les liaisons restent affichées, et deviennent **illisibles en écriture** —
+  `openPersonForSkill` refuse d'y toucher, l'écran cesse d'en proposer les gestes. Refuser le
+  changement de genre ou retirer les liaisons en cascade sont deux gestes que la fiche de T5bis.6 ne
+  demandait pas (règle 3), et le second serait une cascade, que l'arbitrage (f) de C4bis écarte.
+  Aucune donnée n'est perdue ; l'état est incohérent avec l'arbitrage (d), qu'il n'a pas les moyens
+  de tenir. → **ticket propre, C7 au plus tard.**
+- **`PERSON_KIND_LABEL` vit hors de `lib/format.ts`.** Les libellés des énumérés y vivent depuis
+  T5.1 — `formatIndicatorDirection`, `formatResourceType` —, et les deux mots du genre d'une personne
+  sont posés dans `lib/forms/person.ts`, faute que `lib/format.ts` soit au périmètre de T5bis.6
+  (règle 3). Le vocabulaire ne diverge pas — « côté entité » est celui de la liste depuis T5bis.2 —,
+  c'est la place qui est fausse. → **au prochain ticket qui ouvre `lib/format.ts`.**
 - **`uiLayerSeal` ne scelle pas `components/shell/`.** Les trois groupes interdits sont ceux que la
   fiche de TD.6 énumère ; la coquille applicative — `breadcrumb.tsx`, `main-nav.tsx` — n'y est pas,
   et rien n'empêcherait `components/ui/` de l'importer. La propriété est vraie aujourd'hui, donc ce

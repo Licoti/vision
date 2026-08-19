@@ -5170,3 +5170,152 @@ jetable.
 
 **`ETAT.md` est à 498 lignes.** Le plafond de 250 est dépassé depuis T4bis.6 ; ce ticket y ajoute
 une ligne. → **le repliage reste dû au découpage de C6.**
+
+## T5bis.6 — l'écriture : créer une personne, corriger son profil, poser ses compétences, 20/08/2026
+
+### Deux clés d'URL de la fiche entraient en collision avec la page telle qu'elle est
+
+La fiche du ticket a été écrite au découpage de C5bis, **avant** que T5bis.3 et T5bis.4 ne fixent le
+vocabulaire d'URL de `/equipe`. Elle demande deux formes devenues indisponibles, et les deux
+arbitrages ont été rendus avant écriture.
+
+**(1) `personne=<uuid>` ne pouvait pas devenir la correction.** La fiche écrit « `personne=nouvelle`
+crée et `personne=<uuid>` corrige — la forme d'`indicateur` (T5.2) ». Or `personne=<uuid>` désigne la
+**fiche en lecture** depuis T5bis.4. Ce ne sont pas deux gestes de même rang, ce sont deux
+**droits** : la fiche se lit par tout le domaine (D9), la saisie demande `manageDomain` (arbitrage
+(c)). Une clé unique aurait fait tomber la fiche avec le droit d'écrire — un simple membre n'aurait
+plus pu consulter un profil. C'est exactement la séparation que la page produit tient déjà deux fois,
+`persona` / `fiche` puis `usecase` / `scenario`, et la note de `PERSONA_DETAIL_PARAM` l'énonce mot
+pour mot. → **clé propre `profil`**, deux valeurs d'ouverture (`nouveau` | identifiant).
+
+**(2) `competence` ne pouvait pas devenir une clé de panneau**, et c'est la collision la plus
+coûteuse. La fiche écrit « `competence=<uuid de personne>` pose une compétence ». Mais `competence`
+est une clé de **filtre** depuis T5bis.3 — répétable, conjonctive, sa valeur étant un identifiant de
+`skills`. En faire une clé de panneau l'aurait fait entrer dans `TEAM_PANEL_PARAMS` et dans le
+décompte d'exclusivité, c'est-à-dire dans les **deux mécanismes que T5bis.4 a écrits pour en tenir
+les filtres dehors**. Les deux défauts sont concrets : fermer un panneau balaie les clés de
+`TEAM_PANEL_PARAMS` (`components/ui/drawer.tsx`), donc aurait défait la recherche ; et le décompte
+refuse d'ouvrir dès que deux clés sont présentes, donc poser un filtre aurait fermé la fiche.
+→ **`maitrise`**, mot du domaine (`skill_levels` est l'échelle de maîtrise), sans accent comme
+`releve`. **La propriété se mesure** : `?personne=<uuid>&competence=<uuid>` rend bien la fiche
+ouverte *et* le filtre appliqué.
+
+**(3) `archiver` porte un identifiant, à rebours de `productArchive` et de `projectArchive`.** Les
+deux pages de détail ouvrent leur confirmation sur `archiver=confirmation`, la valeur ne désignant
+rien parce que l'objet visé est celui de la page. **`/equipe` n'a pas d'objet de page** : il faut
+donc dire qui l'on range. C'est la forme de `CANCEL_PANEL_PARAM`, adoptée pour la même raison. Le
+couple `ConfirmPanel` + `ARCHIVE_PANEL_PARAM` est bien repris tel quel ; seule la valeur change de
+nature. → **`archiver=<uuid de personne>`**, et `archiver=confirmation` n'ouvre plus rien sur cette
+page.
+
+**Conséquence sur `asTeamRequest` :** `archive` devient la **seule clé commune aux trois pages**. Le
+rétrécissement par nom ne la distingue donc plus — une demande `{ kind: "archive" }` forgée depuis la
+page produit, qui n'y porte aucun identifiant, franchit `asTeamRequest`. C'est `resolveTeamDrawer` qui
+la refuse, par `isUuid` avant toute lecture. **Mesuré** : la charge `[{"kind":"archive"}]` frappée sur
+`loadTeamDrawer` rend `null`.
+
+### `components/team/person-detail.tsx` entre au périmètre, et le câblage l'imposait
+
+La fiche liste `person-card.tsx` mais pas `person-detail.tsx`. Or `PersonDetail` rend `PersonCard` :
+les six gestes ne peuvent atteindre la carte sans que la fiche les transmette. C'est du câblage de
+propriétés — la fiche ne lit aucun des six, elle les passe —, et non une fonctionnalité. Le précédent
+est `app/(app)/equipe/page.tsx` entré au périmètre de TD.3 sur arbitrage humain, pour une raison de
+même nature. → **écart assumé, arbitré avant écriture.**
+
+### Une compétence ne se déplace pas, et c'est ce qui a dispensé d'arbitrer l'unicité
+
+La fiche énumère les gestes : « ajouter une compétence avec son niveau ; **corriger ce niveau** ». Le
+panneau de correction ne rend donc **aucun contrôle de compétence**, et `parsePersonSkillForm` reçoit
+la compétence de la ligne relue côté serveur en second argument — `lockedSkillId`, qui **gagne
+toujours** sur ce que le `FormData` porterait. Trois conséquences, et la troisième est la vraie
+raison :
+
+1. l'unicité `person_skills_person_skill_unique` n'a rien à arbitrer sur le chemin de la correction,
+   puisque le couple `(person_id, skill_id)` ne bouge pas ;
+2. aucun champ caché ne double la compétence — un champ caché est ce que ce dépôt refuse depuis
+   T3.3 ;
+3. une soumission forgée qui posterait un `skillId` en correction n'obtient rien, parce que la valeur
+   reçue est **ignorée** plutôt que crue. Le contrôle n'est pas « refuser une valeur différente »,
+   c'est « ne pas la lire » — la seule forme qui ne puisse pas se tromper.
+
+Se tromper de compétence se répare en la retirant puis en la reposant, ce que les deux autres gestes
+rendent possible. → **aucun geste de déplacement n'est ouvert, et la règle 3 est tenue.**
+
+### Le pré-contrôle d'unicité est le mécanisme, la contrainte reste le dernier mot
+
+La fiche demande qu'« une compétence déjà portée soit refusée par l'unicité et rende une **erreur de
+champ**, jamais une trace serveur ». Une violation d'index rendrait une erreur PostgreSQL, donc un
+500 : ce n'est pas une erreur de champ. `createPersonSkill` interroge donc `count(personSkills, …)`
+avant d'insérer, et pose `errors.skillId`. La contrainte n'est pas retirée pour autant — elle couvre
+la fenêtre que `neon-http` laisse ouverte, faute de transaction interactive (dette consignée depuis
+T3.6). **Mesuré** : reposer une compétence déjà portée rend le message sous le champ, la base ne
+bouge pas, et le journal de développement reste muet.
+
+### Le harnais a rencontré un second « 200 muet », d'une famille voisine de celle de TD.1
+
+TD.1 avait appris qu'un harnais postant en urlencodé là où React rend du multipart obtient un 200
+muet ; T5bis.4 avait ajouté qu'une fonction serveur frappée en urlencodé rend un 404. **Le piège de
+ce ticket est un troisième** : les champs `$ACTION_*` d'un formulaire à action liée se recopient
+depuis le HTML servi, et l'un d'eux — **`$ACTION_REF_1` — est rendu sans attribut `value`**. Un
+extracteur qui exige `value="…"` le saute silencieusement, et Next répond alors
+`Failed to find Server Action`, **un 500** — indiscernable, pour qui ne lit pas le journal du serveur,
+d'une action qui refuserait bruyamment. Sans étape témoin, les six refus mesurés sous un simple
+membre auraient tous été des 500 pris pour des refus.
+→ **règle : un harnais qui recopie des champs cachés doit poster ceux qui n'ont pas de `value`, avec
+une valeur vide**, et sa première mesure doit être un **succès**, jamais un refus.
+
+### `revalidatePath` ne revalide que `/equipe`, et la page projet n'en a pas besoin
+
+Une personne archivée reste affichée dans l'équipe de ses accompagnements passés (arbitrage (e)) :
+c'est `findProjectDetail` qui la rend, et **son rendu ne change pas**. Revalider les pages projet
+ferait croire à qui lit ce fichier que l'archivage d'une personne les touche, alors qu'il ne les
+touche précisément pas — la leçon de T4.2 sur `refreshLastActivity`. **Mesuré des deux côtés** : après
+archivage, 0 occurrence dans `/equipe`, 1 dans la page de l'accompagnement.
+
+### `PERSON_KIND_LABEL` vit dans `lib/forms/person.ts`, et non dans `lib/format.ts`
+
+Les libellés des énumérés vivent dans `lib/format.ts` depuis T5.1 — `formatIndicatorDirection`,
+`formatResourceType`. `lib/format.ts` n'est pas au périmètre de ce ticket (règle 3), et les deux mots
+du genre sont donc posés à côté de `PERSON_KIND_VALUES`, dans le module de formulaire qui les
+propose. Le vocabulaire, lui, ne diverge pas : « Intervenant côté entité » reprend le « côté entité »
+que la liste et la fiche emploient depuis T5bis.2. `AVAILABILITY_LABEL`, à l'inverse, est **importé**
+de `components/team/availability-dot.tsx` plutôt que recopié — la règle posée en T5bis.3, un seul
+endroit disant ces trois mots. → **à reverser dans `lib/format.ts` au prochain ticket qui l'ouvre.**
+
+### Une personne peut passer du centre à l'entité en gardant ses compétences
+
+`parsePersonForm` efface la disponibilité quand le genre devient `stakeholder` — sans ce `null`
+explicite, le `CHECK` `persons_availability_requires_center` refuserait l'écriture. **Rien
+d'équivalent n'existe pour les compétences** : `person_skills` n'a aucune contrainte sur le genre de
+sa personne, et corriger un profil de `center` vers `stakeholder` laisse des liaisons que
+l'arbitrage (d) interdirait de poser. L'écran cesse alors de proposer les gestes de compétence, et
+`openPersonForSkill` refuse d'y toucher : les liaisons deviennent **illisibles en écriture mais
+toujours affichées**. Refuser le changement de genre, ou retirer les liaisons en cascade, sont deux
+gestes que la fiche ne demande pas et que la règle 3 interdit d'ajouter — le second serait de surcroît
+une cascade, que l'arbitrage (f) de C4bis écarte. → **point ouvert dans `ETAT.md`.**
+
+### Le `<form>` de retrait a failli être rendu dans un élément de phrasé
+
+La ligne de compétence portait ses deux gestes dans un `<span>`, par symétrie avec le texte qu'elle
+accompagne. `<form>` est du **contenu de flux** : un élément de phrasé ne l'accepte pas, le navigateur
+réécrit le balisage servi, et l'hydratation diverge. C'est le piège déjà consigné pour
+`readings-panel.tsx` et `persona-detail.tsx`, rencontré une troisième fois — le conteneur est donc un
+`<div>`, ce qu'un `<li>` accepte. → **règle déjà écrite trois fois : tout conteneur de `<form>` est un
+`<div>`.**
+
+### Aucun couple de couleurs n'est neuf, et cela s'est mesuré plutôt que de se supposer
+
+Les six couples du ticket — `ACTION_LINK` sur le fond du tiroir, les trois rangs de texte, le filet
+d'un contrôle, le bouton primaire — sont tous déjà employés dans un panneau depuis T4.1, TD.1 et
+T5bis.4. La mesure a néanmoins été refaite sur `surface-neutral-pale` (`#fdfdfd`), le fond du tiroir :
+15,72:1 · 17,87:1 · 8,12:1 · 4,98:1 · 3,88:1 pour le filet (limite 3:1) · 13,65:1 pour le bouton.
+**Aucun jeton neuf, aucun septième substitut.**
+
+### `ETAT.md` passe de 512 à 545 lignes, soit 295 au-dessus du seuil de 250
+
+Le protocole borne le fichier à 250 lignes et confie le balayage à la **session de découpage**, seul
+moment où `ETAT.md` se balaie. C5bis n'est pas clos — T5bis.7 reste —, et replier son chantier ici
+serait faire à contretemps le geste 1 d'une session qui n'a pas lieu. Le ticket ajoute donc une
+entrée de journal et deux points ouverts, et **ne balaie rien**. Le dépassement est le même que celui
+signalé par TD.5 et TD.6, aggravé de trois entrées. → **le découpage de C6 le referme, et il porte
+maintenant trois chantiers de retard.**

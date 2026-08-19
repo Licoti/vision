@@ -315,11 +315,61 @@ export const USE_CASE_DETAIL_PARAM = "scenario";
  * traversent la **même** résolution — `lib/drawers/team.tsx`.
  *
  * **Aucun droit ne la garde** : la fiche se lit par tout le domaine (D9), comme
- * la liste qui la porte. T5bis.6 ajoutera deux clés d'écriture — `personne` y
- * prendra une seconde valeur, `nouvelle`, et `competence` viendra à côté —, qui
- * demanderont `manageDomain` (arbitrage (c)).
+ * la liste qui la porte. Les trois clés d'écriture de T5bis.6 sont **à côté**
+ * d'elle, et jamais sur elle : voir `PERSON_FORM_PARAM` ci-dessous.
  */
 export const PERSON_PANEL_PARAM = "personne";
+
+/**
+ * Le panneau de **saisie d'une personne** (T5bis.6) — la créer, ou corriger son
+ * profil.
+ *
+ * **Une clé à elle, et non une seconde valeur sur `personne`.** La fiche du
+ * ticket annonçait « `personne=nouvelle` crée et `personne=<uuid>` corrige, la
+ * forme d'`indicateur` » : cette forme est **indisponible ici**, parce que
+ * `personne=<uuid>` désigne déjà la **fiche** depuis T5bis.4. Ce ne sont pas
+ * deux gestes de même rang, ce sont deux **droits** — la fiche se lit par tout
+ * le domaine (D9), la saisie demande `manageDomain` (arbitrage (c)) —, et une
+ * clé unique aurait fait tomber la fiche avec le droit. C'est exactement la
+ * séparation que la page produit tient déjà deux fois : `persona` / `fiche`,
+ * puis `usecase` / `scenario`. Écart consigné dans `JOURNAL-TECHNIQUE.md`.
+ *
+ * **Deux valeurs d'ouverture**, comme `persona` : `nouveau` ouvre le panneau
+ * vide, un identifiant de personne l'ouvre sur le profil à corriger, et toute
+ * autre valeur n'ouvre rien — un UUID ne peut pas valoir `nouveau`.
+ *
+ * Ce n'est pas cette route qui protège, mais les deux actions, qui rederivent
+ * le droit sur l'identifiant **reçu**.
+ */
+export const PERSON_FORM_PARAM = "profil";
+
+/** La valeur qui ouvre le panneau vide. Un identifiant ouvre la correction. */
+export const PERSON_FORM_NEW = "nouveau";
+
+/**
+ * Le panneau de **saisie d'une compétence portée** (T5bis.6) — la poser sur une
+ * personne, ou en corriger le niveau.
+ *
+ * **`maitrise` et non `competence`, et ce n'est pas un choix de style** :
+ * `competence` est **déjà** une clé de cette page depuis T5bis.3 — le filtre
+ * conjonctif, répétable, dont la valeur est un identifiant de `skills`. Lui
+ * faire porter en plus l'ouverture d'un panneau l'aurait fait entrer dans
+ * `TEAM_PANEL_PARAMS` et dans le décompte d'exclusivité, c'est-à-dire dans les
+ * deux mécanismes que T5bis.4 a écrits pour **en tenir les filtres dehors** :
+ * fermer un panneau aurait alors défait la recherche, et poser un filtre aurait
+ * fermé la fiche. Le mot vient du domaine — `skill_levels` est l'**échelle de
+ * maîtrise** — et se lit sans accent comme `releve`. Écart consigné dans
+ * `JOURNAL-TECHNIQUE.md`.
+ *
+ * **Aucune valeur d'ouverture fixe, la valeur est polymorphe** : c'est la forme
+ * de `releve` (T5.3), et pour la même raison — la valeur désigne la **cible**
+ * du geste, et `nouvelle` n'aurait rien désigné. L'identifiant d'une
+ * **personne** ouvre la pose d'une compétence sur elle, celui d'une ligne de
+ * `person_skills` ouvre la correction de son niveau. Un UUID de `persons` n'est
+ * pas un UUID de `person_skills` : deux lectures scopées successives tranchent,
+ * et ce qui n'est ni l'un ni l'autre n'ouvre rien.
+ */
+export const SKILL_PANEL_PARAM = "maitrise";
 
 /**
  * Les deux bornes de la fenêtre de la **roadmap**, sur la page du produit.
@@ -579,6 +629,49 @@ export const ROUTES = {
    * pas vérifiés.
    */
   teamPerson: (personId: string) => `/equipe?${PERSON_PANEL_PARAM}=${personId}`,
+  /**
+   * La page Équipe, panneau de **saisie d'une personne** ouvert sur le vide
+   * (T5bis.6). Même mécanique que les précédentes : un paramètre, pas un écran
+   * de plus, et la fermeture reste `team`.
+   *
+   * **La forme canonique, et non celle qu'emploie l'écran** : la page y ajoute
+   * les filtres courants pour que la sortie du panneau ne défasse pas la
+   * recherche. Cette recomposition appartient à l'écran, qui seul a lu et
+   * confronté ces valeurs — une route ne recopie pas des paramètres qu'elle n'a
+   * pas vérifiés.
+   */
+  teamPersonNew: `/equipe?${PERSON_FORM_PARAM}=${PERSON_FORM_NEW}`,
+  /**
+   * Le même panneau, ouvert sur un profil à corriger : la valeur porte le cas,
+   * et c'est la seule différence avec l'entrée ci-dessus.
+   */
+  teamPersonEdit: (personId: string) =>
+    `/equipe?${PERSON_FORM_PARAM}=${personId}`,
+  /**
+   * La page Équipe, panneau de **confirmation d'archivage** ouvert sur une
+   * personne (T5bis.6) — troisième page à reprendre le couple `ConfirmPanel` +
+   * `ARCHIVE_PANEL_PARAM`.
+   *
+   * **La valeur porte l'identifiant**, à la différence de `productArchive` et de
+   * `projectArchive` : `/equipe` n'a pas d'objet de page, et il faut donc dire
+   * *qui* l'on range. C'est la forme de `projectActivityCancel`, pour la même
+   * raison.
+   */
+  teamPersonArchive: (personId: string) =>
+    `/equipe?${ARCHIVE_PANEL_PARAM}=${personId}`,
+  /**
+   * La page Équipe, panneau de **compétence** ouvert sur une personne : y poser
+   * une compétence avec son niveau. La fermeture reste `team`.
+   */
+  teamSkillNew: (personId: string) =>
+    `/equipe?${SKILL_PANEL_PARAM}=${personId}`,
+  /**
+   * Le même panneau, sur une compétence déjà portée : un seul formulaire, deux
+   * points d'entrée — la forme de `productReadingEdit` jusqu'au nom de la clé,
+   * la valeur changeant ici de **table** et non de nature.
+   */
+  teamSkillEdit: (personSkillId: string) =>
+    `/equipe?${SKILL_PANEL_PARAM}=${personSkillId}`,
   about: "/a-propos",
 } as const;
 

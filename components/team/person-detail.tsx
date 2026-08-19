@@ -24,8 +24,10 @@
  * pas en deux lignes de texte. `DrawerContent.header` existe pour cela.
  *
  * **Elle se lit par tout le domaine** (D9), comme la liste qui la porte : son
- * ouverture ne passe par aucun droit. Elle ne porte non plus **aucun geste** —
- * les trois de T5bis.6 viendront dans la carte, avec leur porte.
+ * ouverture ne passe par aucun droit. Ce sont ses **six gestes** qui tombent
+ * avec lui, chacun à `null` — la règle de `PersonaDetail`. Ils vivent dans la
+ * carte, qui porte l'identité et les compétences ; cette fiche ne fait que les
+ * transmettre, et ne décide de rien.
  *
  * **Rien n'est calculé, rien n'est totalisé** : ni nombre d'accompagnements, ni
  * moyenne de niveau, ni indice de profil. Une fiche décrit une personne, elle ne
@@ -75,10 +77,37 @@ export function PersonDetailHeader({ person }: { person: PersonDetailRow }) {
   );
 }
 
-export function PersonDetail({ person }: { person: PersonDetailRow }) {
+export function PersonDetail({
+  person,
+  editHref,
+  archiveHref,
+  addSkillHref,
+  editSkillHref,
+  removeSkill,
+}: {
+  person: PersonDetailRow;
+  /**
+   * Les six points d'entrée de T5bis.6, dérivés du droit par
+   * `lib/drawers/team.tsx` — `null` retire le geste. Ils traversent cette fiche
+   * sans qu'elle les lise : c'est la carte qui les porte, et ce sont les actions
+   * qui protègent.
+   */
+  editHref: string | null;
+  archiveHref: string | null;
+  addSkillHref: string | null;
+  editSkillHref: ((personSkillId: string) => string) | null;
+  removeSkill: ((personSkillId: string) => Promise<void>) | null;
+}) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
-      <PersonCard person={person} />
+      <PersonCard
+        person={person}
+        editHref={editHref}
+        archiveHref={archiveHref}
+        addSkillHref={addSkillHref}
+        editSkillHref={editSkillHref}
+        removeSkill={removeSkill}
+      />
 
       <section className="flex flex-col gap-2">
         {/* **Aucun décompte dans l'intitulé** : la liste se lit, elle ne se

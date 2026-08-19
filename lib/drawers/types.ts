@@ -60,20 +60,33 @@ export type ProjectDrawerRequest =
   | { kind: "activity"; id?: string | undefined };
 
 /**
- * Le panneau de la page **Équipe** — T5bis.4.
+ * Les quatre panneaux de la page **Équipe** — T5bis.4, puis T5bis.6.
  *
- * **Un seul pour l'instant, et l'union est écrite pour trois de plus** :
- * T5bis.6 y ajoutera `person`, `skill` et `archive`, qui sont des écritures et
- * demandent donc un droit. La fiche, elle, se lit par tout le domaine (D9) —
- * c'est la séparation que la page produit tient déjà entre `personaDetail` et
- * `persona`.
+ * **Une lecture et trois écritures**, et la séparation est celle que la page
+ * produit tient déjà deux fois : `personDetail` se lit par tout le domaine
+ * (D9), comme `personaDetail` et `useCaseDetail` ; `person`, `skill` et
+ * `archive` demandent `manageDomain` (arbitrage (c) de C5bis).
+ *
+ * `id` est facultatif là où la valeur porte le cas dans l'URL — `nouveau`
+ * contre un identifiant : son absence dit « créer ». Il est requis partout
+ * ailleurs, y compris sur `archive`, qui désigne **une personne** et non
+ * l'objet de la page : `/equipe` n'en a pas.
+ *
+ * **`skill` est polymorphe** : la valeur change de **table** et non de nature —
+ * l'identifiant d'une personne pose une compétence, celui d'une ligne de
+ * `person_skills` en corrige le niveau. C'est la forme de `reading` sur la page
+ * produit.
  *
  * `personDetail` ne se confond pas avec le `personaDetail` du produit, et le
  * piège de nom est celui du schéma : `persons` porte les membres du centre,
  * `personas` les profils pour lesquels on conçoit. Deux tables sans rapport,
  * deux panneaux sans rapport.
  */
-export type TeamDrawerRequest = { kind: "personDetail"; id: string };
+export type TeamDrawerRequest =
+  | { kind: "personDetail"; id: string }
+  | { kind: "person"; id?: string | undefined }
+  | { kind: "skill"; id: string }
+  | { kind: "archive"; id: string };
 
 export type DrawerRequest =
   | ProductDrawerRequest
@@ -149,7 +162,7 @@ const PROJECT_KINDS = [
   "activity",
 ] as const;
 
-const TEAM_KINDS = ["personDetail"] as const;
+const TEAM_KINDS = ["personDetail", "person", "skill", "archive"] as const;
 
 export function asProductRequest(
   request: DrawerRequest,
@@ -169,12 +182,14 @@ export function asProjectRequest(
 }
 
 /**
- * Le troisième jumeau, pour la page Équipe (T5bis.4).
+ * Le troisième jumeau, pour la page Équipe (T5bis.4, complété en T5bis.6).
  *
- * Il n'a aucune clé en commun avec les deux autres : une demande de la page
- * produit — `personaDetail`, dont le nom ne diffère que d'une lettre — n'ouvre
- * donc rien ici, et c'est ce que le point d'entrée serveur doit garantir avant
- * la moindre lecture.
+ * **`archive` est désormais la seule clé commune aux trois pages**, et ce
+ * rétrécissement ne la distingue donc pas : une demande `{ kind: "archive" }`
+ * forgée depuis la page produit — qui n'y porte aucun identifiant — passe ce
+ * filtre. C'est `resolveTeamDrawer` qui la refuse, en vérifiant la forme de
+ * l'UUID avant toute lecture. Le rétrécissement écarte le reste : une demande
+ * `personaDetail`, dont le nom ne diffère que d'une lettre, n'ouvre rien ici.
  */
 export function asTeamRequest(
   request: DrawerRequest,

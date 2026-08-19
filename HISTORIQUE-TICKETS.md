@@ -2335,6 +2335,116 @@ seule dissymétrie neuve est un rang 5 donné au second domaine, sans quoi un te
 ---
 
 
+### T5bis.6 — l'écriture : créer une personne, corriger son profil, poser ses compétences — 20/08/2026
+
+**Ce que le ticket livre.** Les six gestes sur les deux objets : créer une personne, corriger son
+profil, l'archiver ; poser une compétence avec son niveau, corriger ce niveau, la **retirer**. Le
+patron en trois couches tenu depuis T3.3, sans dépendance neuve — deux modules de validation
+**purs** (`lib/forms/person.ts`, `lib/forms/person-skill.ts`, 35 cas), deux panneaux clients à
+`useActionState` (`person-panel.tsx`, `skill-panel.tsx`), six actions serveur avec leurs trois portes
+(`app/(app)/equipe/actions.ts`). Sans lui, C5bis livrerait un référentiel qu'un script seul alimente,
+et T5bis.7 ne pourrait pas retirer la création d'une personne du formulaire de projet.
+
+**Trois arbitrages rendus avant écriture, et deux tiennent à ce que la fiche est plus vieille que la
+page.** `tickets-C5bis.md` a été écrit au découpage, avant que T5bis.3 ne pose les cinq filtres et
+que T5bis.4 ne pose la fiche. Deux des formes qu'il demande étaient devenues indisponibles.
+
+1. **`profil` et non `personne`.** La fiche veut « `personne=nouvelle` crée et `personne=<uuid>`
+   corrige, la forme d'`indicateur` ». Mais `personne=<uuid>` **est** la fiche en lecture depuis
+   T5bis.4. Ce ne sont pas deux gestes de même rang, ce sont deux **droits** — la fiche se lit par
+   tout le domaine (D9), la saisie demande `manageDomain` —, et une clé unique aurait fait tomber la
+   fiche avec le droit d'écrire : un simple membre n'aurait plus pu consulter un profil. C'est la
+   séparation que la page produit tient déjà deux fois, `persona`/`fiche` puis `usecase`/`scenario`.
+2. **`maitrise` et non `competence`**, et c'est la collision la plus coûteuse. `competence` est la
+   clé du **filtre conjonctif répétable** depuis T5bis.3. En faire une clé de panneau l'aurait fait
+   entrer dans `TEAM_PANEL_PARAMS` et dans le décompte d'exclusivité — **les deux mécanismes que
+   T5bis.4 a écrits pour en tenir les filtres dehors**. Fermer un panneau aurait défait la recherche ;
+   poser un filtre aurait fermé la fiche. La valeur, elle, reste polymorphe comme la fiche le
+   demande.
+3. **`archiver=<uuid>` et non `=confirmation`.** Les deux pages de détail n'ont rien à désigner,
+   l'objet visé étant celui de la page ; `/equipe` n'a pas d'objet de page. C'est la forme de
+   `CANCEL_PANEL_PARAM`. Le couple `ConfirmPanel` + `ARCHIVE_PANEL_PARAM` est bien repris tel quel ;
+   seule la valeur change de nature.
+
+**Un quatrième écart, de périmètre.** `components/team/person-detail.tsx` entre : `PersonDetail` rend
+`PersonCard`, et les six gestes ne peuvent atteindre la carte sans transiter par lui. Câblage de
+propriétés — la fiche n'en lit aucun —, sur le précédent d'`equipe/page.tsx` en TD.3.
+
+**Le décompte d'exclusivité passe d'une clé à quatre sans qu'un caractère change**, pour la quatrième
+fois depuis T5.2. Les cinq clés de filtre n'y entrent toujours pas, et cette propriété-là **se
+mesure** : `?personne=<uuid>&competence=<uuid>` rend la fiche ouverte *et* le filtre appliqué.
+
+**La propriété la mieux payée du ticket est un non-geste.** La fiche énumère « ajouter une compétence
+avec son niveau ; **corriger ce niveau** ». Le panneau de correction ne rend donc **aucun contrôle de
+compétence**, et `parsePersonSkillForm` reçoit la compétence de la ligne relue côté serveur —
+`lockedSkillId`, qui gagne toujours sur ce que le `FormData` porterait. Trois conséquences, et la
+troisième est la vraie raison : l'unicité n'a rien à arbitrer sur ce chemin ; aucun champ caché ne
+double la compétence ; et une soumission forgée n'obtient rien parce que la valeur reçue est
+**ignorée** plutôt que crue — la seule forme qui ne puisse pas se tromper. Se tromper de compétence
+se répare en la retirant puis en la reposant.
+
+**Retirer est un `unlink`, et c'est le typage qui l'impose.** `person_skills` n'a pas d'`archived_at`,
+ce qui la range dans `LinkTable` et fait d'`archive` un refus de compilation (T5bis.1). Le verbe à
+l'écran suit la table : « Retirer », jamais « Archiver » — la règle de T5.4.
+
+**Vérification.** *Dans le HTML servi* — les quatre panneaux rendent chacun le leur
+(`panneau-profil-titre`, `panneau-maitrise-titre`, `panneau-confirmation-titre`,
+`panneau-personne-titre`), la page reste rendue derrière et porte `inert`, et **la polymorphie de
+`maitrise` se lit sur une même page** : la fiche de Camille Roux porte `maitrise=<son uuid>` pour la
+pose et quatre `maitrise=<uuid de liaison>` pour les corrections. Le panneau de correction n'a
+**aucun** `name="skillId"`, dit sa compétence en toutes lettres, et pré-sélectionne « Avancé ». Une
+personne **créée** paraît aussitôt dans la liste avec son métier et sa disponibilité ; **corrigée**,
+elle s'y affiche autrement — « Partiellement disponible » → « Indisponible ». Une compétence **déjà
+portée** rend le message sous le champ, la base ne bouge pas, et le journal du serveur reste muet.
+La fiche d'un intervenant côté entité ne porte **aucun** geste de compétence, et garde les deux du
+profil. `?profil=n-importe-quoi`, `?archiver=confirmation` et deux clés ensemble n'ouvrent rien.
+
+*Arbitrage (e), vérifié et non affirmé :* une personne archivée disparaît de `/equipe` — 0 occurrence
+— et **reste dans l'équipe de son accompagnement** — 1 occurrence sur la page projet.
+
+*Mise en défaut :* trois témoins, tous concluants et tous bornés. Neutraliser l'obligation du nom fait
+tomber **2** cas — celui qui la nomme, et celui qui épingle la propriété `input ⇔ !errors` en s'en
+servant comme source d'erreur ; neutraliser le refus du `stakeholder` en fait tomber **1**, le sien ;
+neutraliser `lockedSkillId` en fait tomber **2**, les deux qui l'isolent. Les autres tiennent.
+
+*Le droit s'éprouve par l'action.* Les **six** points d'entrée sont capturés sous le responsable de
+domaine puis rejoués **en multipart** sous un simple membre : six 200, et **la base ne bouge pas** —
+10 personnes et 27 liaisons avant comme après, profil de la sonde intact. Chacun est **précédé de son
+étape témoin** sous le responsable, qui écrit : nom modifié, liaison ajoutée, niveau changé, liaison
+retirée, personne archivée. Cinq charges forgées refusées, base comptée : une personne d'un autre
+domaine, une compétence d'un autre domaine, un niveau d'un autre domaine, une compétence posée sur un
+intervenant côté entité, une personne déjà archivée.
+
+*Et `loadTeamDrawer` compte pour un septième.* Frappé en `text/plain` avec sa charge Flight : les
+trois `kind` d'écriture demandés par un simple membre rendent **`null`** — 70 octets, la charge du
+rien — quand les mêmes sous le responsable rendent leur panneau (1 322, 1 833, 1 443 octets), et
+l'étape témoin est `personDetail` sous le responsable, à 15 177 octets. **Huit charges forgées
+refusées**, dont `{"kind":"archive"}` **sans identifiant** — la forme exacte de la page produit, que
+`archive` devenu clé commune aux trois pages rendait atteignable.
+
+*Contraste :* aucun couple n'est neuf par la position, et les six ont été **remesurés** sur
+`surface-neutral-pale` (`#fdfdfd`), le fond du tiroir — 15,72:1 · 17,87:1 · 8,12:1 · 4,98:1 ·
+3,88:1 pour le filet (limite 3:1) · 13,65:1 pour le bouton primaire. Aucun jeton neuf, aucun septième
+substitut. `npx tsc --noEmit` propre, `npm run lint` à zéro avertissement, **28 fichiers de test,
+868 tests verts**.
+
+**La leçon, et elle est dans le harnais.** TD.1 avait appris qu'un harnais urlencodé là où React rend
+du multipart obtient un **200 muet** ; T5bis.4 qu'une fonction serveur frappée en urlencodé rend un
+**404**. Celui-ci en trouve un **troisième** : `$ACTION_REF_1` est rendu **sans attribut `value`**, un
+extracteur qui exige `value="…"` le saute silencieusement, et Next répond
+`Failed to find Server Action` — **un 500**, indiscernable d'un refus pour qui ne lit pas le journal
+du serveur. Sans étape témoin, les six refus mesurés auraient tous été des 500 pris pour des refus.
+La règle qui en sort : **la première mesure d'un harnais doit être un succès, jamais un refus.**
+
+**Sondes.** Quatre personnes créées puis **archivées** (règle 4 — les sondes s'archivent, elles ne se
+suppriment pas, le typage d'`unlink` refusant une table à `archived_at`) ; une compétence et un niveau
+posés dans un domaine-sonde de T5bis.4, archivés de même ; une liaison `project_members`
+**supprimée**, une table de lien se retirant. `/equipe` et la page projet vérifiées rendues à leur
+état : 0 sonde visible, 9 personnes vivantes et 27 liaisons, comme avant le ticket.
+
+---
+
+
 ## Points ouverts refermés
 
 *(archivés depuis `ETAT.md` le 14/08/2026 — ils étaient barrés dans la section « Points ouverts »,
