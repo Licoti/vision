@@ -32,15 +32,13 @@
  * **reçue triée** ; aucun tri ne se rejoue ici.
  */
 
+import { ACTION_LINK } from "@/components/ui/action-link";
 import { DrawerLink } from "@/components/ui/drawer";
 import { formatDateMonth, formatResultValue } from "@/lib/format";
 import type {
   ProductIndicator,
   ProductReading,
 } from "@/lib/queries/indicators";
-
-const ACTION_LINK =
-  "text-xs font-semibold text-content-primary-dark underline underline-offset-2";
 
 export function ReadingsPanel({
   indicator,

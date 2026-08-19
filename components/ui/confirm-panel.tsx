@@ -34,6 +34,8 @@
 
 import { useActionState, useEffect, type ReactNode } from "react";
 
+import { ACTION_LINK_SM } from "@/components/ui/action-link";
+import { Button } from "@/components/ui/button";
 import { DrawerClose, useDrawer } from "@/components/ui/drawer";
 
 /**
@@ -86,16 +88,14 @@ export function ConfirmPanel({
       </div>
 
       <div className="flex flex-none flex-wrap items-center gap-4 border-t border-surface-neutral-lighter px-6 py-4">
-        <button
+        <Button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale disabled:opacity-60"
+          className="disabled:opacity-60"
         >
           {pending ? pendingLabel : submitLabel}
-        </button>
-        <DrawerClose className="text-sm font-semibold text-content-primary-dark underline">
-          Annuler
-        </DrawerClose>
+        </Button>
+        <DrawerClose className={ACTION_LINK_SM}>Annuler</DrawerClose>
       </div>
     </form>
   );

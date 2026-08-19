@@ -23,6 +23,7 @@ import { notFound } from "next/navigation";
 
 import { ProjectForm } from "@/components/projects/project-form";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
+import { ACTION_LINK_SM } from "@/components/ui/action-link";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Page, PageHeader } from "@/components/ui/page";
 import { requireSession } from "@/lib/auth/provider";
@@ -98,7 +99,7 @@ export default async function NewProjectPage({
             action={
               <Link
                 href={missing.href}
-                className="text-sm font-semibold text-content-primary-dark underline"
+                className={ACTION_LINK_SM}
               >
                 {missing.label}
               </Link>

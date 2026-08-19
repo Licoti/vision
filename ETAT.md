@@ -2,10 +2,10 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 19/08/2026 — T5bis.4 terminé : la fiche d'une personne, en panneau sur
-la page Équipe.
+**Dernière mise à jour :** 19/08/2026 — TD.3 terminé : le bouton et le lien d'action entrent au
+socle.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
-**Ticket suivant :** **T5bis.5** — le radar des compétences (`tickets-C5bis.md`). **TD.3 est
+**Ticket suivant :** **T5bis.5** — le radar des compétences (`tickets-C5bis.md`). **TD.5 est
 disponible et ne dépend de rien** (`tickets-TD.md`) : l'ordre entre les deux revient à l'humain.
 
 ---
@@ -21,7 +21,7 @@ disponible et ne dépend de rien** (`tickets-TD.md`) : l'ordre entre les deux re
 | C4bis — Archivage et correction | T4bis.1 → T4bis.6 | **terminé** |
 | C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **terminé** |
 | TD — Dette technique | TD.1, TD.2 | **terminé** |
-| TD — Couche de présentation | TD.3 → TD.6 | **découpé**, non entamé (`tickets-TD.md`) |
+| TD — Couche de présentation | TD.3 → TD.6 | **en cours** — TD.3 terminé (`tickets-TD.md`) |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **en cours** — T5bis.4 terminé |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
@@ -144,6 +144,21 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   Flight, et l'urlencodé rend un **404** là où TD.1 avait connu un 200 muet ; sans étape témoin, ni
   l'un ni l'autre ne prouve un refus.
 
+- **TD.3 — 19/08/2026 — le bouton et le lien d'action.** Ticket **hors chantier**. Les trois chaînes
+  de geste étaient à **vingt-sept** copies et non vingt-quatre : `app/(app)/equipe/page.tsx` en avait
+  acquis trois le jour même de l'audit, et il **entre au périmètre** sur arbitrage humain — laissées
+  là, `socleLock` les ferait tomber en TD.6. `components/ui/button.tsx` porte `Button` pour les neuf
+  `<button>` et `BUTTON_PRIMARY`/`BUTTON_SECONDARY` pour les huit balises qui n'en sont pas ;
+  `ACTION_LINK_SM` rejoint `ACTION_LINK`. **Vingt-trois adresses mesurées, vingt-et-une au HTML
+  strictement identique**, et les deux écarts sont ceux annoncés : la dérivée de `/dev/session`
+  (contraste recalculé, 12,97:1 → **13,65:1**) et les cinq `underline-offset-2` que
+  `readings-panel.tsx` perd en cessant de redéfinir `ACTION_LINK`. Sa leçon est dans l'instrument :
+  **le HTML servi en développement n'est pas déterministe** — la charge RSC embarquée change
+  d'identifiants de rangée à chaque requête —, si bien qu'une comparaison brute mesure le bruit ; le
+  DOM seul, `<script>` retirés, l'est. Et il **se met en défaut avant d'être cru** : un `rounded-xl`
+  témoin dans la variante a fait bouger **les vingt captures** alors posées — chaque écran porte au
+  moins le skip-link, si bien qu'aucune ne pouvait rester muette.
+
 - **Les indicateurs associés repliés par défaut — hors ticket, le 18/08/2026.** Le rang 3 du bloc
   « Vision produit » devient un `<details>` fermé, dont `BlockDivider` sait être le `<summary>` — la
   question du produit reste seule à l'écran, ses cartes tiennent à un clic. Sa leçon :
@@ -262,15 +277,17 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   l'arbitrage (g) sort la création d'une personne du formulaire de projet, et une limite sur un bloc
   qui n'existe plus n'a plus d'objet. → **T5bis.7.**
 
-- **Le socle couvre dix-sept des quarante composants du design system.** Détail et mesures dans
-  `JOURNAL-TECHNIQUE.md` (18/08/2026) : le **bouton** absent et ses trois chaînes recopiées **24
-  fois** — dont une dérivée, `app/dev/session/page.tsx:112` —, l'**état vide dans un bloc** en **cinq
-  variantes**, le **bandeau d'archivage** dupliqué entre les deux pages de détail, et
-  `readings-panel.tsx:42` **redivergé** d'`ACTION_LINK`. La doctrine est tranchée : ce qui manque
-  n'est plus une décision, c'est du travail.
-  → **TD.3 à TD.6 (`tickets-TD.md`), dans l'ordre TD.3 · TD.5 · TD.4 · TD.6.** TD.6 est le seul qui
-  ne retire rien : il **empêche la copie suivante**, faute de quoi les trois autres ne sont qu'un
-  nettoyage — `ACTION_LINK`, extrait en TD.1, a redivergé six jours plus tard.
+- **Le socle couvre dix-huit des quarante composants du design system.** Détail et mesures dans
+  `JOURNAL-TECHNIQUE.md` (18/08/2026). **Le bouton est refermé** — TD.3, 19/08/2026 : `Button`,
+  `BUTTON_PRIMARY`, `BUTTON_SECONDARY`, `ACTION_LINK_SM`, vingt-sept copies retirées et
+  `readings-panel.tsx` ramené au socle. Restent l'**état vide dans un bloc** en **cinq variantes** et
+  le **bandeau d'archivage** dupliqué entre les deux pages de détail. La doctrine est tranchée : ce
+  qui manque n'est plus une décision, c'est du travail.
+  → **TD.5, puis TD.4, puis TD.6 (`tickets-TD.md`).** TD.6 est le seul qui ne retire rien : il
+  **empêche la copie suivante**, faute de quoi les autres ne sont qu'un nettoyage — `ACTION_LINK`,
+  extrait en TD.1, a redivergé six jours plus tard. **Sa liste de signatures est à corriger** : la
+  fiche annonce onze copies du bouton primaire et neuf du lien `sm`, le dépôt en portait douze et
+  onze.
 - **La règle 2 n'est pas surveillée sur les espacements.** `--spacing` est un pas et non une échelle :
   Tailwind en dérive n'importe quel multiplicateur, et **une soixantaine de valeurs hors `--number-*`**
   se sont accumulées (`gap-2.5`, `px-2.25`, `mt-3.5`, `top-7.5`…), plus deux dimensions en dur dans

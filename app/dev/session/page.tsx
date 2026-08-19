@@ -24,6 +24,7 @@ import { asc, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 
+import { Button } from "@/components/ui/button";
 import { getSession, setCurrentPerson } from "@/lib/auth/provider";
 import { listAccounts, type DomainRole } from "@/lib/auth/session";
 import { projects } from "@/lib/db/schema";
@@ -107,12 +108,7 @@ export default async function DevSessionPage() {
                   </option>
                 ))}
               </select>
-              <button
-                type="submit"
-                className="rounded-sm bg-surface-primary-base px-4 py-2 text-sm font-semibold text-surface-neutral-lightest"
-              >
-                Basculer
-              </button>
+              <Button type="submit">Basculer</Button>
             </div>
           </form>
 

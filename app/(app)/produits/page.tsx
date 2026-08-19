@@ -22,6 +22,8 @@
 
 import Link from "next/link";
 
+import { ACTION_LINK_SM } from "@/components/ui/action-link";
+import { BUTTON_PRIMARY } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { List, ListHeader, ListRow } from "@/components/ui/list";
 import { Page, PageHeader } from "@/components/ui/page";
@@ -128,7 +130,7 @@ export default async function ProductsPage({
           action={
             <Link
               href={ROUTES.products}
-              className="text-sm font-semibold text-content-primary-dark underline"
+              className={ACTION_LINK_SM}
             >
               Voir tous les produits
             </Link>
@@ -153,7 +155,7 @@ function NewProductLink() {
   return (
     <Link
       href={ROUTES.productNew}
-      className="rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale"
+      className={BUTTON_PRIMARY}
     >
       Nouveau produit
     </Link>

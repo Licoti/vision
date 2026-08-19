@@ -4565,3 +4565,103 @@ HTML servi de `/equipe?dispo=available&q=fontaine&personne=<id>` : les deux sort
 `ETAT.md` passe de 378 à 403 lignes, soit **153 au-dessus du seuil de 250**. Le constat du 18/08/2026
 tient sans être récrit : le balayage reste réservé à la session de découpage de C6, qui est le seul
 moment où le protocole l'autorise.
+
+---
+
+## TD.3 — le bouton et le lien d'action, 19/08/2026
+
+### Le piège du harnais, et il est neuf : le HTML servi en développement n'est pas déterministe
+
+**Mesuré, pas supposé.** Deux `curl` consécutifs sur la même adresse, code inchangé et base immobile,
+rendent **94 604 puis 94 713 octets**. Le diff porte sur trois cents lignes. Rien n'a bougé.
+
+La cause est la **charge RSC embarquée** : Next sérialise l'arbre dans des `<script>` en fin de
+document, et ses identifiants de rangée (`ec:I[…]` d'un côté, `f5:I[…]` de l'autre pour le même
+`DrawerHost`) ainsi que le nonce `self.__next_r` changent à chaque requête. Comme la charge
+**duplique tous les `className`** du document, un ticket qui compare des `class` sur du HTML brut
+compare surtout du bruit.
+
+**La parade tient en une ligne** : remplacer tout `<script>…</script>` par un jeton avant de
+comparer. Vérifié avant d'être employé — deux captures successives du DOM ainsi nettoyé sont
+identiques **au caractère près**, sur le plus lourd des vingt écrans (466 lignes).
+
+**Ce qu'il faut en retenir pour TD.4 et TD.5, qui ont le même critère :** le critère « diff du HTML
+servi » de TD.1 n'est un instrument que sur le **DOM**, jamais sur la réponse entière. Un diff
+volumineux en développement n'est pas nécessairement une régression — mais il faut l'avoir mesuré
+pour le dire, et un ticket qui découvrirait ce bruit après coup ne saurait plus distinguer ce qu'il a
+cassé de ce que Next a renuméroté.
+
+**À ne pas confondre avec la leçon de TD.1**, qui portait sur la **base** : une donnée créée pendant
+la capture. Les deux se cumulent. Ici la base n'a pas bougé — le ticket n'a écrit aucune ligne.
+
+### L'ordre des attributs se lit, il ne se suppose pas
+
+`Button` compose `<button {...props} className={…}>`. Mettre `className` **avant** le spread aurait
+rendu `<button class="…" type="submit">` là où les neuf points d'appel servaient
+`<button type="submit" class="…">` — React rend les attributs dans l'ordre des props, et un attribut
+réordonné est un attribut qui a changé. Même raison pour le skip-link d'`app/(app)/layout.tsx`, dont
+`sr-only` **précède** la chaîne du bouton et dont les quatre `focus:*` la suivent : un
+`${BUTTON_PRIMARY} sr-only …` aurait été juste visuellement et faux au diff.
+
+**Le cas est réglé, mais il fixe une règle pour TD.4** : `BlockNote` et `ArchivedNotice` recevront
+eux aussi des props sur des éléments dont l'attribut `class` est en dernière position. La règle est
+d'écrire le spread avant, et de **le lire dans le HTML**.
+
+### Deux écarts de rendu là où la fiche n'en annonçait qu'un
+
+La fiche range `dev/session:112` dans « l'unique écart, assumé et rapporté » et traite la divergence
+de `readings-panel.tsx` en incise — « une divergence se referme au passage ». Or la refermer **change
+le rendu** : cinq éléments perdent `underline-offset-2`. Ce n'est pas un défaut de la fiche, c'est
+une omission de comptage, et elle est signalée parce qu'un ticket qui découvre un écart non listé ne
+peut plus dire si son critère tient. Les deux sont rapportés séparément, chacun avec sa mesure.
+
+### Le périmètre de la fiche était périmé de trois copies
+
+`app/(app)/equipe/page.tsx` porte trois des vingt-sept copies et n'est pas dans la liste de
+`tickets-TD.md`. La raison est datée : T5bis.2 et T5bis.3 ont écrit ces trois copies **le jour même
+de l'audit**, et le comptage 11 / 4 / 9 de la fiche est celui d'avant. Retrancher `/equipe` redonne
+exactement ces trois nombres.
+
+**Ce n'est pas une erreur de la fiche, c'est une propriété du dispositif** : un audit qui chiffre une
+duplication produit un chiffre daté, et tout ticket écrit entre l'audit et son exécution le périme.
+→ **à savoir pour TD.4 et TD.5, dont les comptages datent du même jour** — les vérifier par `grep`
+avant d'écrire, jamais les reprendre de la fiche. TD.5 est le plus exposé : sa « soixantaine de
+valeurs hors échelle » est un décompte sur tout le dépôt.
+
+**Conséquence pour TD.6, consignée dans `ETAT.md`** : sa table de signatures s'appuie sur les mêmes
+chiffres périmés. Elle n'en tire rien de faux — un motif lâche rattrape n'importe quel nombre de
+copies —, mais son texte de fiche est à corriger.
+
+### Une dette de forme, assumée et bornée
+
+Les points d'appel où un `className` littéral devient un identifiant court gardent leur **forme
+multiligne** :
+
+```tsx
+<Link
+  href={ROUTES.productNew}
+  className={BUTTON_PRIMARY}
+>
+```
+
+Prettier replierait l'ouverture sur une seule ligne, l'élément tenant désormais en 80 colonnes. Le
+dépôt **n'a pas Prettier en dépendance** et rien ne normalise ces fichiers ; replier à la main
+coûterait trois lignes de diff par point d'appel pour un gain nul, là où la forme retenue tient la
+promesse de la fiche — **seul l'attribut `className` change**, une ligne par site, revue immédiate.
+→ **sans échéance ; le jour où le dépôt se dote d'un formateur, il repliera tout d'un coup.**
+
+### Ce que le ticket n'a pas eu à payer
+
+**Aucune sonde, aucune écriture en base.** Les deux boutons « Rétablir » ne se rendent que sur une
+fiche archivée ; six produits et cinq accompagnements archivés existaient déjà, sondes de TD.1 et de
+tickets antérieurs, **archivées et jamais supprimées** parce que le typage d'`unlink` refuse une
+table à `archived_at`. La règle 4 a rendu la mesure gratuite — c'est la première fois qu'une dette
+consignée comme telle sert d'outil.
+
+### Le compte des lignes
+
+`ETAT.md` passe de 403 à 420 lignes, soit **170 au-dessus du seuil de 250**. Le constat ne change pas
+de nature : le balayage reste réservé à la session de découpage de C6. Il faut cependant noter que
+**la section « Journal des tickets » a repris trois lignes en deux jours** après avoir été repliée le
+17/08, et que le repliage suivant devra sortir les entrées hors chantier autant que celles des
+chantiers clos.

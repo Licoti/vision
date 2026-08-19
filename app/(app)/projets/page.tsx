@@ -27,7 +27,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { ACTION_LINK_SM } from "@/components/ui/action-link";
 import { AvatarGroup } from "@/components/ui/avatar";
+import { Button, BUTTON_PRIMARY } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { List, ListHeader, ListRow } from "@/components/ui/list";
 import { Page, PageHeader } from "@/components/ui/page";
@@ -159,7 +161,7 @@ export default async function ProjectsPage({
           {applied.length > 0 ? (
             <Link
               href={ROUTES.projects}
-              className="text-sm font-semibold text-content-primary-dark underline"
+              className={ACTION_LINK_SM}
             >
               Retirer tous les filtres
             </Link>
@@ -228,7 +230,7 @@ export default async function ProjectsPage({
           action={
             <Link
               href={ROUTES.projects}
-              className="text-sm font-semibold text-content-primary-dark underline"
+              className={ACTION_LINK_SM}
             >
               Voir tous les projets
             </Link>
@@ -253,7 +255,7 @@ function NewProjectLink() {
   return (
     <Link
       href={ROUTES.projectNew}
-      className="rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale"
+      className={BUTTON_PRIMARY}
     >
       Nouvel accompagnement
     </Link>
@@ -321,12 +323,7 @@ function ProjectFilters({
         value={statusId}
       />
 
-      <button
-        type="submit"
-        className="rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale"
-      >
-        Filtrer
-      </button>
+      <Button type="submit">Filtrer</Button>
     </form>
   );
 }

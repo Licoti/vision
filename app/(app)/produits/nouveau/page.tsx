@@ -28,6 +28,7 @@ import { notFound } from "next/navigation";
 
 import { Breadcrumb } from "@/components/shell/breadcrumb";
 import { ProductForm } from "@/components/products/product-form";
+import { ACTION_LINK_SM } from "@/components/ui/action-link";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Page, PageHeader } from "@/components/ui/page";
 import { requireSession } from "@/lib/auth/provider";
@@ -78,7 +79,7 @@ export default async function NewProductPage() {
             action={
               <Link
                 href={ROUTES.products}
-                className="text-sm font-semibold text-content-primary-dark underline"
+                className={ACTION_LINK_SM}
               >
                 Revenir aux produits
               </Link>

@@ -19,6 +19,7 @@
 import Link from "next/link";
 
 import { MainNav } from "@/components/shell/main-nav";
+import { BUTTON_PRIMARY } from "@/components/ui/button";
 import { ROUTES } from "@/lib/navigation";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -26,7 +27,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen flex-col md:flex-row">
       <a
         href="#contenu"
-        className="sr-only rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale focus:not-sr-only focus:absolute focus:top-4 focus:left-4"
+        /* `sr-only` **précède** la chaîne du bouton et les quatre `focus:*` la
+           suivent : c'est l'ordre servi jusqu'ici, et un attribut réordonné est
+           un attribut qui a changé. */
+        className={`sr-only ${BUTTON_PRIMARY} focus:not-sr-only focus:absolute focus:top-4 focus:left-4`}
       >
         Aller au contenu
       </a>

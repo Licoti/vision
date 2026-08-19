@@ -87,6 +87,11 @@ import { Indicators } from "@/components/products/indicators";
 import { Personas } from "@/components/products/personas";
 import { Roadmap } from "@/components/products/roadmap";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
+import {
+  Button,
+  BUTTON_PRIMARY,
+  BUTTON_SECONDARY,
+} from "@/components/ui/button";
 import { DrawerHost, DrawerLink } from "@/components/ui/drawer";
 import { AvatarGroup } from "@/components/ui/avatar";
 import { Block, BlockHeader } from "@/components/ui/block";
@@ -308,25 +313,20 @@ export default async function ProductPage({
                        `docs/06` §9 proscrit la confirmation là où elle ne
                        protège rien. */
                   <form action={restoreProduct.bind(null, product.id)}>
-                    <button
-                      type="submit"
-                      className="rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale"
-                    >
-                      Rétablir ce produit
-                    </button>
+                    <Button type="submit">Rétablir ce produit</Button>
                   </form>
                 ) : (
                   <>
                     <Link
                       href={ROUTES.productEdit(product.id)}
-                      className="rounded-lg border border-content-neutral-normal px-4 py-2 text-sm font-semibold text-content-neutral-dark"
+                      className={BUTTON_SECONDARY}
                     >
                       Modifier ce produit
                     </Link>
                     <DrawerLink
                       href={ROUTES.productArchive(product.id)}
                       request={{ kind: "archive" }}
-                      className="rounded-lg border border-content-neutral-normal px-4 py-2 text-sm font-semibold text-content-neutral-dark"
+                      className={BUTTON_SECONDARY}
                     >
                       Archiver
                     </DrawerLink>
@@ -531,7 +531,7 @@ function NewProjectLink({ productId }: { productId: string }) {
   return (
     <Link
       href={ROUTES.projectNewForProduct(productId)}
-      className="rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale"
+      className={BUTTON_PRIMARY}
     >
       Nouvel accompagnement
     </Link>

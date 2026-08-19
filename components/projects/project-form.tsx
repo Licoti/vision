@@ -31,6 +31,8 @@
 import Link from "next/link";
 import { useActionState, useId } from "react";
 
+import { ACTION_LINK_SM } from "@/components/ui/action-link";
+import { Button } from "@/components/ui/button";
 import {
   borderOf,
   CONTROL_TEXT,
@@ -408,16 +410,16 @@ export function ProjectForm({
       </fieldset>
 
       <div className="flex flex-wrap items-center gap-4">
-        <button
+        <Button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale disabled:opacity-60"
+          className="disabled:opacity-60"
         >
           {pending ? "Enregistrement…" : submitLabel}
-        </button>
+        </Button>
         <Link
           href={cancelHref}
-          className="text-sm font-semibold text-content-primary-dark underline"
+          className={ACTION_LINK_SM}
         >
           Annuler
         </Link>

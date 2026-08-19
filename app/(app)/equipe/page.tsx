@@ -63,7 +63,9 @@ import {
   AVAILABILITY_LABEL,
   AvailabilityDot,
 } from "@/components/team/availability-dot";
+import { ACTION_LINK_SM } from "@/components/ui/action-link";
 import { Avatar } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { DrawerHost, DrawerLink } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { borderOf, CONTROL, CONTROL_TEXT } from "@/components/ui/form-field";
@@ -356,7 +358,7 @@ export default async function TeamPage({
             {applied.length > 0 ? (
               <Link
                 href={ROUTES.team}
-                className="text-sm font-semibold text-content-primary-dark underline"
+                className={ACTION_LINK_SM}
               >
                 Retirer tous les filtres
               </Link>
@@ -454,7 +456,7 @@ export default async function TeamPage({
             action={
               <Link
                 href={ROUTES.team}
-                className="text-sm font-semibold text-content-primary-dark underline"
+                className={ACTION_LINK_SM}
               >
                 Voir toutes les personnes
               </Link>
@@ -554,12 +556,7 @@ function TeamFilters({
           className="w-56"
         />
 
-        <button
-          type="submit"
-          className="rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale"
-        >
-          Filtrer
-        </button>
+        <Button type="submit">Filtrer</Button>
       </div>
 
       {options.skills.length > 0 ? (

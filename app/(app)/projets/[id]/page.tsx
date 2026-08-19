@@ -80,6 +80,7 @@ import { AdoptedIndicators } from "@/components/projects/adopted-indicators";
 import { Resources } from "@/components/projects/resources";
 import { Roadmap } from "@/components/projects/roadmap";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
+import { Button, BUTTON_SECONDARY } from "@/components/ui/button";
 import { DrawerHost, DrawerLink } from "@/components/ui/drawer";
 import { Avatar } from "@/components/ui/avatar";
 import { Field, FieldRow } from "@/components/ui/field";
@@ -269,25 +270,22 @@ export default async function ProjectPage({
                          `docs/06` §9 proscrit la confirmation là où elle ne
                          protège rien. */
                     <form action={restoreProject.bind(null, project.id)}>
-                      <button
-                        type="submit"
-                        className="rounded-lg bg-surface-primary-base px-4 py-2 text-sm font-semibold text-content-neutral-pale"
-                      >
+                      <Button type="submit">
                         Rétablir cet accompagnement
-                      </button>
+                      </Button>
                     </form>
                   ) : (
                     <>
                       <Link
                         href={ROUTES.projectEdit(project.id)}
-                        className="rounded-lg border border-content-neutral-normal px-4 py-2 text-sm font-semibold text-content-neutral-dark"
+                        className={BUTTON_SECONDARY}
                       >
                         Modifier cet accompagnement
                       </Link>
                       <DrawerLink
                         href={ROUTES.projectArchive(project.id)}
                         request={{ kind: "archive" }}
-                        className="rounded-lg border border-content-neutral-normal px-4 py-2 text-sm font-semibold text-content-neutral-dark"
+                        className={BUTTON_SECONDARY}
                       >
                         Archiver
                       </DrawerLink>

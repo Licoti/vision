@@ -17,3 +17,22 @@
  */
 export const ACTION_LINK =
   "text-xs font-semibold text-content-primary-dark underline";
+
+/**
+ * Le même geste, d'un rang au-dessus — « Annuler » au pied d'un formulaire,
+ * « Retirer tous les filtres », l'action d'un état vide.
+ *
+ * **Un seul exemplaire, après onze.** La variante `xs` a été factorisée en TD.1 ;
+ * celle-ci n'a jamais eu droit au même traitement, et elle est allée deux fois
+ * plus loin. Elle porte les deux mêmes balises que sa jumelle et une troisième —
+ * `<Link>`, `<button type="submit">`, `<DrawerClose>` —, ce qui la range au même
+ * niveau : une constante, pas un composant.
+ *
+ * **Écrite en entier plutôt que dérivée d'`ACTION_LINK`** : la taille est en
+ * tête de chaîne. Un `${ACTION_LINK} text-sm` servirait deux `text-*` dans le
+ * même attribut, et il faudrait alors savoir laquelle gagne — c'est exactement
+ * la question que `tailwind-merge` existe pour trancher, et que ce dépôt évite
+ * en ne la posant pas.
+ */
+export const ACTION_LINK_SM =
+  "text-sm font-semibold text-content-primary-dark underline";

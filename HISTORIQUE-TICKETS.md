@@ -1939,6 +1939,79 @@ dans l'alphabet, délibérément.
 
 ---
 
+### TD.3 — le bouton et le lien d'action — 19/08/2026
+
+**Pourquoi ce ticket, et pourquoi maintenant.** Premier des quatre tickets tirés de l'audit de la
+couche de présentation du 18/08/2026. Il vient en tête parce qu'il **crée les logements** que
+`socleLock` gardera en TD.6 : on ne garde pas une signature qui n'a pas de remplaçant à offrir. Sa
+dette est celle que l'audit a chiffrée — `docs/design/design-system.md` §10 nomme une quarantaine de
+composants, `components/ui/` en portait dix-sept, et **pas de bouton**.
+
+**Le périmètre a changé avant d'écrire, et c'est un arbitrage.** La fiche annonce 11 / 4 / 9 copies,
+soit 24 ; le dépôt en portait **27**. Les trois de plus sont dans `app/(app)/equipe/page.tsx`, écrites
+par T5bis.2 et T5bis.3 **le jour même de l'audit**, et le fichier ne figurait pas au périmètre — alors
+qu'il est l'un des six écrans sur lesquels la fiche mesure le diff. Décision humaine prise avant
+écriture : **le fichier entre**. Le motif n'est pas l'esthétique, c'est TD.6 — `socleLock` s'applique
+hors de `components/ui/**`, et trois copies laissées là feraient échouer `npm run lint` au ticket
+suivant, sur un ticket dont le critère est justement de finir à zéro. La règle 3 est enfreinte d'un
+fichier, sciemment.
+
+**Ce que le ticket livre.** `components/ui/button.tsx` porte les deux niveaux que la doctrine du
+18/08 a nommés : `Button` pour les **neuf** `<button>`, `BUTTON_PRIMARY` et `BUTTON_SECONDARY` pour
+les **huit** points d'appel qui n'en sont pas — trois `<Link>` primaires, deux `<Link>` et deux
+`<DrawerLink>` secondaires, et le skip-link. `ACTION_LINK_SM` rejoint `ACTION_LINK` dans
+`action-link.ts`, à onze appels. `readings-panel.tsx` cesse de redéfinir `ACTION_LINK` et importe
+celui du socle. Bilan : **15 fichiers modifiés, 1 fichier neuf**, et plus **aucune** occurrence des
+trois chaînes hors du socle — vérifié par `grep`.
+
+**Trois décisions de composant, chacune imposée par une mesure et non par un goût.**
+
+- **`disabled:opacity-60` reste au point d'appel**, hors de la variante. Quatre des neuf boutons le
+  portent, cinq non : dans la variante, il serait apparu sur douze rendus.
+- **Le ternaire plutôt que `${className ?? ""}`**, la forme dont TD.1 avait mesuré le coût — dix-huit
+  espaces finaux dans un attribut `class` servi.
+- **`{...props}` précède `className`**, et l'ordre n'est pas indifférent : React rend les attributs
+  dans l'ordre des props, les neuf points d'appel portaient tous `className` en dernier, et l'inverser
+  aurait remonté `class` devant `type`. Lu dans le HTML servi — `<button type="submit" class="…">` —,
+  pas supposé.
+
+**L'instrument a dû être construit avant d'être employé, et c'est la leçon transportable.** La
+première mesure a montré la même adresse rendant **94 604 puis 94 713 octets à code inchangé**. La
+cause n'est pas la base : c'est la **charge RSC embarquée dans le HTML**, dont les identifiants de
+rangée (`ec:I[…]`, `f5:I[…]`) et le nonce `self.__next_r` changent à chaque requête en développement.
+Une comparaison brute mesure ce bruit, pas le code. Le DOM seul — tout `<script>` remplacé par un
+jeton — est **déterministe, vérifié sur deux captures successives identiques au caractère près**.
+C'est sur lui que le critère se lit. *Sans cette étape, un diff de plusieurs centaines de lignes
+aurait masqué les deux vrais écarts, ou pire, les aurait fait passer pour du bruit.*
+
+**Et l'instrument s'est mis en défaut avant d'être cru.** Un `rounded-xl` témoin posé dans la
+variante primaire a fait bouger **les vingt captures alors mesurées** — aucune ne pouvait rester
+muette, chaque écran portant au moins le skip-link. Témoin retiré, retour exact à l'état attendu.
+
+**Vérification — vingt-trois adresses, vingt-et-une strictement identiques.** Les six écrans de la
+fiche, les deux `nouveau`, les deux `modifier`, `/dev/session`, deux états vides filtrés, l'état vide
+de `/equipe`, quatre corps de panneaux atteints par leur **URL d'ouverture** — qui reste une adresse
+valide depuis TD.2 —, et **deux fiches archivées**, seul endroit où les deux boutons « Rétablir » se
+rendent. Ces deux dernières et l'état vide filtré de `/produits` ont été mesurées par `git stash`,
+la base immobile entre les deux temps. `npx tsc --noEmit` propre, `npm run lint` à son unique
+avertissement d'avant, **773 tests sur 23 fichiers verts sans qu'un fichier de test soit touché**.
+
+**Les deux écarts, tous deux annoncés avant d'être vus.**
+
+- `app/dev/session/page.tsx:112` portait une copie **dérivée** — `rounded-sm` et
+  `text-surface-neutral-lightest`. Elle rentre dans le rang. **Contraste mesuré des deux couples**,
+  et non repris de mémoire : `#f7f7f8` sur `#24226a` donnait **12,97:1**, `#fdfdfd` sur `#24226a`
+  donne **13,65:1**. Les deux passent ; la correction améliore.
+- `components/products/readings-panel.tsx` perd `underline-offset-2` sur **cinq** éléments — trois
+  gestes, dont deux répétés par relevé. C'est ce que la fiche appelait « une divergence se referme au
+  passage » sans la ranger dans ses écarts : il y en avait **deux**, pas un.
+
+**Aucune sonde, aucune écriture en base.** Les deux fiches archivées nécessaires à la mesure
+existaient déjà — ce sont les sondes de TD.1 et de tickets antérieurs, archivées et jamais
+supprimées. La règle 4 a rendu ce ticket gratuit en données.
+
+---
+
 
 ## Points ouverts refermés
 
