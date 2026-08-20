@@ -8,6 +8,7 @@
 
 import type { IndicatorDirection } from "@/lib/queries/indicators";
 import type { ResourceType } from "@/lib/queries/resources";
+import type { StarterKind } from "@/lib/queries/starters";
 
 const MONTH = new Intl.DateTimeFormat("fr-FR", {
   month: "long",
@@ -342,6 +343,25 @@ export function formatIndicatorDirection(
   direction: IndicatorDirection,
 ): string {
   return INDICATOR_DIRECTIONS[direction];
+}
+
+/**
+ * La nature d'une piste de démarrage : « Outil » · « Méthode » · « Ressource ».
+ *
+ * **Une étiquette, jamais un rang.** Les trois valeurs disent de quoi la piste
+ * est faite, pas laquelle vaut mieux : rien dans le bloc ne les ordonne, et le
+ * référentiel les mélange librement.
+ *
+ * Le `Record` est **exhaustif à la compilation**, comme les deux précédents.
+ */
+const STARTER_KINDS: Record<StarterKind, string> = {
+  tool: "Outil",
+  method: "Méthode",
+  resource: "Ressource",
+};
+
+export function formatStarterKind(kind: StarterKind): string {
+  return STARTER_KINDS[kind];
 }
 
 /**

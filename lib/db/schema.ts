@@ -97,6 +97,21 @@ export const toolKind = pgEnum("tool_kind", [
 /** `manual` au POC ; `api` le jour où les outils exposeront le leur (D15). */
 export const syncMode = pgEnum("sync_mode", ["manual", "api"]);
 
+/**
+ * La nature d'une piste de démarrage.
+ *
+ * C'est l'axe d'extension du bloc « Démarrage » : `tool` renvoie vers une
+ * plateforme raccordée, `method` propose une manière de faire qu'aucun outil ne
+ * porte, `resource` désignera un document de référence. Les trois valeurs
+ * existent parce que le bloc en affiche l'étiquette ; aucune n'attend un
+ * lecteur futur.
+ */
+export const starterKind = pgEnum("starter_kind", [
+  "tool",
+  "method",
+  "resource",
+]);
+
 /** D10 — `internal` porte les missions transverses. */
 export const productKind = pgEnum("product_kind", ["product", "internal"]);
 
@@ -341,6 +356,53 @@ export const tools = pgTable(
     ...stamps,
   },
   (t) => [index("tools_domain_id_idx").on(t.domainId)],
+);
+
+/**
+ * Une **piste de démarrage** : ce qu'un designer peut envisager pour ouvrir un
+ * accompagnement.
+ *
+ * Référentiel du domaine, comme `tools` et `activity_types` — pas de
+ * `project_id` ni de `product_id` : la boîte à outils est la même sur tous les
+ * accompagnements, et c'est ce qui en fait une **invitation** plutôt qu'une
+ * prescription. Ajouter une piste coûte une ligne, jamais un module.
+ *
+ * **L'adresse n'est pas ici.** Elle vit sur `tools.base_url`, et une seule
+ * fois : deux sources pour un même lien divergeraient le jour où l'une des deux
+ * changerait. Une piste sans outil — une méthode — n'a donc pas de lien, ce qui
+ * est un état normal.
+ *
+ * **Ce que la table ne porte pas, et pourquoi** : aucun `activity_type_id`,
+ * parce que personne ne le lirait aujourd'hui (leçon de T5.2) — le jour où une
+ * piste devra ouvrir le panneau d'activité sur son type, ce sera une colonne de
+ * plus. Aucune URL construite avec le contexte du projet non plus : ce serait le
+ * « niveau 2 — lancement délégué » que `docs/03` §5 et D15 rangent après le POC.
+ */
+export const starters = pgTable(
+  "starters",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    domainId: domainRef(),
+    label: text("label").notNull(),
+    /** La phrase de la carte : ce que la piste permet, en une ligne. */
+    summary: text("summary").notNull(),
+    /** Le texte long du panneau. Nul tant que personne ne l'a écrit. */
+    guidance: text("guidance"),
+    kind: starterKind("kind").notNull(),
+    /** L'outil vers lequel la piste renvoie, quand il y en a un. */
+    toolId: uuid("tool_id").references(() => tools.id, {
+      onDelete: "set null",
+    }),
+    position: numeric("position", { precision: 10, scale: 2 })
+      .notNull()
+      .default("0"),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    ...stamps,
+  },
+  (t) => [
+    index("starters_domain_id_idx").on(t.domainId),
+    index("starters_tool_id_idx").on(t.toolId),
+  ],
 );
 
 /** Référentiel du domaine, groupé par famille. */

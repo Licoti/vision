@@ -78,6 +78,7 @@ import {
 import { restoreProject } from "../actions";
 import { AdoptedIndicators } from "@/components/projects/adopted-indicators";
 import { Resources } from "@/components/projects/resources";
+import { Starters } from "@/components/projects/starters";
 import { Roadmap } from "@/components/projects/roadmap";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
 import { Button, BUTTON_SECONDARY } from "@/components/ui/button";
@@ -106,6 +107,7 @@ import {
   findProjectDetail,
 } from "@/lib/queries/projects";
 import { listProjectResources } from "@/lib/queries/resources";
+import { listStarters } from "@/lib/queries/starters";
 import { isUuid } from "@/lib/uuid";
 
 export const metadata = {
@@ -150,6 +152,7 @@ export default async function ProjectPage({
     annuler?: string;
     archiver?: string;
     indicateur?: string;
+    piste?: string;
   }>;
 }) {
   const { id } = await params;
@@ -174,8 +177,15 @@ export default async function ProjectPage({
      que ce `&&` cherchait. Le rendu n'est pas le verrou pour autant : les deux
      portes de `./actions` refusent le projet archivé reçu. */
   const canWrite = session.can.writeProject(project.id) && !archived;
-  const { activite, ressource, resultat, annuler, archiver, indicateur } =
-    await searchParams;
+  const {
+    activite,
+    ressource,
+    resultat,
+    annuler,
+    archiver,
+    indicateur,
+    piste,
+  } = await searchParams;
 
   /* **L'URL reste une adresse, elle n'est plus le mécanisme** (TD.2). Coller
      `?activite=nouvelle` ouvre encore le panneau, ici, au rendu serveur ; le
@@ -187,32 +197,50 @@ export default async function ProjectPage({
      L'exclusivité ne vaut donc plus que pour ce chemin-ci : plusieurs clés
      présentes ensemble n'ouvrent **rien** (T4.2, réécrite en décompte par
      T4.4). Côté clic, elle est devenue structurelle — l'état ne porte qu'une
-     demande à la fois. */
-  const keys = { activite, ressource, resultat, annuler, archiver, indicateur };
+     demande à la fois.
+
+     **Le décompte passe de six à sept clés sans qu'un caractère de sa logique
+     change** (20/08/2026, `piste`) : c'est la propriété pour laquelle T4.4
+     l'avait écrit en décompte plutôt qu'en comparaison, vérifiée pour la
+     cinquième fois. */
+  const keys = {
+    activite,
+    ressource,
+    resultat,
+    annuler,
+    archiver,
+    indicateur,
+    piste,
+  };
   const conflict =
     Object.values(keys).filter((value) => value !== undefined).length > 1;
   const asked: Partial<typeof keys> = conflict ? {} : keys;
 
   const request = projectRequestFromParams(asked);
 
-  /* Quatre lectures indépendantes, un seul aller-retour : les ressources
-     rejoignent le rang et la roadmap plutôt que d'attendre leur tour (T4.1), et
-     les adoptions les rejoignent à leur tour (T5.4). */
-  const [rank, roadmap, projectResources, adoptions] = await Promise.all([
-    findAccompanimentRank(session.db, project),
-    listProjectRoadmap(session.db, project.id),
-    listProjectResources(session.db, project.id),
-    listProjectAdoptions(session.db, project.id),
-  ]);
+  /* Cinq lectures indépendantes, un seul aller-retour : les ressources
+     rejoignent le rang et la roadmap plutôt que d'attendre leur tour (T4.1),
+     les adoptions les rejoignent à leur tour (T5.4), et les pistes de démarrage
+     en dernier (20/08/2026). Celle-ci ne prend pas d'identifiant : c'est un
+     référentiel du domaine, le même sur tous les accompagnements. */
+  const [rank, roadmap, projectResources, adoptions, starters] =
+    await Promise.all([
+      findAccompanimentRank(session.db, project),
+      listProjectRoadmap(session.db, project.id),
+      listProjectResources(session.db, project.id),
+      listProjectAdoptions(session.db, project.id),
+      listStarters(session.db),
+    ]);
 
-  /* La roadmap est **déjà lue** pour l'écran : la résolution la reçoit plutôt
-     que de la relire. C'est `loadProjectDrawerContext` qui paie une lecture, et
-     seulement quand le clic ouvre un panneau qui en a besoin. */
+  /* La roadmap et les pistes sont **déjà lues** pour l'écran : la résolution
+     les reçoit plutôt que de les relire. C'est `loadProjectDrawerContext` qui
+     paie une lecture, et seulement quand le clic ouvre un panneau qui en a
+     besoin. */
   const drawer = request
     ? await resolveProjectDrawer(
         session,
         project,
-        { canWrite, roadmap },
+        { canWrite, roadmap, starters },
         request,
       )
     : null;
@@ -390,8 +418,26 @@ export default async function ProjectPage({
           archiveResult={canWrite ? archiveResult.bind(null, project.id) : null}
         />
 
-        {/* Les blocs de référence, « Ressources » en tête (docs/06 §5). */}
+        {/* Les blocs de référence. « Ressources » les ouvrait depuis T4.1
+              (docs/06 §5) ; « Démarrage » passe devant le 20/08/2026, et
+              **c'est un écart assumé** : `docs/06` §5 donne une liste close
+              ordonnée par fréquence de consultation, où ce bloc ne figure pas.
+              La roadmap garde sa position dominante — D31 tient sur l'essentiel
+              —, c'est l'ordre interne des blocs de référence qui cède : un
+              point de départ qui se lirait en cinquième position n'en serait
+              plus un. */}
         <div className="grid gap-5 md:grid-cols-2">
+          {/* Le seul bloc de cette page qui ne reçoive aucun droit, et le seul
+                dont le point d'entrée ne soit jamais nul : une piste se lit par
+                tout le domaine (D9), et son référentiel a son écran de gestion
+                en C7 (D25). Il n'y a rien ici que `canWrite` puisse fermer. */}
+          <Starters
+            starters={starters}
+            detailHref={(starterId) =>
+              ROUTES.projectStarter(project.id, starterId)
+            }
+          />
+
           {/* Les trois points d'entrée du bloc tombent avec le même
                 `canWrite` : le droit d'écrire dans ce projet (D9), et la
                 lecture seule d'un accompagnement archivé (T4bis.3). Aucune

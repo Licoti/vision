@@ -50,14 +50,23 @@ export type ProductDrawerRequest =
   | { kind: "useCase"; id?: string | undefined }
   | { kind: "useCaseDetail"; id: string };
 
-/** Les six panneaux de la page projet, sur la même forme. */
+/**
+ * Les sept panneaux de la page projet, sur la même forme.
+ *
+ * **Le septième est le seul en lecture seule** (20/08/2026) : `starter` ouvre le
+ * détail d'une piste de démarrage, que tout le domaine lit (D9), là où les six
+ * autres ouvrent une écriture ou une confirmation. Il n'a pas de jumeau
+ * d'écriture — la paire « une clé pour lire, une clé pour écrire » de la page
+ * produit n'a rien à séparer sur un référentiel dont D25 donne l'écran à C7.
+ */
 export type ProjectDrawerRequest =
   | { kind: "archive" }
   | { kind: "cancel"; id: string }
   | { kind: "result"; id: string }
   | { kind: "adoption"; id?: string | undefined }
   | { kind: "resource"; id?: string | undefined }
-  | { kind: "activity"; id?: string | undefined };
+  | { kind: "activity"; id?: string | undefined }
+  | { kind: "starter"; id: string };
 
 /**
  * Les quatre panneaux de la page **Équipe** — T5bis.4, puis T5bis.6.
@@ -160,6 +169,7 @@ const PROJECT_KINDS = [
   "adoption",
   "resource",
   "activity",
+  "starter",
 ] as const;
 
 const TEAM_KINDS = ["personDetail", "person", "skill", "archive"] as const;

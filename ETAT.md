@@ -2,7 +2,8 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 20/08/2026 — T5bis.6, l'écriture des personnes et des compétences.
+**Dernière mise à jour :** 20/08/2026 — le bloc « Démarrage » sur la page d'un accompagnement, hors
+ticket.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
 **Ticket suivant :** **T5bis.7** — la sélection d'équipe du formulaire de projet, refondue
 (`tickets-C5bis.md`).
@@ -261,6 +262,23 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   un extracteur qui l'exige le saute, et Next répond `Failed to find Server Action` — un 500 que
   seule l'étape témoin distingue d'un refus.
 
+- **Le bloc « Démarrage » — hors ticket, le 20/08/2026.** La page disait ce qui **a été fait** ;
+  elle ne disait pas ce qu'on **peut** faire. `starters` et `starter_kind` (migration **0008**),
+  quatre pistes amorcées, une carte par piste avec son lien sortant et un panneau « en savoir plus »
+  (`?piste=<id>`). Quatre arbitrages rendus avant écriture — référentiel neuf plutôt que dérivation
+  d'`activity_types`, même liste sur tous les accompagnements, adresses provisoires sur
+  `example.com`, carte plus panneau. **Une seule clé d'URL là où Personae et Use Cases en ont deux**,
+  et c'est la conséquence exacte de leur règle : la paire « une clé pour lire, une clé pour écrire »
+  n'a rien à séparer quand il n'y a pas d'écriture — `starters` est un référentiel, D25 lui donne son
+  écran en C7. Le décompte d'exclusivité passe **de six à sept clés sans qu'un caractère change**,
+  pour la cinquième fois. Sept écarts consignés, dont l'ordre de `docs/06` §5 : le bloc passe devant
+  « Ressources », D31 ne tenant que sur la position dominante de la roadmap. Sa propriété la mieux
+  payée est la forme de sa lecture : **`listStarters` ne prend aucun identifiant**, si bien que rien
+  n'y regarde le projet et que la jauge de complétion interdite est **non représentable**. Sa leçon
+  est dans la mise en défaut : **neutraliser un critère de tri secondaire ne prouve rien en une
+  exécution** — l'ordre rendu sans départage est arbitraire mais **stable**, celui de l'insertion,
+  et la fixture doit insérer les ex æquo à rebours de l'alphabet pour que la neutralisation morde.
+
 ---
 
 ## Points ouverts
@@ -306,6 +324,14 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   qu'il y a là quelque chose à déplier. Le rang « Indicateurs associés » a été doté d'un chevron en
   `mark` le 18/08/2026 ; le même geste, cinq lignes, referme celui-ci. Hors périmètre ce jour-là
   (règle 3). → **ticket propre, C7 au plus tard.**
+- **Une piste de démarrage ne mène pas à l'activité qu'elle suggère.** Le bloc du 20/08/2026 renvoie
+  vers la plateforme et vers son propre texte ; il ne propose pas d'ouvrir le panneau d'activité
+  pré-réglé sur le type correspondant — « Audit UX » la piste et « Audit UX » le type d'activité sont
+  deux objets que rien ne relie. Le geste n'était pas demandé (règle 3), et `starters` ne porte
+  **volontairement aucun `activity_type_id`** : une colonne sans lecteur est celle qu'on relit un
+  jour sans savoir pourquoi (leçon de T5.2). Le jour où le geste est voulu, c'est une colonne de plus
+  et trois lignes dans le composant. À joindre alors au point voisin sur
+  `activity_types.default_tool_id`, qui attend le même panneau. → **ticket propre, C7 au plus tard.**
 - **`project_indicators.note` n'a ni écrivain ni lecteur.** La colonne existe depuis T1.2, `docs/04`
   §3 la décrit « texte court », et le panneau d'adoption de T5.4 ne la saisit pas : sa fiche énumère
   ce qu'une ligne du bloc dit et n'en parle nulle part. Arbitrage tranché avant écriture le
@@ -378,11 +404,14 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   demandait pas (règle 3), et le second serait une cascade, que l'arbitrage (f) de C4bis écarte.
   Aucune donnée n'est perdue ; l'état est incohérent avec l'arbitrage (d), qu'il n'a pas les moyens
   de tenir. → **ticket propre, C7 au plus tard.**
-- **`PERSON_KIND_LABEL` vit hors de `lib/format.ts`.** Les libellés des énumérés y vivent depuis
-  T5.1 — `formatIndicatorDirection`, `formatResourceType` —, et les deux mots du genre d'une personne
-  sont posés dans `lib/forms/person.ts`, faute que `lib/format.ts` soit au périmètre de T5bis.6
-  (règle 3). Le vocabulaire ne diverge pas — « côté entité » est celui de la liste depuis T5bis.2 —,
-  c'est la place qui est fausse. → **au prochain ticket qui ouvre `lib/format.ts`.**
+- **`PERSON_KIND_LABEL` existe en deux exemplaires, et ils ne disent pas la même chose.** Le point
+  était « une constante mal placée » ; il est **récrit le 20/08/2026** après mesure, et c'est autre
+  chose. `lib/forms/project.ts:28` dit « Côté centre de compétence » / « Côté entité » ;
+  `lib/forms/person.ts:64` dit « Membre du centre » / « Intervenant côté entité ». Les réunir dans
+  `lib/format.ts` — où vivent `formatIndicatorDirection`, `formatResourceType` et désormais
+  `formatStarterKind` — n'est donc **pas un déplacement, c'est trancher un vocabulaire** : deux
+  écrans changeraient de mots. Le bloc « Démarrage » a ouvert `lib/format.ts` et n'a pas fait ce
+  geste, qui n'est pas technique. → **arbitrage éditorial, puis un ticket propre, C7 au plus tard.**
 - **`uiLayerSeal` ne scelle pas `components/shell/`.** Les trois groupes interdits sont ceux que la
   fiche de TD.6 énumère ; la coquille applicative — `breadcrumb.tsx`, `main-nav.tsx` — n'y est pas,
   et rien n'empêcherait `components/ui/` de l'importer. La propriété est vraie aujourd'hui, donc ce
@@ -401,8 +430,11 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   domaine portent des relevés et une cible ; le seul indicateur sans relevé est archivé, et la seule
   personne sans équipe n'entre pas dans la liste Équipe. **Le code de ces cinq branches a changé
   comme les autres, mais leur rendu n'a pas été vu** — ce n'est pas une dette de code, c'est un trou
-  de jeu d'essai. → **à couvrir par la fixture, ou par une sonde assumée, au prochain ticket qui
-  écrit en base.**
+  de jeu d'essai. **La sonde assumée a désormais son précédent** (20/08/2026) : le bloc « Démarrage »
+  a servi sa troisième branche de panneau en pointant une piste vers l'outil sans adresse, l'a lue,
+  puis a rétabli la ligne et supprimé le script — aucune ligne de sonde ne reste, la sonde ayant
+  modifié une ligne existante au lieu d'en créer une. → **à couvrir par la fixture, ou par une sonde
+  de cette forme, au prochain ticket qui écrit en base.**
 
 ### c. Dettes assumées, sans échéance
 
@@ -495,13 +527,20 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
 - **La fixture est incomplète sur les ressources et les résultats.** Les deux résultats factices
   n'ont pas de lien profond, le brief §7 n'en donnant aucun. Trois des quatre ressources du brief ne
   sont pas semées : « Grille d'entretien », « Maquettes v3 » et « Rapport d'audit d'accessibilité »
-  attendent une ancre que le brief ne fournit pas. Même silence sur `tools.base_url` et sur les
-  courriels des personnes. → **sans échéance, ou l'humain fournit les adresses.**
-- **L'amorçage rapproche par clé naturelle, donc un renommage recrée.** Renommer « Espace client
-  web » puis relancer `db:seed` crée un second produit sous l'ancien nom. La clé des activités a été
-  étendue à `projet · type · période` avant C3, ce qui atténue sans éliminer : deux activités du même
-  type sur le même projet **dans le même mois** collisionneraient encore. Sans conséquence en
-  production, où l'amorçage ne tourne pas. → **écran de gestion des référentiels (D25, C7).**
+  attendent une ancre que le brief ne fournit pas. Même silence sur les courriels des personnes.
+  **`tools.base_url` sort de cette liste le 20/08/2026 et entre dans une autre** : trois adresses y
+  sont posées, sur le domaine réservé `example.com`, pour que le bloc « Démarrage » ouvre quelque
+  chose. Elles sont **provisoires par construction** et se remplacent par une ligne de `scripts/seed.ts`
+  le jour où les vraies sont connues. → **sans échéance, ou l'humain fournit les adresses.**
+- **L'amorçage rapproche par clé naturelle, donc un renommage recrée — et c'est arrivé.** Renommer
+  « Espace client web » puis relancer `db:seed` crée un second produit sous l'ancien nom. La clé des
+  activités a été étendue à `projet · type · période` avant C3, ce qui atténue sans éliminer : deux
+  activités du même type sur le même projet **dans le même mois** collisionneraient encore. Le
+  20/08/2026, le bloc « Démarrage » a renommé l'outil « Audit d'accessibilité » en **« Everyone »** :
+  la base de développement porte désormais les deux lignes — la neuve, que le type d'activité et le
+  résultat semés référencent ; l'ancienne, orpheline et non archivée. Le cas n'est donc plus
+  théorique, et il reste sans conséquence en production, où l'amorçage ne tourne pas.
+  → **écran de gestion des référentiels (D25, C7).**
 - **Les filtres ne survivent pas à un aller-retour par la navigation principale.** `docs/06` §9 les
   veut conservés. Ils vivent dans l'URL, donc le retour navigateur les restitue ; un clic sur
   « Projets » dans la barre latérale repart à zéro. Mémoriser l'URL de retour demanderait un état de

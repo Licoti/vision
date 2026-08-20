@@ -28,6 +28,7 @@ import {
   type ResourceActivityOption,
 } from "@/components/projects/resource-panel";
 import { ResultPanel } from "@/components/projects/result-panel";
+import { StarterDetail } from "@/components/projects/starter-detail";
 import { ConfirmPanel } from "@/components/ui/confirm-panel";
 import { borderOf, CONTROL, FormField } from "@/components/ui/form-field";
 import type { Session } from "@/lib/auth/session";
@@ -49,6 +50,7 @@ import {
   RESOURCE_PANEL_PARAM,
   RESULT_PANEL_PARAM,
   ROUTES,
+  STARTER_PANEL_PARAM,
 } from "@/lib/navigation";
 import type { DrawerContent, ProjectDrawerRequest } from "@/lib/drawers/types";
 import {
@@ -61,6 +63,11 @@ import type { RoadmapGroup } from "@/lib/queries/activities";
 import { listAdoptableIndicators } from "@/lib/queries/indicators";
 import type { ProjectDetail } from "@/lib/queries/projects";
 import { findResourceActivity } from "@/lib/queries/resources";
+import {
+  findStarter,
+  listStarters,
+  type DomainStarter,
+} from "@/lib/queries/starters";
 import { isUuid } from "@/lib/uuid";
 
 import { archiveProject } from "@/app/(app)/projets/actions";
@@ -87,10 +94,16 @@ import {
 export type ProjectDrawerContext = {
   /**
    * Le droit d'écrire sur cet accompagnement, archivage compris : un seul point
-   * de bascule fait tomber ensemble les six panneaux (T4bis.3, arbitrage (a)).
+   * de bascule fait tomber ensemble les six panneaux d'écriture (T4bis.3,
+   * arbitrage (a)). Le septième, `starter`, ne le consulte pas : il lit.
    */
   canWrite: boolean;
   roadmap: readonly RoadmapGroup[];
+  /**
+   * Les pistes de démarrage du domaine (20/08/2026) — lues seulement quand le
+   * panneau qui les emploie s'ouvre, comme la roadmap.
+   */
+  starters: readonly DomainStarter[];
 };
 
 export async function loadProjectDrawerContext(
@@ -109,12 +122,16 @@ export async function loadProjectDrawerContext(
     request.kind === "cancel" ||
     request.kind === "resource";
 
-  return {
-    canWrite,
-    roadmap: needsRoadmap
-      ? await listProjectRoadmap(session.db, project.id)
-      : [],
-  };
+  /* Le référentiel des pistes ne se lit que pour le panneau qui l'emploie —
+     la même discipline, et une lecture de moins pour les six autres. */
+  const needsStarters = request.kind === "starter";
+
+  const [roadmap, starters] = await Promise.all([
+    needsRoadmap ? listProjectRoadmap(session.db, project.id) : [],
+    needsStarters ? listStarters(session.db) : [],
+  ]);
+
+  return { canWrite, roadmap, starters };
 }
 
 export async function resolveProjectDrawer(
@@ -487,6 +504,32 @@ export async function resolveProjectDrawer(
         ),
       };
     }
+
+    /* ------------------------------------------------------------------ */
+    /* Le septième panneau, et le seul en lecture seule (20/08/2026).
+
+       **Aucun droit ne le garde**, et c'est exact : une piste de démarrage est
+       un référentiel du domaine, que D9 ouvre à tout le domaine. Ce qui le
+       ferme est la seule chose qui puisse le fermer — que la piste demandée
+       n'existe pas, ou qu'elle soit archivée : `listStarters` ne rend que les
+       vivantes du domaine courant, et `findStarter` cherche là-dedans.
+
+       La forme de l'UUID est vérifiée avant : une valeur fantaisiste ne doit
+       pas atteindre la base, où elle rendrait une erreur PostgreSQL plutôt
+       qu'une page nue. La règle tenue par les cinq branches qui précèdent. */
+    case "starter": {
+      if (!isUuid(request.id)) return null;
+
+      const starter = findStarter(context.starters, request.id);
+      if (!starter) return null;
+
+      return {
+        titleId: "panneau-piste-titre",
+        title: starter.label,
+        subtitles: [project.name],
+        body: <StarterDetail starter={starter} />,
+      };
+    }
   }
 }
 
@@ -501,6 +544,7 @@ export function projectRequestFromParams(asked: {
   annuler?: string | undefined;
   archiver?: string | undefined;
   indicateur?: string | undefined;
+  piste?: string | undefined;
 }): ProjectDrawerRequest | null {
   if (asked.archiver === ARCHIVE_PANEL_CONFIRM) return { kind: "archive" };
   if (asked.annuler !== undefined) return { kind: "cancel", id: asked.annuler };
@@ -525,6 +569,10 @@ export function projectRequestFromParams(asked: {
       : { kind: "activity", id: asked.activite };
   }
 
+  /* Aucune sentinelle : la valeur désigne toujours une piste, il n'y a pas de
+     cas « nouvelle » à porter. */
+  if (asked.piste !== undefined) return { kind: "starter", id: asked.piste };
+
   return null;
 }
 
@@ -536,4 +584,5 @@ export const PROJECT_PANEL_PARAMS = [
   CANCEL_PANEL_PARAM,
   ARCHIVE_PANEL_PARAM,
   INDICATOR_PANEL_PARAM,
+  STARTER_PANEL_PARAM,
 ] as const;

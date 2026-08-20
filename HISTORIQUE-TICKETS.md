@@ -2880,3 +2880,87 @@ par la position** : les quatre hôtes sont tous en `surface-neutral-pale`, le fo
 Le droit n'était pas en cause : aucun point d'entrée, aucune action, aucun `can`.
 
 **Le résultat.** `npm run lint` (`--max-warnings=0`), `npx tsc --noEmit` et les **821 tests** passent.
+
+---
+
+## Hors ticket — le bloc « Démarrage », 20/08/2026
+
+**La demande.** La page d'un accompagnement raconte ce qui **a été fait** — roadmap, ressources,
+indicateurs adoptés — et ne dit nulle part ce qu'on **peut** faire. Un designer qui ouvre un
+accompagnement neuf n'a aucun point de départ : ni la liste des plateformes raccordées au domaine,
+ni la moindre piste. Le bloc « Démarrage » pose une boîte à outils — « voici ce que tu peux
+envisager » — et un accès direct à la plateforme, dans un nouvel onglet, pour que l'accompagnement
+reste ouvert dans Vision.
+
+**Quatre arbitrages rendus avant écriture**, tous par l'humain le 20/08/2026. (1) **Un référentiel
+neuf, `starters`**, plutôt qu'une dérivation d'`activity_types.default_tool_id` ou de `tools` : la
+demande réclame explicitement d'accueillir demain « d'autres outils, méthodes, ressources ou
+recommandations », et ni un type d'activité ni un outil n'a de place pour une phrase de conseil ni
+pour une piste sans plateforme. (2) **La même liste sur tous les accompagnements** — aucun filtrage
+par approche, aucune marque « déjà engagée » : la seconde aurait été la jauge de complétion que
+`docs/06` §10 proscrit. (3) **Des adresses provisoires** sur `tools.base_url`, faute que le brief en
+donne. (4) **Carte plus panneau**, le motif de Personae et de Use Cases : la carte porte l'essentiel
+et le lien, le panneau porte le texte long.
+
+**Le modèle, migration `0008`.** Une table et un énuméré. `starters` porte un libellé, un `summary`
+non nul — la phrase de la carte —, un `guidance` nullable — le texte long du panneau —, une nature
+(`tool` · `method` · `resource`), un `tool_id` facultatif, un rang et un `archived_at`. **Ce qu'elle
+ne porte pas est le plus argumenté** : ni `project_id` ni `product_id`, parce que c'est un
+référentiel du domaine ; **aucune colonne d'URL propre**, l'adresse ayant une seule source,
+`tools.base_url`, sans quoi deux sources pour un même lien divergeraient ; et **aucun
+`activity_type_id`**, que personne ne lirait aujourd'hui — la leçon de T5.2, le geste « planifier
+cette activité depuis une piste » n'étant pas demandé (règle 3). La `position`, elle, a son écrivain
+— l'amorçage —, ce qui la distingue de la colonne de rang que le journal du 19/08 proscrit.
+
+**La lecture.** `listStarters(scope)` ne prend **aucun identifiant** : c'est la première lecture du
+dépôt dans ce cas, et c'est la traduction directe de l'arbitrage (2). Une seule requête en
+`joinedRead`, `filter(starters)` dans le `where` et `filter(tools)` dans le `on` — la règle absolue
+du fichier. Le `on` porte en plus `isNull(tools.archivedAt)`, et **c'est la règle « décrire ≠
+proposer » qui le décide** : la roadmap *décrit* et nomme l'outil d'un résultat ancien, ce bloc
+*propose* et ne renvoie pas vers une plateforme rangée. Une piste dont l'outil est archivé se lit
+donc encore, sans lien — le texte de la piste reste vrai quand la plateforme ne l'est plus.
+
+**Les écrans.** `components/projects/starters.tsx` est en première case de la grille, avant
+« Ressources », et **c'est l'écart le plus visible du lot** : `docs/06` §5 donne une liste close de
+blocs de référence ordonnée par fréquence de consultation, où « Démarrage » ne figure pas. La
+roadmap garde sa position dominante — D31 tient sur l'essentiel —, c'est l'ordre interne des blocs
+de référence qui cède, un point de départ qui se lirait en cinquième position n'en étant plus un.
+`starter-detail.tsx` est le corps du panneau : composant **serveur**, en lecture seule, sur le
+modèle d'`UseCaseDetail` — pas de `Panel`, dont le corps enveloppe ses `children` dans un `<form>`.
+
+**Le bloc est le seul de la page à ne recevoir aucun droit, et le seul dont le point d'entrée ne
+soit jamais nul.** Les six autres panneaux tombent avec `canWrite` ; celui-ci n'a rien à faire
+tomber — une piste se lit par tout le domaine (D9), et son référentiel a son écran de gestion en C7
+(D25). C'est aussi pourquoi il n'y a **qu'une clé d'URL** là où Personae et Use Cases en ont deux :
+la paire « une clé pour lire, une clé pour écrire » n'a rien à séparer quand il n'y a pas d'écriture.
+Le décompte d'exclusivité passe **de six à sept clés sans qu'un caractère change**, pour la
+cinquième fois.
+
+**La fixture reçoit trois écritures, toutes signalées d'avance.** Les adresses des outils sont
+posées sur `example.com`, le domaine réservé à la documentation — la seule forme plausible dans sa
+structure et prouvablement provisoire, incapable d'atteindre un tiers réel par accident. L'outil
+« Audit d'accessibilité » est renommé **« Everyone »**, du nom de la plateforme, avec la conséquence
+déjà documentée d'un rapprochement par clé naturelle. Et **quatre pistes** sont semées, dont la
+quatrième — « Entretiens utilisateurs », une méthode sans outil ni texte long — est une invention
+assumée qui paie deux fois : elle prouve que le référentiel accueille autre chose qu'un outil, et
+elle est la seule ligne qui **rende visibles les deux états vides du panneau**.
+
+**La vérification, en quatre disciplines.** Le HTML servi donne les sept `<h2>` dans l'ordre voulu —
+`Roadmap`, puis `Démarrage`, puis `Ressources` —, quatre `<li>`, trois `<a target="_blank"
+rel="noreferrer">` avec leur chevron et leur mention `sr-only`, et la quatrième ligne sans aucun lien
+sortant. Cinq adresses mesurées : `?piste=<id>` ouvre le dialogue au bon titre — **l'étape témoin** —,
+et un UUID inconnu, une valeur fantaisiste, un identifiant de projet et la conjonction
+`?piste=…&ressource=nouvelle` rendent tous **la page nue en 200**, jamais un 404 ni un 500. La
+troisième branche du panneau — un outil raccordé sans adresse — a été servie par **sonde scopée**,
+la fixture ne l'atteignant pas, puis rétablie. Les **six filtres** de `listStarters` ont été
+neutralisés un à un : chacun fait tomber exactement les tests attendus et rien d'autre, et le
+départage par libellé a été mesuré **trois fois** parce qu'un ordre sans départage est arbitraire.
+Les contrastes ont été recalculés : le plus bas couple de texte est à **4,98:1**, et les trois
+couples non textuels sous 3:1 sont ceux, déjà consignés, qu'aucun jeton du design system ne relève.
+Le droit, enfin, n'a **aucune action à éprouver** — ce qui s'énonce plutôt que de se sauter : le
+bloc et le panneau ont été servis sous deux identités, un responsable de domaine et un membre sans
+droit d'écriture ici, et **leur DOM est identique au caractère près**, alors que le reste de la page
+diffère bien entre les deux.
+
+**Le résultat.** `npm run lint` (`--max-warnings=0`), `npx tsc --noEmit`, `npm run build` et les
+**882 tests** passent.

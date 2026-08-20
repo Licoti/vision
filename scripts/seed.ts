@@ -63,6 +63,8 @@ import {
   results,
   skillLevels,
   skills,
+  starterKind,
+  starters,
   toolKind,
   tools,
   useCases,
@@ -150,11 +152,34 @@ const STATUSES: { label: string; nature: Nature }[] = [
   { label: "Terminé", nature: "done" },
 ];
 
-/** `docs/04` §2 — brancher un outil coûte une ligne, pas un module. */
-const TOOLS: { name: string; kind: ToolKind }[] = [
-  { name: "Ergonome", kind: "audit" },
-  { name: "Audit d'accessibilité", kind: "audit" },
-  { name: "Portail analytics", kind: "analytics" },
+/**
+ * `docs/04` §2 — brancher un outil coûte une ligne, pas un module.
+ *
+ * **Deux écarts à la règle de tête, arbitrés le 20/08/2026 avec l'humain**, et
+ * tous deux appelés par le bloc « Démarrage », qui a besoin d'une adresse pour
+ * ouvrir quoi que ce soit.
+ *
+ * (1) **Les adresses sont provisoires.** Le brief nomme les outils et jamais
+ * leurs adresses ; celles-ci sont posées sur `example.com`, le domaine réservé
+ * à la documentation — la seule forme qui soit plausible dans sa structure et
+ * prouvablement provisoire, incapable d'atteindre un tiers réel par accident.
+ * « Outil budget » reste sans adresse : aucune piste ne le désigne, et le
+ * budget est en C7 (D28).
+ *
+ * (2) **« Audit d'accessibilité » s'appelle désormais « Everyone »**, du nom de
+ * la plateforme. La clé naturelle de l'amorçage est le nom : la base de
+ * développement gardera donc l'ancienne ligne à côté de la neuve, ce qu'`ETAT.md`
+ * documente déjà — « l'amorçage rapproche par clé naturelle, donc un renommage
+ * recrée ». Sans conséquence en production, où l'amorçage ne tourne pas.
+ */
+const TOOLS: { name: string; kind: ToolKind; baseUrl?: string }[] = [
+  { name: "Ergonome", kind: "audit", baseUrl: "https://ergonome.example.com" },
+  { name: "Everyone", kind: "audit", baseUrl: "https://everyone.example.com" },
+  {
+    name: "Portail analytics",
+    kind: "analytics",
+    baseUrl: "https://analytics.example.com",
+  },
   { name: "Outil budget", kind: "budget" },
 ];
 
@@ -205,7 +230,7 @@ const ACTIVITY_TYPES: {
     label: "Audit d'accessibilité",
     family: "evaluation",
     producesResult: true,
-    defaultTool: "Audit d'accessibilité",
+    defaultTool: "Everyone",
   },
   { label: "Audit d'éco-conception", family: "evaluation", producesResult: true },
   { label: "Revue experte", family: "evaluation" },
@@ -218,6 +243,68 @@ const ACTIVITY_TYPES: {
   { label: "Formation", family: "transfer" },
   { label: "Documentation", family: "transfer" },
   { label: "Passation", family: "transfer" },
+];
+
+/**
+ * Les **pistes de démarrage** — le référentiel du bloc « Démarrage »
+ * (20/08/2026).
+ *
+ * **Troisième source de ce fichier**, après les `docs/` et le brief §7 : elles
+ * viennent de la demande humaine, qui nomme les trois premières mot pour mot —
+ * audit UX vers Ergonome, audit d'accessibilité vers Everyone, mise en place du
+ * tracking vers le portail analytics. Le précédent est celui des deux use cases
+ * du 19/08/2026.
+ *
+ * **La quatrième est une invention assumée**, signalée avant écriture et non
+ * découverte après. Elle paie deux fois : elle est la preuve que le référentiel
+ * accueille une **méthode sans outil**, ce que la demande réclame explicitement
+ * pour la suite ; et elle est la seule ligne qui **rende visible la branche
+ * « piste sans lien »** du bloc, qui rejoindrait sinon les états vides
+ * qu'aucun HTML servi ne montre.
+ *
+ * Le texte long reste nul sur la quatrième : une piste sans texte long est un
+ * état normal, et il fallait qu'une ligne le serve.
+ */
+const STARTERS: {
+  label: string;
+  kind: StarterKind;
+  summary: string;
+  guidance?: string;
+  tool?: string;
+}[] = [
+  {
+    label: "Audit UX",
+    kind: "tool",
+    tool: "Ergonome",
+    summary:
+      "Mesurer la qualité d'usage du produit sur une grille heuristique, et repartir d'un état des lieux daté.",
+    guidance:
+      "À envisager quand l'accompagnement s'ouvre sur un produit déjà en ligne : l'audit donne un point de départ chiffré, auquel les mesures suivantes se compareront. Ergonome produit le rapport ; Vision en reporte la valeur, sa date et son lien, et rien de plus — le détail reste dans l'outil.",
+  },
+  {
+    label: "Audit d'accessibilité",
+    kind: "tool",
+    tool: "Everyone",
+    summary:
+      "Situer le produit face au référentiel d'accessibilité, et savoir ce qui bloque avant de concevoir.",
+    guidance:
+      "À envisager tôt : un écran conçu sans cette lecture se reprend deux fois. Everyone rend un taux de conformité que l'accompagnement peut adopter comme indicateur du produit, puis suivre dans le temps.",
+  },
+  {
+    label: "Mise en place du tracking",
+    kind: "tool",
+    tool: "Portail analytics",
+    summary:
+      "Poser les mesures d'usage avant de changer le produit, pour que l'effet du travail soit lisible après.",
+    guidance:
+      "À envisager avant toute refonte : sans mesure d'avant, il n'y aura pas d'après. Le portail documente la pose des marqueurs ; les valeurs reviennent ensuite dans Vision comme relevés d'indicateur, avec leur date.",
+  },
+  {
+    label: "Entretiens utilisateurs",
+    kind: "method",
+    summary:
+      "Aller chercher chez les utilisateurs ce qu'aucune mesure ne dit : leurs raisons, leurs contournements, leurs mots.",
+  },
 ];
 
 /**
@@ -587,7 +674,7 @@ const RESULTS: {
     value: "68",
     unit: "%",
     measuredOn: "2026-06-30",
-    tool: "Audit d'accessibilité",
+    tool: "Everyone",
   },
 ];
 
@@ -676,6 +763,7 @@ const USE_CASES: { product: string; title: string; summary: string }[] = [
 
 type Nature = (typeof projectStatusNature.enumValues)[number];
 type ToolKind = (typeof toolKind.enumValues)[number];
+type StarterKind = (typeof starterKind.enumValues)[number];
 type Family = (typeof activityFamily.enumValues)[number];
 type ActivityState = (typeof activityState.enumValues)[number];
 type DomainRole = (typeof domainRole.enumValues)[number];
@@ -918,8 +1006,12 @@ async function seed(): Promise<void> {
     (row) => row.name,
     TOOLS.map((tool) => ({
       key: tool.name,
-      // `base_url` reste nul : le brief nomme les outils, pas leurs adresses.
-      values: { name: tool.name, kind: tool.kind },
+      values: {
+        name: tool.name,
+        kind: tool.kind,
+        // Provisoire, et nulle là où aucune piste n'en réclame : voir TOOLS.
+        baseUrl: tool.baseUrl ?? null,
+      },
     })),
   );
 
@@ -938,6 +1030,27 @@ async function seed(): Promise<void> {
         defaultToolId: type.defaultTool
           ? idOf(toolIndex, type.defaultTool, "Outil")
           : null,
+      },
+    })),
+  );
+
+  /* Les pistes de démarrage. Elles viennent après les outils, dont elles
+     tirent leur lien, et la clé naturelle est le libellé — celui que l'écran
+     affiche, comme partout ailleurs dans ce fichier. */
+  await ensureAll(
+    scope,
+    starters,
+    "starters",
+    (row) => row.label,
+    STARTERS.map((starter, index) => ({
+      key: starter.label,
+      values: {
+        label: starter.label,
+        kind: starter.kind,
+        summary: starter.summary,
+        guidance: starter.guidance ?? null,
+        position: positionOf(index),
+        toolId: starter.tool ? idOf(toolIndex, starter.tool, "Outil") : null,
       },
     })),
   );

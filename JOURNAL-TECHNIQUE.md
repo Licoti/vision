@@ -5319,3 +5319,97 @@ serait faire à contretemps le geste 1 d'une session qui n'a pas lieu. Le ticket
 entrée de journal et deux points ouverts, et **ne balaie rien**. Le dépassement est le même que celui
 signalé par TD.5 et TD.6, aggravé de trois entrées. → **le découpage de C6 le referme, et il porte
 maintenant trois chantiers de retard.**
+
+---
+
+## Le bloc « Démarrage » — hors ticket, 20/08/2026
+
+**Une lecture sans identifiant est une première, et c'est l'arbitrage qui la produit.** Les
+vingt-trois lectures de `lib/queries/` prennent toutes une cible — un produit, un projet, une
+personne. `listStarters(scope)` n'en prend aucune, parce que l'arbitrage (2) veut la même boîte à
+outils sur tous les accompagnements. **La conséquence est une propriété, pas une commodité** : rien
+dans cette lecture ne regarde le projet, donc rien ne peut lui reprocher ce qu'il n'a pas fait — la
+frontière que D39 et `docs/06` §10 tracent, tenue par la forme de la requête plutôt que par une
+discipline d'écran.
+
+**`isNull(tools.archivedAt)` dans le `on` de la jointure, et la règle qui le décide n'est écrite
+nulle part.** Le dépôt la pratique depuis T4.4 sans l'avoir nommée : **une lecture qui *décrit*
+joint les archivés, une lecture qui *propose* les écarte.** `listProjectRoadmap` nomme l'outil d'un
+résultat ancien même archivé — le fait a eu lieu ; `listResultToolOptions` ne le propose plus, sauf
+exception nominative. Ce bloc propose, donc il écarte. **Le tiers état est le sien** : la piste
+reste affichée, sans lien, parce que le texte d'une piste reste vrai quand la plateforme est rangée
+— là où un outil archivé retirerait simplement une option d'un `<select>`. À reprendre pour toute
+lecture future qui offre un choix.
+
+**Le décompte d'exclusivité passe de six à sept clés sans qu'un caractère change, pour la cinquième
+fois.** `piste` rejoint `keys` dans `app/(app)/projets/[id]/page.tsx`, et ni le `filter`, ni le
+`> 1`, ni le `asked = {}` ne bougent. La propriété que T4.4 cherchait en réécrivant la comparaison
+binaire de T4.2 en décompte est vérifiée une fois de plus.
+
+**Le typage a trouvé la branche manquante avant le premier test.** Ajouter `{ kind: "starter" }` à
+`ProjectDrawerRequest` a fait échouer `tsc` sur `resolveProjectDrawer` — « Function lacks ending
+return statement » —, parce que le `switch` est exhaustif et que TypeScript le sait. C'est le
+bénéfice qu'un `switch` sans `default` achète : **oublier une branche est une erreur de
+compilation, pas un panneau qui ne s'ouvre pas.** Rien n'aurait signalé l'oubli avec un `default:
+return null`.
+
+**Sept écarts documentaires, tous arbitrés le 20/08/2026.**
+(1) **L'ordre de `docs/06` §5 cède** : la liste des blocs de référence y est close et ordonnée par
+fréquence de consultation, et « Démarrage » passe devant « Ressources » sans y figurer. D31 tient
+sur l'essentiel — la roadmap reste dominante — ; c'est l'ordre **interne** des blocs de référence
+qui bouge, un point de départ qui se lirait en cinquième position n'en étant plus un.
+(2) **`starters` et `starter_kind` n'existent dans aucun `docs/`**, comme `products.vision`,
+`indicators.is_north_star`, `personas` et `use_cases` avant eux. Cinquième fois, et la question que
+le bloc « Personae » posait le 18/08 reste entière : `docs/02` et `docs/04` décrivent-ils désormais
+ces objets, ou vit-on avec un modèle dont cinq éléments ne sont écrits que dans le code ?
+(3) **La fixture reçoit sa quatrième source** : la demande humaine, qui nomme trois pistes mot pour
+mot. L'en-tête de `scripts/seed.ts` pose « deux sources, et pas une de plus ».
+(4) **Trois adresses sont inventées**, contre la règle « un champ que le brief ne donne pas reste
+nul ». Elles sont posées sur `example.com`, réservé à la documentation : plausible dans sa
+structure, prouvablement provisoire, et incapable d'atteindre un tiers réel.
+(5) **Une quatrième piste est inventée** — « Entretiens utilisateurs », méthode sans outil ni texte
+long. Elle n'est pas décorative : c'est la seule ligne qui prouve que le référentiel accueille autre
+chose qu'un outil, et la seule qui **rende visibles les deux états vides du panneau**.
+(6) **L'outil « Audit d'accessibilité » est renommé « Everyone »**, et l'amorçage rapprochant par
+clé naturelle, la base de développement porte désormais **les deux lignes** — la neuve, référencée
+par le type d'activité et le résultat semés ; l'ancienne, orpheline et non archivée. Sans
+conséquence en production, où l'amorçage ne tourne pas. La dette « un renommage recrée » d'`ETAT.md`
+est récrite en conséquence.
+(7) **`docs/03` §5 range le « niveau 2 — lancement délégué » après le POC**, et D15 avec lui : un
+bouton qui ouvrirait l'outil **pré-rempli du contexte projet** est donc interdit. Le lien pointe la
+**racine** de `tools.base_url`, jamais une adresse construite avec l'identifiant du projet. Ce n'est
+pas un manque, c'est la ligne à ne pas franchir, et elle est écrite en tête des deux composants.
+
+**Sa leçon est dans la mise en défaut, et elle vaut pour tout test d'ordre : neutraliser un critère
+de tri secondaire ne prouve rien en une exécution.** Retirer `asc(starters.label)` fait tomber le
+test du départage — mais l'ordre rendu par PostgreSQL sans critère est **arbitraire**, pas aléatoire
+: il suit l'ordre physique des lignes, qui est ici celui de l'insertion, si bien qu'une fixture
+insérant « Anouk » **avant** « Bravo » aurait laissé le test passer et la neutralisation muette. La
+fixture insère donc délibérément les deux ex æquo à rebours de l'alphabet, et la neutralisation a
+été **répétée trois fois** avant d'être crue. Les cinq autres — `filter(starters)`,
+`isNull(starters.archivedAt)`, `filter(tools)`, `isNull(tools.archivedAt)`, `asc(position)` — font
+tomber exactement 4, 4, 1, 1 et 1 tests, et rien d'autre.
+
+**Sa seconde leçon est dans l'instrument du droit.** Ce bloc n'a **aucune action serveur** : la
+quatrième discipline n'a rien à frapper. La sauter aurait été un aveu ; ce qui la remplace se
+mesure — le bloc et le panneau ont été servis sous deux identités et **leur DOM est identique au
+caractère près**. L'étape témoin est ce qui rend le constat concluant : les deux mêmes identités
+diffèrent bien ailleurs sur la page, l'une portant « Relier une ressource » et l'autre non. Sans
+elle, deux diffs vides auraient aussi bien pu dire que la comparaison ne comparait rien.
+
+**Une branche de rendu n'est pas atteignable par la fixture, et la sonde a été jetée.** Le panneau
+distingue trois états de plateforme — nommée avec adresse, nommée sans adresse, absente. Le second
+n'a aucun porteur : la seule ligne de `tools` sans `base_url` est « Outil budget », qu'aucune piste
+ne désigne. Une sonde scopée a pointé « Mise en place du tracking » vers lui, le rendu a été lu —
+carte sans lien, panneau disant « Outil budget est raccordé au domaine, sans adresse renseignée » —,
+puis la piste a été rétablie et le script supprimé. **Aucune ligne de sonde ne reste**, à la
+différence de TD.1 et du bloc « Use Cases » : ici la sonde modifiait une ligne existante, elle n'en
+créait pas.
+
+**Une incohérence documentaire, relevée sans être tranchée.** Le protocole de ticket de `CLAUDE.md`
+(étape 5) demande que `ETAT.md` « ne dépasse pas 250 lignes : au-delà, le balayer avant de
+continuer ». La section « Session de découpage » du même fichier pose que le découpage « est le seul
+moment où `ETAT.md` se balaie ». Le fichier est à **545 lignes** ce jour. Les deux règles ne peuvent
+pas être suivies ensemble hors d'un découpage, et c'est la seconde qui a été retenue : balayer ici
+aurait été une réécriture massive qu'aucune demande ne couvre. → **à trancher par qui écrit
+`CLAUDE.md`.**

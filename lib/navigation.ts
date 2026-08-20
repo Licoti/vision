@@ -372,6 +372,21 @@ export const PERSON_FORM_NEW = "nouveau";
 export const SKILL_PANEL_PARAM = "maitrise";
 
 /**
+ * Le détail d'une **piste de démarrage**, sur la page d'un accompagnement
+ * (20/08/2026).
+ *
+ * **Une seule clé, et en lecture seule** — la première des sept de cette page
+ * dans ce cas. Les six autres ouvrent une écriture ou une confirmation ; celle-ci
+ * n'ouvre qu'un texte, que tout le domaine lit (D9). La paire « une clé pour
+ * lire, une clé pour écrire » de la page produit n'a donc rien à séparer ici :
+ * `starters` est un **référentiel**, et D25 donne son écran de gestion à C7.
+ *
+ * La valeur est toujours un identifiant : il n'y a pas de cas « nouvelle » à
+ * porter, donc aucune sentinelle.
+ */
+export const STARTER_PANEL_PARAM = "piste";
+
+/**
  * Les deux bornes de la fenêtre de la **roadmap**, sur la page du produit.
  *
  * **Ce ne sont pas des clés d'ouverture**, et elles ne rejoignent donc pas le
@@ -606,6 +621,16 @@ export const ROUTES = {
    */
   projectIndicatorEdit: (id: string, adoptionId: string) =>
     `/projets/${id}?${INDICATOR_PANEL_PARAM}=${adoptionId}`,
+  /**
+   * La page du projet, panneau d'une **piste de démarrage** ouvert
+   * (20/08/2026).
+   *
+   * **Ce n'est pas un écran de plus** : c'est le même, avec un paramètre — la
+   * règle des treize adresses d'ouverture qui précèdent, et la fermeture reste
+   * `project(id)`.
+   */
+  projectStarter: (id: string, starterId: string) =>
+    `/projets/${id}?${STARTER_PANEL_PARAM}=${starterId}`,
   /**
    * Le référentiel des personnes (T5bis.2).
    *

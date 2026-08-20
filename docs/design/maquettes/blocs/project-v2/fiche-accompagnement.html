@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autonomie des opérations courantes — Vision</title>
+<link rel="stylesheet" href="fiche-accompagnement.css">
+</head>
+<body>
+<div class="layout">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <span class="sidebar__dot"></span>
+      <span class="sidebar__name">Vision</span>
+    </div>
+    <nav class="sidebar__nav">
+      <a href="#" class="nav-link">Vue d'ensemble</a>
+      <a href="#" class="nav-link">Produits</a>
+      <a href="#" class="nav-link nav-link--active">Projets</a>
+      <a href="#" class="nav-link">Équipe</a>
+      <a href="#" class="nav-link">À propos</a>
+    </nav>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+
+    <!-- Breadcrumb -->
+    <div class="breadcrumb">
+      <a href="#">Produits</a>
+      <span class="sep">›</span>
+      <a href="#">Espace client web</a>
+      <span class="sep">›</span>
+      <span class="current">Autonomie des opérations courantes</span>
+    </div>
+
+    <!-- ===================== HEADER CARD ===================== -->
+    <div class="card header-card">
+      <div class="header-card__top">
+        <div style="min-width:0;">
+          <div class="header-card__meta-line">
+            <span class="pill pill--encours">En cours</span>
+            <span class="muted">depuis février 2026 · 2ᵉ accompagnement du produit</span>
+          </div>
+          <h1 class="header-card__title">Autonomie des opérations courantes</h1>
+          <p class="header-card__desc">Permettre les opérations courantes sans contact avec le support.</p>
+        </div>
+        <div class="header-card__actions">
+          <a href="#" class="btn btn--primary">Modifier</a>
+          <div class="menu-wrap">
+            <button class="kebab" aria-label="Plus d'options" title="Plus d'options" data-menu-toggle>
+              <span class="kebab__dots"><span></span><span></span><span></span></span>
+            </button>
+            <div class="menu" hidden>
+              <a href="#">Dupliquer</a>
+              <a href="#">Exporter (PDF)</a>
+              <a href="#" class="is-danger">Archiver</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="meta-strip">
+        <div>
+          <div class="meta-strip__label">Entité</div>
+          <div class="meta-strip__value">Banque de détail</div>
+        </div>
+        <div>
+          <div class="meta-strip__label">Commanditaire</div>
+          <div class="meta-strip__value meta-strip__value--empty">Non renseigné</div>
+        </div>
+        <div>
+          <div class="meta-strip__label">Approches</div>
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <span class="tag">Research</span>
+            <span class="tag">Audit d'accessibilité</span>
+            <span class="tag">Mesure des usages</span>
+          </div>
+        </div>
+        <div style="min-width:220px;">
+          <div class="meta-strip__label">Équipe</div>
+          <div class="meta-strip__team">
+            <span class="avatar avatar--lg" title="Camille Roux">CR</span>
+            <span class="avatar avatar--lg" title="Forge A">FA</span>
+            <span class="avatar avatar--lg" title="Inès Kaddour">IK</span>
+            <span class="avatar avatar--lg" title="Léa Fontaine">LF</span>
+            <span class="avatar avatar--lg" title="Marc Tellier">MT</span>
+            <span class="meta-strip__team-count">5 personnes</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sticky sub-nav -->
+    <div class="subnav">
+      <div class="subnav__inner">
+        <a href="#activites" class="subnav__link subnav__link--active">Activités</a>
+        <a href="#demarrage" class="subnav__link">Démarrage</a>
+        <a href="#indicateurs" class="subnav__link">Indicateurs</a>
+        <a href="#ressources" class="subnav__link">Ressources &amp; suivi</a>
+      </div>
+    </div>
+
+    <!-- ===================== BODY : 2 columns ===================== -->
+    <div class="body-grid">
+
+      <!-- ===== LEFT COLUMN ===== -->
+      <div class="col">
+
+        <!-- Activités -->
+        <section id="activites" class="card section">
+          <div class="section__head">
+            <div>
+              <h2 class="section__title">Roadmap des activités</h2>
+              <p class="section__sub">Le récit de l'accompagnement, du plus récent au plus ancien.</p>
+            </div>
+            <a href="#" class="btn btn--ghost btn--sm" style="white-space:nowrap;">+ Ajouter une activité</a>
+          </div>
+
+          <!-- status filter chips -->
+          <div class="status-chips">
+            <button class="chip chip--active" data-filter="all"><span class="chip__dot dot--all"></span>Toutes<span class="chip__count">5</span></button>
+            <button class="chip" data-filter="encours"><span class="chip__dot dot--encours"></span>En cours<span class="chip__count">1</span></button>
+            <button class="chip" data-filter="prevu"><span class="chip__dot dot--prevu"></span>Prévu<span class="chip__count">1</span></button>
+            <button class="chip" data-filter="aplanifier"><span class="chip__dot dot--aplanifier"></span>À planifier<span class="chip__count">1</span></button>
+            <button class="chip" data-filter="termine"><span class="chip__dot dot--termine"></span>Terminé<span class="chip__count">2</span></button>
+          </div>
+
+          <!-- rows -->
+          <div class="act-list">
+            <div class="act-row" data-status="encours">
+              <span class="act-row__dot dot--encours"></span>
+              <div class="act-row__main">
+                <div class="act-row__title-line">
+                  <span class="act-row__title">Atelier de priorisation</span>
+                  <span class="pill pill--sm pill--encours">En cours</span>
+                </div>
+                <div class="act-row__meta">4 participants</div>
+              </div>
+              <div class="avatar-stack">
+                <span class="avatar avatar--md">CR</span><span class="avatar avatar--md">FA</span><span class="avatar avatar--md">IK</span><span class="avatar avatar--md">LF</span>
+              </div>
+              <span class="act-row__date">août 2026</span>
+              <button class="kebab kebab--sm" aria-label="Options"><span class="kebab__dots"><span></span><span></span><span></span></span></button>
+            </div>
+
+            <div class="act-row" data-status="prevu">
+              <span class="act-row__dot dot--prevu"></span>
+              <div class="act-row__main">
+                <div class="act-row__title-line">
+                  <span class="act-row__title">Audit UX</span>
+                  <span class="pill pill--sm pill--prevu">Prévu</span>
+                </div>
+                <div class="act-row__meta">4 participants</div>
+              </div>
+              <div class="avatar-stack">
+                <span class="avatar avatar--md">CR</span><span class="avatar avatar--md">FA</span><span class="avatar avatar--md">IK</span><span class="avatar avatar--md">LF</span>
+              </div>
+              <span class="act-row__date">octobre 2026</span>
+              <button class="kebab kebab--sm" aria-label="Options"><span class="kebab__dots"><span></span><span></span><span></span></span></button>
+            </div>
+
+            <div class="act-row" data-status="aplanifier">
+              <span class="act-row__dot dot--aplanifier"></span>
+              <div class="act-row__main">
+                <div class="act-row__title-line">
+                  <span class="act-row__title">Formation</span>
+                  <span class="pill pill--sm pill--aplanifier">À planifier</span>
+                </div>
+                <div class="act-row__meta">Formation des équipes produit · 4 participants</div>
+              </div>
+              <div class="avatar-stack">
+                <span class="avatar avatar--md">CR</span><span class="avatar avatar--md">FA</span><span class="avatar avatar--md">IK</span><span class="avatar avatar--md">LF</span>
+              </div>
+              <span class="act-row__date">À planifier</span>
+              <button class="kebab kebab--sm" aria-label="Options"><span class="kebab__dots"><span></span><span></span><span></span></span></button>
+            </div>
+
+            <div class="act-row" data-status="termine">
+              <span class="act-row__dot dot--termine"></span>
+              <div class="act-row__main">
+                <div class="act-row__title-line">
+                  <span class="act-row__title">Audit d'accessibilité</span>
+                  <span class="pill pill--sm pill--termine">Terminé</span>
+                </div>
+                <div class="act-row__meta">Résultat : taux de conformité 68 % · 4 participants</div>
+              </div>
+              <div class="avatar-stack">
+                <span class="avatar avatar--md">CR</span><span class="avatar avatar--md">FA</span><span class="avatar avatar--md">IK</span><span class="avatar avatar--md">LF</span>
+              </div>
+              <span class="act-row__date">juin 2026</span>
+              <button class="kebab kebab--sm" aria-label="Options"><span class="kebab__dots"><span></span><span></span><span></span></span></button>
+            </div>
+
+            <div class="act-row" data-status="termine">
+              <span class="act-row__dot dot--termine"></span>
+              <div class="act-row__main">
+                <div class="act-row__title-line">
+                  <span class="act-row__title">Test utilisateur</span>
+                  <span class="pill pill--sm pill--termine">Terminé</span>
+                </div>
+                <div class="act-row__meta">Campagne de tests — vague 2 · 4 participants</div>
+              </div>
+              <div class="avatar-stack">
+                <span class="avatar avatar--md">CR</span><span class="avatar avatar--md">FA</span><span class="avatar avatar--md">IK</span><span class="avatar avatar--md">LF</span>
+              </div>
+              <span class="act-row__date">mars 2026</span>
+              <button class="kebab kebab--sm" aria-label="Options"><span class="kebab__dots"><span></span><span></span><span></span></span></button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Démarrage -->
+        <section id="demarrage" class="card section">
+          <h2 class="section__title">Démarrage</h2>
+          <p class="section__sub">Des pistes pour ouvrir cet accompagnement. Rien n'est imposé.</p>
+          <div class="starter-grid">
+            <div class="starter">
+              <div class="starter__head"><span class="starter__title">Audit UX</span><span class="tag tag--sm">Outil</span></div>
+              <p class="starter__desc">Mesurer la qualité d'usage sur une grille heuristique, et repartir d'un état des lieux daté.</p>
+              <a href="#" class="link-cta">En savoir plus →</a>
+            </div>
+            <div class="starter">
+              <div class="starter__head"><span class="starter__title">Audit d'accessibilité</span><span class="tag tag--sm">Outil</span></div>
+              <p class="starter__desc">Situer le produit face au référentiel d'accessibilité, et savoir ce qui bloque avant de concevoir.</p>
+              <a href="#" class="link-cta">En savoir plus →</a>
+            </div>
+            <div class="starter">
+              <div class="starter__head"><span class="starter__title">Mise en place du tracking</span><span class="tag tag--sm">Outil</span></div>
+              <p class="starter__desc">Poser les mesures d'usage avant de changer le produit, pour que l'effet du travail soit lisible après.</p>
+              <a href="#" class="link-cta">En savoir plus →</a>
+            </div>
+            <div class="starter">
+              <div class="starter__head"><span class="starter__title">Entretiens utilisateurs</span><span class="tag tag--sm">Méthode</span></div>
+              <p class="starter__desc">Aller chercher chez les utilisateurs ce qu'aucune mesure ne dit : leurs raisons, leurs mots.</p>
+              <a href="#" class="link-cta">En savoir plus →</a>
+            </div>
+          </div>
+        </section>
+
+        <!-- Empty-state trio -->
+        <div class="empty-trio">
+          <div class="card empty-card">
+            <h3 class="empty-card__title">Projets liés</h3>
+            <p class="empty-card__desc">Les autres accompagnements de ce produit et les liens déclarés vers d'autres projets s'afficheront ici.</p>
+            <a href="#" class="link-cta">+ Relier un projet</a>
+          </div>
+          <div class="card empty-card">
+            <h3 class="empty-card__title">Budget</h3>
+            <p class="empty-card__desc">La synthèse macro — alloué, consommé — avec le lien vers l'outil de gestion, tenu là-bas.</p>
+            <a href="#" class="link-cta">Relier l'outil de gestion →</a>
+          </div>
+          <div class="card empty-card">
+            <h3 class="empty-card__title">Journal</h3>
+            <p class="empty-card__desc">Qui a modifié quoi, et quand. Une information de contrôle pour retrouver l'origine d'une saisie.</p>
+            <a href="#" class="link-cta">Voir le journal →</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== RIGHT RAIL ===== -->
+      <div id="indicateurs" class="col" style="scroll-margin-top:76px;">
+
+        <!-- Indicators -->
+        <section class="card rail-section">
+          <div class="rail-section__head">
+            <h2 class="rail-section__title">Indicateurs adoptés</h2>
+            <a href="#" class="link-cta" style="white-space:nowrap;">+ Adopter</a>
+          </div>
+
+          <!-- North Star -->
+          <div class="ns-box">
+            <div class="ns-box__eyebrow">
+              <span class="ns-box__star">★</span>
+              <span class="ns-box__label">North Star</span>
+            </div>
+            <div class="ns-box__name">Part des virements réalisés sans contact support</div>
+            <div class="ns-box__value-row">
+              <span class="ns-box__value">71 %</span>
+              <span class="ns-box__date">juin 2026</span>
+              <span class="ns-box__target">Cible 85 %</span>
+            </div>
+            <div class="ns-gauge">
+              <div class="ns-gauge__fill" style="width:71%;"></div>
+              <div class="ns-gauge__target" style="left:85%;"></div>
+            </div>
+            <div class="ns-box__foot">
+              <span class="ns-box__gap">Encore 14 pts</span>
+              <a href="#" class="link-cta" style="font-size:12px;">Modifier</a>
+            </div>
+          </div>
+
+          <!-- secondary indicator -->
+          <div class="ind">
+            <div class="ind__head">
+              <span class="ind__name">test</span>
+              <span class="tag tag--sm">Complémentaire</span>
+            </div>
+            <div class="ind__value-row">
+              <span class="ind__value">32 %</span>
+              <span class="ind__meta">août 2026 · pas de cible définie</span>
+            </div>
+            <div class="ind__foot"><a href="#" class="link-cta" style="font-size:12px;">Modifier</a></div>
+          </div>
+        </section>
+
+        <!-- Ressources -->
+        <section id="ressources" class="card rail-section">
+          <div class="rail-section__head">
+            <h2 class="rail-section__title">Ressources</h2>
+            <a href="#" class="link-cta" style="white-space:nowrap;">+ Relier</a>
+          </div>
+          <div class="res-list">
+            <div class="res">
+              <a href="#" class="res__title">Compte rendu d'atelier — T4.2 ↗</a>
+              <div class="res__meta">Word · Test utilisateur</div>
+            </div>
+            <div class="res">
+              <a href="#" class="res__title">Restitution des tests — vague 2 ↗</a>
+              <div class="res__meta">PowerPoint · Test utilisateur</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  // Kebab menus (open/close)
+  document.addEventListener('click', (e) => {
+    const toggle = e.target.closest('[data-menu-toggle]');
+    document.querySelectorAll('.menu').forEach(m => {
+      if (!toggle || m !== toggle.parentElement.querySelector('.menu')) m.hidden = true;
+    });
+    if (toggle) {
+      const menu = toggle.parentElement.querySelector('.menu');
+      menu.hidden = !menu.hidden;
+    }
+  });
+
+  // Activity status filter
+  const chips = document.querySelectorAll('.chip');
+  chips.forEach(chip => chip.addEventListener('click', () => {
+    chips.forEach(c => c.classList.remove('chip--active'));
+    chip.classList.add('chip--active');
+    const f = chip.dataset.filter;
+    document.querySelectorAll('.act-row').forEach(row => {
+      row.style.display = (f === 'all' || row.dataset.status === f) ? '' : 'none';
+    });
+  }));
+</script>
+</body>
+</html>
