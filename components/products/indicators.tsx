@@ -68,8 +68,8 @@
  * surface bleue, `p-6`. `BlockHeader`, si — la maquette remplace la ligne
  * « titre + note + menu » par un **surtitre** de 12 pixels en capitales et un
  * kebab posé en absolu au coin. Ce bloc porte donc désormais un langage
- * d'en-tête que « Accompagnements en cours » et « Tous les accompagnements » ne
- * partagent pas : **c'est un écart assumé**, arbitré le 18/08/2026, consigné
+ * d'en-tête que les autres blocs de la page ne partagent pas : **c'est un écart
+ * assumé**, arbitré le 18/08/2026, consigné
  * dans `JOURNAL-TECHNIQUE.md`. Il défait pour ce bloc seul l'unification du
  * 17/08.
  *
@@ -274,7 +274,14 @@ export function Indicators({
       <div className="relative">
         {visionHref || designate ? (
           <div className="absolute right-0 top-0 z-10">
-            <ActionMenu label="Options du bloc de la vision produit">
+            <ActionMenu
+              /* Le rang discret, comme celui d'« Utilisateurs et usages » :
+                 c'est le rang des gestes en haut à droite d'un bloc
+                 (21/08/2026). Sur la surface bleue, les trois points tiennent
+                 15,14:1 — mesuré, pas supposé. */
+              variant="tertiary"
+              label="Options du bloc de la vision produit"
+            >
               {/* **Le geste de la vision en tête**, avant les désignations :
                   c'est l'ordre de lecture du bloc, et un menu qui rangerait le
                   premier rang après le second se lirait à l'envers. */}

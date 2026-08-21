@@ -2,7 +2,7 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 21/08/2026 — Administration : le référentiel des entités, hors ticket.
+**Dernière mise à jour :** 21/08/2026 — La page produit : hiérarchie, regroupement, second rang effacé, hors ticket.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
 **Ticket suivant :** **T5bis.7** — la sélection d'équipe du formulaire de projet, refondue
 (`tickets-C5bis.md`).
@@ -330,6 +330,39 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   archivable sans être supprimable. Sa leçon est dans un `catch` : **une clé `restrict` rend `23001`
   et non `23503`**, et Drizzle enveloppe l'erreur du pilote dans un `DrizzleQueryError` sans `code` —
   un `catch` sur un code d'erreur est du code que seul le test qui le provoque met en défaut.
+
+- **Un seul bloc d'accompagnements sur la page produit — hors ticket, le 21/08/2026.**
+  « Accompagnements en cours » et « Tous les accompagnements » lisaient le même tableau, dans le même
+  ordre, vers la même destination de clic : le doublon, assumé depuis T5.5, est refermé. Le second
+  disparaît, le premier perd « en cours » de son titre et reçoit ce qui n'existait que là —
+  **l'objectif et l'équipe** sur chaque ligne (colonne de 280 à 352 px, filets d'axe suivis),
+  une section **« Sans date »** hors du filtre, et l'état vide qui porte le geste (`addHref`, idiome
+  de `Personas`). Le filtre d'échelle passe **côté client** : les préréglages étaient des liens vers
+  `?de=&a=`, donc une navigation — l'URL changeait, le défilement repartait en haut. Le serveur rend
+  désormais **une frise par préréglage** et `ScaleSwitch` monte la bonne, si bien que le calcul reste
+  entier dans `lib/queries/timeline.ts` : **960 tests passent sans qu'une ligne de test bouge**, ce
+  qui est la preuve que rien n'a changé de place. `de`, `a`, `productRoadmapWindow` et le formulaire
+  « De / à » disparaissent avec l'URL qu'ils écrivaient. Sa leçon : **une frise pré-rendue par
+  fenêtre coûte une charge RSC, jamais un DOM** — c'est ce qui évite d'embarquer le schéma de la base
+  dans le paquet du navigateur pour un `useState`.
+
+- **La page produit : hiérarchie, regroupement, second rang effacé — hors ticket, le 21/08/2026.**
+  Quatre gestes dans la foulée du bloc unique d'accompagnements, le même jour. **« Accompagnements »
+  remonte** juste sous « Vision produit » — ce qu'on fait sur ce produit se lit avant ce que le
+  produit est — et **rend les avatars d'équipe** reçus le matin : trop de place pour ce qu'ils
+  disaient. **« Personae » et « Use Cases » fusionnent** en « Utilisateurs et usages », deux rangs à
+  intertitre dans une seule carte : la distinction reste entière, le nombre de cartes tombe de
+  quatre à trois. Les deux composants perdent leur coquille et deviennent `PersonasRank` /
+  `UseCasesRank` ; **leurs états vides passent d'`EmptyState` à `BlockNote`**, ce qui est le critère
+  déjà écrit dans `empty-state.tsx` — un rang qui a son intertitre n'a pas de titre à redonner à son
+  quart vide — et évite au passage deux `h3` empilés. Les deux « Ajouter » entrent dans **un seul
+  menu ⋮** en haut du bloc, au rang **tertiaire**, comme celui de « Vision produit » : c'est le rang
+  des gestes de bloc, arbitré ce jour. En en-tête de page, **« Modifier ce produit » et « Archiver »
+  entrent dans un kebab `secondary`** — la forme de la page projet —, et « Nouvel accompagnement »
+  reste seul visible. Sa leçon : **un menu ne rend ses entrées qu'ouvert**, donc un geste qui n'existe
+  que là est invisible au `curl` ; c'est le bouton et son `aria-label` qui se lisent dans le HTML
+  servi, et le second chemin — le lien inline du paragraphe d'absence — qui garde le geste
+  atteignable sans JavaScript.
 
 ---
 

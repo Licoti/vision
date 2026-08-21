@@ -1,10 +1,16 @@
 /**
- * Le bloc « Personae » de la page produit — **pour qui** ce produit est conçu
- * (18/08/2026).
+ * Le rang « Personae » — **pour qui** ce produit est conçu (18/08/2026).
+ *
+ * **Ce n'est plus un bloc depuis le 21/08/2026** : c'est le premier des deux
+ * rangs d'« Utilisateurs et usages » (`audience.tsx`), avec « Use Cases ». Les
+ * deux répondaient à la même question sous deux titres, et deux cartes posées
+ * l'une sous l'autre repoussaient les accompagnements hors de l'écran. La
+ * distinction reste entière — un intertitre, une grille de cartes qui n'a pas
+ * changé —, elle a seulement cessé d'être une carte de plus.
  *
  * Il complète le bloc de tête : « Vision produit » dit pourquoi le produit
- * existe et ce qu'il mesure, celui-ci dit à qui il s'adresse. Les deux blocs
- * d'accompagnements, dessous, disent ce qu'on a fait.
+ * existe et ce qu'il mesure, celui-ci dit à qui il s'adresse. Le bloc
+ * « Accompagnements », entre les deux, dit ce qu'on a fait.
  *
  * **Un persona n'est pas un contenu éditorial**, et le bloc ne le rend pas comme
  * tel : c'est un référentiel rattaché au produit, dont chaque ligne porte un
@@ -22,6 +28,10 @@
  * point d'entrée absent du rendu ne protège rien : les trois actions redérivent
  * le droit sur les identifiants reçus.
  *
+ * **Son geste d'ajout vit dans le menu du bloc** depuis la fusion : un rang ne
+ * porte pas d'en-tête, donc pas d'action d'en-tête. Le paragraphe d'absence le
+ * reprend en lien inline — c'est le seul endroit où ce rang l'écrit.
+ *
  * **Aucun décompte de complétude, aucune couverture, aucune jauge** : un persona
  * ne se note pas, et D39 interdit tout indice calculé par Vision pour qualifier
  * un produit.
@@ -31,12 +41,12 @@ import { DrawerLink } from "@/components/ui/drawer";
 
 import { ACTION_LINK } from "@/components/ui/action-link";
 import { Avatar } from "@/components/ui/avatar";
-import { Block, BlockHeader } from "@/components/ui/block";
-import { EmptyState } from "@/components/ui/empty-state";
+import { BlockDivider } from "@/components/ui/block";
+import { BlockNote } from "@/components/ui/empty-state";
 import { Tag } from "@/components/ui/tag";
 import type { ProductPersona } from "@/lib/queries/personas";
 
-export function Personas({
+export function PersonasRank({
   personas,
   detailHref,
   addHref,
@@ -49,21 +59,15 @@ export function Personas({
   addHref: string | null;
 }) {
   return (
-    <Block>
-      <BlockHeader
+    <div className="flex flex-col gap-4">
+      {/* L'intertitre du bloc partagé, et le seul endroit où ce rang se nomme.
+          Son filet est celui de la tonalité neutre : sur la surface bleue de
+          « Vision produit » ce n'en serait pas le bon, et un séparateur qui ne
+          suivrait pas sa carte se verrait. */}
+      <BlockDivider
         title="Personae"
         note="Les profils pour lesquels ce produit est conçu."
-        action={
-          addHref && personas.length > 0 ? (
-            <DrawerLink
-              href={addHref}
-              request={{ kind: "persona" }}
-              className={ACTION_LINK}
-            >
-              Ajouter un persona
-            </DrawerLink>
-          ) : null
-        }
+        rule="bg-surface-neutral-lighter"
       />
 
       {personas.length > 0 ? (
@@ -78,30 +82,33 @@ export function Personas({
           ))}
         </ul>
       ) : (
-        /* Un `EmptyState` et non un paragraphe : c'est un bloc de pleine
-           largeur qui porte un **geste**, comme « Tous les accompagnements ».
-           Il dit ce que le bloc contiendra et propose l'action (règle 5) ; il
-           ne s'excuse pas et ne reproche rien. */
-        <EmptyState
-          level={3}
-          title="Aucun persona pour l'instant"
-          description="Ce bloc réunira les profils pour lesquels ce produit est conçu — leur rôle, ce qu'ils cherchent à faire, ce qui les bloque et ce qu'ils attendent. C'est ce référentiel qui permettra de dire, demain, pour quel persona telle décision a été prise."
-          {...(addHref
-            ? {
-                action: (
-                  <DrawerLink
-                    href={addHref}
-                    request={{ kind: "persona" }}
-                    className={ACTION_LINK}
-                  >
-                    Ajouter un persona
-                  </DrawerLink>
-                ),
-              }
-            : {})}
-        />
+        /* **Un paragraphe et non un `EmptyState`**, depuis la fusion — et c'est
+           le critère écrit dans `empty-state.tsx` : un rang qui a son
+           intertitre n'a pas de titre à redonner à son quart vide. Il en va de
+           la hiérarchie des titres autant que du dessin : le `h3` d'un
+           `EmptyState` suivrait ici le `h3` de l'intertitre.
+
+           Le geste est dans le menu du bloc ; le lien inline est le second
+           chemin, celui d'`indicators.tsx` pour la vision absente. */
+        <BlockNote>
+          Aucun persona pour l&apos;instant. Ce rang réunira les profils pour
+          lesquels ce produit est conçu — leur rôle, ce qu&apos;ils cherchent à
+          faire, ce qui les bloque et ce qu&apos;ils attendent.
+          {addHref ? (
+            <>
+              {" "}
+              <DrawerLink
+                href={addHref}
+                request={{ kind: "persona" }}
+                className={ACTION_LINK}
+              >
+                Ajouter un persona
+              </DrawerLink>
+            </>
+          ) : null}
+        </BlockNote>
       )}
-    </Block>
+    </div>
   );
 }
 

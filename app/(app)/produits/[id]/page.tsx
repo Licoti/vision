@@ -23,7 +23,9 @@
  *
  * **« Modifier ce produit », « Archiver » et « Nouvel accompagnement »
  * n'apparaissent qu'au responsable de domaine** (F1-D1, D9) : les actions sont
- * absentes du rendu pour tout autre, pas grisées.
+ * absentes du rendu pour tout autre, pas grisées. **Les deux premières vivent
+ * dans un menu ⋮ depuis le 21/08/2026** — trois boutons alignés donnaient trois
+ * gestes de même poids, et un seul est celui qu'on vient faire.
  *
  * **Un produit archivé garde sa page** (règle 4, T4bis.2) : elle reste servie
  * entière, mention datée en tête, et ce sont ses actions d'écriture qui
@@ -83,20 +85,19 @@ import { notFound } from "next/navigation";
 
 import { archiveIndicator, setNorthStar } from "./actions";
 import { restoreProduct } from "../actions";
+import { Audience } from "@/components/products/audience";
 import { Indicators } from "@/components/products/indicators";
-import { Personas } from "@/components/products/personas";
-import { UseCases } from "@/components/products/use-cases";
 import { Roadmap } from "@/components/products/roadmap";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
+import {
+  ActionMenu,
+  MENU_ITEM,
+  MENU_ITEM_DANGER,
+} from "@/components/ui/action-menu";
 import { Button, buttonClass } from "@/components/ui/button";
 import { DrawerHost, DrawerLink } from "@/components/ui/drawer";
 import { ArchivedNotice } from "@/components/ui/archived-notice";
-import { AvatarGroup } from "@/components/ui/avatar";
-import { Block, BlockHeader } from "@/components/ui/block";
-import { EmptyState } from "@/components/ui/empty-state";
-import { List, ListRow } from "@/components/ui/list";
 import { Page, PageHeader } from "@/components/ui/page";
-import { StatusPill } from "@/components/ui/status-pill";
 import { loadProductDrawer } from "./drawers";
 import { requireSession } from "@/lib/auth/provider";
 import {
@@ -104,7 +105,7 @@ import {
   PRODUCT_PANEL_PARAMS,
   resolveProductDrawer,
 } from "@/lib/drawers/product";
-import { formatAccompaniments, formatPeriod } from "@/lib/format";
+import { formatAccompaniments } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
 import {
   listProductAdoptions,
@@ -169,13 +170,6 @@ export default async function ProductPage({
      * tiennent déjà.
      */
     scenario?: string;
-    /**
-     * Les deux bornes de la fenêtre de la roadmap. **Elles ne rejoignent pas le
-     * décompte d'exclusivité** des trois clés au-dessus : elles n'ouvrent aucun
-     * panneau, et leur absence est l'état sans filtre plutôt qu'une fermeture.
-     */
-    de?: string;
-    a?: string;
   }>;
 }) {
   const { id } = await params;
@@ -245,8 +239,6 @@ export default async function ProductPage({
     fiche,
     usecase,
     scenario,
-    de,
-    a,
   } = await searchParams;
 
   /* **L'URL reste une adresse, elle n'est plus le mécanisme** (TD.2). Coller
@@ -260,9 +252,9 @@ export default async function ProductPage({
      structurelle — l'état ne porte qu'une demande à la fois, et deux
      `role="dialog"` concurrents ne sont plus représentables.
 
-     **`de` et `a` n'y entrent pas**, et le décompte les ignore comme avant : ce
-     ne sont pas des clés d'ouverture, et les faire compter fermerait un panneau
-     chaque fois que la roadmap est filtrée. */
+     **La fenêtre de la roadmap n'est plus une clé d'URL** (21/08/2026) : elle
+     n'a donc plus à être tenue hors du décompte, et filtrer ne ferme plus un
+     panneau ouvert — c'est un `useState`, pas une navigation. */
   const keys = {
     archiver,
     indicateur,
@@ -337,20 +329,35 @@ export default async function ProductPage({
                   </form>
                 ) : (
                   <>
-                    <Link
-                      href={ROUTES.productEdit(product.id)}
-                      className={buttonClass({ variant: "secondary" })}
-                    >
-                      Modifier ce produit
-                    </Link>
-                    <DrawerLink
-                      href={ROUTES.productArchive(product.id)}
-                      request={{ kind: "archive" }}
-                      className={buttonClass({ variant: "secondary" })}
-                    >
-                      Archiver
-                    </DrawerLink>
                     <NewProjectLink productId={product.id} />
+                    {/* **Les deux gestes de second rang passent au menu**
+                        (21/08/2026) : trois boutons alignés donnaient trois
+                        gestes de même poids, alors qu'un seul est celui qu'on
+                        vient faire. La forme est celle de l'en-tête de la page
+                        projet — rang `secondary` ici, le tertiaire étant celui
+                        des gestes **de bloc**, et « Archiver » en
+                        `MENU_ITEM_DANGER` parce qu'il retire de la vue.
+
+                        Ce n'est pas ce menu qui protège : `updateProduct` et
+                        l'archivage redérivent le droit sur le produit
+                        **reçu**. */}
+                    <ActionMenu label={`Options du produit ${product.name}`}>
+                      <Link
+                        href={ROUTES.productEdit(product.id)}
+                        role="menuitem"
+                        className={MENU_ITEM}
+                      >
+                        Modifier ce produit
+                      </Link>
+                      <DrawerLink
+                        href={ROUTES.productArchive(product.id)}
+                        request={{ kind: "archive" }}
+                        role="menuitem"
+                        className={MENU_ITEM_DANGER}
+                      >
+                        Archiver ce produit
+                      </DrawerLink>
+                    </ActionMenu>
                   </>
                 )}
               </span>
@@ -419,146 +426,76 @@ export default async function ProductPage({
             canWriteIndicators ? setNorthStar.bind(null, product.id) : null
           }
         />
-        {/* **Le troisième bloc de la page** (18/08/2026) : « Vision produit »
-              dit pourquoi ce produit existe et ce qu'il mesure, celui-ci dit
-              **pour qui**. Il vient juste après, avant les accompagnements :
-              c'est la question qu'on se pose en concevant, pas ce qu'on a fait.
+        {/* **Le deuxième bloc de la page** depuis le 21/08/2026, et il a
+              **remonté de deux rangs** : ce qu'on fait sur ce produit se lit
+              avant ce que le produit est. C'est aussi le seul à porter les
+              accompagnements — « Tous les accompagnements », qui le suivait,
+              lisait le même tableau dans le même ordre vers la même destination
+              de clic, et ce qui n'existait que là est versé dedans : l'objectif
+              sur chaque ligne, les accompagnements sans date, et l'état vide qui
+              porte le geste. **Les avatars d'équipe en sont repartis le jour
+              même** — trop de place pour ce qu'ils disaient.
 
-              Le bloc se lit par tout le domaine (D9) — d'où le lien de fiche,
-              jamais nul. Son seul point d'entrée d'écriture tombe avec
-              `canWriteIndicators` : **le même droit que les indicateurs**,
-              dérivé des accompagnements du produit, et la lecture seule d'un
-              produit archivé avec lui. Ce n'est pas ce rendu qui protège — les
-              trois actions redérivent le droit sur les identifiants reçus. */}
-        <Personas
-          personas={productPersonas}
-          detailHref={(personaId) =>
-            ROUTES.productPersona(product.id, personaId)
-          }
+              Il ne connaît aucun droit pour ce qu'il montre — il se lit par
+              tout le domaine (D9), sur un produit vivant comme archivé — et
+              n'ouvre qu'un point d'entrée d'écriture, celui de son état vide.
+
+              **Sa fenêtre n'est plus dans l'URL** : filtrer était une
+              navigation, ce qui remontait en haut de la page et changeait
+              l'adresse. C'est désormais un `useState` dans `ScaleSwitch`, et
+              les frises qu'il monte sont rendues ici, sur le serveur. */}
+        <Roadmap
+          projects={projects}
+          milestones={milestones}
+          /* **Le seul point d'entrée d'écriture du bloc**, celui de son état
+               vide, et il tombe avec les deux mêmes conditions que « Nouvel
+               accompagnement » de l'en-tête (F1-D1, D9, règle 4). Ce n'est pas
+               ce rendu qui protège : le formulaire de création redérive le
+               droit sur le produit reçu. */
           addHref={
-            canWriteIndicators ? ROUTES.productPersonaNew(product.id) : null
+            session.can.manageDomain && !archived
+              ? ROUTES.projectNewForProduct(product.id)
+              : null
           }
         />
 
-        {/* **Le quatrième bloc de la page** (19/08/2026), sous « Personae » et
-              avant les accompagnements. « Vision produit » dit pourquoi ce
-              produit existe et ce qu'il mesure, « Personae » dit pour qui,
-              celui-ci dit **comment il est construit** — les grands scénarios
-              qui le structurent. C'est le niveau de lecture du milieu,
-              `Personae → Use Cases → Features`, dont les deux premiers rangs
-              existent.
+        {/* **Le dernier bloc de la page**, né le 21/08/2026 de la fusion de
+              « Personae » et de « Use Cases ». Les deux répondaient à la même
+              question sous deux titres — pour qui ce produit est conçu, et ce
+              qu'on vient y faire —, et deux cartes de pleine largeur posées
+              l'une sous l'autre repoussaient les accompagnements hors de
+              l'écran. La distinction reste entière à l'intérieur : deux rangs,
+              deux intertitres, deux dessins.
 
-              Il **reçoit les personae que le bloc voisin affiche déjà**, plutôt
-              que de les relire : le rattachement arrive en identifiants, et
-              c'est le bloc qui leur rend des noms. Aucune lecture par carte —
-              la discipline de la page depuis T5.5.
+              Il **ne demande aucune lecture neuve** : ce sont les deux mêmes
+              collections qu'avant, et les personae y servent deux fois — les
+              cartes du premier rang, et les pastilles du second, qui reçoit les
+              identifiants et leur rend des noms. Aucune lecture par carte, la
+              discipline de la page depuis T5.5.
 
-              Le bloc se lit par tout le domaine (D9) — d'où le lien de fiche,
-              jamais nul. Son seul point d'entrée d'écriture tombe avec
-              `canWriteIndicators` : **le même droit que les indicateurs et les
-              personae**, dérivé des accompagnements du produit, et la lecture
-              seule d'un produit archivé avec lui. Ce n'est pas ce rendu qui
-              protège — les trois actions redérivent le droit sur les
-              identifiants reçus. */}
-        <UseCases
-          useCases={productUseCases}
+              Le bloc se lit par tout le domaine (D9) — d'où les deux liens de
+              fiche, jamais nuls. Ses deux points d'entrée d'écriture tombent
+              avec `canWriteIndicators` : **le même droit que les indicateurs**,
+              dérivé des accompagnements du produit, et la lecture seule d'un
+              produit archivé avec lui. Ce n'est pas ce rendu qui protège — les
+              actions redérivent le droit sur les identifiants reçus. */}
+        <Audience
           personas={productPersonas}
-          detailHref={(useCaseId) =>
+          useCases={productUseCases}
+          personaHref={(personaId) =>
+            ROUTES.productPersona(product.id, personaId)
+          }
+          useCaseHref={(useCaseId) =>
             ROUTES.productUseCase(product.id, useCaseId)
           }
-          addHref={
+          addPersonaHref={
+            canWriteIndicators ? ROUTES.productPersonaNew(product.id) : null
+          }
+          addUseCaseHref={
             canWriteIndicators ? ROUTES.productUseCaseNew(product.id) : null
           }
         />
 
-        {/* **Le deuxième bloc de la page** (18/08/2026), sous le nom
-              « Accompagnements en cours ». Il ferme la position qu'il occupait
-              la veille et retrouve celle de `docs/06` §6 — « au-dessus de la
-              liste des accompagnements, sans la déplacer ». L'écart qui reste
-              au document n'est plus l'ordre mais **le nom et la fenêtre** :
-              le bloc s'ouvre sur l'année en cours, janvier à décembre, et la
-              liste ci-dessous porte l'histoire entière.
-
-              Elle ne connaît aucun droit — elle se lit par tout le domaine (D9),
-              sur un produit vivant comme archivé — et n'ouvre aucun point
-              d'entrée d'écriture. `de` et `a` sont des paramètres de **lecture**,
-              et `timelineWindow` est la seule porte par où ils entrent. */}
-        <Roadmap
-          productId={product.id}
-          projects={projects}
-          milestones={milestones}
-          from={de}
-          to={a}
-        />
-
-        {/* **Le dernier bloc de la page** (18/08/2026), sous le nom « Tous
-              les accompagnements » : le bloc au-dessus cadre l'année en cours,
-              celui-ci porte l'histoire entière, du plus récent au plus ancien.
-              C'est ce couple qui répond à la question de l'écran — ce qu'on
-              fait en ce moment, et ce qu'on a fait.
-
-              **Sa liste est à fond perdu** : la carte est celle du bloc, et
-              une liste qui gardait la sienne faisait une carte dans une carte.
-              Il ne reste que les lignes, leurs filets et leur rythme — ceux
-              des lignes de la frise juste au-dessus, ce qui était le but.
-
-              L'état vide garde son `EmptyState`, à la différence des deux
-              autres blocs qui rendent un paragraphe : c'est le seul des trois
-              qui porte un **geste**, et `EmptyState` est ce qui le place
-              (règle 5). */}
-        <Block>
-          <BlockHeader
-            title="Tous les accompagnements"
-            note="Les accompagnements de ce produit, du plus récent au plus ancien."
-          />
-
-          {projects.length > 0 ? (
-            <List flush label="Tous les accompagnements de ce produit">
-              {projects.map((project) => (
-                <ListRow
-                  key={project.id}
-                  flush
-                  href={ROUTES.project(project.id)}
-                >
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <span className="flex flex-wrap items-center gap-2 text-xs">
-                      <StatusPill
-                        nature={project.statusNature}
-                        label={project.statusLabel}
-                      />
-                      <span className="text-content-neutral-base">
-                        {formatPeriod(project.startedOn, project.expectedEndOn)}
-                      </span>
-                    </span>
-
-                    <span className="text-md font-semibold text-content-neutral-darkest">
-                      {project.name}
-                    </span>
-
-                    {project.objective ? (
-                      <span className="max-w-160 text-sm text-content-neutral-base">
-                        {project.objective}
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <AvatarGroup
-                    names={project.team.map((member) => member.fullName)}
-                  />
-                </ListRow>
-              ))}
-            </List>
-          ) : (
-            <EmptyState
-              level={3}
-              title="Aucun accompagnement pour l'instant"
-              description="Les accompagnements de ce produit s'afficheront ici, du plus récent au plus ancien, chacun avec sa période, son statut, son objectif et son équipe."
-              {...(session.can.manageDomain && !archived
-                ? { action: <NewProjectLink productId={product.id} /> }
-                : {})}
-            />
-          )}
-        </Block>
       </Page>
     </DrawerHost>
   );

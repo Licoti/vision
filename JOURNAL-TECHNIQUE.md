@@ -5904,3 +5904,175 @@ l'amorçage qui recrée par clé naturelle, dont la destination était « écran
 référentiels (D25, C7) ». Il ne se referme **qu'à moitié pour les outils** : c'est `entities` qui a
 son écran, pas `tools`, et les deux lignes « Everyone » / « Audit d'accessibilité » de la base de
 développement restent. Le point est donc **récrit** plutôt que sorti.
+
+---
+
+## Un seul bloc d'accompagnements sur la page produit — hors ticket, 21/08/2026
+
+**La demande.** « Le bloc "Tous les accompagnements" fait redondance avec le bloc "Accompagnements
+en cours". On pourrait le retirer. Et lorsqu'on filtre, on évite de remonter en haut de la page, il
+faut que ce soit fluide, et pas de changement d'URL — c'est juste un simple filtre. »
+
+### Le doublon était écrit dans le code, pas seulement à l'écran
+
+Les deux blocs recevaient **le même tableau**, issu d'un seul `listProductProjects` : même ordre,
+même destination de clic, aucune lecture de plus d'un côté que de l'autre. Le code le disait déjà —
+« son équivalent textuel » (`page.tsx`), « au-dessus de la liste, sans la déplacer » (`roadmap.tsx`),
+et l'état vide de la frise **renvoyait au bloc du bas**. Trois choses n'existaient pourtant que là :
+l'objectif, l'équipe, et **l'exhaustivité** — un accompagnement sans date n'a pas de barre, et un
+accompagnement hors fenêtre est écarté. Retirer le bloc sans les verser aurait fait disparaître des
+accompagnements de la page.
+
+### Le piège : un `useState` aurait embarqué le schéma de la base
+
+`lib/queries/timeline.ts` porte **à la fois** la lecture des repères (`drizzle-orm`,
+`@/lib/db/schema`) et toute la géométrie (`monthBand`, `monthTicks`, `windowYears`…). Passer
+`roadmap.tsx` en `"use client"` pour un `useState` aurait tiré ce module — donc le schéma — dans le
+paquet du navigateur, ou imposé de scinder un module documenté et couvert par 
+`timeline.test.ts`.
+
+**Le serveur rend une frise par préréglage ; le client monte la bonne.** `ScaleSwitch` reçoit
+`{ key, label, view }[]` où `view` est un `ReactNode` **déjà rendu sur le serveur**, et ne fait rien
+d'autre que `useState`. Les positions continuent donc de venir de `lib/queries/timeline.ts`, au
+rendu serveur, et **les 960 tests passent sans qu'une ligne de test bouge** — c'est la preuve que le
+calcul n'a pas changé de place, et elle vaut mieux qu'une affirmation.
+
+**Le coût est une charge RSC, jamais un DOM.** Les N vues sont sérialisées dans la charge de la
+page ; une seule est montée. Sur le produit à deux millésimes de la base de développement, la vue
+inactive se lit dans la charge avec ses propres graduations et sa propre note « Aucun accompagnement
+sur cette période » — vérifié dans le HTML servi. C'est l'arbitrage assumé : quelques kilooctets
+contre le schéma de la base et un module scindé.
+
+### L'URL cesse d'être l'adresse de la fenêtre, et pas seulement son mécanisme
+
+TD.2 avait gardé l'URL comme **adresse** des panneaux en n'en retirant que le mécanisme. Ici la
+demande dit « c'est juste un simple filtre » : `de`, `a`, `ROUTES.productRoadmapWindow`,
+`ROADMAP_FROM_PARAM`, `ROADMAP_TO_PARAM` et le formulaire GET « De / à » (masqué depuis le
+18/08/2026) partent ensemble. `?de=2025-01&a=2025-12` rend toujours **200** : le paramètre n'existe
+plus, il n'est pas une erreur.
+
+`timelineWindow` et `windowMonths` **restent** dans le module, sans appelant applicatif : ce sont
+des outils éprouvés par des tests, et les retirer aurait été du travail hors demande (règle 3).
+Dette assumée, et notée ici pour qu'elle ne se redécouvre pas.
+
+**Des boutons, et non plus des liens.** La raison qui imposait le lien — « ils mènent à une autre
+URL de la même page » — tombe avec l'URL, et un lien sans destination serait un bouton déguisé que
+l'assistance annoncerait comme une navigation. `aria-pressed` remplace `aria-current`.
+
+### Ce qui a été mesuré et lu, plutôt qu'affirmé
+
+- **Le critère se lit dans le HTML servi.** « Tous les accompagnements » : **0 occurrence** sur les
+  trois produits. Un seul `<h2>Accompagnements</h2>` par page. L'objectif, la période et les noms
+  d'équipe (`sr-only` d'`AvatarGroup`) se lisent **dans la ligne de la frise**. Le groupe de
+  préréglages porte `aria-pressed="true"` sur un seul bouton. La mention des masqués se lit sur le
+  produit qui en a.
+- **La section « Sans date » a été éprouvée sur une donnée créée pour elle.** La base de
+  développement n'avait aucun accompagnement sans date : un a été inséré par un script jetable
+  passant par `forDomain` (règle 1), le HTML lu — intertitre, décompte « 1 accompagnement », ligne
+  sans période —, puis **la ligne effacée et le décompte de la table revérifié à 10**. Le script
+  n'entre pas dans le dépôt.
+- **Le droit s'éprouve par l'action, pas par l'écran.** L'état vide et son geste ont été lus sur un
+  **produit sans accompagnement créé pour l'occasion**, puis effacé : « Nouvel accompagnement »
+  paraît deux fois pour le responsable de domaine (en-tête et état vide) et **zéro fois** pour deux
+  autres personnes. Le point d'entrée tombe avec la **même expression** que celui de l'en-tête, et
+  ce n'est pas ce rendu qui protège — le formulaire de création redérive le droit sur le produit
+  reçu.
+- **Le contraste se mesure.** Sur `surface-neutral-pale` : l'objectif (`content-neutral-base`)
+  **4,98:1**, le nom (`content-neutral-darkest`) 17,87:1, le décompte « Sans date »
+  (`content-neutral-dark`) 8,12:1 ; sur `surface-neutral-lightest`, le préréglage inactif
+  (`content-neutral-dark`) **7,72:1**. Aucun couple n'est neuf — les deux blocs étaient en
+  `tone="neutral"`, donc sur la même surface —, ils sont mesurés quand même.
+- **La colonne et l'axe bougent ensemble.** `w-88` et `left-94` sont deux constantes voisines
+  (`IDENTITY_WIDTH`, `AXIS_LEFT`) : 352 + 24 de `gap-6` = 376. Les changer séparément décrocherait
+  les graduations des barres. Les trois classes neuves — `w-88`, `left-94`, `line-clamp-2` — ont été
+  **relues dans la feuille servie**, pas supposées présentes.
+- **La suite est verte** : **960 tests, 33 fichiers**, `npm run lint --max-warnings=0` et
+  `tsc --noEmit` sans une ligne.
+
+### `ETAT.md` passe de 661 à 676 lignes
+
+Le seuil de 250 reste franchi et attend la session de découpage de C6 — c'est le seul moment où le
+fichier se balaie. Rien ne se referme ici : aucune ligne de « Points ouverts » ne portait ce
+doublon, ce qui est en soi une observation — **la page produit a été récrite six fois hors ticket
+depuis le 17/08/2026**, et ses écarts ne passent pas par la liste des points ouverts.
+
+---
+
+## La page produit : hiérarchie, regroupement, second rang effacé — hors ticket, 21/08/2026
+
+**La demande.** Quatre ajustements, dans la foulée du bloc unique d'accompagnements du même jour :
+remonter « Accompagnements » sous « Vision produit » et lui retirer ses avatars ; fusionner
+« Personae » et « Use Cases » en gardant la distinction visible ; passer les gestes d'en-tête de bloc
+au rang tertiaire ; sortir « Archiver » de la barre d'en-tête vers un menu ⋮.
+
+### La fusion ne pouvait pas être une enveloppe
+
+Deux `Block` ne se glissent pas dans un troisième : chacun portait sa coquille, son `BlockHeader` et
+son action d'en-tête. `Personas` et `UseCases` ont donc **perdu leur coquille** pour devenir
+`PersonasRank` et `UseCasesRank` — un `BlockDivider`, puis leur contenu inchangé : la **grille** pour
+les personae, la **ligne défilante** pour les use cases. C'est cette différence de dessin qui fait la
+distinction à l'intérieur du bloc, et non un trait de séparation ; le retrait négatif `-m-1 … p-1` de
+la ligne défilante est resté, sans quoi le liseré de focus d'une carte serait rogné par
+l'`overflow-y: auto` que le navigateur calcule tout seul.
+
+**Un rang n'a pas d'en-tête, donc pas d'action d'en-tête.** Les deux « Ajouter » sont remontés dans
+un `ActionMenu` unique en haut du bloc. Le menu ne se rend pas du tout quand les deux `addHref` sont
+nuls — un kebab qui n'ouvrirait rien est un bouton qui ment —, et les deux conditions restent
+séparées à l'intérieur, pour le jour où les deux droits divergeront.
+
+### L'état vide change de forme, et le critère existait déjà
+
+Les deux rangs rendaient un `EmptyState`. Dans un bloc partagé, son `h3` suivrait le `h3` de
+l'intertitre — deux titres pour une même absence. Le critère est écrit noir sur blanc dans
+`empty-state.tsx` depuis l'audit du 18/08/2026 : « un bloc **déjà rempli par ailleurs** n'a pas de
+titre à redonner à son quart vide : il prend `BlockNote` ». La fusion n'a donc rien inventé, elle a
+fait basculer les deux rangs du bon côté d'une règle qui les attendait. **Le geste survit à la
+bascule** par le lien inline du paragraphe — le motif d'`indicators.tsx` pour la vision absente —, ce
+qui lui donne un second chemin quand le menu, lui, demande du JavaScript.
+
+### Le piège du `curl` : un menu ne rend ses entrées qu'ouvert
+
+`ActionMenu` monte ses enfants sous `{open ? … : null}`. « Archiver ce produit » et les deux
+« Ajouter » sont donc **absents du HTML servi** — un `grep` sur leur libellé rend zéro, et le lire
+comme « le geste a disparu » serait une erreur de méthode. Ce qui se lit dans le HTML, c'est le
+**bouton** : son `aria-label`, son `aria-haspopup="menu"`, son `aria-expanded="false"`, et sa classe,
+qui dit son rang. C'est sur cela que la vérification a porté.
+
+Conséquence assumée, déjà consignée pour `ActionMenu` : sans JavaScript, ces gestes ne s'atteignent
+pas. Ils n'ont pas de repli — sauf les deux « Ajouter », dont le paragraphe d'absence garde un lien.
+
+### Ce qui a été mesuré et lu, plutôt qu'affirmé
+
+- **Le critère se lit dans le HTML servi.** Trois `<section>` au lieu de quatre, dans l'ordre
+  « Vision produit », « Accompagnements », « Utilisateurs et usages ». « Personae » et « Use Cases »
+  sont deux `<h3>` **dans la même section**, chacun suivi de son dessin propre — `grid gap-4
+  sm:grid-cols-2` d'un côté, `-m-1 flex … overflow-x-auto p-1 pb-3` de l'autre, vérifiés présents sur
+  les produits qui en portent. **Zéro `sr-only` « Équipe : »** dans les lignes de la frise.
+- **Le rang de chaque kebab se lit dans sa classe**, et les trois sont ceux voulus :
+  `border-content-neutral-normal` (secondary) pour « Options du produit », `border-transparent
+  text-content-primary-dark` (tertiary) pour « Options du bloc de la vision produit » et pour
+  « Options du bloc "Utilisateurs et usages" ». Le kebab des **cartes** d'indicateur ne change pas :
+  il n'est pas en haut d'un bloc.
+- **Le droit s'éprouve par l'action, pas par l'écran.** Sous le cookie d'un membre non responsable et
+  non contributeur de ce produit : aucun kebab de produit, aucun kebab de bloc, pas de « Nouvel
+  accompagnement », et `/produits/<id>/modifier` rend **404**. Sous celui du responsable : les quatre
+  kebabs et le bouton. **Une observation à ne pas confondre** — ce même membre voit le kebab d'une
+  **carte** d'indicateur : il porte « Gérer les relevés », que D9 ouvre à tout le domaine. Le menu
+  n'est pas un indice de droit d'écriture, et le prendre pour tel aurait fait conclure à une fuite.
+- **Le contraste se mesure**, et le couple neuf par la position est le kebab tertiaire sur la surface
+  **bleue** : les trois points (`surface-primary-dark`) sur `surface-primary-lightest` tiennent
+  **15,14:1**, très au-dessus des 3:1 d'un élément d'interface. Sur la carte pâle, 15,72:1.
+  L'intertitre, sa note et le paragraphe d'absence (`content-neutral-dark`) : 8,12:1 ; le lien inline
+  (`content-primary-dark`) : 15,72:1. **Le survol du tertiaire ne se détache qu'à 1,20:1** de la
+  surface bleue — c'est la valeur déjà consignée pour ce rang sur la carte pâle (1,24:1), aucun seuil
+  WCAG ne porte sur un survol, et le fait est rapporté plutôt que masqué.
+- **La suite est verte** : **960 tests, 33 fichiers**, `npm run lint --max-warnings=0` et
+  `tsc --noEmit` sans une ligne. Aucun test n'a bougé : aucune règle métier n'est touchée, c'est une
+  page qui se réorganise.
+
+### `ETAT.md` passe de 676 à 694 lignes
+
+Le seuil de 250 reste franchi et attend la session de découpage de C6. Rien ne se referme ici. **La
+page produit en est à sa huitième reprise hors ticket depuis le 17/08/2026**, et c'est un fait qui
+mérite d'être écrit : ses écarts ne passent par aucun point ouvert, donc par aucune destination de
+chantier. Le jour où C6 se découpe, c'est cette page qu'il faudra regarder en premier.

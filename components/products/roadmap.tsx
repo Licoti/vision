@@ -2,12 +2,18 @@
  * La roadmap — la couche que D26 réservait à C5, redessinée le 17/08/2026
  * d'après `docs/design/maquettes/blocs/roadmap/Roadmap.dc.html`.
  *
- * **Le bloc s'intitule « Accompagnements en cours »** (18/08/2026) et occupe la
- * deuxième position de la page, entre « Vision produit » et « Tous les
- * accompagnements ». Il retrouve ainsi la place que `docs/06` §6 lui donne —
- * **au-dessus de la liste des accompagnements, sans la déplacer** —, qu'il
- * avait perdue la veille en fermant la page. Ce que le document ne prévoit
- * toujours pas, et qui reste consigné : son nom, et sa fenêtre par défaut.
+ * **Le bloc s'intitule « Accompagnements »** (21/08/2026), il est **le seul** de
+ * la page à les porter, et il vient **juste après « Vision produit »** : ce qu'on
+ * fait sur ce produit se lit avant ce que le produit est. « Tous les
+ * accompagnements », qui le suivait, lisait le même tableau, dans le même ordre,
+ * vers la même destination de clic : le doublon était assumé — « son équivalent
+ * textuel » — et il est refermé. Ce qui n'existait que là a été versé ici :
+ * **l'objectif** sur chaque ligne, une section **« Sans date »**, et l'état vide
+ * qui porte le geste.
+ * L'équipe y avait été versée aussi, puis **retirée le jour même** : trop de
+ * place pour ce qu'elle disait. Le bloc perd du même coup le « en cours » de son
+ * titre : sa fenêtre cadre l'année en cours, mais son contenu est toute
+ * l'histoire du produit.
  *
  * **Deux couches sur un axe commun** (`docs/03` §7) : une **bande par
  * accompagnement**, un **repère par activité porteuse d'un résultat**. La
@@ -19,8 +25,6 @@
  * **La ligne des repères est masquée pour le POC** (`SHOW_MILESTONES`, demande
  * du 17/08/2026) : il n'en reste qu'une seule à l'écran. Le code de la couche
  * est intact, ses dates portent toujours l'axe, et la rallumer est un booléen.
- * **La fenêtre libre au mois l'est aussi** (`SHOW_MONTH_RANGE`, 18/08/2026) :
- * l'échelle qui reste est annuelle, et l'année en cours est ce qui s'ouvre.
  *
  * **C'est la juxtaposition de `docs/03` §7, et rien d'autre.** Elle répond à
  * « est-ce que ce que nous avons recommandé a fonctionné ? » en donnant à lire,
@@ -34,11 +38,15 @@
  * contrainte qui gouvernait la frise disparaît — **pas de `viewBox`, donc pas de
  * `polyline`**, qui reste vraie dans le bloc des courbes et n'a plus cours ici.
  *
- * **Rendue sur le serveur, sans une ligne de JavaScript**, filtre compris : les
- * préréglages sont des liens, et les deux sélecteurs — quand ils reparaîtront —
- * un formulaire GET natif. Les
- * positions viennent de `lib/queries/timeline.ts`, où elles s'éprouvent par des
- * tests ; ce fichier les pose, il ne les calcule pas.
+ * **Le filtre est le seul JavaScript du bloc, et il ne calcule rien**
+ * (21/08/2026). Les préréglages étaient des liens vers `?de=&a=` : filtrer
+ * était une navigation entière — l'URL changeait, le défilement repartait en
+ * haut. Ils sont devenus les boutons de `ScaleSwitch`, et **ce fichier rend une
+ * frise par préréglage**, que le commutateur monte à la demande. Les positions
+ * continuent donc de venir de `lib/queries/timeline.ts`, au rendu serveur, où
+ * elles s'éprouvent par des tests ; ce fichier les pose, il ne les calcule pas.
+ * Le formulaire « De / à », masqué depuis le 18/08/2026, disparaît avec l'URL
+ * qu'il écrivait.
  *
  * **Vision juxtapose, elle ne prouve pas.** Aucune annotation de causalité entre
  * une bande et un repère, aucun écart, aucune flèche d'impact, aucun pourcentage
@@ -49,26 +57,29 @@
  * **La couleur ne porte jamais seule** (`docs/06` §11) : chaque ligne écrit son
  * libellé, son statut en toutes lettres dans sa pastille et sa période ; la
  * barre est décorative et sort de l'arbre d'accessibilité ; chaque repère porte
- * son intitulé en clair. Le préréglage actif porte `aria-current`, jamais sa
+ * son intitulé en clair. Le préréglage actif porte `aria-pressed`, jamais sa
  * seule couleur de fond.
  *
- * **Trois éléments de la maquette ne sont pas rendus**, et chacun a sa raison,
+ * **Deux éléments de la maquette ne sont pas rendus**, et chacun a sa raison,
  * consignée dans `JOURNAL-TECHNIQUE.md` : l'ombre portée de la carte — le design
  * system nomme ses trois élévations sans leur donner de valeur, et rien ne
  * s'invente ; le menu « … » (exporter en PDF, partager le lien) — hors du
- * périmètre de `docs/05`, et impossible sans JavaScript ; l'application du
- * filtre à la volée — remplacée par un bouton, pour la même raison.
+ * périmètre de `docs/05`. Le troisième, **l'application du filtre à la volée**,
+ * est refermé : c'est exactement ce que la demande du 21/08/2026 obtient.
  *
  * Le composant ne lit aucune base et **ne connaît aucun droit** : la roadmap se
  * lit par tout le domaine (D9), sur un produit vivant comme archivé (règle 4).
- * Elle ne porte aucun geste d'écriture — `de` et `a` sont des paramètres de
- * lecture, et `timelineWindow` est la seule porte par où ils entrent.
+ * Son unique point d'entrée d'écriture — celui de l'état vide — arrive en
+ * `addHref`, déjà décidé par l'appelant, `null` quand il n'a pas lieu d'être.
  */
 
 import Link from "next/link";
 
-import { Block, BlockHeader } from "@/components/ui/block";
-import { BlockNote } from "@/components/ui/empty-state";
+import { ScaleSwitch, type ScalePreset } from "@/components/products/roadmap-scale";
+import { Block, BlockDivider, BlockHeader } from "@/components/ui/block";
+import { buttonClass } from "@/components/ui/button";
+import { BlockNote, EmptyState } from "@/components/ui/empty-state";
+import { List, ListRow } from "@/components/ui/list";
 import { BAND_BG, StatusPill } from "@/components/ui/status-pill";
 import {
   formatDay,
@@ -76,20 +87,13 @@ import {
   formatPeriodShort,
   formatResultValue,
 } from "@/lib/format";
-import {
-  ROADMAP_FROM_PARAM,
-  ROADMAP_TO_PARAM,
-  ROUTES,
-} from "@/lib/navigation";
+import { ROUTES } from "@/lib/navigation";
 import type { ProductProject } from "@/lib/queries/products";
 import {
-  defaultWindow,
   monthBand,
   monthMark,
   monthTicks,
   timelineScale,
-  timelineWindow,
-  windowMonths,
   windowYears,
   withinWindow,
   yearWindow,
@@ -127,14 +131,15 @@ function milestoneTitle(milestone: TimelineMilestone): string {
  * le premier accord, jamais les suivants, et « 1 accompagnements masqués » se
  * lit faux sans que personne ne s'en aperçoive.
  *
- * La mention est **nécessaire** : sans elle, une fenêtre resserrée ferait
- * disparaître des accompagnements sans le dire, et la roadmap affirmerait un
- * vide qui n'est que le sien.
+ * La mention est **nécessaire**, et elle l'est deux fois plus depuis que la
+ * liste du bas n'existe plus : sans elle, une fenêtre resserrée ferait
+ * disparaître des accompagnements sans le dire, et le bloc affirmerait un vide
+ * qui n'est que le sien.
  */
 function hiddenNotice(count: number): string {
   return count > 1
-    ? `${count} accompagnements sont masqués hors de cette période.`
-    : "1 accompagnement est masqué hors de cette période.";
+    ? `${count} accompagnements sont masqués hors de cette période. « Tout » les ramène.`
+    : "1 accompagnement est masqué hors de cette période. « Tout » le ramène.";
 }
 
 /** Le calage d'un libellé de graduation sur sa position. */
@@ -143,6 +148,22 @@ const TICK_ANCHOR = {
   middle: "-translate-x-1/2",
   end: "-translate-x-full",
 } as const;
+
+/**
+ * La largeur de la colonne d'identité, et l'endroit où l'axe commence.
+ *
+ * **Les deux valeurs vont ensemble** : les filets verticaux sont posés en
+ * absolu sur toute la hauteur du tracé, et ils doivent commencer exactement là
+ * où finissent la colonne et l'écart qui la suit (`gap-6`, 24 px). Les changer
+ * séparément décrocherait les graduations des barres — 352 + 24 = 376.
+ *
+ * La colonne est passée de 280 à 352 px le 21/08/2026 : elle porte désormais
+ * l'objectif, versé par le bloc « Tous les accompagnements ». Elle ne rétrécit
+ * pas quand l'équipe en repart le même jour — un objectif de deux lignes vaut
+ * mieux qu'un objectif de quatre.
+ */
+const IDENTITY_WIDTH = "w-88";
+const AXIS_LEFT = "left-94";
 
 /**
  * La ligne des repères, **masquée pour le POC** (demande du 17/08/2026).
@@ -156,275 +177,83 @@ const TICK_ANCHOR = {
 const SHOW_MILESTONES = false;
 
 /**
- * Le formulaire de fenêtre libre au mois, **masqué** (demande du 18/08/2026).
+ * L'identité d'un accompagnement : ce qu'on lit avant sa barre.
  *
- * Un drapeau, et non une suppression, pour la raison de `SHOW_MILESTONES` : la
- * couche est entière et vivante. `windowMonths`, `ROADMAP_FROM_PARAM`,
- * `ROADMAP_TO_PARAM` et `timelineWindow` restent lus par les préréglages
- * d'année et par l'URL — retirer le formulaire ne retirerait donc rien du
- * calcul, et le rallumer est ce booléen.
+ * **Un seul dessin pour les deux endroits** où un accompagnement se lit dans ce
+ * bloc — la colonne de gauche de la frise, et la section « Sans date ». C'est
+ * ce qui garantit qu'un accompagnement daté et un accompagnement sans date se
+ * lisent pareil, la barre en moins.
  *
- * Ce qui reste à l'écran est **l'échelle annuelle**, seule granularité que la
- * demande retient : « Tout », puis une pastille par millésime.
+ * L'objectif est **coupé à deux lignes** : c'est une colonne, pas une fiche, et
+ * la page de l'accompagnement porte le texte entier. L'`overflow-hidden` de la
+ * colonne est la ceinture de cette bretelle — un mot sans espace ne déborde pas
+ * sur l'axe.
+ *
+ * **L'équipe n'y est plus** (21/08/2026, second passage) : la pile d'avatars y a
+ * tenu une demi-journée. Elle prenait plus de place qu'elle n'en disait — un
+ * visage ne dit pas ce qu'on a fait sur ce produit —, et elle se lit sur la page
+ * de l'accompagnement, où elle a son bloc.
  */
-const SHOW_MONTH_RANGE = false;
-
-/**
- * La fenêtre libre au mois — deux sélecteurs et un bouton, un formulaire GET
- * natif, donc pas une ligne de JavaScript.
- *
- * Un composant à part et non trois lignes de `FilterBar`, pour une raison de
- * portée : `windowMonths` n'a de lecteur que sous `SHOW_MONTH_RANGE`, et le
- * laisser dans `FilterBar` y calculerait douze mois que rien ne rendrait.
- *
- * Soumettre abandonne `archiver`, `indicateur` et `releve` : changer la période
- * ferme un panneau ouvert, ce qui est le comportement attendu.
- */
-function MonthRange({
-  /** L'axe **entier** : une fenêtre resserrée ne retire pas les mois qui l'élargiraient. */
-  scale,
-  /** La fenêtre courante, pour pré-remplir les deux sélecteurs. */
-  window,
+function ProjectIdentity({
+  project,
+  period,
 }: {
-  scale: TimelineScale;
-  window: TimelineScale;
+  project: ProductProject;
+  /** La période déjà formulée, ou `null` quand il n'y en a pas à écrire. */
+  period: string | null;
 }) {
-  const months = windowMonths(scale);
-
   return (
-    <form method="get" className="flex flex-wrap items-center gap-2">
-      <label
-        htmlFor="roadmap-from"
-        className="text-sm text-content-neutral-base"
-      >
-        De
-      </label>
-      <select
-        id="roadmap-from"
-        name={ROADMAP_FROM_PARAM}
-        defaultValue={window.firstMonth}
-        className="rounded-lg border border-content-neutral-normal bg-surface-neutral-pale px-2 py-1.5 text-sm text-content-neutral-dark"
-      >
-        {months.map((month) => (
-          <option key={month} value={month}>
-            {formatMonthTick(month)}
-          </option>
-        ))}
-      </select>
+    <div className="flex min-w-0 flex-col gap-1 overflow-hidden">
+      {/* La pastille et la période tiennent **sur une seule ligne** : pas de
+          `flex-wrap`, et la période abrégée pour qu'elle y entre — « sept.
+          2024 » là où `formatPeriod` écrirait « septembre 2024 ». */}
+      <span className="flex items-center gap-2 text-xs">
+        <StatusPill nature={project.statusNature} label={project.statusLabel} />
+        {period ? (
+          <span className="truncate text-content-neutral-base">{period}</span>
+        ) : null}
+      </span>
 
-      <label
-        htmlFor="roadmap-to"
-        className="text-sm text-content-neutral-base"
-      >
-        à
-      </label>
-      <select
-        id="roadmap-to"
-        name={ROADMAP_TO_PARAM}
-        defaultValue={window.lastMonth}
-        className="rounded-lg border border-content-neutral-normal bg-surface-neutral-pale px-2 py-1.5 text-sm text-content-neutral-dark"
-      >
-        {months.map((month) => (
-          <option key={month} value={month}>
-            {formatMonthTick(month)}
-          </option>
-        ))}
-      </select>
+      <span className="text-sm font-semibold text-content-neutral-darkest">
+        {project.name}
+      </span>
 
-      <button
-        type="submit"
-        className="rounded-lg bg-surface-primary-dark px-3 py-1.5 text-sm font-medium text-content-neutral-pale"
-      >
-        Appliquer
-      </button>
-    </form>
-  );
-}
-
-/**
- * La barre de filtre — préréglages, puis fenêtre libre.
- *
- * **Elle se rend même quand le tracé est vide.** Une fenêtre trop étroite
- * enfermerait sinon dans un bloc sans rien, et sans moyen de l'élargir.
- *
- * Les préréglages sont des **liens** et non des boutons : ils mènent à une autre
- * URL de la même page, ce qu'un lien fait et ce qu'un bouton simulerait. Les
- * deux sélecteurs sont un **formulaire GET natif** — pas d'`onChange`, donc pas
- * de JavaScript, donc un bloc qui reste entièrement rendu sur le serveur. Le
- * bouton « Appliquer » est le prix de cette propriété, et l'écart à la maquette
- * est consigné.
- *
- * Soumettre abandonne `archiver`, `indicateur` et `releve` : changer la période
- * ferme un panneau ouvert, ce qui est le comportement attendu.
- */
-function FilterBar({
-  productId,
-  scale,
-  window,
-}: {
-  productId: string;
-  /** L'axe **entier** : les préréglages ne se réduisent pas à mesure qu'on filtre. */
-  scale: TimelineScale;
-  /** La fenêtre courante, pour marquer l'actif et pré-remplir les sélecteurs. */
-  window: TimelineScale;
-}) {
-  const years = windowYears(scale);
-  const whole =
-    window.firstMonth === scale.firstMonth &&
-    window.lastMonth === scale.lastMonth;
-
-  const presetClass = (active: boolean) =>
-    `rounded-md px-3 py-1.5 text-sm font-medium ${
-      active
-        ? "bg-surface-primary-dark text-content-neutral-pale"
-        : "text-content-neutral-dark"
-    }`;
-
-  return (
-    /* `rounded-2xl` comme les cartes d'indicateur : c'est le rayon des surfaces
-       posées **dans** un bloc, le `3xl` restant celui du bloc lui-même. */
-    <div>
-      <div className="flex flex-wrap items-center gap-3">
-        <span
-          id="roadmap-scale-label"
-          className="text-xs font-semibold uppercase text-content-neutral-base"
-        >
-          Échelle
+      {project.objective ? (
+        <span className="line-clamp-2 text-sm text-content-neutral-base">
+          {project.objective}
         </span>
-        {/* Un `group` plutôt qu'une `nav` : ce sont des raccourcis de cadrage
-            sur la page courante, pas une destination de navigation. */}
-        <div
-          role="group"
-          aria-labelledby="roadmap-scale-label"
-          className="flex flex-wrap gap-0.5 rounded-lg bg-surface-neutral-lightest p-1 border border-surface-neutral-lighter"
-        >
-          {/* **Une URL sans paramètre ne vaut plus « Tout »** depuis le
-              18/08/2026 : elle vaut l'année en cours (`defaultWindow`). Le
-              préréglage doit donc écrire les deux bornes de l'axe entier, sans
-              quoi il ramènerait la fenêtre par défaut au lieu de l'élargir. */}
-          <Link
-            href={ROUTES.productRoadmapWindow(
-              productId,
-              scale.firstMonth,
-              scale.lastMonth,
-            )}
-            aria-current={whole ? "true" : undefined}
-            className={presetClass(whole)}
-          >
-            Tout
-          </Link>
-          {years.map((year) => {
-            const target = yearWindow(scale, year);
-            const active =
-              !whole &&
-              target.firstMonth === window.firstMonth &&
-              target.lastMonth === window.lastMonth;
-
-            return (
-              <Link
-                key={year}
-                href={ROUTES.productRoadmapWindow(
-                  productId,
-                  `${year}-01`,
-                  `${year}-12`,
-                )}
-                aria-current={active ? "true" : undefined}
-                className={presetClass(active)}
-              >
-                {year}
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-
-      {SHOW_MONTH_RANGE ? <MonthRange scale={scale} window={window} /> : null}
+      ) : null}
     </div>
   );
 }
 
-export function Roadmap({
-  productId,
-  projects,
+/** Un accompagnement daté, et les deux bornes qui le posent sur l'axe. */
+type DatedProject = {
+  project: ProductProject;
+  start: string;
+  end: string | null;
+};
+
+/**
+ * La frise d'une fenêtre : son axe, ses bandes, ses repères.
+ *
+ * **Elle est rendue une fois par préréglage** (21/08/2026) et c'est ce qui
+ * permet au filtre de n'être qu'un `useState` : le serveur dessine « Tout » et
+ * chaque millésime, `ScaleSwitch` monte celui qu'on demande. Elle reçoit les
+ * accompagnements datés **déjà triés**, calculés une seule fois par l'appelant :
+ * seule la position dépend de la fenêtre.
+ */
+function Timeline({
+  window,
+  dated,
   milestones,
-  from,
-  to,
 }: {
-  /** Le produit, pour construire les liens de préréglage vers sa propre page. */
-  productId: string;
-  /**
-   * Les accompagnements **déjà lus par la page** pour la liste juste en dessous
-   * (T2.2) : la roadmap ne demande aucune lecture neuve pour ses bandes. Ils
-   * arrivent du plus récent au plus ancien, et les lignes gardent cet ordre —
-   * celui de la liste, donc celui du parcours au clavier.
-   */
-  projects: ProductProject[];
-  /** Les activités porteuses d'un résultat vivant, de la plus ancienne mesure. */
+  window: TimelineScale;
+  dated: DatedProject[];
   milestones: TimelineMilestone[];
-  /** Les deux bornes brutes de l'URL. Rien ne les croit avant `timelineWindow`. */
-  from: string | undefined;
-  to: string | undefined;
 }) {
-  /* L'axe entier se déduit de **toutes** les dates connues des deux couches, et
-     de rien d'autre. Les relevés d'indicateurs n'y entrent plus : ils ont leur
-     bloc et leur axe depuis le 17/08/2026. */
-  const scale = timelineScale([
-    ...projects.flatMap((project) => [project.startedOn, project.expectedEndOn]),
-    ...milestones.map((milestone) => milestone.measuredOn),
-  ]);
-
-  /* **L'état vide se juge avant la fenêtre** : sans aucune date, il n'y a pas
-     d'axe à filtrer, et la barre de filtre n'aurait rien à offrir. */
-  if (!scale) {
-    return (
-      <Block>
-        <Header />
-        {/* Un paragraphe et non un `EmptyState` — la règle de `Resources` et de
-            `Indicators`. La raison qui reste après TD.1, qui a donné un `level`
-            à `EmptyState` : **deux phrases distinctes**, là où `EmptyState` n'a
-            qu'un `description`. N'avoir aucun accompagnement et n'en avoir aucun
-            de daté ne sont pas la même chose, et l'écran ne les confond pas. */}
-        {/* `content-neutral-dark`, comme les paragraphes vides des deux autres
-            blocs : c'est le jeton d'état vide de la page, et il passe sur les
-            deux tonalités de `Block` — 8,12:1 sur la pâle, 6,11:1 sur la bleue,
-            là où `content-neutral-base` tombe à 3,75:1 sur la seconde. */}
-        <BlockNote>
-          {projects.length === 0
-            ? "Les accompagnements de ce produit s'afficheront ici dès que l'un d'eux sera daté : leurs périodes en barres, sur l'axe de l'année en cours."
-            : "Aucun accompagnement de ce produit ne porte de date : il n'y a rien à situer sur un axe. Le bloc « Tous les accompagnements », ci-dessous, les porte tous."}
-        </BlockNote>
-      </Block>
-    );
-  }
-
-  /* La fenêtre demandée, ramenée dans ce que les données portent. C'est le seul
-     endroit où `from` et `to` entrent dans un calcul.
-
-     **Sans demande, l'année en cours** (18/08/2026), et non plus l'axe entier :
-     le bloc s'appelle « Accompagnements en cours », et c'est sa fenêtre qui
-     porte ce nom — aucun accompagnement n'est écarté sur son statut, la liste
-     du bas restant celle qui porte tout. `defaultWindow` se replie sur l'axe
-     entier quand l'année en cours n'y est pas, faute de quoi un produit
-     terminé en 2024 s'ouvrirait sur une fenêtre d'un seul mois.
-
-     La lecture de l'horloge est ici et le calcul est là-bas : une fonction qui
-     lirait l'heure ne s'éprouverait pas par un test. */
-  const window =
-    from && to
-      ? timelineWindow(scale, from, to)
-      : defaultWindow(scale, new Date().getFullYear());
-
-  /* Un accompagnement sans **aucune** date n'a pas de barre : `docs/03` §7
-     interdit de positionner arbitrairement ce qui n'a pas de date, et la liste
-     juste en dessous le porte entier. Celui qui n'a qu'une fin est posé sur ce
-     seul mois. Puis `withinWindow` écarte ceux que la fenêtre ne montre pas —
-     sans lui, `monthBand` les écraserait contre un bord au lieu de les taire. */
-  const dated = projects.flatMap((project) => {
-    const start = project.startedOn ?? project.expectedEndOn;
-    if (!start) return [];
-    return [{ project, start, end: project.expectedEndOn }];
-  });
-
+  /* `withinWindow` écarte ceux que la fenêtre ne montre pas — sans lui,
+     `monthBand` les écraserait contre un bord au lieu de les taire. */
   const bands = dated
     .filter((row) => withinWindow(window, row.start, row.end))
     .map((row) => ({ ...row, ...monthBand(window, row.start, row.end) }));
@@ -440,17 +269,14 @@ export function Roadmap({
   const ticks = monthTicks(window);
 
   return (
-    <Block>
-      <Header />
-      <FilterBar productId={productId} scale={scale} window={window} />
-
+    <div className="flex flex-col gap-5">
       <div className="relative">
         {/* Les filets verticaux, alignés sur les graduations — posés sur la
             seule zone de tracé, jamais sous la colonne des libellés. Ils sont
             décoratifs : la position se lit sur les graduations écrites. */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 left-76 right-0"
+          className={`pointer-events-none absolute inset-y-0 right-0 ${AXIS_LEFT}`}
         >
           {ticks.map((tick) => (
             <div
@@ -463,7 +289,7 @@ export function Roadmap({
 
         {/* ---- L'en-tête d'axe : son filet, ses graduations ---- */}
         <div className="flex gap-6">
-          <div className="w-70 flex-none" />
+          <div className={`${IDENTITY_WIDTH} flex-none`} />
           <div className="relative h-9 min-w-0 flex-1">
             <div className="absolute inset-x-0 bottom-5 h-px bg-surface-neutral-lighter" />
             {ticks.map((tick) => (
@@ -491,27 +317,14 @@ export function Roadmap({
             href={ROUTES.project(band.project.id)}
             className="flex items-center gap-6 border-t border-surface-neutral-lighter py-4"
           >
-            <div className="w-70 flex-none">
-              <span className="block text-sm font-semibold text-content-neutral-darkest">
-                {band.project.name}
-              </span>
-              {/* La pastille et la période tiennent **sur une seule ligne** :
-                  pas de `flex-wrap`, et la période abrégée pour qu'elle y
-                  entre — « sept. 2024 » là où `formatPeriod` écrirait
-                  « septembre 2024 », qui poussait la période sous la pastille
-                  dans une colonne de 280 px. */}
-              <span className="flex items-center gap-2">
-                <StatusPill
-                  nature={band.project.statusNature}
-                  label={band.project.statusLabel}
-                />
-                <span className="truncate text-sm text-content-neutral-base">
-                  {formatPeriodShort(
-                    band.project.startedOn,
-                    band.project.expectedEndOn,
-                  )}
-                </span>
-              </span>
+            <div className={`${IDENTITY_WIDTH} flex-none`}>
+              <ProjectIdentity
+                project={band.project}
+                period={formatPeriodShort(
+                  band.project.startedOn,
+                  band.project.expectedEndOn,
+                )}
+              />
             </div>
 
             {/* La barre est **décorative** : le statut et la période sont écrits
@@ -538,7 +351,9 @@ export function Roadmap({
             fiable sur un élément sans contenu. */}
         {SHOW_MILESTONES && marks.length > 0 ? (
           <div className="flex items-center gap-6 border-t border-surface-neutral-lighter py-4">
-            <div className="w-70 flex-none text-xs text-content-neutral-base">
+            <div
+              className={`${IDENTITY_WIDTH} flex-none text-xs text-content-neutral-base`}
+            >
               Activités porteuses d&apos;un résultat
             </div>
             <div className="relative h-4 min-w-0 flex-1">
@@ -574,38 +389,194 @@ export function Roadmap({
           {hiddenNotice(hidden)}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Les accompagnements que rien ne date, sous la frise.
+ *
+ * **Ils sont hors du commutateur d'échelle**, et à double titre : ils ne
+ * dépendent d'aucune fenêtre — ils se lisent sous « Tout » comme sous un
+ * millésime —, et les sortir évite de les rendre une fois par préréglage.
+ *
+ * `docs/03` §7 interdit de positionner arbitrairement ce qui n'a pas de date :
+ * ils n'ont donc pas de barre, et c'est la seule chose qui les distingue des
+ * lignes du dessus. Avant le 21/08/2026, c'est le bloc « Tous les
+ * accompagnements » qui les portait ; sans cette section, ils auraient disparu
+ * de la page avec lui.
+ *
+ * La `List` est **à fond perdu** : la carte est celle du bloc, et une liste qui
+ * gardait la sienne ferait une carte dans une carte.
+ */
+function Undated({ projects }: { projects: ProductProject[] }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <BlockDivider
+        title="Sans date"
+        note={
+          projects.length > 1
+            ? `${projects.length} accompagnements`
+            : "1 accompagnement"
+        }
+        rule="bg-surface-neutral-lighter"
+      />
+
+      <List flush label="Les accompagnements de ce produit sans date">
+        {projects.map((project) => (
+          <ListRow key={project.id} flush href={ROUTES.project(project.id)}>
+            <ProjectIdentity project={project} period={null} />
+          </ListRow>
+        ))}
+      </List>
+    </div>
+  );
+}
+
+export function Roadmap({
+  projects,
+  milestones,
+  addHref,
+}: {
+  /**
+   * Les accompagnements **déjà lus par la page** (T2.2) : ce bloc ne demande
+   * aucune lecture neuve. Ils arrivent du plus récent au plus ancien, les non
+   * datés en dernier, et les lignes gardent cet ordre — celui du parcours au
+   * clavier.
+   */
+  projects: ProductProject[];
+  /** Les activités porteuses d'un résultat vivant, de la plus ancienne mesure. */
+  milestones: TimelineMilestone[];
+  /** `null` retire le point d'entrée — le composant ne connaît aucun droit. */
+  addHref: string | null;
+}) {
+  /* **L'état vide se juge en premier** : c'est le seul cas où le bloc porte un
+     geste, et `EmptyState` est ce qui le place (règle 5). Les deux autres cas
+     d'absence — aucune date, aucune bande dans la fenêtre — ont quelque chose
+     à montrer, et prennent un paragraphe. */
+  if (projects.length === 0) {
+    return (
+      <Block>
+        <Header />
+        <EmptyState
+          level={3}
+          title="Aucun accompagnement pour l'instant"
+          description="Les accompagnements de ce produit s'afficheront ici, du plus récent au plus ancien, chacun avec sa période, son statut et son objectif. Ceux qui portent des dates se posent sur un axe."
+          {...(addHref
+            ? {
+                action: (
+                  <Link href={addHref} className={buttonClass()}>
+                    Nouvel accompagnement
+                  </Link>
+                ),
+              }
+            : {})}
+        />
+      </Block>
+    );
+  }
+
+  /* Un accompagnement sans **aucune** date n'a pas de barre : `docs/03` §7
+     interdit de positionner arbitrairement ce qui n'a pas de date. Celui qui
+     n'a qu'une fin est posé sur ce seul mois. */
+  const dated: DatedProject[] = [];
+  const undated: ProductProject[] = [];
+
+  for (const project of projects) {
+    const start = project.startedOn ?? project.expectedEndOn;
+    if (start) dated.push({ project, start, end: project.expectedEndOn });
+    else undated.push(project);
+  }
+
+  /* L'axe entier se déduit de **toutes** les dates connues des deux couches, et
+     de rien d'autre. Les relevés d'indicateurs n'y entrent plus : ils ont leur
+     bloc et leur axe depuis le 17/08/2026. */
+  const scale = timelineScale([
+    ...projects.flatMap((project) => [project.startedOn, project.expectedEndOn]),
+    ...milestones.map((milestone) => milestone.measuredOn),
+  ]);
+
+  /* **Sans axe, pas de fenêtre à filtrer** : il n'y a que des accompagnements
+     sans date, et la section du bas les porte tous. */
+  if (!scale) {
+    return (
+      <Block>
+        <Header />
+        {/* Un paragraphe et non un `EmptyState` — la règle de `Resources` et de
+            `Indicators` : le bloc n'est pas vide, il n'a rien à situer sur un
+            axe. `content-neutral-dark` est le jeton d'état vide de la page. */}
+        <BlockNote>
+          Aucun accompagnement de ce produit ne porte de date : il n&apos;y a
+          rien à situer sur un axe.
+        </BlockNote>
+        <Undated projects={undated} />
+      </Block>
+    );
+  }
+
+  /* Un préréglage, une frise. **« Tout », puis un millésime par année
+     d'histoire** — la seule granularité que la demande du 18/08/2026 retient. */
+  const years = windowYears(scale);
+  const presets: ScalePreset[] = [
+    {
+      key: "all",
+      label: "Tout",
+      view: <Timeline window={scale} dated={dated} milestones={milestones} />,
+    },
+    ...years.map((year) => ({
+      key: String(year),
+      label: String(year),
+      view: (
+        <Timeline
+          window={yearWindow(scale, year)}
+          dated={dated}
+          milestones={milestones}
+        />
+      ),
+    })),
+  ];
+
+  /* **La fenêtre d'ouverture est l'année en cours**, et l'axe entier quand elle
+     n'y est pas — la règle de `defaultWindow`, transposée aux clés : sans le
+     repli, un produit terminé en 2024 s'ouvrirait sur un préréglage qui n'existe
+     pas. La lecture de l'horloge est ici, comme avant : une fonction qui lirait
+     l'heure ne s'éprouverait pas par un test. */
+  const currentYear = new Date().getFullYear();
+  const initial = years.includes(currentYear) ? String(currentYear) : "all";
+
+  return (
+    <Block>
+      <Header />
+      <ScaleSwitch presets={presets} initial={initial} />
+      {undated.length > 0 ? <Undated projects={undated} /> : null}
     </Block>
   );
 }
 
 /**
- * Le titre du bloc — « Accompagnements en cours » depuis le 18/08/2026.
+ * Le titre du bloc — « Accompagnements » depuis le 21/08/2026.
  *
- * **La carte et l'en-tête ne sont plus propres à ce bloc** (17/08/2026) : ils
- * viennent de `components/ui/block.tsx`, partagés avec « North Star » et
- * « Accompagnements ». C'est cette roadmap qui a servi de référence — son cadre
- * ample et son titre de plein rang sont ce que les trois blocs portent
- * désormais —, si bien que sa coquille n'a pas changé d'apparence en devenant
- * partagée. Ce qui a changé ici tient en un jeton : la note passe de
- * `content-neutral-base` à `content-neutral-dark`, parce que le premier tombe à
- * 3,75:1 sur la surface bleue de la North Star et qu'un en-tête commun prend le
- * jeton qui passe sur les deux tonalités.
+ * **La carte et l'en-tête ne sont pas propres à ce bloc** (17/08/2026) : ils
+ * viennent de `components/ui/block.tsx`, partagés avec « Vision produit »,
+ * « Personae » et « Use Cases ». C'est cette roadmap qui a servi de référence —
+ * son cadre ample et son titre de plein rang sont ce que les blocs portent
+ * désormais.
  *
- * **Le mot « roadmap » ne paraît plus à l'écran** : le bloc dit ce qu'il montre
- * — les accompagnements, cadrés sur l'année en cours. Le nom du fichier et
- * celui du composant ne suivent pas : ils désignent la couche de `docs/03` §7,
- * qui n'a pas changé de nature.
+ * **Le titre a perdu « en cours »** le jour où « Tous les accompagnements » a
+ * été retiré : le bloc porte toute l'histoire du produit, sa fenêtre n'en cadre
+ * qu'une part, et un titre qui dirait « en cours » promettrait un filtre sur le
+ * statut que le bloc n'a jamais fait — aucun accompagnement n'est écarté sur ce
+ * qu'il est.
  *
- * La note ne promet plus de filtre, si bien que le paramètre `filterable` qui
- * distinguait les deux appels n'a plus d'objet — il était reçu sans être lu
- * depuis le 17/08/2026, et c'était le seul avertissement ESLint du dépôt.
- * Il ne reste de local que ce petit composant, pour l'appel qu'en fait l'état
- * vide.
+ * **Le mot « roadmap » ne paraît pas à l'écran** : le bloc dit ce qu'il montre.
+ * Le nom du fichier et celui du composant ne suivent pas : ils désignent la
+ * couche de `docs/03` §7, qui n'a pas changé de nature.
  */
 function Header() {
   return (
     <BlockHeader
-      title="Accompagnements en cours"
+      title="Accompagnements"
+      note="Les accompagnements de ce produit, posés sur le temps."
     />
   );
 }

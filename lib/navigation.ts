@@ -435,27 +435,6 @@ export const ENTITY_FORM_NEW = "nouvelle";
 export const DELETE_PANEL_PARAM = "supprimer";
 
 /**
- * Les deux bornes de la fenêtre de la **roadmap**, sur la page du produit.
- *
- * **Ce ne sont pas des clés d'ouverture**, et elles ne rejoignent donc pas le
- * décompte d'exclusivité des six précédentes : elles n'ouvrent aucun panneau,
- * ne portent aucun geste d'écriture, et leur absence est un état normal — la
- * roadmap sans filtre — plutôt qu'une fermeture. Une fenêtre est une lecture.
- *
- * **Deux clés et non une**, à rebours de la règle d'`activite` : ce ne sont pas
- * deux gestes sur un objet, ce sont les deux bornes d'un même intervalle, que
- * les deux `<select>` du formulaire GET soumettent nativement sous deux noms. Un
- * paramètre unique « 2025-01..2025-12 » demanderait de le recomposer en
- * JavaScript, que le bloc s'interdit.
- *
- * Elles se lisent **ensemble ou pas du tout** : `timelineWindow` retombe sur
- * l'axe entier dès que l'une manque ou ne vaut pas « YYYY-MM ». C'est la seule
- * porte par où elles entrent dans un calcul, et elle s'éprouve par test.
- */
-export const ROADMAP_FROM_PARAM = "de";
-export const ROADMAP_TO_PARAM = "a";
-
-/**
  * Les adresses des sept écrans, et des formulaires qui les alimentent. Les
  * pages de détail prennent un identifiant : le schéma en pose des UUID, et
  * rien ne promet encore de slug — ce choix revient à C2, avec l'écran qui
@@ -567,20 +546,6 @@ export const ROUTES = {
    */
   productUseCase: (id: string, useCaseId: string) =>
     `/produits/${id}?${USE_CASE_DETAIL_PARAM}=${useCaseId}`,
-  /**
-   * La page du produit, roadmap resserrée sur une fenêtre de mois.
-   *
-   * **Ce n'est pas un écran de plus**, comme les panneaux au-dessus : c'est le
-   * même, avec deux paramètres. La différence est qu'ils ne portent aucun geste
-   * d'écriture — une fenêtre est une lecture, et l'URL sans eux
-   * (`product(id)`) est l'état sans filtre plutôt qu'une fermeture.
-   *
-   * Les deux bornes voyagent **ensemble** : `timelineWindow` retombe sur l'axe
-   * entier dès que l'une manque, et une route qui n'en poserait qu'une ne mènerait
-   * jamais qu'à l'état sans filtre.
-   */
-  productRoadmapWindow: (id: string, from: string, to: string) =>
-    `/produits/${id}?${ROADMAP_FROM_PARAM}=${from}&${ROADMAP_TO_PARAM}=${to}`,
   projects: "/projets",
   project: (id: string) => `/projets/${id}`,
   projectNew: "/projets/nouveau",
