@@ -44,6 +44,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { buttonClass } from "@/components/ui/button";
 import { FocusTrap } from "@/components/ui/focus-trap";
 import type { DrawerContent, DrawerRequest } from "@/lib/drawers/types";
 
@@ -363,7 +364,7 @@ export function DrawerHost({
               <DrawerClose
                 autoFocus
                 aria-label="Fermer le panneau"
-                className="flex size-8 flex-none items-center justify-center rounded-lg border border-content-neutral-normal text-sm text-content-neutral-dark"
+                className={`${buttonClass({ variant: "secondary", iconOnly: true })} flex-none`}
               >
                 <span aria-hidden="true">✕</span>
               </DrawerClose>

@@ -167,11 +167,21 @@ const spacingScaleLock = {
 const SOCLE_CLAUSES = [
   ...classNameRule(
     String.raw`bg-surface-primary-base.*px-4.*py-2`,
-    "Bouton primaire recopié : employer `Button` de `components/ui/button.tsx`, ou `BUTTON_PRIMARY` quand la balise n'est pas un `<button>` (TD.3).",
+    "Bouton primaire recopié : employer `Button` de `components/ui/button.tsx`, ou `buttonClass()` quand la balise n'est pas un `<button>`.",
   ),
   ...classNameRule(
     String.raw`border-content-neutral-normal.*px-4.*py-2`,
-    'Bouton secondaire recopié : employer `<Button variant="secondary">` de `components/ui/button.tsx`, ou `BUTTON_SECONDARY` quand la balise n\'est pas un `<button>` (TD.3).',
+    'Bouton secondaire recopié : employer `<Button variant="secondary">` de `components/ui/button.tsx`, ou `buttonClass({ variant: "secondary" })` quand la balise n\'est pas un `<button>`.',
+  ),
+  /* La troisième écriture du bouton, et la seule que TD.6 ne pouvait pas
+     atteindre : trois composants de `components/projects/` portaient la forme
+     dans une coquille et recevaient la couleur de leur appelant, si bien que
+     **chaque motif ne voyait qu'un attribut à la fois** (point ouvert
+     d'`ETAT.md`). Les coquilles ont disparu ; ce motif garde leur forme, qui ne
+     nomme aucune couleur et n'avait donc aucun gardien. */
+  ...classNameRule(
+    String.raw`inline-flex.*rounded-lg.*px-4.*py-2.*font-semibold`,
+    "Coquille de bouton recopiée : employer `buttonClass({ variant })` de `components/ui/button.tsx`, et non une forme dont l'appelant fournit la couleur.",
   ),
   ...classNameRule(
     String.raw`font-semibold.*text-content-primary-dark.*underline`,

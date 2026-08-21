@@ -29,7 +29,7 @@ import type { ReactNode } from "react";
 
 import { ACTION_LINK_SM } from "@/components/ui/action-link";
 import { AvatarGroup } from "@/components/ui/avatar";
-import { Button, BUTTON_PRIMARY } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { borderOf, CONTROL, CONTROL_TEXT } from "@/components/ui/form-field";
 import { List, ListHeader, ListRow } from "@/components/ui/list";
@@ -253,7 +253,7 @@ function NewProjectLink() {
   return (
     <Link
       href={ROUTES.projectNew}
-      className={BUTTON_PRIMARY}
+      className={buttonClass()}
     >
       Nouvel accompagnement
     </Link>

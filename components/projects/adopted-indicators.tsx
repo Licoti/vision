@@ -54,6 +54,11 @@
 
 import Link from "next/link";
 
+import {
+  ButtonIcon,
+  buttonClass,
+  type ButtonVariant,
+} from "@/components/ui/button";
 import { DrawerLink } from "@/components/ui/drawer";
 
 import { ACTION_LINK } from "@/components/ui/action-link";
@@ -94,12 +99,7 @@ export function AdoptedIndicators({
         title="Indicateurs adoptés"
         {...(addHref
           ? {
-              action: (
-                <AdoptIndicator
-                  href={addHref}
-                  className="border border-content-neutral-normal bg-surface-neutral-pale text-content-primary-dark"
-                />
-              ),
+              action: <AdoptIndicator href={addHref} variant="secondary" />,
             }
           : {})}
       />
@@ -132,12 +132,7 @@ export function AdoptedIndicators({
             </Link>
             , puis s&apos;adopte ici.
           </BlockNote>
-          {addHref ? (
-            <AdoptIndicator
-              href={addHref}
-              className="bg-surface-primary-base text-content-neutral-pale"
-            />
-          ) : null}
+          {addHref ? <AdoptIndicator href={addHref} variant="primary" /> : null}
         </div>
       )}
     </Section>
@@ -358,18 +353,18 @@ function LastReading({
  */
 function AdoptIndicator({
   href,
-  className,
+  variant,
 }: {
   href: string;
-  className: string;
+  variant: ButtonVariant;
 }) {
   return (
     <DrawerLink
       href={href}
       request={{ kind: "adoption" }}
-      className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold ${className}`}
+      className={buttonClass({ variant })}
     >
-      <span aria-hidden="true">+</span>
+      <ButtonIcon>+</ButtonIcon>
       Adopter un indicateur
     </DrawerLink>
   );

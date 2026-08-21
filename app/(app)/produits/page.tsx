@@ -23,7 +23,7 @@
 import Link from "next/link";
 
 import { ACTION_LINK_SM } from "@/components/ui/action-link";
-import { BUTTON_PRIMARY } from "@/components/ui/button";
+import { buttonClass } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { List, ListHeader, ListRow } from "@/components/ui/list";
 import { Page, PageHeader } from "@/components/ui/page";
@@ -155,7 +155,7 @@ function NewProductLink() {
   return (
     <Link
       href={ROUTES.productNew}
-      className={BUTTON_PRIMARY}
+      className={buttonClass()}
     >
       Nouveau produit
     </Link>

@@ -114,7 +114,7 @@ import { Roadmap } from "@/components/projects/roadmap";
 import { Subnav } from "@/components/projects/subnav";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
 import { ActionMenu, MENU_ITEM_DANGER } from "@/components/ui/action-menu";
-import { Button, BUTTON_PRIMARY } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { DrawerHost, DrawerLink } from "@/components/ui/drawer";
 import { ArchivedNotice } from "@/components/ui/archived-notice";
 import { AvatarGroup } from "@/components/ui/avatar";
@@ -422,7 +422,7 @@ export default async function ProjectPage({
                           ne l'est pas. Les deux étaient au même rang. */}
                       <Link
                         href={ROUTES.projectEdit(project.id)}
-                        className={BUTTON_PRIMARY}
+                        className={buttonClass()}
                       >
                         Modifier
                       </Link>

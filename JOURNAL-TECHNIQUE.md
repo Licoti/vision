@@ -5493,3 +5493,85 @@ venir, tombe à **3,88:1**, sous la limite du texte courant ; il passe à `conte
 tient toujours.** L'étape 5 du protocole demande 250 lignes au plus ; la section « Session de
 découpage » pose que le découpage est le seul moment où le fichier se balaie. La seconde a de
 nouveau été retenue. → **à trancher par qui écrit `CLAUDE.md`.**
+
+---
+
+## Hors ticket — le bouton, composant unique à trois rangs, 21/08/2026
+
+### Le désaccord, et pourquoi il ne s'est pas soldé par une réouverture
+
+La demande rouvrait nommément la doctrine du 18/08/2026 : `@apply` et `@layer components` avaient
+été écartés. Ce n'est pas une décision de `docs/07`, donc la règle 6 ne l'interdisait pas — et la
+question a été portée à l'humain avant écriture plutôt que tranchée en silence.
+
+**La réponse humaine a déplacé la question** : « rester sur la meilleure approche possible en termes
+de bonnes pratiques et de standard Tailwind ; l'idée est de pouvoir changer la nature d'un bouton
+sans avoir à manipuler et connaître par cœur l'ensemble des classes ». Posée ainsi, elle **n'oppose
+plus** la doctrine à la demande : la documentation de Tailwind déconseille elle-même `@apply` pour
+abstraire un composant, et le standard qu'ont formalisé `cva` et `tailwind-variants` est une
+fonction de variantes. La doctrine tient, et la demande est satisfaite. **Aucune ligne de CSS n'a
+été écrite** ; `app/globals.css` et `app/tokens.css` ne bougent pas.
+
+Ce qui a permis de trancher n'est pas d'avoir relu le journal, c'est d'avoir demandé. La note du
+18/08 argumentait contre `@apply` par le typage et par l'endroit où vit la justification mesurée ;
+elle ne citait pas la recommandation de Tailwind, qui est l'argument le plus court et le seul que
+l'humain avait demandé.
+
+### Le critère d'`action-link.ts`, retourné d'un cran
+
+Il disait : « un composant quand l'élément rendu est fixe, une constante quand c'est la balise qui
+varie ». Il ne prévoyait pas le cas où la balise varie **et** où la mise en forme a des paramètres :
+trois rangs × deux gabarits font six constantes. Le critère devient donc à trois niveaux —
+composant, **fonction**, constante — et `buttonClass()` est le premier occupant du niveau neuf.
+`borderOf()` de `form-field.tsx` y était déjà sans qu'on l'ait nommé.
+
+### Deux entorses assumées, portées aux points ouverts
+
+`tertiary` et les props d'icône de `Button` n'ont **aucun appelant** au jour où ils sont écrits, ce
+que l'en-tête du fichier interdit depuis TD.3. Elles sont l'objet même de la demande. Les deux sont
+éprouvées par sonde plutôt que crues : le tertiaire lu dans le HTML servi après avoir posé un
+appelant temporaire, puis la ligne rétablie — **aucune ligne de sonde ne reste**, la sonde ayant
+modifié une ligne existante au lieu d'en créer une (précédent du bloc « Démarrage ») ; les quatre
+formes de `Button` passées à `tsc` dans un fichier de sonde supprimé après lecture.
+
+### La leçon d'instrument, et elle est la plus chère du travail
+
+Le premier comptage des balises modifiées donnait **deux lignes par adresse** — un chiffre
+rassurant, et faux. Il venait de `tr '>' '>\n'`, et **`tr` mappe caractère à caractère** : un
+ensemble d'arrivée plus long que l'ensemble de départ est tronqué, si bien que la commande valait
+`tr '>' '>'`, c'est-à-dire l'identité. Le diff portait donc sur du HTML d'une seule ligne, et ne
+voyait qu'une poignée de changements.
+
+**Un instrument qui rend un résultat plausible n'est pas pour autant calibré.** Ce qui l'a redressé
+n'est pas une relecture de la commande : c'est le témoin `rounded-xl`, qui devait faire bouger les
+onze adresses et n'en faisait presque rien bouger. La discipline « les tests se mettent en défaut
+avant d'être crus » vaut donc **aussi pour l'outil de mesure**, et c'est la seule chose qui a
+rattrapé l'erreur. `sed 's/></>\n</g'` remplace `tr`.
+
+Corollaire méthodique, à reprendre tel quel au prochain diff de HTML : la preuve utile n'est pas le
+nombre de balises qui changent, c'est que **les balises changées, dépouillées de leur attribut
+`class`, soient identiques des deux côtés**. Ce second diff a rendu zéro ligne, et c'est lui qui
+établit qu'aucune structure n'a bougé.
+
+### Une dette d'octets, nommée
+
+`disabled:opacity-60` vit dans les trois chaînes de variante, donc aussi sur les onze `<a>`,
+`<Link>` et `<DrawerLink>` qui portent un bouton — où `&:disabled` ne s'appliquera jamais.
+L'alternative était de le laisser au point d'appel, ce que ce travail vient de retirer : il y était
+recopié quatre fois. Le coût est de vingt-trois caractères par balise dans le HTML servi ; le
+bénéfice est une seule source pour l'état désactivé. Porté aux points ouverts d'`ETAT.md`.
+
+### Trois montages sur six n'ont pas été lus
+
+Les six points de montage des coquilles se répartissent en trois « rang secondaire » — l'action de
+l'en-tête de bloc, servie par la fixture — et trois « rang primaire », qui sont l'**action de l'état
+vide**. Aucun des trois n'entre dans le HTML servi : les trois blocs concernés ont des données dans
+la base de développement. C'est exactement le point ouvert d'`ETAT.md` sur les cinq états vides
+qu'aucun HTML ne montre, et il s'en ajoute trois. Le code de ces branches a changé comme les autres ;
+leur rendu n'a pas été vu. Ce qui manque est un jeu d'essai, pas du code.
+
+### `ETAT.md` passe de 598 à 617 lignes
+
+Le seuil de 250 reste franchi et attend la session de découpage de C6 — c'est le seul moment où le
+fichier se balaie. Le point ouvert du bouton en est sorti vers `HISTORIQUE-TICKETS.md`, deux points
+neufs y sont entrés.

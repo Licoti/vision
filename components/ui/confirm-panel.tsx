@@ -91,7 +91,6 @@ export function ConfirmPanel({
         <Button
           type="submit"
           disabled={pending}
-          className="disabled:opacity-60"
         >
           {pending ? pendingLabel : submitLabel}
         </Button>

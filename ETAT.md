@@ -2,8 +2,8 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 20/08/2026 — la page d'un accompagnement passe à la maquette
-`project-v2`, hors ticket.
+**Dernière mise à jour :** 21/08/2026 — le bouton devient un composant à trois rangs, hors
+ticket.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
 **Ticket suivant :** **T5bis.7** — la sélection d'équipe du formulaire de projet, refondue
 (`tickets-C5bis.md`).
@@ -292,6 +292,19 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   **une maquette faite hors du produit dessine ses interdits en toute bonne foi, et les dessine
   bien** ; ce qui permet de trancher n'est pas de relire la règle, c'est que la question se pose
   « étend-on la dérogation ? » plutôt que « peut-on ? ».
+- **Le bouton, composant unique à trois rangs — hors ticket, le 21/08/2026.** `buttonClass()`
+  rend la chaîne pour toute balise, `Button` couvre les `<button>` et place l'icône, `ButtonIcon`
+  porte le glyphe ; `BUTTON_PRIMARY` et `BUTTON_SECONDARY` disparaissent. La doctrine du 18/08 sur
+  `@apply` **est maintenue**, pour une raison neuve : c'est aussi ce que la documentation de Tailwind
+  déconseille, et la fonction de variantes est le standard qu'ont formalisé `cva` et
+  `tailwind-variants`. Aucune ligne de CSS écrite. Trois écritures rentrent au socle **par
+  disparition** — les trois coquilles à deux attributs (le point ouvert se referme comme il le
+  prescrivait), les deux boutons icône seule, et `disabled:opacity-60` recopié quatre fois. Deux
+  écarts assumés à la demande : `tertiary` et les props d'icône de `Button` n'ont **aucun appelant**
+  au jour où ils sont écrits. **34 balises bougent, et pas une de plus** : dépouillées de leur
+  attribut `class`, elles sont strictement identiques des deux côtés. Sa leçon est dans
+  l'instrument : **`tr` mappe caractère à caractère**, si bien que `tr '>' '>\n'` vaut `tr '>' '>'`
+  — un comptage plausible et nul, que seul le témoin `rounded-xl` a redressé.
 
 ---
 
@@ -397,17 +410,6 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   l'arbitrage (g) sort la création d'une personne du formulaire de projet, et une limite sur un bloc
   qui n'existe plus n'a plus d'objet. → **T5bis.7.**
 
-- **Le bouton primaire et le secondaire s'écrivent aussi en deux attributs, hors de portée de
-  `socleLock`.** `components/projects/roadmap.tsx:235`, `resources.tsx:215` et
-  `adopted-indicators.tsx:285` portent une coquille
-  `inline-flex … rounded-lg px-4 py-2 text-sm font-semibold ${className}` dont l'appelant fournit la
-  couleur (`roadmap.tsx:209` et `:177`). C'est le bouton du socle, en deux morceaux, et **chaque
-  motif de `socleLock` ne voit qu'un attribut à la fois** : la limite est structurelle, pas un
-  réglage. La rattraper par un motif de couleur est refusé — les couleurs sont déjà protégées par
-  `--color-*: initial`, et une règle redondante est une règle qu'on désactive. La réponse est de
-  faire de ces trois coquilles des `Button` / `BUTTON_PRIMARY`, ce qui les ferait rentrer sous la
-  règle par disparition. Hors du périmètre de TD.6, qui ne touche aucun composant (règle 3).
-  → **ticket propre, C7 au plus tard.**
 - **Corriger une personne du centre en intervenant côté entité lui laisse ses compétences.**
   `parsePersonForm` efface la disponibilité quand le genre devient `stakeholder` — sans ce `null`
   explicite, le `CHECK` `persons_availability_requires_center` refuserait l'écriture. Rien
@@ -449,6 +451,23 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   puis a rétabli la ligne et supprimé le script — aucune ligne de sonde ne reste, la sonde ayant
   modifié une ligne existante au lieu d'en créer une. → **à couvrir par la fixture, ou par une sonde
   de cette forme, au prochain ticket qui écrit en base.**
+
+- **Deux capacités du bouton n'ont aucun appelant, et c'est une entorse assumée.** L'en-tête de
+  `components/ui/button.tsx` pose depuis TD.3 qu'« un composant de socle qui porte une variante sans
+  appelant est une variante que le suivant emploiera de travers ». Le rang `tertiary` et les props
+  `icon` / `iconSide` / `label` de `Button` l'enfreignent : **zéro point d'appel** au 21/08/2026. Ils
+  sont l'objet même de la demande — trois rangs, une icône plaçable — et les livrer sans eux aurait
+  été livrer autre chose. Les deux sont **éprouvés par sonde** : le tertiaire lu dans le HTML servi,
+  les quatre formes de `Button` passées à `tsc`. Le premier appelant naturel du tertiaire est le
+  « Annuler » des quatre pieds de formulaire, aujourd'hui en `ACTION_LINK_SM` — hors périmètre ce
+  jour-là. → **au prochain ticket qui ouvre un pied de formulaire.**
+
+- **`disabled:opacity-60` est servi sur onze balises qui ne peuvent pas être désactivées.** Il vit
+  dans les trois chaînes de variante, donc aussi sur les `<a>`, `<Link>` et `<DrawerLink>` qui
+  portent un bouton — où `&:disabled` ne s'appliquera jamais. L'alternative était de le laisser au
+  point d'appel, ce que ce travail vient précisément de retirer : il y était recopié quatre fois.
+  Le coût est de vingt-trois caractères par balise dans le HTML servi ; le bénéfice est une seule
+  source pour l'état désactivé. → **sans échéance.**
 
 ### c. Dettes assumées, sans échéance
 

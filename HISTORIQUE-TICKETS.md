@@ -2451,6 +2451,17 @@ posés dans un domaine-sonde de T5bis.4, archivés de même ; une liaison `proje
 où ils occupaient encore la place. Conservés tels quels : un point refermé documente comment il
 l%s été.)*
 
+- ~~**Le bouton primaire et le secondaire s'écrivent aussi en deux attributs, hors de portée de
+  `socleLock`.**~~ **Refermé le 21/08/2026, hors ticket.** Trois composants de
+  `components/projects/` — `AddActivity`, `LinkResource`, `AdoptIndicator` — portaient la forme du
+  bouton dans une coquille et recevaient la couleur de leurs six points de montage, si bien que
+  **chaque motif de `socleLock` ne voyait qu'un attribut à la fois**. Le point prescrivait sa propre
+  réponse : « faire de ces trois coquilles des `Button`, ce qui les ferait rentrer sous la règle par
+  disparition ». C'est ce qui a été fait, à ceci près que le remplaçant n'est pas `BUTTON_PRIMARY` —
+  qui n'existe plus — mais `buttonClass({ variant })`, les trois coquilles rendant un `<DrawerLink>`
+  et non un `<button>`. **Une clause de plus** garde désormais leur forme, celle qui ne nomme aucune
+  couleur et n'avait donc aucun gardien ; elle a été mise en défaut sur un nœud et un seul.
+
 - ~~**Le socle couvre vingt et un des quarante composants du design system.**~~ **Refermé le
   19/08/2026 par TD.6.** Les logements créés par TD.3 et TD.4 — `Button` / `BUTTON_PRIMARY` /
   `BUTTON_SECONDARY`, `ACTION_LINK_SM`, `BlockNote`, `ArchivedNotice` — sont désormais **gardés** :
@@ -3070,3 +3081,82 @@ textes de Vision refusent nommément — et elle les dessine bien, ce qui est le
 permis de trancher n'est pas d'avoir relu D39 : c'est que le calcul **existait déjà**, testé, sous
 `targetGap` et `axisScale`, du travail du 17/08. La question posée n'était donc jamais « peut-on ? »
 mais « étend-on la dérogation ? » — et posée ainsi, elle se répond.
+
+---
+
+## Le bouton, composant unique à trois rangs — hors ticket, le 21/08/2026
+
+**La demande, et ce qu'elle rouvrait.** Changer la nature d'un bouton demandait de connaître et de
+recomposer des chaînes de classes. La demande était de faire du bouton un composant à part entière,
+avec ses variantes nommées et la possibilité d'y poser une icône à gauche, à droite, ou seule.
+
+Elle rouvrait explicitement la doctrine du 18/08/2026 : **`@apply` et `@layer components` avaient
+été écartés**. L'arbitrage a été rendu avant écriture, et il **maintient la décision** — pour une
+raison neuve qui n'était pas celle du journal. La documentation de Tailwind déconseille elle-même
+`@apply` pour abstraire un composant et dirige vers l'extraction d'un composant ; le standard
+qu'ont formalisé `cva` et `tailwind-variants` est une **fonction de variantes** qui rend la chaîne,
+plus un composant qui l'appelle. La demande — « ne plus avoir à connaître les classes » — est
+satisfaite par cette forme, et le dépôt en avait déjà le précédent avec `borderOf()` de
+`form-field.tsx`. Aucune ligne de CSS n'a été écrite ; `app/globals.css` et `app/tokens.css` ne
+bougent pas.
+
+**Ce que le socle porte désormais.** `buttonClass({ variant, iconOnly })` rend la chaîne pour
+**toute** balise ; `Button` couvre les `<button>` et place l'icône ; `ButtonIcon` est le glyphe que
+les balises composant leurs propres enfants appellent à la main. `BUTTON_PRIMARY` et
+`BUTTON_SECONDARY` disparaissent — une constante par combinaison en aurait fait six.
+
+**Le critère de choix est celui d'`action-link.ts`, retourné d'un cran.** Il disait « un composant
+quand l'élément rendu est fixe, une constante quand c'est la balise qui varie » ; il devient « une
+**fonction** quand la balise varie **et** que la mise en forme a des paramètres ». Treize points
+d'appel de l'application portent un bouton sur un `<Link>`, un `<DrawerLink>` ou un `<a>` — dont le
+skip-link. Aucun `as`, aucun `render` : la polymorphie reste ce que ce dépôt refuse.
+
+**Les trois rangs ont le même gabarit, et c'est le point.** Chacun porte un `border` d'un pixel,
+transparent pour le primaire et le tertiaire, si bien qu'un rang se substitue à un autre **sans
+qu'un pixel de mise en page bouge**. C'est ce que la maquette dessine déjà
+(`fiche-accompagnement.css:90`, `border: 1px solid transparent`).
+
+**Trois écritures rentrent au socle par disparition.**
+
+- **Les trois coquilles à deux attributs** — `AddActivity`, `LinkResource`, `AdoptIndicator` —
+  portaient la forme et recevaient la couleur de leurs six points de montage. Elles passent à
+  `variant`, et **le point ouvert d'`ETAT.md` se referme comme il le prescrivait lui-même** : par
+  disparition, la règle ne pouvant pas voir deux attributs à la fois.
+- **Les deux boutons icône seule** — le kebab d'`action-menu.tsx` et la croix de `drawer.tsx` —
+  avaient le même calibre de 32 px et deux écritures différentes. Ils passent tous deux à
+  `buttonClass({ variant: "secondary", iconOnly: true })`.
+- **`disabled:opacity-60`**, recopié aux quatre pieds de formulaire, entre dans les trois chaînes de
+  variante : un état qui dépend du rang n'a rien à faire chez celui qui pose le rang.
+
+**Le garde-fou suit.** Les deux clauses bouton de `socleLock` nommaient `BUTTON_PRIMARY` et
+`BUTTON_SECONDARY`, qui n'existent plus — un message qui nomme un export mort est un défaut. Elles
+désignent `buttonClass`, et **une clause de plus** garde la forme des coquilles supprimées, celle
+qui ne nomme aucune couleur et n'avait donc aucun gardien.
+
+**Vérification — quatre disciplines, toutes tenues.**
+
+- **Le critère se lit dans le HTML servi.** Onze adresses capturées avant et après par `git stash`,
+  `<script>` retirés (leçon de TD.3), la base immobile entre les deux mesures (leçon de TD.1).
+  **Trente-quatre balises bougent, et pas une de plus** : dépouillées de leur attribut `class`,
+  elles sont **strictement identiques** des deux côtés — zéro ligne de différence. **Six écritures
+  distinctes en amont deviennent quatre en aval**, ce qui est la mesure même du regroupement. La
+  croix du tiroir a été mesurée à part, sur `?archiver=confirmation` : même résultat.
+- **La règle se met en défaut avant d'être crue.** Un `rounded-xl` témoin dans `BASE` fait bouger
+  **les onze captures**, sur exactement les trente-quatre mêmes balises — chaque écran porte au
+  moins le skip-link. La clause ESLint neuve tombe sur une réécriture témoin de la coquille
+  supprimée, **sur un nœud et un seul**, et le lint redevient vert au rétablissement. Le typage se
+  met en défaut aussi : les quatre formes légitimes de `Button` compilent, et un bouton icône seule
+  sans `label` produit **une** erreur.
+- **Le contraste se mesure.** Sept couples, dont quatre neufs par la position — les trois survols et
+  le fond du secondaire. Aucun texte sous 4,5:1 (le plus bas est à 6,52:1), aucun filet sous 3:1
+  (3,88:1). La table est dans l'en-tête de `components/ui/button.tsx`.
+- **Le droit ne bouge pas.** Aucune action serveur, aucune requête, aucun droit n'entre au
+  périmètre : **882 tests, 29 fichiers, verts et non modifiés**.
+
+**Sa leçon est dans l'instrument, et elle a failli coûter la mesure.** Le premier comptage des
+balises modifiées donnait **deux lignes par adresse**, chiffre rassurant et faux : il venait d'un
+`tr '>' '>\n'` — et `tr` mappe caractère à caractère, si bien qu'un ensemble d'arrivée plus long est
+tronqué. La commande valait `tr '>' '>'`, c'est-à-dire rien du tout, et le diff portait sur le HTML
+d'une seule ligne. **Un instrument qui rend un résultat plausible n'est pas pour autant calibré** :
+c'est le témoin `rounded-xl` qui l'a redressé, en montrant que les onze adresses bougeaient là où le
+comptage n'en voyait presque rien.

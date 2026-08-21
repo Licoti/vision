@@ -88,11 +88,7 @@ import { Personas } from "@/components/products/personas";
 import { UseCases } from "@/components/products/use-cases";
 import { Roadmap } from "@/components/products/roadmap";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
-import {
-  Button,
-  BUTTON_PRIMARY,
-  BUTTON_SECONDARY,
-} from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { DrawerHost, DrawerLink } from "@/components/ui/drawer";
 import { ArchivedNotice } from "@/components/ui/archived-notice";
 import { AvatarGroup } from "@/components/ui/avatar";
@@ -343,14 +339,14 @@ export default async function ProductPage({
                   <>
                     <Link
                       href={ROUTES.productEdit(product.id)}
-                      className={BUTTON_SECONDARY}
+                      className={buttonClass({ variant: "secondary" })}
                     >
                       Modifier ce produit
                     </Link>
                     <DrawerLink
                       href={ROUTES.productArchive(product.id)}
                       request={{ kind: "archive" }}
-                      className={BUTTON_SECONDARY}
+                      className={buttonClass({ variant: "secondary" })}
                     >
                       Archiver
                     </DrawerLink>
@@ -580,7 +576,7 @@ function NewProjectLink({ productId }: { productId: string }) {
   return (
     <Link
       href={ROUTES.projectNewForProduct(productId)}
-      className={BUTTON_PRIMARY}
+      className={buttonClass()}
     >
       Nouvel accompagnement
     </Link>

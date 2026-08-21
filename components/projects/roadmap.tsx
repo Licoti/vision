@@ -60,6 +60,11 @@
 
 import Link from "next/link";
 
+import {
+  ButtonIcon,
+  buttonClass,
+  type ButtonVariant,
+} from "@/components/ui/button";
 import { DrawerLink } from "@/components/ui/drawer";
 
 import {
@@ -242,12 +247,7 @@ export function Roadmap({
         note="Le récit de l'accompagnement, au mois."
         {...(addHref
           ? {
-              action: (
-                <AddActivity
-                  href={addHref}
-                  className="border border-content-neutral-normal bg-surface-neutral-pale text-content-primary-dark"
-                />
-              ),
+              action: <AddActivity href={addHref} variant="secondary" />,
             }
           : {})}
       />
@@ -318,12 +318,7 @@ export function Roadmap({
           description="La roadmap réunira ici les ateliers, tests, audits et restitutions de l'accompagnement, chacun avec son état : en cours, prévu, à planifier, terminé. Chaque activité portera son type, son objectif, sa période, son approche et, le cas échéant, son résultat avec le lien vers l'outil qui l'a produit."
           {...(addHref
             ? {
-                action: (
-                  <AddActivity
-                    href={addHref}
-                    className="bg-surface-primary-base text-content-neutral-pale"
-                  />
-                ),
+                action: <AddActivity href={addHref} variant="primary" />,
               }
             : {})}
         />
@@ -441,14 +436,20 @@ function StatusChips({
  *
  * Le `+` de la maquette est décoratif : « Ajouter une activité » se lit seul.
  */
-function AddActivity({ href, className }: { href: string; className: string }) {
+function AddActivity({
+  href,
+  variant,
+}: {
+  href: string;
+  variant: ButtonVariant;
+}) {
   return (
     <DrawerLink
       href={href}
       request={{ kind: "activity" }}
-      className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold ${className}`}
+      className={buttonClass({ variant })}
     >
-      <span aria-hidden="true">+</span>
+      <ButtonIcon>+</ButtonIcon>
       Ajouter une activité
     </DrawerLink>
   );
@@ -631,17 +632,7 @@ function RoadmapEntry({
       {/* Facultatif (`docs/03` §4, T3.6) : la plupart des entrées n'ont aucun
           participant, et `AvatarGroup` rend `null` sur une liste vide — la
           colonne disparaît alors sans qu'une condition s'écrive ici. */}
-      <AvatarGroup
-        label="Participants"
-        count={`${activity.participants.length} ${
-          activity.participants.length > 1 ? "participants" : "participant"
-        }`}
-        names={activity.participants.map((person) => ({
-          fullName: person.fullName,
-          tone: person.kind === "stakeholder" ? "stakeholder" : "center",
-          ...(person.kind === "stakeholder" ? { note: "côté entité" } : {}),
-        }))}
-      />
+
 
       <span className="min-w-21 text-right text-xs whitespace-nowrap text-content-neutral-base">
         {period}
@@ -706,7 +697,11 @@ function RoadmapEntry({
               est obligatoire et qui a donc dû quitter le menu pour un panneau. */}
           {archiveActivity && activity.result === null ? (
             <form action={archiveActivity.bind(null, activity.id)}>
-              <button type="submit" role="menuitem" className={MENU_ITEM_DANGER}>
+              <button
+                type="submit"
+                role="menuitem"
+                className={MENU_ITEM_DANGER}
+              >
                 Archiver la saisie
               </button>
             </form>

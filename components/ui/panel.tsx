@@ -91,7 +91,6 @@ export function Panel({
         <Button
           type="submit"
           disabled={pending}
-          className="disabled:opacity-60"
         >
           {pending ? "Enregistrement…" : submitLabel}
         </Button>

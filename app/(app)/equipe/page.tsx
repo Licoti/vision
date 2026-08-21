@@ -72,7 +72,7 @@ import {
 } from "@/components/team/availability-dot";
 import { ACTION_LINK_SM } from "@/components/ui/action-link";
 import { Avatar } from "@/components/ui/avatar";
-import { Button, BUTTON_PRIMARY } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { DrawerHost, DrawerLink } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { borderOf, CONTROL, CONTROL_TEXT } from "@/components/ui/form-field";
@@ -355,7 +355,7 @@ export default async function TeamPage({
     <DrawerLink
       href={addPersonHref}
       request={{ kind: "person" }}
-      className={BUTTON_PRIMARY}
+      className={buttonClass()}
     >
       Ajouter une personne
     </DrawerLink>

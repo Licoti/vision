@@ -53,13 +53,9 @@
  * l'enveloppe dans un conteneur positionné.
  */
 
-import {
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+
+import { buttonClass } from "@/components/ui/button";
 
 export function ActionMenu({
   label,
@@ -124,7 +120,7 @@ export function ActionMenu({
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen((was) => !was)}
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-border-primary-base bg-surface-neutral-pale"
+        className={buttonClass({ variant: "secondary", iconOnly: true })}
       >
         {/* Les trois points sont **décoratifs** : le bouton est nommé par son
             `aria-label`, et la couleur ne porte jamais seule (docs/06 §11). */}

@@ -46,6 +46,11 @@
  * `listProjectResources` a déjà lu, filtré et trié.
  */
 
+import {
+  ButtonIcon,
+  buttonClass,
+  type ButtonVariant,
+} from "@/components/ui/button";
 import { DrawerLink } from "@/components/ui/drawer";
 
 import { ACTION_LINK } from "@/components/ui/action-link";
@@ -83,12 +88,7 @@ export function Resources({
         title="Ressources"
         {...(addHref
           ? {
-              action: (
-                <LinkResource
-                  href={addHref}
-                  className="border border-content-neutral-normal bg-surface-neutral-pale text-content-primary-dark"
-                />
-              ),
+              action: <LinkResource href={addHref} variant="secondary" />,
             }
           : {})}
       />
@@ -185,12 +185,7 @@ export function Resources({
             produits. Vision n&apos;héberge aucun fichier : elle renvoie vers
             l&apos;outil qui le porte.
           </BlockNote>
-          {addHref ? (
-            <LinkResource
-              href={addHref}
-              className="bg-surface-primary-base text-content-neutral-pale"
-            />
-          ) : null}
+          {addHref ? <LinkResource href={addHref} variant="primary" /> : null}
         </div>
       )}
     </Section>
@@ -210,18 +205,18 @@ export function Resources({
  */
 function LinkResource({
   href,
-  className,
+  variant,
 }: {
   href: string;
-  className: string;
+  variant: ButtonVariant;
 }) {
   return (
     <DrawerLink
       href={href}
       request={{ kind: "resource" }}
-      className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold ${className}`}
+      className={buttonClass({ variant })}
     >
-      <span aria-hidden="true">+</span>
+      <ButtonIcon>+</ButtonIcon>
       Relier une ressource
     </DrawerLink>
   );

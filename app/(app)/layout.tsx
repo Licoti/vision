@@ -19,7 +19,7 @@
 import Link from "next/link";
 
 import { MainNav } from "@/components/shell/main-nav";
-import { BUTTON_PRIMARY } from "@/components/ui/button";
+import { buttonClass } from "@/components/ui/button";
 import { ROUTES } from "@/lib/navigation";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -30,7 +30,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         /* `sr-only` **précède** la chaîne du bouton et les quatre `focus:*` la
            suivent : c'est l'ordre servi jusqu'ici, et un attribut réordonné est
            un attribut qui a changé. */
-        className={`sr-only ${BUTTON_PRIMARY} focus:not-sr-only focus:absolute focus:top-4 focus:left-4`}
+        className={`sr-only ${buttonClass()} focus:not-sr-only focus:absolute focus:top-4 focus:left-4`}
       >
         Aller au contenu
       </a>
