@@ -3160,3 +3160,91 @@ tronqué. La commande valait `tr '>' '>'`, c'est-à-dire rien du tout, et le dif
 d'une seule ligne. **Un instrument qui rend un résultat plausible n'est pas pour autant calibré** :
 c'est le témoin `rounded-xl` qui l'a redressé, en montrant que les onze adresses bougeaient là où le
 comptage n'en voyait presque rien.
+
+---
+
+## Administration — le référentiel des entités — hors ticket, le 21/08/2026
+
+**La demande.** « Il faudrait pouvoir gérer (supprimer / ajouter / modifier) les entités, qu'on voit
+notamment sur la page des produits. »
+
+**Ce qui manquait, et depuis quand.** `entities` existe depuis T1.2 et n'a **jamais reçu une seule
+écriture applicative** : `scripts/seed.ts` la pose, et plus rien ne la touche. Elle est pourtant
+lue partout — colonne et filtre de `/produits`, `select` des deux formulaires de produit, colonne
+de la liste transverse des projets. Renommer une division de l'entreprise, en ajouter une après une
+réorganisation ou ranger une ligne créée en double demandait une session psql.
+
+C'est l'écran promis par **D25** et l'entrée **Administration** de `docs/06` §8, absente de
+`MAIN_NAV` depuis T1.6 faute du droit de lire la session. Le ticket **avance C7 sur un seul
+référentiel** ; les six autres portent des colonnes propres — `family`, `nature`, `rank`,
+`produces_result` — donc d'autres formulaires, et restent à découper.
+
+### Les trois arbitrages, rendus avant écriture
+
+**(a) « Supprimer » existe, et c'est un écart à la règle 4** — arbitré par l'humain, seul à écrire
+`CLAUDE.md`, et consigné au journal technique. Il est borné à une ligne de référentiel que **rien**
+ne référence : ce n'est pas la donnée métier que la règle protège, c'est un doublon d'amorçage.
+L'archivage reste le geste normal.
+
+**(b) L'archivage se refuse tant qu'un produit vivant porte l'entité**, avec le décompte dans le
+message — l'arbitrage (e) de C4bis transposé. Sans lui, le filtre disparaîtrait de `/produits` en y
+laissant ses produits.
+
+**(c) Aucun droit neuf.** `manageDomain` seul ; `SessionRights` garde ses quatre membres, comme
+l'arbitrage (c) de C5bis l'exige.
+
+### Ce qui a été écrit
+
+**Neuf fichiers créés.** `lib/forms/entity.ts` et son test (un champ, `sameEntityLabel` en prime) ;
+`lib/queries/entities.ts` et son test (`listEntitiesForAdmin`, `listEntityLabels`) ;
+`app/(app)/administration/` — la page, les cinq actions, leur test, le point d'entrée des panneaux ;
+`lib/drawers/admin.tsx` ; `components/admin/entity-panel.tsx`.
+
+**Six fichiers modifiés.** `lib/db/scoped.ts` reçoit `deleteRow` et le type `DeletableTable` ;
+`lib/drawers/types.ts` son quatrième jumeau ; `lib/navigation.ts` la route, trois clés et
+`mainNavFor` ; `components/shell/main-nav.tsx` et `app/(app)/layout.tsx` l'entrée conditionnelle ;
+`lib/format.ts` reçoit `formatProducts`. **Aucune migration** : `entities` avait déjà tout.
+
+**Cinq gestes, et leurs conditions.** Ajouter et corriger sous `manageDomain` ; archiver si aucun
+produit **vivant** ; rétablir sans confirmation (la forme de `restoreProduct`) ; supprimer si
+**aucun** produit, archivés compris. La colonne « Produits » porte les deux décomptes — « 1 produit
+· 2 archivés » — parce que ce sont deux règles distinctes, et qu'une entité dont tous les produits
+sont rangés est archivable sans être supprimable.
+
+### Trois choses valent d'être retenues
+
+**Le piège du jour est dans un `catch`.** Le premier `deleteRow` attrapait `23503` — la violation de
+clé étrangère ordinaire — et laissait tout passer : une clé déclarée **`restrict`** est tenue par un
+déclencheur distinct, qui rend **`23001`**. Le code n'était pas non plus là où on le cherchait :
+Drizzle enveloppe l'erreur du pilote dans un `DrizzleQueryError` sans `code`, et il faut descendre
+la chaîne des `cause`. **Un `catch` sur un code d'erreur est du code qui ne s'exécute jamais en
+développement normal, et dont la fausseté ne se voit qu'au test qui le provoque.**
+
+**Le décompte parle, la base décide.** La démonstration est dans la mise en défaut : décompte total
+neutralisé, les deux tests de refus tombent sur le **message** et non sur la donnée — la clé
+étrangère a pris le relais, les entités sont intactes. Une garde qui ne vit que dans l'appelant est
+une garde qu'un prochain appelant oubliera.
+
+**Le rejeu forgé est ce qui prouve la porte.** Le champ `$ACTION_1:1` servi portait
+`["<entité libre>",{}]` ; réécrit vers une entité chargée, Next l'a accepté et l'action a refusé sur
+ce qu'elle avait **reçu** — « 3 produits portent encore cette entité ». Les identifiants liés
+rangent hors de la saisie ; ils ne protègent pas.
+
+### Les quatre disciplines
+
+- **Le critère se lit dans le HTML servi.** 200 au responsable, **404** au membre ; l'entrée de
+  navigation présente pour l'un et absente pour l'autre dans le HTML de `/produits` ; les six
+  adresses de panneau ouvrant chacune un `role="dialog"`, une valeur inconnue n'en ouvrant aucun, et
+  **deux clés ensemble n'ouvrant rien**. Une entité archivée se lit « Archivée en août 2026 » et
+  quitte le `select` du formulaire de produit.
+- **Le droit s'éprouve par l'action.** `createEntity` et `deleteEntity` capturées puis rejouées en
+  `multipart/form-data` sous le cookie d'un membre : refus, base immobile — **avec étape témoin**
+  sous le responsable dans les deux cas, sans laquelle « rien n'a bougé » ne prouverait rien.
+- **Les tests se mettent en défaut.** Neuf neutralisations, chacune faisant tomber ce qu'elle
+  devait. La porte partagée en fait tomber six et non quatre : les deux surnuméraires tombent parce
+  que la neutralisation a **laissé un membre écrire** sur une fixture partagée — corroboration, et
+  non bruit.
+- **Le contraste se mesure.** Quatre couples sur `surface-neutral-pale`, de 4,98:1 à 17,87:1. Aucun
+  n'est neuf par la position ; mesurés quand même.
+
+**960 tests, 33 fichiers, verts.** `lint --max-warnings=0` et `tsc --noEmit` sans une ligne.

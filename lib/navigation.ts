@@ -9,8 +9,12 @@
  * Projets parce que la hiérarchie est le chemin canonique, et que la liste
  * transverse n'en est qu'un raccourci.
  *
- * Administration n'y figure pas : son accès dépend du rôle de la personne
- * courante, donc d'une lecture en base, que T1.6 s'interdit.
+ * Administration y figure depuis le 21/08/2026, et **sous condition** : son
+ * accès dépend du rôle de la personne courante, donc d'une lecture en base, que
+ * T1.6 s'interdisait. La coquille lit désormais la session, et `MAIN_NAV` cède
+ * donc la place à `mainNavFor(canManageDomain)` — une fonction pure, qui reçoit
+ * le droit plutôt qu'elle ne le cherche : ce module ne dépend de rien, ni de
+ * Next, ni de la base, et ce n'est pas cette liste qui protège l'écran.
  *
  * Ce module ne dépend de rien — ni de Next, ni de la base.
  */
@@ -387,6 +391,50 @@ export const SKILL_PANEL_PARAM = "maitrise";
 export const STARTER_PANEL_PARAM = "piste";
 
 /**
+ * Le panneau de **saisie d'une entité**, sur la page Administration
+ * (21/08/2026) — la première clé d'ouverture de cet écran.
+ *
+ * **Deux valeurs d'ouverture**, la forme de `persona` et de `profil` :
+ * `nouvelle` ouvre le panneau vide, un identifiant d'entité l'ouvre sur le
+ * libellé à corriger, et toute autre valeur n'ouvre rien — un UUID ne peut pas
+ * valoir `nouvelle`. Créer et corriger portent ici sur deux lignes distinctes :
+ * la valeur doit donc désigner.
+ *
+ * **`entite` est déjà le filtre de `/produits`**, et ce n'est pas un conflit :
+ * ce sont deux pages, jamais la même URL — la règle qui laisse `indicateur`
+ * vivre sur la page produit et sur la page projet, et `archiver` sur trois
+ * pages. Ce qui interdirait le réemploi serait deux sens sur un **même** écran,
+ * comme `competence` l'a interdit à la page Équipe en T5bis.6.
+ *
+ * **Une seule clé pour lire et pour écrire**, à rebours de la paire
+ * `persona`/`fiche` : l'écran entier ne s'ouvre qu'à `manageDomain`, il n'y a
+ * donc pas deux droits à séparer. Une entité n'a rien à donner à lire que sa
+ * ligne de liste ne dise déjà.
+ */
+export const ENTITY_FORM_PARAM = "entite";
+
+/** La valeur qui ouvre le panneau vide. Un identifiant ouvre la correction. */
+export const ENTITY_FORM_NEW = "nouvelle";
+
+/**
+ * Le panneau de **confirmation de suppression** d'une entité (21/08/2026).
+ *
+ * **Une clé à elle, et non une valeur de plus sur `archiver`** : ce sont deux
+ * gestes aux conséquences opposées — l'un range et se défait, l'autre efface et
+ * ne se défait pas. C'est la distinction qu'`annuler` tient déjà face à
+ * `archiver` sur la page du projet, et elle est ici plus tranchée encore.
+ *
+ * La valeur porte l'identifiant de l'entité : cet écran n'a pas d'objet de
+ * page, il faut donc dire *laquelle*. La forme de `teamPersonArchive`.
+ *
+ * **La suppression est l'écart à la règle 4**, arbitré le 21/08/2026 et borné à
+ * une ligne de référentiel que rien ne référence — voir `DeletableTable` dans
+ * `lib/db/scoped.ts`. Ce n'est pas cette route qui protège : `deleteEntity`
+ * redérive le droit et la condition sur l'identifiant **reçu**.
+ */
+export const DELETE_PANEL_PARAM = "supprimer";
+
+/**
  * Les deux bornes de la fenêtre de la **roadmap**, sur la page du produit.
  *
  * **Ce ne sont pas des clés d'ouverture**, et elles ne rejoignent donc pas le
@@ -697,6 +745,45 @@ export const ROUTES = {
    */
   teamSkillEdit: (personSkillId: string) =>
     `/equipe?${SKILL_PANEL_PARAM}=${personSkillId}`,
+  /**
+   * L'écran **Administration** — le référentiel des entités (21/08/2026).
+   *
+   * L'entrée promise par `docs/06` §8 et l'écran promis par D25, avancé de C7
+   * sur un seul référentiel. **Il n'a pas de page de détail** : une entité est
+   * un libellé, elle n'a rien à montrer qu'une ligne de liste ne dise. Les
+   * quatre fonctions ci-dessous n'en sont donc pas — c'est la même adresse,
+   * avec un paramètre.
+   */
+  admin: "/administration",
+  /**
+   * La page Administration, panneau de saisie ouvert sur le vide. Même
+   * mécanique que les treize adresses d'ouverture qui précèdent : un paramètre,
+   * pas un écran de plus, et la fermeture reste `admin`.
+   */
+  adminEntityNew: `/administration?${ENTITY_FORM_PARAM}=${ENTITY_FORM_NEW}`,
+  /**
+   * Le même panneau, ouvert sur une entité à corriger : la valeur porte le cas,
+   * et c'est la seule différence avec l'entrée ci-dessus.
+   */
+  adminEntityEdit: (entityId: string) =>
+    `/administration?${ENTITY_FORM_PARAM}=${entityId}`,
+  /**
+   * La page Administration, panneau de **confirmation d'archivage** ouvert sur
+   * une entité — quatrième page à reprendre le couple `ConfirmPanel` +
+   * `ARCHIVE_PANEL_PARAM`.
+   *
+   * **La valeur porte l'identifiant**, comme `teamPersonArchive` et à la
+   * différence de `productArchive` : cet écran n'a pas d'objet de page.
+   */
+  adminEntityArchive: (entityId: string) =>
+    `/administration?${ARCHIVE_PANEL_PARAM}=${entityId}`,
+  /**
+   * La page Administration, panneau de **confirmation de suppression** ouvert
+   * sur une entité. Une clé distincte de la précédente : ranger et effacer ne
+   * sont pas deux formes du même geste.
+   */
+  adminEntityDelete: (entityId: string) =>
+    `/administration?${DELETE_PANEL_PARAM}=${entityId}`,
   about: "/a-propos",
 } as const;
 
@@ -716,6 +803,32 @@ export const MAIN_NAV: readonly NavEntry[] = [
   { href: ROUTES.team, label: "Équipe" },
   { href: ROUTES.about, label: "À propos" },
 ];
+
+/** La sixième entrée, celle que `docs/06` §8 réserve au responsable de domaine. */
+const ADMIN_NAV_ENTRY: NavEntry = {
+  href: ROUTES.admin,
+  label: "Administration",
+};
+
+/**
+ * Les entrées à rendre, selon que la personne courante administre ou non.
+ *
+ * **Administration vient en dernier, après « À propos »**, quand `docs/06` §8
+ * la place en quatrième position. L'écart est délibéré et se lit dans le
+ * document lui-même : il énumère quatre entrées dont l'administration est la
+ * dernière, sans connaître ni Équipe ni À propos, qui sont venues après. Ce
+ * qu'il fixe est un **rang** — l'administration ferme la marche —, pas un
+ * indice, et le rang est tenu ici.
+ *
+ * **Cette fonction ne protège rien**, et elle ne doit pas le laisser croire :
+ * elle décide de ce qui s'affiche. Ce qui protège est `/administration`
+ * elle-même, qui rend 404 à qui n'administre pas, et les cinq actions, qui
+ * redérivent le droit sur ce qu'elles reçoivent. Un lien masqué n'est pas un
+ * droit.
+ */
+export function mainNavFor(canManageDomain: boolean): readonly NavEntry[] {
+  return canManageDomain ? [...MAIN_NAV, ADMIN_NAV_ENTRY] : MAIN_NAV;
+}
 
 /**
  * L'entrée de navigation qui correspond au chemin courant.

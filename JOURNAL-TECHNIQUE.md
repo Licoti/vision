@@ -5726,3 +5726,181 @@ Le seuil de 250 reste franchi et attend la session de découpage de C6 — c'est
 fichier se balaie. Une ligne de journal entre, un point ouvert est **récrit** (`default_tool_id`, à
 moitié refermé), un autre est récrit en suspension (la barre d'ancres), deux points neufs entrent
 (« Projets liés » retiré, le filtre qui ne se partage plus).
+
+---
+
+## Administration — le référentiel des entités, hors ticket, 21/08/2026
+
+Le premier écran de gestion de référentiel de Vision, demandé hors chantier alors que C5bis en est
+à son septième ticket. Il **avance D25 sur un seul référentiel** — les entités — et laisse les six
+autres à C7.
+
+### L'écart à la règle 4, et ses quatre bornes
+
+`CLAUDE.md` règle 4 : « aucune donnée métier ne se supprime ». **La suppression d'une entité a été
+demandée et arbitrée par l'humain le 21/08/2026**, seul à écrire `CLAUDE.md`. Elle est consignée
+ici, et le fichier de règles n'est pas touché.
+
+L'argument qui la borne tient en une phrase : **une ligne de référentiel que rien ne référence n'a
+jamais qualifié quoi que ce soit.** Ce n'est pas la donnée métier que la règle 4 protège, c'est un
+doublon d'amorçage — le cas exact que le point ouvert d'`ETAT.md` décrivait, où renommer un outil
+puis relancer `db:seed` avait laissé deux lignes en base.
+
+Quatre choses la tiennent, et il faut les lire ensemble :
+
+1. **Le typage.** `DeletableTable` est une **union nominative** — `typeof entities`, rien d'autre —
+   et non un prédicat structurel. `deleteRow(products, …)` ne compile pas ; c'est la méthode
+   d'`unlink`, dont le type refuse déjà toute table archivable. Le garde-fou de typage de
+   `scoped.test.ts` s'étend de trois lignes.
+2. **La clé étrangère.** `products.entity_id` est déclarée `on delete restrict` depuis T1.2 :
+   PostgreSQL refuse lui-même l'effacement, y compris pour un produit **archivé**.
+3. **Le décompte.** `deleteEntity` compte `includeArchived: true` — pour **dire** combien, jamais
+   pour décider. La distinction n'est pas rhétorique : elle est ce qui permet à la garde de rester
+   vraie sous une écriture concurrente.
+4. **Le panneau.** La confirmation dit, avant le geste, que la ligne est effacée et non rangée, et
+   que le geste n'existe que pour une entité créée par erreur.
+
+**L'archivage, lui, ne change pas de doctrine** : il reste le geste normal, il se refuse tant qu'un
+produit **vivant** porte l'entité (arbitrage (e) de C4bis transposé), et il se défait.
+
+### Deux décomptes et non un, et c'est le cœur de l'écran
+
+`liveProductCount` s'oppose à l'archivage, `totalProductCount` à la suppression. Une entité dont
+tous les produits sont archivés est **archivable et pas supprimable** : c'est le cas qui sépare les
+deux règles, il est éprouvé trois fois — dans `lib/queries/entities.test.ts`, dans
+`lib/db/scoped.test.ts` et dans `app/(app)/administration/actions.test.ts` — et c'est lui qui
+justifie que la colonne « Produits » affiche « 1 produit · 2 archivés » plutôt qu'un seul nombre.
+
+### Le piège du jour : `restrict` rend `23001`, pas `23503`
+
+**Le premier `deleteRow` attrapait `23503` et laissait tout passer.** Deux erreurs empilées, et la
+mesure les a rendues toutes les deux :
+
+- **Le code n'était pas le bon.** `23503` est la violation de clé étrangère ordinaire, celle que
+  rend une clé `no action`. Une clé déclarée **`restrict`** est tenue par un déclencheur distinct,
+  qui rend **`23001`** (`restrict_violation`). La seule clé que ce code existait pour attraper est
+  précisément une clé `restrict`.
+- **Le code n'était pas là où on le cherchait.** Drizzle enveloppe l'erreur du pilote dans un
+  `DrizzleQueryError`, qui ne porte pas de `code` : il faut descendre la chaîne des `cause`.
+
+D'où `isReferenceViolation`, qui accepte les deux codes et parcourt les causes sur cinq niveaux. Il
+se lit sur le **code**, jamais sur le message — celui-ci est localisé par le serveur.
+
+**La leçon est plus large que le bogue** : un `catch` qui teste un code d'erreur est du code qui ne
+s'exécute jamais en développement normal, et dont la fausseté ne se voit qu'au test qui le
+provoque. Écrit sans test, il aurait rendu un 500 au premier usage réel.
+
+### Le décompte d'exclusivité passe de sept clés à trois — sur une autre page
+
+`/administration` porte trois clés d'ouverture : `entite`, `archiver`, `supprimer`. Le décompte est
+repris **mot pour mot** de la page Équipe, sans qu'un caractère de son énoncé change.
+
+- **`entite` est déjà le filtre de `/produits`**, et ce n'est pas un conflit : ce sont deux pages,
+  jamais la même URL — la règle qui laisse `indicateur` vivre sur produit et projet, et `archiver`
+  désormais sur **quatre** pages. Ce qui interdirait le réemploi serait deux sens sur un **même**
+  écran, comme `competence` l'a interdit à la page Équipe en T5bis.6.
+- **`supprimer` est une clé à elle, et non une valeur d'`archiver`.** Ranger et effacer ont des
+  conséquences opposées ; les confondre aurait mis l'écart à la règle 4 derrière un booléen. C'est
+  la distinction qu'`annuler` tient déjà face à `archiver` sur la page projet.
+- **Une seule clé pour lire et pour écrire**, à rebours de `persona`/`fiche` et de
+  `personne`/`profil` : l'écran entier ne s'ouvre qu'à `manageDomain`, il n'y a pas deux droits à
+  séparer. Une entité est un libellé.
+
+### La sixième entrée de navigation, contre les « quatre » de `docs/06` §8
+
+`MAIN_NAV` en portait cinq depuis T5bis.2, déjà en écart. Administration en fait une sixième.
+`docs/06` §8 énumère quatre entrées **dont l'administration est la dernière**, sans connaître ni
+Équipe ni À propos, arrivées après : ce qu'il fixe est un **rang**, pas un indice, et le rang est
+tenu — Administration ferme la marche.
+
+`MAIN_NAV` reste exporté tel quel ; `mainNavFor(canManageDomain)` lui ajoute l'entrée. La fonction
+est **pure** : `lib/navigation.ts` ne dépend toujours ni de Next ni de la base.
+
+**L'interdit de T1.6 tombe, et il faut dire lequel.** La coquille s'interdisait toute lecture en
+base, ce qui écartait deux blocs de la maquette : la carte de la personne courante et l'entrée
+Administration. `app/(app)/layout.tsx` devient `async` et appelle `getSession()` — mémorisée par le
+`cache()` de React, donc sans second aller-retour. **La carte de la personne courante reste
+dehors** : elle n'est du périmètre d'aucun ticket en cours (règle 3), et ce qui lui manquait n'est
+plus un droit mais un ticket.
+
+`getSession()` et non `requireSession()` : une barre de navigation n'est pas l'endroit où l'on
+refuse l'accès. Sans session, aucune entrée d'administration — le repli le plus étroit.
+
+### Le refus de doublon, et pourquoi il n'est pas en base
+
+`entities` ne porte **aucune contrainte d'unicité**, et le commentaire de `schema.ts` dit pourquoi :
+« une contrainte non demandée contraindrait l'écran de gestion dû à C7 ». L'écran est là, et il
+refuse le doublon — mais **dans l'action**, où le refus se dit en français et se nuance, plutôt
+qu'en base, où il rendrait un 500.
+
+`sameEntityLabel` compare par `localeCompare` avec `sensitivity: "base"` : ni la casse, ni les
+espaces de bord, ni **l'accent** ne distinguent. « Banque de detail » ne crée pas une seconde
+« Banque de détail ». Les entités **archivées** comptent, et le refus propose alors de rétablir —
+c'est le geste juste, et le cas exact du point ouvert de l'amorçage.
+
+### Ce que le ticket n'a pas fait, et pourquoi
+
+- **`entities.position` reste non exposée.** Elle existe en base depuis T1.2 et **n'est lue par
+  aucun écran** de Vision — tous les tris se font sur `label`. L'ouvrir aurait fait de la gestion du
+  référentiel un ordonnancement, que rien ne demande. Le formulaire n'a donc qu'un champ.
+- **Aucune écriture dans `events`.** L'énuméré `eventTargetType` ne porte aucun référentiel, et le
+  journal est à C6. Journaliser ici aurait demandé une migration et un énuméré étendu, hors
+  périmètre.
+- **Aucune migration.** `entities` avait déjà tout.
+- **Les six autres référentiels.** `activity_types`, `project_statuses` et `skill_levels` portent
+  des colonnes propres — `family`, `produces_result`, `nature`, `rank` — donc d'autres formulaires.
+  Ils reprendront cette forme, ils ne s'y glissent pas.
+
+### La dette de l'`ActionMenu`, aggravée d'un cran
+
+**« Rétablir cette entité » n'a aucun repli sans JavaScript**, et c'est la première fois qu'un geste
+de rétablissement est dans ce cas : celui du produit vit dans l'en-tête de sa page, en `<form>` nu
+toujours servi. Ici il vit dans le menu « … », qui ne s'ouvre pas sans JavaScript — et il n'a pas
+d'URL, un rétablissement n'ayant rien à confirmer.
+
+C'est exactement l'arbitrage du 17/08/2026 sur les cartes de roadmap, où quatre actions serveur ont
+perdu leur repli, et il est repris sciemment plutôt qu'étendu : inventer ici un bouton hors menu
+aurait donné deux langages de geste dans une même liste. **Le prix est connu, il monte d'un cran.**
+
+### Les quatre disciplines, et ce que la mesure a coûté
+
+- **Le critère se lit dans le HTML servi.** `/administration` rend **200** au responsable et
+  **404** au membre ; l'entrée de navigation est **présente** dans le HTML de `/produits` servi au
+  premier et **absente** du second. Les six adresses de panneau ouvrent chacune un `role="dialog"` ;
+  `?entite=nimportequoi` n'en ouvre aucun ; **deux clés ensemble n'ouvrent rien**. Les deux
+  confirmations disent le bon décompte au bon nombre — « 1 produit vivant porte », « 3 produits
+  portent […] archivés compris ». Une entité archivée se lit « Archivée en août 2026 » et **quitte
+  le `select` du formulaire de produit**, vérifié sur le HTML des deux écrans.
+- **Le droit s'éprouve par l'action.** `createEntity` et `deleteEntity` ont été **capturées puis
+  rejouées à la main** en `multipart/form-data` (leçon de TD.1) sous le cookie d'un membre : les
+  deux refusent, la base ne bouge pas. **L'étape témoin a été faite dans les deux cas** — le même
+  rejeu sous le cookie du responsable écrit, puis efface. Sans elle, « rien n'a bougé » ne prouve
+  rien. Un troisième rejeu a **forgé l'identifiant lié** : le champ `$ACTION_1:1` servi portait
+  `["<entité libre>",{}]`, réécrit vers une entité chargée ; Next a accepté, et l'action a refusé
+  sur ce qu'elle avait **reçu** — « 3 produits portent encore cette entité ».
+- **Les tests se mettent en défaut.** Neuf neutralisations. Le droit de `createEntity` fait tomber
+  **un** test ; le décompte vivant **un** ; le contrôle de doublon **quatre**, tous des doublons ;
+  le décompte total **deux** ; le `filter(products)` de la jointure **un** ; le `filter(entities)`
+  **deux** ; l'inclusion des archivées **deux** ; la traduction en `IntegrityError` **deux**. Le
+  droit de la porte partagée en fait tomber **six** et non quatre : les deux surnuméraires tombent
+  **parce que la neutralisation a laissé un membre écrire**, et la fixture est partagée — c'est une
+  corroboration, pas du bruit, et il est plus honnête de le noter que de l'arrondir.
+  **Le cinquième cas vaut d'être lu en détail** : décompte total neutralisé, les deux tests tombent
+  sur le **message** et non sur la donnée — la clé étrangère a pris le relais et les entités sont
+  intactes. C'est la démonstration que le décompte parle et que la base décide.
+- **Le contraste se mesure.** Quatre couples sur `surface-neutral-pale` : `content-neutral-base`
+  (« Archivée en… », « · N archivés ») **4,98:1**, `content-neutral-dark` (« En service ») 8,12:1,
+  `content-neutral-darkest` (le libellé) 17,87:1, `content-danger-dark` (« Supprimer cette
+  entité ») **6,90:1**. Aucun couple n'est neuf par la position — la liste Équipe rend déjà les
+  trois premiers, les menus de la roadmap le quatrième —, ils sont mesurés quand même.
+- **La suite est verte** : **960 tests, 33 fichiers**, `npm run lint --max-warnings=0` et
+  `tsc --noEmit` sans une ligne.
+
+### `ETAT.md` passe de 646 à 661 lignes
+
+Le seuil de 250 reste franchi et attend la session de découpage de C6 — c'est le seul moment où le
+fichier se balaie. Une ligne de journal entre, et **un point ouvert se referme** : celui de
+l'amorçage qui recrée par clé naturelle, dont la destination était « écran de gestion des
+référentiels (D25, C7) ». Il ne se referme **qu'à moitié pour les outils** : c'est `entities` qui a
+son écran, pas `tools`, et les deux lignes « Everyone » / « Audit d'accessibilité » de la base de
+développement restent. Le point est donc **récrit** plutôt que sorti.

@@ -715,6 +715,63 @@ describe("les compétences portées", () => {
    Contraintes de typage — vérifiées par `tsc --noEmit`, jamais exécutées
    ========================================================================== */
 
+/* ==========================================================================
+   La suppression — l'exception à la règle 4
+   ========================================================================== */
+
+describe("`deleteRow`", () => {
+  test("efface une entité que rien ne référence", async () => {
+    const orphan = await a.scope.insert(entities, {
+      label: `Orpheline ${suffix}`,
+    });
+
+    expect(await a.scope.deleteRow(entities, orphan.id)).toBe(1);
+    expect(await a.scope.find(entities, orphan.id)).toBeUndefined();
+  });
+
+  test("la clé étrangère refuse une entité qu'un produit porte", async () => {
+    /* `a.entityId` porte `a.productId`. C'est **la base** qui refuse, pas la
+       couche : `products.entity_id` est déclarée `on delete restrict`, et
+       `deleteRow` ne compte rien avant d'effacer. La traduction en
+       `IntegrityError` est ce qui évite un 500 à l'écran. */
+    await expect(a.scope.deleteRow(entities, a.entityId)).rejects.toThrow(
+      IntegrityError,
+    );
+
+    expect(await a.scope.find(entities, a.entityId)).toBeDefined();
+  });
+
+  test("un produit **archivé** retient la ligne tout autant", async () => {
+    /* Le cas qui sépare l'archivage de la suppression : plus rien de vivant ne
+       s'oppose au rangement, et la clé étrangère s'oppose pourtant encore à
+       l'effacement. C'est pour lui que l'écran porte deux décomptes. */
+    const entity = await a.scope.insert(entities, {
+      label: `Portée par un rangé ${suffix}`,
+    });
+    const product = await a.scope.insert(products, {
+      name: `Rangé ${suffix}`,
+      entityId: entity.id,
+    });
+    await a.scope.archive(products, product.id);
+
+    await expect(a.scope.deleteRow(entities, entity.id)).rejects.toThrow(
+      IntegrityError,
+    );
+    expect(await a.scope.find(entities, entity.id)).toBeDefined();
+  });
+
+  test("une entité de l'autre domaine n'existe pas : rien n'est effacé", async () => {
+    expect(await a.scope.deleteRow(entities, b.entityId)).toBe(0);
+    expect(await b.scope.find(entities, b.entityId)).toBeDefined();
+  });
+
+  test("un identifiant inconnu rend zéro plutôt qu'une erreur", async () => {
+    expect(
+      await a.scope.deleteRow(entities, "00000000-0000-4000-8000-000000000000"),
+    ).toBe(0);
+  });
+});
+
 describe("les garde-fous de typage", () => {
   test("`unlink` refuse une table archivable, `archive` une table de liaison", () => {
     const jamaisAppele = async (scope: ScopedDb) => {
@@ -730,6 +787,12 @@ describe("les garde-fous de typage", () => {
       await scope.list(domains);
       // @ts-expect-error `domainId` n'appartient pas à l'appelant.
       await scope.insert(entities, { label: "x", domainId: "…" });
+      // @ts-expect-error `products` n'est pas dans `DeletableTable` : une donnée métier ne s'efface pas.
+      await scope.deleteRow(products, "…");
+      // @ts-expect-error `persons` non plus, et pour la même raison.
+      await scope.deleteRow(persons, "…");
+      // `entities` y est : `deleteRow` y est disponible, sans cast.
+      await scope.deleteRow(entities, "…");
     };
     expect(typeof jamaisAppele).toBe("function");
   });

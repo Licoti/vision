@@ -15,9 +15,11 @@
  *   — toute écriture d'activité recalcule `projects.last_activity_at` ;
  *   — le `domain_id` d'une ligne est cohérent avec celui de ses parents.
  *
- * Ce que cette couche n'expose pas : de suppression générique. Le mot
- * `delete` ne figure pas dans son API. Règle 4 — aucune donnée métier ne se
- * supprime, elle s'archive.
+ * Ce que cette couche n'expose pas : de suppression générique. Règle 4 —
+ * aucune donnée métier ne se supprime, elle s'archive. Deux fonctions font
+ * exception, et toutes deux portent leur exception **dans leur type** plutôt
+ * que dans un commentaire : `unlink`, réservée aux tables de liaison, et
+ * `deleteRow`, réservée aux référentiels que `DeletableTable` énumère.
  *
  * `archive` et `restore` sont les **deux seuls chemins** vers `archived_at` :
  * `update` refuse la colonne, et `UpdateValues` l'exclut du typage. Un
@@ -38,7 +40,7 @@ import {
 import { getTableConfig, type PgColumn, type PgTable } from "drizzle-orm/pg-core";
 
 import { db, type Database } from "./client";
-import { activities, domains, projects, results } from "./schema";
+import { activities, domains, entities, projects, results } from "./schema";
 
 /* ==========================================================================
    Erreurs
@@ -64,6 +66,34 @@ export class IntegrityError extends Error {
   }
 }
 
+/**
+ * PostgreSQL a-t-il refusé une suppression parce qu'une ligne la référence ?
+ *
+ * **Deux codes et non un**, et c'est un piège mesuré le 21/08/2026 : `23503`
+ * est la violation de clé étrangère ordinaire, celle que rend une clé
+ * `no action` ; une clé déclarée **`restrict`** — c'est le cas de
+ * `products.entity_id` — est tenue par un déclencheur distinct, qui rend
+ * `23001`. N'attendre que `23503` laissait donc passer le seul cas que ce
+ * code existe pour attraper.
+ *
+ * **Le code se cherche dans la chaîne des causes**, jamais sur l'erreur reçue :
+ * Drizzle enveloppe celle du pilote dans un `DrizzleQueryError`, qui ne porte
+ * pas de `code`. Et il se lit sur le code, jamais sur le message — celui-ci est
+ * localisé par le serveur et changerait sous nos pieds.
+ */
+function isReferenceViolation(error: unknown): boolean {
+  const REFERENCE_CODES = ["23001", "23503"];
+
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current; depth += 1) {
+    if (typeof current !== "object") return false;
+    const code = (current as { code?: unknown }).code;
+    if (typeof code === "string" && REFERENCE_CODES.includes(code)) return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
 /* ==========================================================================
    Ce qu'est une table scopée
    ========================================================================== */
@@ -84,6 +114,30 @@ export type ArchivableTable = ScopedTable & { archivedAt: PgColumn };
  * compilation toute table qui porte la colonne.
  */
 export type LinkTable = ScopedTable & { archivedAt?: undefined };
+
+/**
+ * Les tables dont une ligne peut être **supprimée** — l'exception à la règle 4,
+ * portée par le typage plutôt que par une convention (21/08/2026).
+ *
+ * **Une union nominative, jamais un prédicat structurel.** `LinkTable` se
+ * définit par une forme — l'absence d'`archived_at` — parce que la forme
+ * *est* la règle : une liaison n'a rien à archiver. Ici, aucune forme ne
+ * distingue `entities` de `products` : les deux portent `archived_at`, les deux
+ * sont scopées. Ce qui les sépare est ce qu'elles **sont** — un référentiel qui
+ * qualifie, contre une donnée métier qui existe. Cette distinction ne se
+ * dérive pas d'un type, elle se décide, et une union nommée est le seul endroit
+ * où une décision se relit.
+ *
+ * **Ajouter une table ici est un arbitrage, pas un ajustement.** `deleteRow`
+ * n'efface qu'une ligne que rien ne référence — la clé étrangère `restrict` de
+ * `products.entity_id` en est le dernier barrage —, si bien qu'aucune donnée
+ * métier ne disparaît jamais avec elle. Une table dont les lignes sont
+ * référencées par du fait d'accompagnement n'entre pas dans cette union.
+ *
+ * L'écart à la règle 4 est arbitré par l'humain le 21/08/2026 et consigné dans
+ * `JOURNAL-TECHNIQUE.md` — `CLAUDE.md` ne s'écrit pas d'ici.
+ */
+export type DeletableTable = typeof entities;
 
 /**
  * `Omit` et non `Except` serait plus court — et faux.
@@ -655,6 +709,50 @@ export function forDomain(scope: Scope) {
     return removed.length;
   }
 
+  /**
+   * Supprime une ligne de référentiel — l'exception à la règle 4, et la seule.
+   *
+   * **Le typage la borne** : `DeletableTable` n'énumère aujourd'hui que
+   * `entities`, si bien que `deleteRow(products, …)` ne compile pas. C'est la
+   * méthode d'`unlink`, dont le type refuse déjà toute table archivable.
+   *
+   * **Elle ne vérifie pas que la ligne est libre, et c'est délibéré.** La clé
+   * étrangère `products.entity_id` est déclarée `on delete restrict`
+   * (`schema.ts`) : PostgreSQL refuse lui-même l'effacement d'une entité
+   * qu'un produit porte encore, archivé compris. Un décompte préalable serait
+   * une seconde autorité, qui divergerait un jour de la première — et il
+   * laisserait de toute façon la fenêtre entre le compte et l'effacement.
+   * L'appelant compte pour **parler** — dire combien de produits s'y opposent —,
+   * jamais pour décider ; c'est cette barrière-ci qui décide.
+   *
+   * Le refus de la base est traduit en `IntegrityError`, la classe prévue pour
+   * « une règle que l'appelant a violée » — sans quoi l'écran rendrait un 500
+   * là où l'on attend un message.
+   *
+   * Rend le nombre de lignes effacées : `0` quand l'identifiant est inconnu ou
+   * appartient à un autre domaine, la couche étant scopée et ne distinguant
+   * pas les deux.
+   */
+  async function deleteRow<T extends DeletableTable>(
+    table: T,
+    id: string,
+  ): Promise<number> {
+    try {
+      const removed = await db
+        .delete(anyTable(table))
+        .where(and(eq(table.id, id), filter(table)))
+        .returning({ id: table.id });
+      return removed.length;
+    } catch (error) {
+      if (isReferenceViolation(error)) {
+        throw new IntegrityError(
+          "Cette ligne est encore référencée : elle ne peut pas être supprimée.",
+        );
+      }
+      throw error;
+    }
+  }
+
   return {
     domainId,
     actorId,
@@ -671,6 +769,7 @@ export function forDomain(scope: Scope) {
     restore,
     refreshLastActivity,
     unlink,
+    deleteRow,
   };
 }
 

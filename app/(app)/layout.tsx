@@ -1,16 +1,25 @@
 /**
  * La coquille applicative : barre latérale de navigation, et zone de contenu.
  *
- * Elle enveloppe le groupe de routes `(app)`, c'est-à-dire les six écrans du
+ * Elle enveloppe le groupe de routes `(app)`, c'est-à-dire les sept écrans du
  * produit — et eux seuls. `/dev/session` vit hors du groupe : c'est un outil
  * de développement, il n'a pas à hériter de la navigation du produit, et
  * `ETAT.md` pose que T1.6 n'a pas à le référencer.
  *
- * Interdit du ticket, tenu : aucune lecture en base. Deux blocs de la
- * maquette en découlent absents, et le sont volontairement — la carte de la
- * personne courante et l'entrée Administration supposent l'une comme l'autre
- * de lire la session, donc la base. Ils reviendront avec l'écran qui en a le
- * droit.
+ * **Elle lit la session depuis le 21/08/2026**, et c'est l'interdit de T1.6 qui
+ * tombe — pas par oubli, mais parce que l'écran qui en avait le droit est
+ * arrivé : l'entrée **Administration** de `docs/06` §8 n'a de sens que rendue
+ * au seul responsable de domaine. `getSession()` est mémorisée par le `cache()`
+ * de React, si bien que la page qu'elle enveloppe la relit sans second
+ * aller-retour.
+ *
+ * **La carte de la personne courante reste absente**, et volontairement : c'est
+ * l'autre bloc que T1.6 avait écarté, et il n'est du périmètre d'aucun ticket
+ * en cours (règle 3). Ce qui lui manquait n'est plus un droit, c'est un ticket.
+ *
+ * **Cette lecture ne protège rien** : `/administration` rend 404 à qui
+ * n'administre pas, et ses cinq actions redérivent le droit sur ce qu'elles
+ * reçoivent. Ce qui se décide ici est ce qui s'affiche.
  *
  * Le lien d'évitement est le premier arrêt de tabulation de chaque page : sans
  * lui, atteindre le contenu coûterait la navigation entière, à chaque écran.
@@ -20,9 +29,20 @@ import Link from "next/link";
 
 import { MainNav } from "@/components/shell/main-nav";
 import { buttonClass } from "@/components/ui/button";
+import { getSession } from "@/lib/auth/provider";
 import { ROUTES } from "@/lib/navigation";
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  /* `getSession` et non `requireSession` : la coquille enveloppe aussi les
+     écrans qui se rendent sans session établie, et une barre de navigation
+     n'est pas l'endroit où l'on refuse l'accès. Sans session, aucune entrée
+     d'administration — le repli le plus étroit. */
+  const session = await getSession();
+
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <a
@@ -46,7 +66,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           />
           Vision
         </Link>
-        <MainNav />
+        <MainNav canManageDomain={session?.can.manageDomain ?? false} />
       </aside>
 
       <main id="contenu" className="min-w-0 max-w-310 flex-1 px-10 pt-9 pb-18">

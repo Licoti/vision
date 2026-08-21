@@ -2,8 +2,7 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 21/08/2026 — reprise de la roadmap et dégraissage de la page projet,
-hors ticket.
+**Dernière mise à jour :** 21/08/2026 — Administration : le référentiel des entités, hors ticket.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
 **Ticket suivant :** **T5bis.7** — la sélection d'équipe du formulaire de projet, refondue
 (`tickets-C5bis.md`).
@@ -320,6 +319,18 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   invisibles** — `--color-*: initial` fait qu'aucune règle ne répond à `aaaa`, donc rien ne le
   signale, ni le navigateur, ni `tsc`, ni `eslint`.
 
+- **Administration : le référentiel des entités — hors ticket, le 21/08/2026.** `entities` recevait
+  ses lignes de `scripts/seed.ts` et **d'aucune écriture applicative** depuis T1.2. L'écran de D25
+  arrive, **avancé de C7 sur un seul référentiel** : lister (archivées comprises), ajouter, corriger,
+  archiver, rétablir, et **supprimer** — écart à la règle 4 arbitré par l'humain, borné à une ligne
+  que rien ne référence et tenu par quatre choses : `DeletableTable`, la clé étrangère `restrict`, le
+  décompte et le panneau. `docs/06` §8 obtient son entrée de navigation, et **l'interdit de lecture
+  en base de T1.6 tombe pour la coquille** — la carte de la personne courante, elle, reste dehors
+  (règle 3). Deux décomptes par ligne, parce qu'une entité dont tous les produits sont rangés est
+  archivable sans être supprimable. Sa leçon est dans un `catch` : **une clé `restrict` rend `23001`
+  et non `23503`**, et Drizzle enveloppe l'erreur du pilote dans un `DrizzleQueryError` sans `code` —
+  un `catch` sur un code d'erreur est du code que seul le test qui le provoque met en défaut.
+
 ---
 
 ## Points ouverts
@@ -599,10 +610,14 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   activités a été étendue à `projet · type · période` avant C3, ce qui atténue sans éliminer : deux
   activités du même type sur le même projet **dans le même mois** collisionneraient encore. Le
   20/08/2026, le bloc « Démarrage » a renommé l'outil « Audit d'accessibilité » en **« Everyone »** :
-  la base de développement porte désormais les deux lignes — la neuve, que le type d'activité et le
-  résultat semés référencent ; l'ancienne, orpheline et non archivée. Le cas n'est donc plus
-  théorique, et il reste sans conséquence en production, où l'amorçage ne tourne pas.
-  → **écran de gestion des référentiels (D25, C7).**
+  la base de développement porte les deux lignes — la neuve, que le type d'activité et le résultat
+  semés référencent ; l'ancienne, orpheline et non archivée. Le cas n'est donc pas théorique, et il
+  reste sans conséquence en production, où l'amorçage ne tourne pas.
+  **Le point se referme pour les entités seules** (21/08/2026) : `/administration` les crée, les
+  corrige, les archive et **supprime** un doublon que rien ne référence, et le refus de libellé en
+  double — insensible à la casse et à l'accent — empêche d'en poser un de plus. **`tools` et les cinq
+  autres référentiels n'ont pas d'écran**, et les deux lignes d'outil restent.
+  → **les six référentiels restants, C7.**
 - **Les filtres ne survivent pas à un aller-retour par la navigation principale.** `docs/06` §9 les
   veut conservés. Ils vivent dans l'URL, donc le retour navigateur les restitue ; un clic sur
   « Projets » dans la barre latérale repart à zéro. Mémoriser l'URL de retour demanderait un état de

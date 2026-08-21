@@ -248,6 +248,20 @@ export function formatProjects(count: number): string {
 }
 
 /**
+ * « 3 produits » · « 1 produit » · « Aucun produit ».
+ *
+ * Le décompte des produits rattachés à une entité, sur l'écran Administration
+ * (21/08/2026). Il dit ce qui **s'oppose à un geste** — archiver, supprimer —
+ * plutôt que ce qu'une recherche a retenu, et zéro y est donc l'état le plus
+ * intéressant : c'est celui où les deux gestes s'ouvrent. Il s'écrit en toutes
+ * lettres comme chez les quatre voisines.
+ */
+export function formatProducts(count: number): string {
+  if (count === 0) return "Aucun produit";
+  return `${count} produit${count > 1 ? "s" : ""}`;
+}
+
+/**
  * « 3 personnes » · « 1 personne » · « Aucune personne ».
  *
  * Le compteur de la liste Équipe, qui dit ce que les filtres ont retenu. Il

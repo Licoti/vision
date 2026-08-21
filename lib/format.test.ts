@@ -1,6 +1,7 @@
 /**
  * Les tests des deux formatages posés par T4.3 — `formatDay` et
- * `formatResultValue` —, puis des trois de T5.1.
+ * `formatResultValue` —, des trois de T5.1, puis de `formatProducts`
+ * (21/08/2026).
  *
  * **Écart de périmètre déclaré** : la fiche du ticket ne nomme que
  * `lib/format.ts`, qui n'avait aucun fichier de tests. Le ticket y ajoute trois
@@ -31,6 +32,7 @@ import {
   formatMonthTick,
   formatPeriodShort,
   formatComplementaryIndicators,
+  formatProducts,
   formatReadings,
   formatResultValue,
 } from "./format";
@@ -227,5 +229,21 @@ describe("formatIndicatorDirection", () => {
     ].join(" ");
 
     expect(both).not.toMatch(/bon|mauvais|objectif|cible|atteint/iu);
+  });
+});
+
+describe("formatProducts", () => {
+  test("zéro s'écrit en toutes lettres", () => {
+    // Sur l'écran Administration, zéro est l'état le plus intéressant : c'est
+    // celui où archiver et supprimer s'ouvrent tous les deux.
+    expect(formatProducts(0)).toBe("Aucun produit");
+  });
+
+  test("un produit reste au singulier", () => {
+    expect(formatProducts(1)).toBe("1 produit");
+  });
+
+  test("au-delà, le pluriel", () => {
+    expect(formatProducts(4)).toBe("4 produits");
   });
 });

@@ -97,10 +97,34 @@ export type TeamDrawerRequest =
   | { kind: "skill"; id: string }
   | { kind: "archive"; id: string };
 
+/**
+ * Les trois panneaux de la page **Administration** (21/08/2026).
+ *
+ * **Une écriture et deux confirmations**, et aucune lecture : cet écran ne
+ * s'ouvre qu'à `manageDomain`, si bien qu'il n'a pas la paire « une clé pour
+ * lire, une clé pour écrire » que les pages produit et Équipe tiennent chacune.
+ * Une entité est un libellé : elle n'a rien à détailler qu'une ligne de liste
+ * ne dise déjà.
+ *
+ * `id` est facultatif sur `entity` — la valeur porte le cas dans l'URL,
+ * `nouvelle` contre un identifiant, et son absence dit « créer ». Il est requis
+ * sur les deux confirmations, qui désignent **une entité** et non l'objet de la
+ * page : `/administration` n'en a pas.
+ *
+ * **`delete` n'est pas une variante d'`archive`**, et le type le dit comme
+ * l'URL : l'un range et se défait, l'autre efface et ne se défait pas. Les
+ * confondre en une clé aurait mis l'écart à la règle 4 derrière un booléen.
+ */
+export type AdminDrawerRequest =
+  | { kind: "entity"; id?: string | undefined }
+  | { kind: "archive"; id: string }
+  | { kind: "delete"; id: string };
+
 export type DrawerRequest =
   | ProductDrawerRequest
   | ProjectDrawerRequest
-  | TeamDrawerRequest;
+  | TeamDrawerRequest
+  | AdminDrawerRequest;
 
 /**
  * Ce que le serveur renvoie, et ce que la coquille sait afficher.
@@ -174,6 +198,8 @@ const PROJECT_KINDS = [
 
 const TEAM_KINDS = ["personDetail", "person", "skill", "archive"] as const;
 
+const ADMIN_KINDS = ["entity", "archive", "delete"] as const;
+
 export function asProductRequest(
   request: DrawerRequest,
 ): ProductDrawerRequest | null {
@@ -206,5 +232,22 @@ export function asTeamRequest(
 ): TeamDrawerRequest | null {
   return (TEAM_KINDS as readonly string[]).includes(request.kind)
     ? (request as TeamDrawerRequest)
+    : null;
+}
+
+/**
+ * Le quatrième jumeau, pour la page Administration (21/08/2026).
+ *
+ * `archive` reste la clé commune aux quatre pages, et ce rétrécissement ne la
+ * distingue donc pas : une demande `{ kind: "archive" }` forgée depuis la page
+ * produit — qui n'y porte aucun identifiant — passe ce filtre. C'est
+ * `resolveAdminDrawer` qui la refuse, en vérifiant la forme de l'UUID avant
+ * toute lecture, puis le droit avant toute chose.
+ */
+export function asAdminRequest(
+  request: DrawerRequest,
+): AdminDrawerRequest | null {
+  return (ADMIN_KINDS as readonly string[]).includes(request.kind)
+    ? (request as AdminDrawerRequest)
     : null;
 }

@@ -5,24 +5,34 @@
  *
  * Il l'est pour une seule raison : `usePathname()`, qui désigne l'entrée
  * courante. La frontière client s'arrête ici ; la coquille, les gabarits et
- * les six pages restent des composants serveur.
+ * les sept pages restent des composants serveur.
  *
  * L'entrée courante porte `aria-current="page"` : elle ne se signale pas
  * qu'à la couleur.
+ *
+ * **Il reçoit le droit, il ne le lit pas** (21/08/2026). L'entrée
+ * « Administration » n'est rendue qu'au responsable de domaine, et c'est la
+ * coquille — composant serveur — qui lit la session pour le dire. Un composant
+ * client n'a rien à faire d'un contexte de droits : la règle de `Panel` et des
+ * seize panneaux.
+ *
+ * **Ce booléen ne protège rien.** `/administration` rend 404 à qui n'administre
+ * pas, et les cinq actions redérivent le droit sur ce qu'elles reçoivent. Une
+ * entrée masquée n'est pas un droit — elle épargne un cul-de-sac, rien de plus.
  */
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { isCurrentEntry, MAIN_NAV } from "@/lib/navigation";
+import { isCurrentEntry, mainNavFor } from "@/lib/navigation";
 
-export function MainNav() {
+export function MainNav({ canManageDomain }: { canManageDomain: boolean }) {
   const pathname = usePathname();
 
   return (
     <nav aria-label="Navigation principale">
       <ul className="flex flex-row flex-wrap gap-1 md:flex-col md:flex-nowrap">
-        {MAIN_NAV.map((entry) => {
+        {mainNavFor(canManageDomain).map((entry) => {
           const current = isCurrentEntry(entry, pathname);
           return (
             <li key={entry.href}>
