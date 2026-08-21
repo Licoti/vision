@@ -542,6 +542,19 @@ export type ProjectAdoption = {
   label: string;
   /** L'unité de l'**indicateur** : les quatre chiffres la partagent. */
   unit: string | null;
+  /**
+   * La North Star **du produit** (migration 0003), telle que l'adoption la
+   * reçoit — jamais une North Star « du projet », qui n'existe pas : l'index
+   * unique partiel en garantit une au plus par produit, et un accompagnement
+   * qui l'adopte adopte celle-là.
+   *
+   * Elle ne change **rien** au contenu de la ligne — les quatre valeurs
+   * reportées restent les mêmes —, elle décide de sa **place** et de son
+   * dessin : la maquette `project-v2` met l'objectif du produit dans un
+   * encadré de tête et les autres en cartes dessous. Une colonne de plus dans
+   * un `select` existant, pas une requête de plus.
+   */
+  isNorthStar: boolean;
   /** Brutes — « 85.0000 ». La mise en forme appartient à l'écran. */
   baselineValue: string | null;
   targetValue: string | null;
@@ -587,6 +600,7 @@ export function listProjectAdoptions(
         indicatorId: projectIndicators.indicatorId,
         label: indicators.label,
         unit: indicators.unit,
+        isNorthStar: indicators.isNorthStar,
         baselineValue: projectIndicators.baselineValue,
         targetValue: projectIndicators.targetValue,
         finalValue: projectIndicators.finalValue,
@@ -617,7 +631,16 @@ export function listProjectAdoptions(
         ),
       )
       .groupBy(projectIndicators.id, indicators.id)
-      .orderBy(asc(indicators.label), asc(projectIndicators.id));
+      /* **La North Star en tête, puis l'alphabet.** `desc` sur un booléen met
+         `true` devant en PostgreSQL, et l'ordre reste **entièrement en SQL** —
+         la discipline de `listProjectRoadmap` : un tri fait en mémoire par
+         l'écran est un tri qu'aucun test de lecture n'éprouve. Le départage par
+         libellé puis par identifiant ne bouge pas. */
+      .orderBy(
+        desc(indicators.isNorthStar),
+        asc(indicators.label),
+        asc(projectIndicators.id),
+      );
   });
 }
 

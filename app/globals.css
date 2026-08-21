@@ -208,6 +208,20 @@
     color: var(--content-neutral-darkest);
     font-family: var(--font-family-primary);
     -webkit-font-smoothing: antialiased;
+
+    /* La barre d'ancres de la page projet (`components/projects/subnav.tsx`)
+       saute d'un bloc à l'autre : sans glissement, la page change de contenu
+       d'un seul coup et l'on ne sait pas d'où l'on vient. C'est le seul
+       mouvement de tout le produit hors du tiroir, et il est **retiré** à qui a
+       demandé moins de mouvement, ci-dessous — la règle de `--duration-drawer`.
+       Aucune valeur n'est écrite : `smooth` est un mot-clé, pas une durée. */
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
   }
 
   /* Posé dès maintenant : la validation de T1.6 exige un focus visible, et

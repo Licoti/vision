@@ -296,6 +296,27 @@ export type RoadmapGroup = {
   activities: RoadmapActivity[];
 };
 
+/**
+ * La clé de groupe portée par une URL, reconnue ou écartée (20/08/2026).
+ *
+ * `?etat=` filtre la roadmap de la page projet (`ROADMAP_STATE_PARAM`). Toute
+ * valeur que ce garde ne reconnaît pas ne filtre **rien** — la roadmap entière,
+ * qui est l'état normal —, exactement ce que la page fait déjà de toute valeur
+ * d'`?activite=` qu'elle ne reconnaît pas. Un filtre inconnu n'est pas une
+ * erreur : c'est une adresse qui n'a rien demandé.
+ *
+ * Il vit ici et non dans `lib/navigation.ts` parce que le vocabulaire est
+ * celui de cette lecture : le jour où un sixième groupe apparaît, les deux
+ * listes doivent bouger ensemble, et elles sont alors sous les yeux.
+ */
+export function roadmapStateFromParam(
+  value: string | undefined,
+): RoadmapGroupKey | null {
+  if (value === undefined) return null;
+  const found = GROUPS.find((group) => group.key === value);
+  return found ? found.key : null;
+}
+
 /** L'ordre de lecture de `docs/03` §6, et les libellés de l'interface. */
 const GROUPS: { key: RoadmapGroupKey; label: string }[] = [
   { key: "in_progress", label: "En cours" },

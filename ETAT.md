@@ -2,8 +2,8 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 20/08/2026 — le bloc « Démarrage » sur la page d'un accompagnement, hors
-ticket.
+**Dernière mise à jour :** 20/08/2026 — la page d'un accompagnement passe à la maquette
+`project-v2`, hors ticket.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
 **Ticket suivant :** **T5bis.7** — la sélection d'équipe du formulaire de projet, refondue
 (`tickets-C5bis.md`).
@@ -278,6 +278,20 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   est dans la mise en défaut : **neutraliser un critère de tri secondaire ne prouve rien en une
   exécution** — l'ordre rendu sans départage est arbitraire mais **stable**, celui de l'insertion,
   et la fixture doit insérer les ex æquo à rebours de l'alphabet pour que la neutralisation morde.
+- **La page d'un accompagnement passe à `project-v2` — hors ticket, le 20/08/2026.** La maquette de
+  Claude Design transposée, à fonctionnalités et à données constantes : en-tête en carte (statut,
+  période et rang sur une ligne, geste principal en bouton primaire, « Archiver » sous un menu),
+  **barre d'ancres collante** (`subnav.tsx`), corps à **deux colonnes** avec un rail de 380 px,
+  roadmap en **liste à plat filtrée par pastilles**, « Démarrage » en cartes, blocs annoncés en trio.
+  `ROADMAP_STATE_PARAM` (`etat`) est la **huitième clé de la page et la première qui n'ouvre rien** :
+  hors de `PROJECT_PANEL_PARAMS` et du décompte d'exclusivité, reconduite par `closeHref`.
+  `listProjectAdoptions` gagne `is_north_star` — une colonne dans un `select` existant, aucune
+  migration. Quatre arbitrages rendus avant écriture, dont **le refus d'étendre la dérogation D39** :
+  ni jauge ni « Encore 14 pts », alors que `targetGap` et `axisScale` les rendraient en trois lignes.
+  Referme le point ouvert sur `Section`/`Block` — la page projet monte au format produit. Sa leçon :
+  **une maquette faite hors du produit dessine ses interdits en toute bonne foi, et les dessine
+  bien** ; ce qui permet de trancher n'est pas de relire la règle, c'est que la question se pose
+  « étend-on la dérogation ? » plutôt que « peut-on ? ».
 
 ---
 
@@ -318,12 +332,6 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
 
 ### b. Assignés à un ticket
 
-- **Le groupe « Annulé » de la roadmap projet se replie sans marque visible.** Son `<summary>` est
-  en `flex`, ce qui retire à `<summary>` le triangle natif du navigateur — le commentaire de
-  `components/projects/roadmap.tsx` affirme l'inverse, et c'est lui qui est faux. Rien n'annonce donc
-  qu'il y a là quelque chose à déplier. Le rang « Indicateurs associés » a été doté d'un chevron en
-  `mark` le 18/08/2026 ; le même geste, cinq lignes, referme celui-ci. Hors périmètre ce jour-là
-  (règle 3). → **ticket propre, C7 au plus tard.**
 - **Une piste de démarrage ne mène pas à l'activité qu'elle suggère.** Le bloc du 20/08/2026 renvoie
   vers la plateforme et vers son propre texte ; il ne propose pas d'ouvrir le panneau d'activité
   pré-réglé sur le type correspondant — « Audit UX » la piste et « Audit UX » le type d'activité sont
@@ -363,16 +371,22 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   aucun écran ; et `persons.kind` sur les deux lectures de projet — `listProductProjects` et la liste
   transverse — qui affichent tous les membres à l'identique faute de remonter la colonne.
   → **ticket propre, C7** (destination du 14/08/2026, confirmée aux découpages de C5 et de C5bis).
-- **`Section` et `Block` cohabitent, et les deux pages de détail divergent.** La mise en cohérence
-  de la page produit (hors ticket, 17/08/2026) a sorti la coquille et l'en-tête de ses trois blocs
-  dans `components/ui/block.tsx` — rayon `3xl`, titre `xl`, note dessous, `gap-5` —, format que les
-  maquettes de `docs/design/maquettes/blocs/` donnent aux blocs de cette page. La page projet garde
-  `Section` — rayon `xl`, titre `md` — pour ses blocs de référence de `docs/06` §5. Deux blocs de
-  même nature n'ont donc pas la même forme selon la page qui les porte. Écart **assumé et borné** :
-  la demande portait sur la page produit, et élargir aurait touché des écrans qu'elle ne visait pas
-  (règle 3). Ce qui reste à trancher n'est pas technique — les deux composants sont interchangeables
-  — mais éditorial : la page projet doit-elle monter au format produit, ou les deux formats
-  disent-ils deux rangs de bloc différents ? → **ticket propre, C7 au plus tard.**
+- **« Voir le journal » est dessiné sans être un lien.** La reprise de `project-v2` (20/08/2026)
+  garde ce seul point d'entrée des cinq gestes que la maquette invente : c'est un `<span>` dans un
+  `<p>`, ni focalisable ni annoncé comme un lien, portant « — à venir » en `sr-only`. Dette
+  d'interface **assumée et bornée** — un libellé qui ressemble à un geste et n'en est pas un —,
+  arbitrée avec l'humain. Elle se referme d'un `href` le jour où le journal a son écran.
+  → **C6.**
+- **Le groupe « Annulé » n'est plus replié par défaut.** La roadmap en liste à plat (20/08/2026) l'a
+  fait disparaître avec les quatre autres intertitres : une activité annulée est désormais une
+  entrée comme les autres, atteignable par sa pastille de filtre. `docs/03` §6 demande « en retrait,
+  replié par défaut » ; le retrait tient — ton neutre, pastille grise, dernier de l'ordre — mais le
+  repli, non. **Ce point remplace celui du `<summary>` sans marque visible**, qui portait sur un
+  `<details>` qui n'existe plus. → **ticket propre, C7 au plus tard.**
+- **La barre d'ancres de la page projet n'a pas d'entrée active.** Elle demanderait un observateur
+  d'intersection, donc un composant client, pour une information décorative (20/08/2026). Le jour où
+  un second écran veut une barre d'ancres, la question se repose une fois pour les deux.
+  → **ticket barre latérale, C7 ou plus tôt** — même famille de coquille.
 - **Le contenu rédigé d'`/a-propos` reste à écrire.** La page a son en-tête et son état vide. Son
   contenu — ce qu'est Vision, le vocabulaire, ce qu'elle ne fait pas, l'état daté — ne demande
   aucune lecture en base. → **ticket propre, C7 au plus tard.**

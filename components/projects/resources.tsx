@@ -27,8 +27,15 @@
  * de 34 px portant les initiales du format ; il demanderait une valeur visuelle
  * que le design system ne nomme pas (règle 2), et la fiche de T4.1 l'écarte.
  *
+ * **Chaque entrée est une carte** depuis la reprise de
+ * `docs/design/maquettes/blocs/project-v2` (20/08/2026) — un filet, un rayon —
+ * là où le bloc empilait des lignes séparées d'un trait. Le bloc a quitté le
+ * corps de la page pour le **rail droit**, où une carte se lit mieux qu'une
+ * ligne : la colonne est étroite, et un titre long y court sur deux lignes sans
+ * qu'un trait dise où finit une ressource et où commence la suivante.
+ *
  * L'état vide est un paragraphe et non un `EmptyState` : le bloc occupe une
- * **demi-largeur de la grille**, où le cadre tireté d'`EmptyState` et son
+ * colonne étroite, où le cadre tireté d'`EmptyState` et son
  * `px-8 py-11` ne tiennent pas. Le motif d'origine était aussi son `h2`, qui
  * faisait doublon sous celui de la section ; ce n'en est plus un — `EmptyState`
  * prend un `level` depuis TD.1 —, et le premier motif suffit. Il dit ce que le
@@ -71,7 +78,7 @@ export function Resources({
   archiveResource: ((resourceId: string) => Promise<void>) | null;
 }) {
   return (
-    <Section>
+    <Section id="ressources">
       <SectionHeader
         title="Ressources"
         {...(addHref
@@ -87,15 +94,15 @@ export function Resources({
       />
 
       {resources.length > 0 ? (
-        <ul role="list" className="flex flex-col">
+        <ul role="list" className="flex flex-col gap-3">
           {resources.map((resource) => (
             <li
               key={resource.id}
-              className="border-t border-surface-neutral-lighter py-3 first:border-t-0 first:pt-0 last:pb-0"
+              className="rounded-xl border border-surface-neutral-lighter p-4"
             >
               <ExternalLink
                 href={resource.url}
-                className="text-sm font-medium text-content-info-base underline"
+                className="text-sm font-semibold text-content-info-base underline"
               >
                 {resource.title}
               </ExternalLink>
@@ -125,8 +132,8 @@ export function Resources({
               </p>
 
               {/* Les deux gestes de T4bis.5, sous la ligne de description et
-                  jamais à droite : le bloc occupe une demi-largeur de la
-                  grille, et une colonne d'actions y écraserait le titre.
+                  jamais à droite du titre : le bloc vit dans un rail de 380 px,
+                  et une colonne d'actions y écraserait le titre.
 
                   Le nom accessible porte le titre de la ressource, comme celui
                   de « Modifier » dans la roadmap : « Modifier » répété dix fois
@@ -143,7 +150,7 @@ export function Resources({
                   serait réécrit par le navigateur, et l'hydratation
                   divergerait. */}
               {editHref || archiveResource ? (
-                <div className="mt-1.5 flex flex-wrap items-center gap-4">
+                <div className="mt-3 flex flex-wrap items-center justify-end gap-4">
                   {editHref ? (
                     <DrawerLink
                       href={editHref(resource.id)}

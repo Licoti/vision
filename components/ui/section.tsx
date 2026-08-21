@@ -1,6 +1,6 @@
 /**
- * La section — le bloc de référence des pages de détail : une surface posée
- * sur le fond de la page, un filet, un rayon.
+ * La section — le bloc de la page projet : une carte posée sur le fond de la
+ * page, un filet, un rayon.
  *
  * `SectionHeader` accepte une action à droite du titre, parce que la maquette
  * la place là et non en pied de bloc : « ajouter une activité » doit être
@@ -8,6 +8,28 @@
  *
  * Le titre est un `h2` : la hiérarchie des titres est vérifiée en audit
  * d'accessibilité, et le centre en fait métier (docs/06 §11).
+ *
+ * **Le cadre passe au format de `docs/design/maquettes/blocs/project-v2`**
+ * (20/08/2026) : rayon `2xl` au lieu de `xl`, `px-7 py-6` au lieu de
+ * `px-6 py-5`. C'est le geste qui **referme le point ouvert d'`ETAT.md`** — le
+ * 17/08/2026 avait sorti la coquille des blocs de la page produit dans
+ * `components/ui/block.tsx` et laissé la page projet sur un cadre plus étroit,
+ * en notant que l'arbitrage restait éditorial. La maquette le rend : les deux
+ * pages portent désormais des cartes de même rang, et `Section` reste distincte
+ * de `Block` par ce qu'elle est — une carte de contenu, non un chapitre
+ * (`gap-4` contre `gap-5`, rayon 16 contre 24).
+ *
+ * **Sans ombre portée** : le design system nomme ses trois élévations sans leur
+ * donner de valeur (`tokens.css` §8), et aucun septième substitut ne s'invente
+ * (`ETAT.md`). La maquette en pose une de 1 px ; l'écart est celui que
+ * `block.tsx` consignait déjà.
+ *
+ * **`id` et `scroll-mt` vont ensemble**, et c'est la barre de sous-navigation
+ * qui les demande (`components/projects/subnav.tsx`) : elle est collante, donc
+ * une ancre qui viserait le haut exact de la carte la ferait passer dessous.
+ * Les 76 px sont ceux de la maquette, et ils s'écrivent par l'échelle —
+ * `scroll-mt-19` vaut `19 × --number-4`. Le décalage est inerte partout où
+ * aucune ancre ne vise le bloc.
  *
  * **La note se rend depuis TD.4 (19/08/2026), et c'est la correction d'un
  * défaut réel.** La prop était déclarée depuis T2.3 et **n'était affichée nulle
@@ -25,22 +47,24 @@
  *
  * **`basis-full` plutôt qu'un conteneur autour du titre**, et c'est le HTML
  * servi qui l'impose : l'en-tête est déjà une boîte `flex-wrap`, la note y prend
- * donc sa propre ligne sans qu'aucune balise s'ajoute. Envelopper le titre aurait
- * donné un `<div>` de plus aux **trois** appelants qui ne passent pas de note —
- * un écart de rendu sur des écrans que ce ticket ne vise pas. L'écartement
- * vertical est celui du `gap-3` de l'en-tête, et non le `mt-1` de `BlockHeader` :
- * le titre est ici d'un rang au-dessus, et sa note se pose à la distance que le
- * bloc donne déjà à ses lignes.
- * L'arbitrage entre rendre la note et retirer la prop était éditorial — une
- * phrase d'interface relève de qui écrit l'interface —, et il a été tranché
- * avant écriture.
+ * donc sa propre ligne sans qu'aucune balise s'ajoute.
  */
 
 import type { ReactNode } from "react";
 
-export function Section({ children }: { children: ReactNode }) {
+export function Section({
+  id,
+  children,
+}: {
+  /** L'ancre que vise la barre de sous-navigation, quand le bloc en porte une. */
+  id?: string;
+  children: ReactNode;
+}) {
   return (
-    <section className="flex flex-col gap-4 rounded-xl border border-surface-neutral-lighter bg-surface-neutral-pale px-6 py-5">
+    <section
+      {...(id ? { id } : {})}
+      className="flex scroll-mt-19 flex-col gap-4 rounded-2xl border border-surface-neutral-lighter bg-surface-neutral-pale px-7 py-6"
+    >
       {children}
     </section>
   );
@@ -56,8 +80,8 @@ export function SectionHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="flex flex-wrap items-baseline gap-3">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex min-w-0 flex-wrap items-baseline gap-3">
         <h2 className="flex items-center gap-2 text-xl font-bold text-content-neutral-darkest">{title}</h2>
         {note ? (
           <p className="basis-full max-w-160 text-sm leading-175 text-content-neutral-dark">

@@ -4,11 +4,40 @@
  * `docs/06` §5 : elle vient immédiatement après l'en-tête, avant tout bloc de
  * référence. C'est le récit de l'accompagnement, et la raison d'être de Vision.
  *
+ * **Elle passe à la forme de `docs/design/maquettes/blocs/project-v2`**
+ * (20/08/2026) : une carte, une barre de pastilles de filtre en tête, puis
+ * **une seule liste** d'entrées à plat. Les cinq intertitres de groupe — « En
+ * cours », « Prévu », « À planifier », « Terminé », « Annulé » replié —
+ * disparaissent : c'est un **écart assumé à `docs/03` §6**, arbitré avec
+ * l'humain avant écriture et consigné dans `JOURNAL-TECHNIQUE.md`. Ce que le
+ * groupement disait, l'entrée le dit désormais elle-même — sa pastille de
+ * statut est écrite en toutes lettres à côté de son titre, là où l'intertitre
+ * l'écrivait une fois pour toute une tranche.
+ *
+ * **L'ordre des entrées, lui, ne bouge pas d'une ligne.** Il reste celui de
+ * `listProjectRoadmap` — les cinq groupes dans l'ordre de `docs/03` §6, et
+ * dedans le tri SQL de T3.1 — simplement aplati. Rien n'est retrié ici : un
+ * ordre calculé par l'écran est un ordre qu'aucun test de lecture n'éprouve.
+ *
+ * **Le filtre passe par l'URL, sans une ligne de JavaScript** — le patron de la
+ * frise de la page produit, et non le `onclick` de la maquette. Une pastille
+ * est un lien vers `?etat=<clé>` ; « Toutes » est le lien vers l'adresse nue.
+ * Il en découle trois propriétés que l'état client n'aurait pas données : le
+ * filtre se copie, se partage et survit au rechargement ; il **n'entre pas dans
+ * le décompte d'exclusivité des sept clés de panneau** (`ROADMAP_STATE_PARAM`),
+ * si bien que fermer un panneau ne défait pas le filtre et que poser un filtre
+ * ne ferme aucun panneau ; et la roadmap reste rendue sur le serveur.
+ *
+ * **Les décomptes ne sont pas un indice.** « Terminé 2 » compte des faits
+ * saisis, il ne qualifie ni le projet ni personne : c'est une valeur de la
+ * donnée, pas une note calculée par Vision (D39, frontière du `CLAUDE.md`).
+ * Aucun total ne dit ce qui « reste à faire », aucune part n'est rapportée à
+ * une autre.
+ *
  * Le composant porte **la section entière**, son en-tête compris. T3.2 tient la
  * promesse écrite ici par T3.1 : « Ajouter une activité » est en tête du bloc
  * *et* dans l'état vide, les deux emplacements vivent ici, et la page n'a pas à
- * connaître ce détail. En **tête**, jamais en pied (`docs/06` §5) : l'action
- * doit être visible sans avoir à parcourir la roadmap entière.
+ * connaître ce détail. En **tête**, jamais en pied (`docs/06` §5).
  *
  * `addHref` à `null` retire les deux : l'action n'existe que pour qui peut
  * écrire dans ce projet (D9). Le composant, lui, ne connaît aucun droit — c'est
@@ -17,9 +46,6 @@
  * chaque entrée (T3.4, T3.5) : chez qui ne peut pas écrire, la roadmap se lit et
  * ne s'ouvre, ni ne se corrige, nulle part — et depuis que les gestes vivent
  * dans un menu, l'entrée ne porte alors même plus de bouton pour l'ouvrir.
- *
- * **Cinq groupes** (`docs/03` §6) depuis T3.5, qui peuple le dernier — annulé,
- * en retrait, replié par défaut. Les quatre premiers restent ceux de T3.1.
  *
  * `transitionActivity`, `archiveActivity` et `archiveResult` sont les actions
  * serveur de `projets/[id]/actions.ts`, **non liées** : c'est ici, à l'intérieur
@@ -32,6 +58,8 @@
  * `listProjectRoadmap` a déjà groupé et trié.
  */
 
+import Link from "next/link";
+
 import { DrawerLink } from "@/components/ui/drawer";
 
 import {
@@ -39,9 +67,11 @@ import {
   MENU_ITEM,
   MENU_ITEM_DANGER,
 } from "@/components/ui/action-menu";
-import { EmptyState } from "@/components/ui/empty-state";
+import { AvatarGroup } from "@/components/ui/avatar";
+import { BlockNote, EmptyState } from "@/components/ui/empty-state";
 import { ExternalLink } from "@/components/ui/external-link";
-import { SectionHeader } from "@/components/ui/section";
+import { Section, SectionHeader } from "@/components/ui/section";
+import { StatusPill } from "@/components/ui/status-pill";
 import { Tag } from "@/components/ui/tag";
 import {
   formatActivityPeriod,
@@ -54,35 +84,53 @@ import type {
   RoadmapGroup,
   RoadmapGroupKey,
 } from "@/lib/queries/activities";
+import type { ProjectStatusNature } from "@/lib/queries/projects";
 
 /**
- * La pastille d'un groupe, et le filet qui reprend sa couleur sur l'entrée.
+ * Le point coloré d'un groupe, porté par la pastille de filtre et par l'entrée.
  *
- * Les deux sont **décoratifs** : l'intitulé du groupe est écrit juste au-dessus
- * des entrées qu'il colore, et la couleur ne porte jamais seule une information
- * (`docs/06` §11). Les teintes reprennent celles des natures de statut d'un
+ * **Le filet vertical de gauche a disparu avec le groupement** (20/08/2026) :
+ * il redisait la couleur du point à 3 px de lui, et la maquette `project-v2`
+ * n'en pose aucun.
+ *
+ * Il est **décoratif** : le statut est écrit en toutes lettres dans la
+ * pastille de l'entrée, et la couleur ne porte jamais seule une information
+ * (`docs/06` §11) — ce qui compte davantage depuis que l'intertitre de groupe a
+ * disparu. Les teintes reprennent celles des natures de statut d'un
  * accompagnement — en cours, à venir, en attente, terminé se lisent de la même
  * façon d'un objet à l'autre. `cancelled` reprend un ton plus retiré encore que
  * `unscheduled` : « en retrait », au sens de `docs/03` §6.
  */
-const GROUP_TONE: Record<RoadmapGroupKey, { dot: string; edge: string }> = {
-  in_progress: {
-    dot: "bg-surface-primary-base",
-    edge: "border-l-surface-primary-base",
-  },
-  planned: { dot: "bg-surface-info-base", edge: "border-l-surface-info-base" },
-  unscheduled: {
-    dot: "bg-surface-neutral-base",
-    edge: "border-l-surface-neutral-base",
-  },
-  done: {
-    dot: "bg-surface-success-base",
-    edge: "border-l-surface-success-base",
-  },
-  cancelled: {
-    dot: "bg-surface-neutral-light",
-    edge: "border-l-surface-neutral-lighter",
-  },
+const GROUP_TONE: Record<RoadmapGroupKey, string> = {
+  in_progress: "bg-surface-primary-base",
+  planned: "bg-surface-info-base",
+  unscheduled: "bg-surface-neutral-base",
+  done: "bg-surface-success-base",
+  cancelled: "bg-surface-neutral-light",
+};
+
+/**
+ * L'état d'une entrée, dit dans le vocabulaire de la pastille de statut.
+ *
+ * **Aucune couleur neuve, et aucune pastille de plus** : `StatusPill` est la
+ * seule forme du statut depuis le 19/08/2026 (septième clause de `socleLock`),
+ * et ses quatre tons sont mesurés. Les cinq états d'activité s'y rangent sans
+ * reste, et les couples ainsi formés sont **exactement** ceux que la maquette
+ * dessine — `pill--encours` est `active`, `pill--prevu` est `framing`,
+ * `pill--aplanifier` est `paused`, `pill--termine` est `done`. Une activité
+ * annulée reprend le ton retiré de « à planifier » : le schéma des natures
+ * d'accompagnement n'en porte pas de cinquième, et en inventer un ici serait
+ * une valeur visuelle de plus (règle 2).
+ *
+ * Le **libellé**, lui, vient du groupe et non de cette table : c'est le
+ * domaine qui nomme, comme pour un statut d'accompagnement.
+ */
+const GROUP_NATURE: Record<RoadmapGroupKey, ProjectStatusNature> = {
+  in_progress: "active",
+  planned: "framing",
+  unscheduled: "paused",
+  done: "done",
+  cancelled: "paused",
 };
 
 /** L'action du cycle de vie, gatée à `null` comme `editHref`. */
@@ -107,6 +155,8 @@ type ArchiveResultAction =
 
 export function Roadmap({
   groups,
+  state,
+  stateHref,
   addHref,
   editHref,
   resultHref,
@@ -116,6 +166,14 @@ export function Roadmap({
   archiveResult,
 }: {
   groups: RoadmapGroup[];
+  /**
+   * L'état retenu, ou `null` pour la roadmap entière — **déjà validé** par
+   * `roadmapStateFromParam`. Le composant ne connaît pas l'URL, il connaît une
+   * clé de groupe : la même règle que pour les droits, qui arrivent en props.
+   */
+  state: RoadmapGroupKey | null;
+  /** L'adresse d'une pastille. `null` désigne « Toutes », donc l'adresse nue. */
+  stateHref: (state: RoadmapGroupKey | null) => string;
   /** L'ouverture du panneau de saisie, ou `null` pour qui ne peut pas écrire. */
   addHref: string | null;
   /**
@@ -130,18 +188,14 @@ export function Roadmap({
    * la donnée**, et l'entrée les tient elle-même.
    *
    * **Une seule adresse pour deux gestes depuis T4bis.6** : la même URL saisit
-   * quand l'entrée n'a pas de résultat et corrige quand elle en porte un. C'est
-   * `lib/navigation.ts` qui l'avait rendu possible sans le savoir — la valeur y
-   * désigne l'activité, donc la cible, jamais le geste.
+   * quand l'entrée n'a pas de résultat et corrige quand elle en porte un.
    */
   resultHref: ((activityId: string) => string) | null;
   /**
    * L'ouverture du panneau d'annulation sur une activité donnée. **C'est une
    * adresse et non une action serveur depuis que le menu contextuel est arrivé
    * sur les entrées** : le champ « Motif » ne tient pas dans une entrée de menu,
-   * il vit désormais dans un `ConfirmPanel` ouvert par `?annuler=<id>`. Même
-   * règle de droit qu'`editHref` ; la condition d'état se lit dans la donnée, et
-   * l'entrée la tient elle-même.
+   * il vit désormais dans un `ConfirmPanel` ouvert par `?annuler=<id>`.
    */
   cancelHref: ((activityId: string) => string) | null;
   /**
@@ -153,8 +207,7 @@ export function Roadmap({
   /**
    * Archiver une saisie erronée (T4bis.4). Même règle de droit que les deux
    * précédentes ; la **cinquième** condition — aucun résultat vivant sur
-   * l'entrée — se lit dans la donnée, et l'entrée la tient elle-même, comme
-   * elle tient déjà celles de `resultHref`.
+   * l'entrée — se lit dans la donnée, et l'entrée la tient elle-même.
    */
   archiveActivity: ArchiveAction;
   /**
@@ -164,8 +217,26 @@ export function Roadmap({
    */
   archiveResult: ArchiveResultAction;
 }) {
+  /* Les groupes retenus, **dans leur ordre de lecture** : le filtre choisit une
+     tranche, il ne réordonne rien. Un état demandé qu'aucune activité ne porte
+     rend une liste vide — l'état vide filtré ci-dessous, jamais un 404 : une
+     adresse qui ne montre rien est une lecture, pas une erreur (règle 5). */
+  const kept = state ? groups.filter((group) => group.key === state) : groups;
+
+  /* La liste à plat que la maquette dessine. Chaque entrée garde la clé de son
+     groupe : c'est elle qui décide de sa pastille, de son filet et des gestes
+     qu'elle offre — ce que l'intertitre décidait pour toute une tranche. */
+  const entries = kept.flatMap((group) =>
+    group.activities.map((activity) => ({ group, activity })),
+  );
+
+  const total = groups.reduce(
+    (count, group) => count + group.activities.length,
+    0,
+  );
+
   return (
-    <section className="flex flex-col gap-4">
+    <Section id="activites">
       <SectionHeader
         title="Roadmap des activités"
         note="Le récit de l'accompagnement, au mois."
@@ -182,25 +253,69 @@ export function Roadmap({
       />
 
       {groups.length > 0 ? (
-        <div className="flex flex-col gap-6">
-          {groups.map((group) => (
-            <RoadmapSection
-              key={group.key}
-              group={group}
-              editHref={editHref}
-              resultHref={resultHref}
-              cancelHref={cancelHref}
-              transitionActivity={transitionActivity}
-              archiveActivity={archiveActivity}
-              archiveResult={archiveResult}
-            />
-          ))}
-        </div>
+        <>
+          <StatusChips
+            groups={groups}
+            total={total}
+            state={state}
+            stateHref={stateHref}
+          />
+
+          {entries.length > 0 ? (
+            <ul role="list" className="flex flex-col">
+              {entries.map(({ group, activity }) => (
+                <RoadmapEntry
+                  key={activity.id}
+                  activity={activity}
+                  groupKey={group.key}
+                  groupLabel={group.label}
+                  transitionActivity={transitionActivity}
+                  archiveActivity={archiveActivity}
+                  archiveResult={archiveResult}
+                  {...(editHref && group.key !== "cancelled"
+                    ? { editHref: editHref(activity.id) }
+                    : {})}
+                  {...(cancelHref && CANCELLABLE.has(group.key)
+                    ? { cancelHref: cancelHref(activity.id) }
+                    : {})}
+                  /* **Les deux gestes du résultat suivent le résultat, pas le
+                     groupe** (T4bis.6). La **saisie** garde les quatre
+                     conditions de T4.4 — le droit, l'état terminé, un type qui
+                     produit, aucun résultat déjà posé. La **correction**, elle,
+                     ne demande que l'existence du résultat : éditer la période
+                     d'une activité terminée la redérive en « prévu » ou « en
+                     cours » sans toucher au résultat, et l'enfermer dans le
+                     groupe « Terminé » le laisserait orphelin. */
+                  {...(resultHref &&
+                  (activity.result !== null ||
+                    (group.key === "done" && activity.producesResult))
+                    ? { resultHref: resultHref(activity.id) }
+                    : {})}
+                />
+              ))}
+            </ul>
+          ) : (
+            /* Un état **filtré** vide, et non l'état vide du bloc : il y a des
+               activités, aucune dans cet état. Il dit donc le chemin du retour
+               plutôt que le geste de saisie — proposer « Ajouter une activité »
+               ici laisserait croire que le filtre a effacé quelque chose. */
+            <BlockNote>
+              Aucune activité dans cet état pour l&apos;instant.{" "}
+              <Link
+                href={stateHref(null)}
+                className="text-content-info-base underline"
+              >
+                Voir toute la roadmap
+              </Link>
+              .
+            </BlockNote>
+          )}
+        </>
       ) : (
         <EmptyState
           level={3}
           title="Aucune activité pour l'instant"
-          description="La roadmap réunira ici les ateliers, tests, audits et restitutions de l'accompagnement, groupés par état : en cours, prévu, à planifier, terminé. Chaque activité portera son type, son objectif, sa période, son approche et, le cas échéant, son résultat avec le lien vers l'outil qui l'a produit."
+          description="La roadmap réunira ici les ateliers, tests, audits et restitutions de l'accompagnement, chacun avec son état : en cours, prévu, à planifier, terminé. Chaque activité portera son type, son objectif, sa période, son approche et, le cas échéant, son résultat avec le lien vers l'outil qui l'a produit."
           {...(addHref
             ? {
                 action: (
@@ -213,7 +328,106 @@ export function Roadmap({
             : {})}
         />
       )}
-    </section>
+    </Section>
+  );
+}
+
+/**
+ * Les trois groupes d'où l'on peut encore annuler.
+ *
+ * La condition vivait dans `RoadmapSection` tant que la roadmap était groupée ;
+ * elle se lit maintenant par entrée, sur la clé que l'entrée porte. Rien n'a
+ * changé de son contenu. `cancelActivity` refuse de toute façon l'activité reçue
+ * qui n'est plus dans un état annulable.
+ */
+const CANCELLABLE = new Set<RoadmapGroupKey>([
+  "planned",
+  "unscheduled",
+  "in_progress",
+]);
+
+/**
+ * La barre de filtre — « Toutes », puis un état par groupe **peuplé**.
+ *
+ * **Aucune pastille pour un groupe vide** : une roadmap sans activité annulée
+ * n'a pas à porter un filtre « Annulé 0 », qui ne mènerait qu'à un écran vide.
+ * Ce que la barre offre est exactement ce que la roadmap contient, et c'est ce
+ * qui rend le décompte lisible sans le rendre normatif.
+ *
+ * **Des liens, jamais des boutons** : chacun mène à une adresse — la page du
+ * projet portant `?etat=<clé>` — et se copie, se partage, s'ouvre dans un
+ * onglet. La maquette en fait des `<button>` pilotés par un `onclick` ; les
+ * trois propriétés y seraient perdues, et le filtre avec le JavaScript.
+ *
+ * **`Link` et non `<a>`**, comme les préréglages de la frise produit : la
+ * navigation reste côté client, si bien que poser un filtre ne repart pas du
+ * haut de la page — ce qui compte ici, la roadmap vivant sous une barre d'ancres
+ * collante. L'adresse, elle, est la même : le repli sans JavaScript est un
+ * `href` complet.
+ *
+ * `aria-current="page"` porte l'état retenu : la pastille active ne se signale
+ * pas qu'à la couleur (`docs/06` §11) — la règle de `MainNav`.
+ *
+ * Le point coloré est **décoratif** : le libellé est écrit juste à côté.
+ */
+function StatusChips({
+  groups,
+  total,
+  state,
+  stateHref,
+}: {
+  groups: RoadmapGroup[];
+  total: number;
+  state: RoadmapGroupKey | null;
+  stateHref: (state: RoadmapGroupKey | null) => string;
+}) {
+  const chips: {
+    key: RoadmapGroupKey | null;
+    label: string;
+    count: number;
+    dot: string;
+  }[] = [
+    {
+      key: null,
+      label: "Toutes",
+      count: total,
+      dot: "bg-surface-neutral-light",
+    },
+    ...groups.map((group) => ({
+      key: group.key,
+      label: group.label,
+      count: group.activities.length,
+      dot: GROUP_TONE[group.key],
+    })),
+  ];
+
+  return (
+    <ul role="list" className="flex flex-wrap gap-2">
+      {chips.map((chip) => {
+        const active = chip.key === state;
+        return (
+          <li key={chip.key ?? "toutes"}>
+            <Link
+              href={stateHref(chip.key)}
+              aria-current={active ? "page" : undefined}
+              className={[
+                "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium",
+                active
+                  ? "border-border-primary-base bg-surface-primary-base text-content-neutral-pale"
+                  : "border-surface-neutral-lighter bg-surface-neutral-pale text-content-neutral-dark",
+              ].join(" ")}
+            >
+              <span
+                aria-hidden="true"
+                className={`h-2 w-2 flex-none rounded-full ${chip.dot}`}
+              />
+              {chip.label}
+              <span className="font-bold">{chip.count}</span>
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -241,140 +455,6 @@ function AddActivity({ href, className }: { href: string; className: string }) {
 }
 
 /**
- * Un groupe : son intitulé, son compteur, ses entrées.
- *
- * Le compteur est un `aria-hidden` : la liste porte déjà son nombre pour
- * l'assistance par le `role="list"` qu'elle expose. Le titre est un `h3` — la
- * section porte le `h2`, et la hiérarchie ne saute pas de niveau.
- *
- * **Le groupe « Annulé » s'enveloppe dans un `<details>` fermé par défaut**
- * (`docs/03` §6 : « en retrait, replié par défaut ») — natif, donc sans
- * JavaScript, comme le reste du produit. Les quatre autres groupes restent
- * toujours ouverts, dans un simple `<div>`. « Modifier » n'est pas transmis à
- * ce groupe : aucun retour en arrière depuis annulée (interdit de T3.5), donc
- * aucun lien qui y mènerait.
- *
- * **L'archivage, lui, traverse les cinq groupes** (T4bis.4, arbitrage du
- * 15/08/2026) : il n'est pas une transition d'état — il ne fait pas sortir de
- * `cancelled`, il sort du récit. L'interdit de T3.5 porte sur le retour en
- * arrière, pas sur le rangement, et une activité saisie par erreur puis annulée
- * n'aurait sinon aucun chemin.
- */
-function RoadmapSection({
-  group,
-  editHref,
-  resultHref,
-  cancelHref,
-  transitionActivity,
-  archiveActivity,
-  archiveResult,
-}: {
-  group: RoadmapGroup;
-  editHref: ((activityId: string) => string) | null;
-  resultHref: ((activityId: string) => string) | null;
-  cancelHref: ((activityId: string) => string) | null;
-  transitionActivity: TransitionAction;
-  archiveActivity: ArchiveAction;
-  archiveResult: ArchiveResultAction;
-}) {
-  const tone = GROUP_TONE[group.key];
-  const cancelled = group.key === "cancelled";
-
-  /* Les trois groupes d'où l'on peut encore annuler. La condition vivait dans
-     l'entrée tant que « Annuler » y était un formulaire ; elle rejoint celles
-     d'`editHref` et de `resultHref` maintenant que c'est une adresse — les
-     points d'entrée se décident tous au même endroit. `cancelActivity` refuse
-     de toute façon l'activité reçue qui n'est plus dans un état annulable. */
-  const cancellable =
-    group.key === "planned" ||
-    group.key === "unscheduled" ||
-    group.key === "in_progress";
-
-  /* Les enfants seuls, sans conteneur : `<summary>` n'accepte que du contenu
-     de phrasé (et, en premier enfant, un titre) — un `<div>` autour n'y est
-     pas valide, contrairement au `<div>` toujours-ouvert des quatre autres
-     groupes, qui porte ces mêmes classes lui-même. */
-  const headerContent = (
-    <>
-      <span
-        aria-hidden="true"
-        className={`h-2 w-2 flex-none rounded-full ${tone.dot}`}
-      />
-      {/* Les capitales sans interlettrage, comme le bandeau de colonnes de
-          `ListHeader` : la maquette écarte les lettres de .04em, mais le
-          design system ne définit aucun jeton d'interlettrage et la règle 2
-          interdit d'en emprunter un à Tailwind. */}
-      <h3 className="text-2xs font-semibold text-content-neutral-base uppercase">
-        {group.label}
-      </h3>
-      <span aria-hidden="true" className="text-xs text-content-neutral-base">
-        {group.activities.length}
-      </span>
-      <span
-        aria-hidden="true"
-        className="h-px flex-1 bg-surface-neutral-lighter"
-      />
-    </>
-  );
-
-  const list = (
-    <ul role="list" className="flex flex-col gap-2">
-      {group.activities.map((activity) => (
-        <RoadmapEntry
-          key={activity.id}
-          activity={activity}
-          edge={tone.edge}
-          groupKey={group.key}
-          transitionActivity={transitionActivity}
-          archiveActivity={archiveActivity}
-          archiveResult={archiveResult}
-          {...(editHref && !cancelled
-            ? { editHref: editHref(activity.id) }
-            : {})}
-          {...(cancelHref && cancellable
-            ? { cancelHref: cancelHref(activity.id) }
-            : {})}
-          /* **Les deux gestes du résultat suivent le résultat, pas le groupe**
-             (T4bis.6, arbitrage du 15/08/2026). La **saisie** garde les quatre
-             conditions de T4.4 — le droit, l'état terminé, un type qui produit,
-             aucun résultat déjà posé. La **correction**, elle, ne demande que
-             l'existence du résultat : éditer la période d'une activité terminée
-             la redérive en « prévu » ou « en cours » (`resolveActivityPeriod`)
-             sans toucher au résultat, et l'enfermer dans le groupe « Terminé »
-             le laisserait orphelin — visible, incorrigible, irretirable. */
-          {...(resultHref &&
-          (activity.result !== null ||
-            (group.key === "done" && activity.producesResult))
-            ? { resultHref: resultHref(activity.id) }
-            : {})}
-        />
-      ))}
-    </ul>
-  );
-
-  if (cancelled) {
-    return (
-      <details className="flex flex-col gap-2">
-        {/* Le triangle natif du navigateur est conservé : c'est le signal
-            standard d'un contenu replié, et l'inventer autrement demanderait
-            une valeur visuelle que le design system ne nomme pas (règle 2). */}
-        <summary className="flex cursor-pointer items-center gap-2">
-          {headerContent}
-        </summary>
-        <div className="mt-1">{list}</div>
-      </details>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">{headerContent}</div>
-      {list}
-    </div>
-  );
-}
-
-/**
  * Le résultat d'une activité — **le contrat unique** de `docs/02` §5, et rien
  * de plus : un libellé, une valeur, une unité, une date, le nom de l'outil, un
  * lien profond. Vision n'affiche **jamais le détail des constats** : il vit
@@ -384,21 +464,10 @@ function RoadmapSection({
  * « Résultat : Score d'audit UX ↗ · 62/100 · 31 mai 2024 · Ergonome »
  *
  * **Le libellé porte l'ancre** quand le lien profond est renseigné, via
- * `ExternalLink` de T4.1 **repris tel quel** — c'est la forme du titre d'une
- * ressource, et une seule règle vaut mieux qu'une règle et son repli : `label`
- * est `not null` en base, l'ancre a donc toujours un texte. **Un résultat sans
- * lien profond est un cas normal**, celui des deux résultats de la fixture : la
- * valeur s'affiche et aucun lien mort n'est rendu.
+ * `ExternalLink` de T4.1 **repris tel quel**. **Un résultat sans lien profond
+ * est un cas normal** : la valeur s'affiche et aucun lien mort n'est rendu.
  *
- * Le couple de couleurs de l'ancre n'est pas neuf par la position :
- * `content-info-base` sur `surface-neutral-pale` est celui du titre d'une
- * ressource depuis T4.1, l'entrée de roadmap et `Section` portant la même
- * surface.
- *
- * Les `·` sont décoratifs et chaque part porte son libellé pour l'assistance —
- * la règle de `resources.tsx` : hors du contexte visuel, « 62/100 · 31 mai
- * 2024 » ne dit pas lequel des deux est quoi. Une part absente disparaît avec
- * son séparateur ; seules la date et le libellé sont garantis par le schéma.
+ * Les `·` sont décoratifs et chaque part porte son libellé pour l'assistance.
  *
  * **Aucun seuil, aucun code couleur, aucune flèche de tendance** : Vision
  * reporte une valeur, elle ne la juge pas et ne la compare à rien (D39).
@@ -436,74 +505,45 @@ function Result({ result }: { result: ActivityResult }) {
 }
 
 /**
- * Une entrée : son type, son approche, son objectif, sa période, et le cas
- * échéant son résultat avec le lien vers l'outil (T4.3, `docs/06` §5) — le lien
- * qui la corrige (T3.4), les gestes de son cycle de vie (T3.5), et le point
- * d'entrée qui saisit son résultat (T4.4).
+ * Une entrée : son état, son type, son approche, son objectif, ses
+ * participants, sa période, et le cas échéant son résultat avec le lien vers
+ * l'outil (T4.3, `docs/06` §5).
+ *
+ * **Elle porte désormais son état elle-même** (20/08/2026) : un point coloré à
+ * gauche et une `StatusPill` à côté du titre, à la place de l'intertitre de
+ * groupe qui le disait pour toute une tranche. C'est ce qui rend la liste à
+ * plat lisible — et c'est la condition posée à l'écart avec `docs/03` §6.
+ *
+ * **Les participants passent en pile d'avatars** (maquette `project-v2`), avec
+ * leur décompte écrit à côté. La ligne « Participants : Camille Roux, Inès
+ * Kaddour · côté entité » disparaît de l'œil, **jamais de l'assistance** :
+ * `AvatarGroup` porte la liste complète en texte de remplacement, mention
+ * « côté entité » comprise, et la teinte de chaque pastille la redit — la
+ * couleur ne porte pas seule, elle double (`docs/06` §11).
  *
  * **L'entrée n'est pas cliquable en entier**, et c'est un choix : un `<a>` n'en
- * contient pas un autre, et elle porte désormais jusqu'à trois formulaires. La
- * même raison qu'en T2.3 pour la ligne de projet, amplifiée ici : l'entrée
- * porte déjà un texte long, l'objectif, qu'un lien engloberait sans rien y
- * gagner.
+ * contient pas un autre, et elle porte jusqu'à trois formulaires.
  *
- * **Les gestes vivent désormais dans un menu contextuel**, et c'est tout l'objet
- * du changement. Ils s'empilaient jusqu'ici en texte souligné dans la colonne
- * droite : jusqu'à sept par entrée, tous du même poids visuel, quinze entrées
- * par roadmap — une centaine de liens sur un écran dont le sujet est le récit de
- * l'accompagnement, pas la liste de ce qu'on peut lui faire. Un bouton « … »
- * (`components/ui/action-menu.tsx`) les réunit et rend la carte à sa lecture.
+ * **Les gestes vivent dans un menu contextuel** (`components/ui/action-menu.tsx`).
+ * **Le bouton ne paraît pas quand il n'ouvrirait rien** : `hasGestures` est la
+ * disjonction des sept conditions ; chez qui ne peut pas écrire, ou sur un
+ * accompagnement archivé, elles tombent toutes ensemble. Ce n'est pas ce rendu
+ * qui protège : chaque action redérive le droit sur l'identifiant reçu.
  *
- * **Le bouton ne paraît pas quand il n'ouvrirait rien.** `hasGestures` est la
- * disjonction des sept conditions : chez qui ne peut pas écrire, ou sur un
- * accompagnement archivé, elles tombent toutes ensemble — le `&&` unique de la
- * page reste le seul point de bascule — et l'entrée se lit sans porter un menu
- * vide. Ce n'est toujours pas ce rendu qui protège : chaque action redérive le
- * droit sur l'identifiant reçu.
- *
- * Le nom accessible du bouton porte l'activité qu'il commande, comme celui du
- * lien « Modifier » avant lui : trois points ne se lisent pas, et « Options »
- * répété quinze fois dans une liste ne dit pas de quoi.
- *
- * **L'ordre des entrées ne change pas** — du plus courant au plus rare, l'ordre
- * qu'avait la colonne. Le menu range les gestes, il ne rejuge pas lesquels
- * viennent d'abord.
+ * Le nom accessible du bouton porte l'activité qu'il commande : trois points ne
+ * se lisent pas, et « Options » répété quinze fois ne dit pas de quoi.
  *
  * **Les gestes du cycle de vie restent des formulaires nus**, sans confirmation
- * intermédiaire (`docs/03` §4) : « Marquer en cours » depuis
- * `planned`/`unscheduled`, « Marquer terminée » depuis `in_progress` — affiché
- * seulement si une fin de période est déjà écrite, faute de quoi le geste
- * serait refusé sans pouvoir l'expliquer ici. Une activité `cancelled` n'offre
- * plus aucun de ces gestes — le schéma d'états ne lui en laisse aucun — et
+ * intermédiaire (`docs/03` §4). Une activité `cancelled` n'en offre aucun et
  * affiche son motif à leur place.
  *
- * **« Annuler » est le seul qui ait quitté l'entrée.** Son motif est un champ
- * obligatoire, et un champ de saisie n'a pas sa place dans une entrée de menu :
- * le geste est devenu un lien vers `?annuler=<id>`, où un `ConfirmPanel` porte
- * le champ et le message d'un refus. Le `<details>` qui le repliait ici a
- * disparu avec lui ; celui du groupe « Annulé » reste, il n'a rien à voir.
- *
- * **« Archiver la saisie » (T4bis.4) est le seul geste qui retire.** Son
- * libellé ne se réduit pas à « Archiver » : voisin d'« Annuler l'activité » dans
- * le même menu, le verbe seul se confondrait avec lui, et la fiche demande que
- * l'écran distingue les deux gestes **par ses libellés**. C'est la saisie qu'on
- * retire, pas l'activité qu'on annule. `MENU_ITEM_DANGER` les colore tous les
- * deux, mais la couleur ne porte pas seule (`docs/06` §11) : ce sont les mots
- * qui disent le geste.
- *
- * **Il disparaît de lui-même quand un résultat est posé** : le résultat se
- * retire d'abord, sans quoi il resterait accroché à une activité sortie du
- * récit. **T4bis.6 donne enfin ce geste** — « Archiver le résultat » occupe
- * exactement la place que « Archiver la saisie » laisse vide, et les deux ne se
- * rencontrent jamais. La même donnée décide du geste et de l'action, comme elle
- * le fait déjà pour « Saisir un résultat » — l'un ne peut pas survivre à
- * l'autre. Ce n'est pas ce rendu qui protège : `archiveActivity` refuse
- * l'activité reçue qui porte un résultat.
+ * **« Archiver la saisie » et « Archiver le résultat » ne se rencontrent
+ * jamais** : la même donnée les exclut l'un l'autre.
  */
 function RoadmapEntry({
   activity,
-  edge,
   groupKey,
+  groupLabel,
   editHref,
   resultHref,
   cancelHref,
@@ -512,8 +552,9 @@ function RoadmapEntry({
   archiveResult,
 }: {
   activity: RoadmapActivity;
-  edge: string;
   groupKey: RoadmapGroupKey;
+  /** Le libellé du groupe — ce que dit la pastille de statut de l'entrée. */
+  groupLabel: string;
   editHref?: string;
   resultHref?: string;
   cancelHref?: string;
@@ -552,14 +593,18 @@ function RoadmapEntry({
     canArchiveActivity;
 
   return (
-    <li
-      className={`flex flex-wrap items-start justify-between gap-x-6 gap-y-2 rounded-lg border border-surface-neutral-lighter border-l-[length:var(--border-width-2)] ${edge} bg-surface-neutral-pale px-5 py-4`}
-    >
+    <li className="flex flex-wrap items-start gap-x-4 gap-y-3 border-t border-surface-neutral-lighter py-4">
+      <span
+        aria-hidden="true"
+        className={`mt-1.5 h-2 w-2 flex-none rounded-full ${GROUP_TONE[groupKey]}`}
+      />
+
       <div className="min-w-55 flex-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <span className="text-sm font-semibold text-content-neutral-darkest">
+          <span className="text-md font-semibold text-content-neutral-darkest">
             {activity.typeLabel}
           </span>
+          <StatusPill nature={GROUP_NATURE[groupKey]} label={groupLabel} />
           {activity.approachLabel ? (
             <Tag label={activity.approachLabel} />
           ) : null}
@@ -569,26 +614,8 @@ function RoadmapEntry({
             {activity.objective}
           </p>
         ) : null}
-        {/* Facultatif (`docs/03` §4, T3.6). « · côté entité » en texte, jamais
-            couleur seule (`docs/06` §11) — la règle de T2.4 et T2.6, reprise
-            ici pour un troisième écran. */}
-        {activity.participants.length > 0 ? (
-          <p className="mt-1.5 text-xs leading-175 text-content-neutral-base">
-            {"Participants : "}
-            {activity.participants
-              .map(
-                (person) =>
-                  person.fullName +
-                  (person.kind === "stakeholder" ? " · côté entité" : ""),
-              )
-              .join(", ")}
-          </p>
-        ) : null}
-        {/* Le résultat (T4.3), sur la forme exacte de la ligne des
-            participants : même balise, mêmes classes, donc aucun couple de
-            couleurs neuf par la position. Il ne croise jamais le motif
-            d'annulation — seule une activité terminée porte un résultat
-            (`docs/03` §4). */}
+        {/* Le résultat (T4.3). Il ne croise jamais le motif d'annulation —
+            seule une activité terminée porte un résultat (`docs/03` §4). */}
         {activity.result ? <Result result={activity.result} /> : null}
         {/* `cancellationReason` n'est renseigné que dans ce groupe
             (`activities_cancelled_requires_reason`) : le motif remplace les
@@ -601,128 +628,103 @@ function RoadmapEntry({
         ) : null}
       </div>
 
-      <div className="flex flex-col items-end gap-1.5">
-        <span className="text-xs whitespace-nowrap text-content-neutral-base">
-          {period}
-        </span>
-        {hasGestures ? (
-          <ActionMenu
-            label={`Options de l'activité ${activity.typeLabel} — ${period}`}
-          >
-            {editHref ? (
-              <DrawerLink
-                href={editHref}
-                request={{ kind: "activity", id: activity.id }}
-                role="menuitem"
-                className={MENU_ITEM}
-              >
-                Modifier
-              </DrawerLink>
-            ) : null}
-            {/* Le point d'entrée de T4.4, **et sa correction depuis T4bis.6** :
-                une seule adresse, un seul panneau, deux gestes. Ce n'est pas le
-                lien qui change, c'est son libellé — la même donnée qui décidait
-                de l'afficher décide désormais de ce qu'il dit. Les conditions
-                vivent dans `RoadmapSection` ; ici ne reste que le mot.
+      {/* Facultatif (`docs/03` §4, T3.6) : la plupart des entrées n'ont aucun
+          participant, et `AvatarGroup` rend `null` sur une liste vide — la
+          colonne disparaît alors sans qu'une condition s'écrive ici. */}
+      <AvatarGroup
+        label="Participants"
+        count={`${activity.participants.length} ${
+          activity.participants.length > 1 ? "participants" : "participant"
+        }`}
+        names={activity.participants.map((person) => ({
+          fullName: person.fullName,
+          tone: person.kind === "stakeholder" ? "stakeholder" : "center",
+          ...(person.kind === "stakeholder" ? { note: "côté entité" } : {}),
+        }))}
+      />
 
-                « Corriger le résultat » et non « Modifier » : la fiche le nomme
-                ainsi, et le verbe dit que la valeur reportée était fausse — non
-                que la mesure a bougé, ce qui serait un second relevé et
-                appartient aux indicateurs (C5). */}
-            {resultHref ? (
-              <DrawerLink
-                href={resultHref}
-                request={{ kind: "result", id: activity.id }}
-                role="menuitem"
-                className={MENU_ITEM}
-              >
-                {activity.result
-                  ? "Corriger le résultat"
-                  : "Saisir un résultat"}
-              </DrawerLink>
-            ) : null}
-            {/* Le retrait de T4bis.6, juste sous le geste qui corrige : l'ordre
-                va du plus courant au plus rare, celui qu'avait la colonne.
+      <span className="min-w-21 text-right text-xs whitespace-nowrap text-content-neutral-base">
+        {period}
+      </span>
 
-                « Archiver le résultat » : le mot de l'arbitrage (d), jamais
-                « Supprimer » — rien n'est supprimé (règle 4). Il ne se confond
-                pas avec « Archiver la saisie » plus bas, et **ne peut pas s'y
-                trouver côte à côte** : celui-là ne paraît que si l'entrée n'a
-                pas de résultat, celui-ci que si elle en a un. La même donnée les
-                exclut l'un l'autre. */}
-            {archiveResult && activity.result ? (
-              <form
-                action={archiveResult.bind(
-                  null,
-                  activity.id,
-                  activity.result.id,
-                )}
-              >
-                <button type="submit" role="menuitem" className={MENU_ITEM}>
-                  Archiver le résultat
-                </button>
-              </form>
-            ) : null}
-            {canMarkInProgress ? (
-              <form
-                action={transitionActivity.bind(
-                  null,
-                  activity.id,
-                  "in_progress",
-                )}
-              >
-                <button type="submit" role="menuitem" className={MENU_ITEM}>
-                  Marquer en cours
-                </button>
-              </form>
-            ) : null}
-            {canMarkDone ? (
-              <form action={transitionActivity.bind(null, activity.id, "done")}>
-                <button type="submit" role="menuitem" className={MENU_ITEM}>
-                  Marquer terminée
-                </button>
-              </form>
-            ) : null}
-            {/* Le geste de T4bis.4, après ce qui fait avancer et avant ce qui
-                annule : l'ordre va toujours du plus courant au plus rare. Un
-                formulaire nu, sans confirmation ni motif (arbitrage (c)) — à la
-                différence d'« Annuler l'activité » juste dessous, dont le motif
-                est obligatoire et qui a donc dû quitter le menu pour un
-                panneau. */}
-            {archiveActivity && activity.result === null ? (
-              <form action={archiveActivity.bind(null, activity.id)}>
-                <button
-                  type="submit"
-                  role="menuitem"
-                  className={MENU_ITEM_DANGER}
-                >
-                  Archiver la saisie
-                </button>
-              </form>
-            ) : null}
-            {/* Un lien, et non plus un `<details>` portant son champ : le motif
-                est obligatoire (`activities_cancelled_requires_reason`) et un
-                champ de saisie n'a pas sa place dans une entrée de menu. Il mène
-                à `?annuler=<id>`, où le `ConfirmPanel` porte le champ et le
-                message d'un refus — ce que le `<details>` n'a jamais su faire.
-
-                « Annuler l'activité » et non « Annuler » : dans un menu, le
-                verbe seul se lit comme le renoncement à ce qu'on est en train de
-                faire, et c'est même le mot que porte la sortie du panneau vers
-                lequel il conduit. */}
-            {cancelHref ? (
-              <DrawerLink
-                href={cancelHref}
-                request={{ kind: "cancel", id: activity.id }}
-                role="menuitem"
-                className={MENU_ITEM_DANGER}
-              >
-                Annuler l&apos;activité
-              </DrawerLink>
-            ) : null}
-          </ActionMenu>
-        ) : null}
-      </div>
+      {hasGestures ? (
+        <ActionMenu
+          label={`Options de l'activité ${activity.typeLabel} — ${period}`}
+        >
+          {editHref ? (
+            <DrawerLink
+              href={editHref}
+              request={{ kind: "activity", id: activity.id }}
+              role="menuitem"
+              className={MENU_ITEM}
+            >
+              Modifier
+            </DrawerLink>
+          ) : null}
+          {/* Le point d'entrée de T4.4, **et sa correction depuis T4bis.6** :
+              une seule adresse, un seul panneau, deux gestes. Ce n'est pas le
+              lien qui change, c'est son libellé. */}
+          {resultHref ? (
+            <DrawerLink
+              href={resultHref}
+              request={{ kind: "result", id: activity.id }}
+              role="menuitem"
+              className={MENU_ITEM}
+            >
+              {activity.result ? "Corriger le résultat" : "Saisir un résultat"}
+            </DrawerLink>
+          ) : null}
+          {/* « Archiver le résultat » : le mot de l'arbitrage (d), jamais
+              « Supprimer » — rien n'est supprimé (règle 4). */}
+          {archiveResult && activity.result ? (
+            <form
+              action={archiveResult.bind(null, activity.id, activity.result.id)}
+            >
+              <button type="submit" role="menuitem" className={MENU_ITEM}>
+                Archiver le résultat
+              </button>
+            </form>
+          ) : null}
+          {canMarkInProgress ? (
+            <form
+              action={transitionActivity.bind(null, activity.id, "in_progress")}
+            >
+              <button type="submit" role="menuitem" className={MENU_ITEM}>
+                Marquer en cours
+              </button>
+            </form>
+          ) : null}
+          {canMarkDone ? (
+            <form action={transitionActivity.bind(null, activity.id, "done")}>
+              <button type="submit" role="menuitem" className={MENU_ITEM}>
+                Marquer terminée
+              </button>
+            </form>
+          ) : null}
+          {/* Un formulaire nu, sans confirmation ni motif (arbitrage (c)) — à la
+              différence d'« Annuler l'activité » juste dessous, dont le motif
+              est obligatoire et qui a donc dû quitter le menu pour un panneau. */}
+          {archiveActivity && activity.result === null ? (
+            <form action={archiveActivity.bind(null, activity.id)}>
+              <button type="submit" role="menuitem" className={MENU_ITEM_DANGER}>
+                Archiver la saisie
+              </button>
+            </form>
+          ) : null}
+          {/* « Annuler l'activité » et non « Annuler » : dans un menu, le verbe
+              seul se lit comme le renoncement à ce qu'on est en train de faire. */}
+          {cancelHref ? (
+            <DrawerLink
+              href={cancelHref}
+              request={{ kind: "cancel", id: activity.id }}
+              role="menuitem"
+              className={MENU_ITEM_DANGER}
+            >
+              Annuler l&apos;activité
+            </DrawerLink>
+          ) : null}
+        </ActionMenu>
+      ) : null}
     </li>
   );
 }

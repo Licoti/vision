@@ -5413,3 +5413,83 @@ moment où `ETAT.md` se balaie ». Le fichier est à **545 lignes** ce jour. Les
 pas être suivies ensemble hors d'un découpage, et c'est la seconde qui a été retenue : balayer ici
 aurait été une réécriture massive qu'aucune demande ne couvre. → **à trancher par qui écrit
 `CLAUDE.md`.**
+
+
+---
+
+**Reprise de `project-v2` (20/08/2026) — la maquette dessine la jauge et l'écart chiffré que D39
+interdit ; les deux sont refusés.** `docs/design/maquettes/blocs/project-v2` pose sur la North Star
+d'un accompagnement une barre remplie à 71 %, un trait de cible à 85 % et la phrase « Encore
+14 pts ». Les trois sont **le même indice calculé par Vision** que D39, `docs/06` §6, l'arbitrage
+(g) de `tickets-C5.md` et `brief-design.md` §4.3 refusent en propres termes. Le bloc « Vision
+produit » en porte une **par dérogation explicite** de l'humain du 17/08/2026 ; **cette dérogation
+n'a pas été étendue** — arbitrage rendu avant écriture le 20/08/2026, sur les deux options posées.
+L'encadré garde donc le surtitre `★ NORTH STAR`, le nom, la grande valeur, son mois et la mention
+« Cible 85 % » ; il ne porte ni barre ni phrase d'écart. `targetGap` et `axisScale` existent et sont
+testés : **ce n'est pas une impossibilité technique, c'est un refus.**
+
+**Reprise de `project-v2` — la roadmap perd ses cinq intertitres de groupe, contre `docs/03` §6.**
+Le document énumère « en cours, puis prévu, puis à planifier, puis terminé, puis annulé replié », et
+`docs/06` §5 le reprend. La maquette met une **liste à plat** filtrée par pastilles. Arbitré avec
+l'humain avant écriture le 20/08/2026 : la liste à plat l'emporte, à **une condition tenue** — ce que
+l'intertitre disait pour toute une tranche, chaque entrée le dit désormais elle-même, par une
+`StatusPill` écrite en toutes lettres à côté de son titre. **L'ordre, lui, n'a pas bougé d'une
+ligne** : `listProjectRoadmap` rend toujours ses cinq groupes dans l'ordre du document, et le
+composant se borne à les aplatir — rien n'est retrié à l'écran. Deux pertes réelles, assumées : le
+groupe « Annulé » n'est plus replié par défaut (il est désormais une pastille de filtre parmi les
+autres), et le décompte par groupe se lit sur les pastilles au lieu de suivre chaque intertitre.
+
+**Reprise de `project-v2` — cinq gestes dessinés par la maquette n'existent pas ; quatre sont
+retirés, un est dessiné sans lien.** La maquette pose « Dupliquer » et « Exporter (PDF) » dans le
+menu d'en-tête, « + Relier un projet », « Relier l'outil de gestion → » et « Voir le journal → » sur
+les trois blocs annoncés. Aucun n'a de route, et la règle 3 interdit d'en ouvrir une. Arbitré le
+20/08/2026 : les quatre premiers disparaissent, « Voir le journal » est **dessiné sans être une
+ancre** — C6 le livre, et le point d'entrée est déjà à sa place. C'est une **dette d'interface
+assumée** : un libellé qui ressemble à un geste et n'en est pas un. Elle est bornée par trois
+choses — c'est un `<span>` dans un `<p>`, donc ni focalisable ni annoncé comme un lien ; il porte
+une mention « — à venir » en `sr-only` ; et il est **le seul**. → **à refermer par C6.**
+
+**Reprise de `project-v2` — la barre de sous-navigation n'a aucune entrée « active ».** La maquette
+en colore une. L'entrée courante d'une barre d'ancres est celle que le défilement désigne : la
+calculer demanderait un observateur d'intersection, donc un composant client, pour une information
+purement décorative ; en marquer une en dur serait faux dès le premier coup de molette. La barre se
+lit donc comme un jeu de raccourcis de même rang. `scroll-behavior: smooth` est posé sur `html` dans
+`app/globals.css` — **le seul mouvement du produit hors du tiroir** —, et retiré sous
+`prefers-reduced-motion`, la règle de `--duration-drawer`.
+
+**Reprise de `project-v2` — l'équipe de l'en-tête et les participants d'une entrée passent en pile
+d'avatars.** Les noms cessent d'être écrits à l'œil ; ils **ne disparaissent pas** — `AvatarGroup`
+les porte en texte de remplacement, mention « côté entité » comprise, et la teinte de chaque
+pastille la redit. La couleur ne porte donc pas seule (`docs/06` §11) : elle **double** une
+information que l'assistance reçoit en toutes lettres. Arbitré avec l'humain le 20/08/2026, sur les
+trois options posées. La perte réelle est pour qui voit sans assistance : « côté entité » n'est plus
+lisible en toutes lettres dans l'en-tête, seulement dans le gris de la pastille.
+
+**Reprise de `project-v2` — `Avatar` réordonne son attribut `class` sur trois écrans qu'elle ne
+vise pas.** `text-2xs` quitte la chaîne de base pour la table des calibres, si bien que l'attribut
+servi passe de `flex h-7 w-7 flex-none … text-2xs font-semibold …` à `flex flex-none … h-7 w-7
+text-2xs …`. **Le rendu est identique** — mêmes classes, même feuille —, mais l'attribut a changé
+sur `/projets`, `/produits/[id]` et le bloc « Use Cases ». C'est exactement l'écart que TD.3 a
+mesuré et annoncé pour lui-même ; il est ici la conséquence de l'arrivée d'un second calibre, qu'un
+seul point d'appel demandait. Aucune autre voie : une taille en prop est une classe qui bouge.
+
+**Reprise de `project-v2` — `?etat=` est la huitième clé de la page projet et la première qui
+n'ouvre rien.** Le filtre de roadmap n'entre ni dans `PROJECT_PANEL_PARAMS` ni dans le décompte
+d'exclusivité : fermer un panneau ne défait pas le filtre, poser un filtre ne ferme aucun panneau.
+C'est la distinction que `?de=`/`?a=` tiennent sur la page produit depuis le 17/08/2026, et que
+`SKILL_PANEL_PARAM` a payée sur `/equipe` pour l'avoir failli perdre. **La propriété a été mise en
+défaut avant d'être crue** : `etat` versé dans `keys`, `?etat=done&activite=nouvelle` cesse
+d'ouvrir le panneau (`role="dialog"` passe de 1 à 0) ; le témoin retiré, il rouvre.
+
+**Reprise de `project-v2` — un couple de couleurs neuf a été refusé par la mesure.** Les onze
+couples neufs par la position ont été mesurés, dont les cinq de la carte North Star sur
+`surface-primary-lightest`. **Dix passent** — de 4,79:1 à 17,21:1. Le onzième non :
+`content-neutral-normal` sur `surface-neutral-pale`, retenu d'abord pour le « Voir le journal » à
+venir, tombe à **3,88:1**, sous la limite du texte courant ; il passe à `content-neutral-base`,
+4,98:1. L'instrument est calibré sur cinq valeurs déjà consignées au dépôt — 6,84:1 du `Tag`,
+8,12:1, 4,98:1, 6,52:1, 13,65:1 —, qu'il retrouve toutes.
+
+**Reprise de `project-v2` — `ETAT.md` est à 584 lignes, et l'incohérence relevée le 20/08/2026
+tient toujours.** L'étape 5 du protocole demande 250 lignes au plus ; la section « Session de
+découpage » pose que le découpage est le seul moment où le fichier se balaie. La seconde a de
+nouveau été retenue. → **à trancher par qui écrit `CLAUDE.md`.**

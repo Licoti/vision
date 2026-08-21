@@ -408,6 +408,28 @@ export const ROADMAP_FROM_PARAM = "de";
 export const ROADMAP_TO_PARAM = "a";
 
 /**
+ * L'état de roadmap retenu, sur la page d'un **accompagnement** (20/08/2026).
+ *
+ * **Ce n'est pas une clé d'ouverture**, et elle ne rejoint donc pas
+ * `PROJECT_PANEL_PARAMS` ni le décompte d'exclusivité des sept autres — la
+ * distinction que `ROADMAP_FROM_PARAM` tient depuis le 17/08/2026, et que
+ * `SKILL_PANEL_PARAM` a payée sur `/equipe` pour l'avoir failli perdre. Elle
+ * n'ouvre aucun panneau, ne porte aucun geste d'écriture, et son absence est un
+ * état normal — la roadmap entière — plutôt qu'une fermeture. Un filtre est une
+ * lecture.
+ *
+ * Les deux mécanismes en découlent, et ils vont dans les deux sens : fermer un
+ * panneau ne défait pas le filtre (`DrawerHost` retire les clés une à une), et
+ * poser un filtre ne ferme aucune fiche.
+ *
+ * Sa valeur est une clé de groupe de `RoadmapGroupKey` — `in_progress`,
+ * `planned`, `unscheduled`, `done`, `cancelled`. Toute autre valeur ne filtre
+ * rien : c'est ce que la page fait déjà de toute valeur d'`?activite=` qu'elle
+ * ne reconnaît pas.
+ */
+export const ROADMAP_STATE_PARAM = "etat";
+
+/**
  * Les adresses des sept écrans, et des formulaires qui les alimentent. Les
  * pages de détail prennent un identifiant : le schéma en pose des UUID, et
  * rien ne promet encore de slug — ce choix revient à C2, avec l'écran qui
@@ -545,6 +567,17 @@ export const ROUTES = {
   projectNewForProduct: (productId: string) =>
     `/projets/nouveau?produit=${productId}`,
   projectEdit: (id: string) => `/projets/${id}/modifier`,
+  /**
+   * La roadmap réduite à un état, et l'adresse qui la rend entière.
+   *
+   * `null` rend l'adresse nue — c'est la pastille « Toutes », qui n'est pas un
+   * filtre mais son retrait. Une route qui poserait `?etat=` vide laisserait
+   * dans la barre une clé qui ne dit rien.
+   */
+  projectRoadmapState: (id: string, state: string | null) =>
+    state === null
+      ? `/projets/${id}`
+      : `/projets/${id}?${ROADMAP_STATE_PARAM}=${state}`,
   /**
    * La page du projet, panneau de confirmation d'archivage ouvert (T4bis.3).
    * **Ce n'est pas un écran de plus** : c'est le même, avec un paramètre — et la

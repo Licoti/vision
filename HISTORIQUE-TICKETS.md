@@ -2638,6 +2638,22 @@ l%s été.)*
 
 ---
 
+- ~~**`Section` et `Block` cohabitent, et les deux pages de détail divergent.**~~ **Refermé le
+  20/08/2026 par la reprise de `project-v2`.** Le point posait la question comme **éditoriale** — la
+  page projet doit-elle monter au format produit, ou les deux formats disent-ils deux rangs de bloc
+  différents ? — et notait que les deux composants étaient techniquement interchangeables. La
+  maquette y répond : `Section` passe du rayon `xl` au rayon `2xl` et de `px-6 py-5` à `px-7 py-6`,
+  et les deux pages portent désormais des cartes de même rang. **Les deux composants restent
+  distincts**, et sur ce qui les sépare vraiment : `Block` est un chapitre — rayon `3xl`, `gap-5` —,
+  `Section` une carte de contenu. Le geste n'a touché que la page projet, `Section` et
+  `SectionHeader` n'ayant aucun autre appelant dans le dépôt.
+
+- ~~**Le groupe « Annulé » de la roadmap projet se replie sans marque visible.**~~ **Sans objet
+  depuis le 20/08/2026** : le `<details>` a disparu avec le passage de la roadmap en liste à plat, et
+  avec lui le `<summary>` en `flex` dont le triangle natif manquait. Ce qui reste — le groupe n'est
+  plus replié du tout — est un point ouvert **neuf**, versé à `ETAT.md`, et il ne porte plus sur une
+  marque mais sur le repli lui-même.
+
 ## Faits acquis, versés aux « Rappels de contexte » d'`ETAT.md`
 
 *(ces deux entrées n'étaient plus des points ouverts mais des règles permanentes. `ETAT.md` en garde
@@ -2964,3 +2980,93 @@ diffère bien entre les deux.
 
 **Le résultat.** `npm run lint` (`--max-warnings=0`), `npx tsc --noEmit`, `npm run build` et les
 **882 tests** passent.
+
+
+---
+
+## La page d'un accompagnement passe à `project-v2` — hors ticket, le 20/08/2026
+
+**Demande.** Reprendre la maquette `docs/design/maquettes/blocs/project-v2` — HTML et CSS bruts
+produits par Claude Design — et la **transposer** dans la page projet : disposition, hiérarchie des
+blocs, style visuel, composants neufs, et adaptation des composants existants au nouveau langage.
+Pas s'en inspirer : la rendre, à fonctionnalités et à données constantes.
+
+**Quatre arbitrages rendus avant écriture**, sur les quatre points où la maquette croisait une règle
+non négociable ou une donnée existante. Ils sont détaillés dans `JOURNAL-TECHNIQUE.md` ; en un mot :
+la **jauge North Star et l'écart chiffré sont refusés** (D39, la dérogation du 17/08 ne s'étend
+pas) ; la **liste à plat filtrée l'emporte** sur les cinq groupes de `docs/03` §6 ; **quatre des cinq
+gestes inventés** par la maquette disparaissent, « Voir le journal » restant dessiné sans lien ;
+l'**équipe passe en pile d'avatars**, les noms restant lus.
+
+**Cinq gestes de forme.**
+
+1. **L'en-tête devient une carte.** Statut, période et rang sur une seule ligne — « En cours ·
+   depuis février 2026 · 2ᵉ accompagnement de ce produit », le rang menant toujours à la page
+   produit (`docs/06` §7). Le geste principal passe en **bouton primaire** (« Modifier »),
+   « Archiver » descend sous un menu « … » : corriger l'identité d'un accompagnement est courant,
+   le ranger ne l'est pas, et les deux étaient au même rang.
+2. **Une barre d'ancres collante** (`components/projects/subnav.tsx`) annonce les quatre blocs qui
+   portent un `id`. Sans entrée active, et la raison est consignée.
+3. **Le corps passe à deux colonnes** — le récit à gauche, « Indicateurs adoptés » puis
+   « Ressources » dans un rail de 380 px à droite, sous `xl` seulement. La roadmap garde sa
+   position dominante (`docs/06` §5, D31) et les deux blocs chiffrés cessent d'exiger qu'on fasse
+   défiler le récit entier.
+4. **La roadmap devient une liste à plat**, précédée de pastilles de filtre à décompte. Chaque
+   entrée porte son point coloré, sa `StatusPill` en toutes lettres, ses participants en pile
+   d'avatars et sa période à droite.
+5. **« Démarrage » passe en cartes** (deux colonnes), et les trois blocs annoncés en **trio d'une
+   rangée**.
+
+**Le filtre passe par l'URL, sans une ligne de JavaScript** — le patron de la frise produit, et non
+le `onclick` de la maquette. `ROADMAP_STATE_PARAM` (`etat`) est la **huitième clé** de la page et la
+première qui n'ouvre rien : elle n'entre ni dans `PROJECT_PANEL_PARAMS` ni dans le décompte
+d'exclusivité, si bien que fermer un panneau ne défait pas le filtre et que poser un filtre ne ferme
+aucun panneau. `closeHref` la reconduit, comme `/equipe` reconduit ses cinq filtres (T5bis.4).
+
+**Une colonne de plus dans un `select` existant, et pas une requête de plus.**
+`listProjectAdoptions` remonte `indicators.is_north_star` et trie `desc` dessus avant l'alphabet :
+c'est ce qui met l'objectif du produit en tête du rail. **L'ordre reste entièrement en SQL** — la
+discipline de `listProjectRoadmap`. Aucune migration.
+
+**Aucune donnée perdue, et c'est le point qu'il fallait tenir.** La maquette montre deux valeurs
+d'indicateur là où le bloc en portait quatre : « Référence » et « Valeur finale » restent, en `dl`
+sous la grande valeur, faute de quoi elles n'auraient plus eu **aucun écran**. L'objectif,
+l'approche, le résultat et le motif d'annulation restent sur l'entrée de roadmap. Les noms de
+l'équipe et des participants restent, en texte de remplacement.
+
+**Ce que la reprise referme.** Le point ouvert d'`ETAT.md` sur la cohabitation de `Section` et de
+`Block` : la question y était posée comme **éditoriale** — « la page projet doit-elle monter au
+format produit ? » —, et la maquette y répond. `Section` passe au rayon `2xl` et à `px-7 py-6`, et
+les deux pages portent désormais des cartes de même rang. `Section` reste distincte de `Block` par
+ce qu'elle est : une carte de contenu, non un chapitre.
+
+**Vérification — quatre disciplines, toutes tenues.**
+
+- **Le critère se lit dans le HTML servi.** Cinq pages de projet capturées, plus les quatre états du
+  filtre. Les quatre `id` d'ancre sont là, la carte North Star sort avec son `★`, sa valeur en
+  `text-3xl` et sa mention « Cible 85 % » — **sans barre ni phrase d'écart** —, la carte
+  complémentaire avec son `Tag`, l'équipe avec ses cinq pastilles, son « 5 personnes » et son
+  `sr-only` portant « Marc Tellier · côté entité ».
+- **Les tests se mettent en défaut.** La propriété neuve — `etat` hors du décompte d'exclusivité —
+  a été **mise en défaut avant d'être crue** : versée dans `keys`,
+  `?etat=done&activite=nouvelle` cesse d'ouvrir le panneau ; le témoin retiré, il rouvre. Les 882
+  tests des 29 fichiers passent, avant comme après.
+- **Le contraste se mesure.** Onze couples neufs par la position, mesurés par un instrument calibré
+  sur cinq valeurs déjà consignées au dépôt. **Dix passent, un échoue** —
+  `content-neutral-normal` sur `surface-neutral-pale` à 3,88:1 — et il a été corrigé avant d'être
+  servi. Les cinq couples de la carte North Star sur `surface-primary-lightest` : 8,21:1 · 17,21:1 ·
+  7,82:1 · 15,14:1 · 4,79:1.
+- **Le droit s'éprouve par l'action.** Cinq identités servies sur la même adresse : le responsable
+  de domaine obtient « Modifier » et le menu d'en-tête, le contributeur désigné écrit dans les blocs
+  **sans** menu d'en-tête — il ne modifie pas l'identité de l'accompagnement (D9) —, et trois
+  lecteurs n'obtiennent **aucun** point d'entrée. Les pastilles de filtre restent pour tous : un
+  filtre est une lecture, ouverte à tout le domaine. L'accompagnement archivé a été éprouvé par
+  **témoin** — `archived` forcé à `true` : « Rétablir » paraît, les deux menus et les trois « + »
+  tombent ensemble, la roadmap reste lisible.
+
+**Sa leçon est dans le refus.** Une maquette faite hors du produit ne connaît pas ses interdits :
+`project-v2` dessine, en toute bonne foi, la jauge de complétion et l'indice calculé que quatre
+textes de Vision refusent nommément — et elle les dessine bien, ce qui est le vrai danger. Ce qui a
+permis de trancher n'est pas d'avoir relu D39 : c'est que le calcul **existait déjà**, testé, sous
+`targetGap` et `axisScale`, du travail du 17/08. La question posée n'était donc jamais « peut-on ? »
+mais « étend-on la dérogation ? » — et posée ainsi, elle se répond.

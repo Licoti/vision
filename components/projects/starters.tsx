@@ -33,9 +33,15 @@
  * piste se lit par tout le domaine (D9), et son référentiel a son écran de
  * gestion en C7 (D25).
  *
- * L'état vide est un paragraphe et non un `EmptyState` : le bloc occupe une
- * demi-largeur de la grille, où le cadre tireté d'`EmptyState` ne tient pas —
- * la règle écrite en tête de `resources.tsx`.
+ * **Le bloc passe en cartes** (20/08/2026, maquette `project-v2`) : une grille
+ * de deux colonnes au lieu d'une liste de lignes. C'est la forme qui dit ce
+ * qu'il est — une boîte à outils où l'on choisit, non une suite d'éléments à
+ * parcourir dans l'ordre. Aucune carte n'est mise en avant, aucune n'est
+ * marquée comme faite : ce serait la jauge de complétion que `docs/06` §10
+ * proscrit.
+ *
+ * L'état vide est un paragraphe et non un `EmptyState` : la règle écrite en
+ * tête de `resources.tsx`.
  *
  * Le composant ne lit aucune base : `starters` est ce que `listStarters` a déjà
  * lu, filtré et trié.
@@ -63,21 +69,25 @@ export function Starters({
   detailHref: (starterId: string) => string;
 }) {
   return (
-    <Section>
+    <Section id="demarrage">
       <SectionHeader
         title="Démarrage"
         note="Des pistes pour ouvrir cet accompagnement. Rien n'est imposé."
       />
 
       {starters.length > 0 ? (
-        <ul role="list" className="flex flex-col">
+        /* Deux colonnes au-delà du pli étroit, une en dessous. La maquette
+           écrit `repeat(auto-fill, minmax(280px, 1fr))` ; le point d'arrêt le
+           rend sans valeur arbitraire, et la colonne de gauche de cette page
+           n'en porte jamais plus de deux à sa largeur utile. */
+        <ul role="list" className="grid gap-3 sm:grid-cols-2">
           {starters.map((starter) => (
             <li
               key={starter.id}
-              className="border-t border-surface-neutral-lighter py-3 first:border-t-0 first:pt-0 last:pb-0"
+              className="flex h-full flex-col rounded-xl border border-surface-neutral-lighter p-4"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-medium text-content-neutral-darkest">
+                <span className="text-sm font-semibold text-content-neutral-darkest">
                   {starter.label}
                 </span>
                 {/* La nature est une **étiquette, jamais un rang** : rien ne
@@ -85,24 +95,11 @@ export function Starters({
                 <Tag label={formatStarterKind(starter.kind)} />
               </div>
 
-              <p className="mt-1 text-xs text-content-neutral-base">
+              <p className="mt-2 mb-3 flex-1 text-xs leading-175 text-content-neutral-base">
                 {starter.summary}
               </p>
 
-              <div className="mt-1.5 flex flex-wrap items-center gap-4">
-                {/* Le lien n'existe que si l'outil en a un. Une piste sans
-                    plateforme — une méthode —, ou dont la plateforme n'a pas
-                    encore d'adresse, rend sa ligne sans lien : c'est un état
-                    normal, pas une erreur (règle 5). */}
-                {starter.toolName && starter.toolUrl ? (
-                  <ExternalLink
-                    href={starter.toolUrl}
-                    className="text-xs font-medium text-content-info-base underline"
-                  >
-                    {starter.toolName}
-                  </ExternalLink>
-                ) : null}
-
+              <div className="flex flex-wrap items-center gap-4">
                 {/* Le nom accessible porte le libellé de la piste : « En savoir
                     plus » répété quatre fois dans une liste de liens ne dit pas
                     sur quoi. Le mot reste écrit à l'écran — l'`aria-label`
@@ -115,6 +112,19 @@ export function Starters({
                 >
                   En savoir plus
                 </DrawerLink>
+
+                {/* Le lien n'existe que si l'outil en a un. Une piste sans
+                    plateforme — une méthode —, ou dont la plateforme n'a pas
+                    encore d'adresse, rend sa carte sans lien : c'est un état
+                    normal, pas une erreur (règle 5). */}
+                {starter.toolName && starter.toolUrl ? (
+                  <ExternalLink
+                    href={starter.toolUrl}
+                    className="text-xs font-medium text-content-info-base underline"
+                  >
+                    {starter.toolName}
+                  </ExternalLink>
+                ) : null}
               </div>
             </li>
           ))}
