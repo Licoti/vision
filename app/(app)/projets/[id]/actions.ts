@@ -475,6 +475,7 @@ export async function updateActivity(
     activityTypeId: existing.activityTypeId,
     approachId: existing.approachId,
     objective: existing.objective,
+    externalUrl: existing.externalUrl,
   };
 
   const { values, errors, input, participantIds } = parseActivityForm(

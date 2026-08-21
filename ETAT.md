@@ -2,8 +2,8 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 21/08/2026 — le bouton devient un composant à trois rangs, hors
-ticket.
+**Dernière mise à jour :** 21/08/2026 — reprise de la roadmap et dégraissage de la page projet,
+hors ticket.
 **Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
 **Ticket suivant :** **T5bis.7** — la sélection d'équipe du formulaire de projet, refondue
 (`tickets-C5bis.md`).
@@ -306,6 +306,20 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   l'instrument : **`tr` mappe caractère à caractère**, si bien que `tr '>' '>\n'` vaut `tr '>' '>'`
   — un comptage plausible et nul, que seul le témoin `rounded-xl` a redressé.
 
+- **La roadmap reprise, la page projet dégraissée — hors ticket, le 21/08/2026.** Six gestes à la
+  demande : lignes centrées, kebab en `tertiary` (premier appelant du rang écrit la veille sans
+  aucun), « Ajouter une activité » remonté en haut à droite, **`activities.external_url`** avec son
+  champ et son lien sortant, filtre de roadmap repassé **côté client**, « Projets liés » et la barre
+  d'ancres retirés du rendu. Le bouton n'avait jamais bougé du code : c'est `SectionHeader` qui le
+  faisait tomber — `basis-full` sur la note étirait le bloc titre à toute la largeur, `flex-wrap`
+  renvoyait l'action dessous. **Un défaut de socle, corrigé pour les cinq blocs à la fois.**
+  `activity_types.default_tool_id` trouve son **premier lecteur** : il nomme le lien, « Ouvrir dans
+  Ergonome », et c'est ce qui évite de reconnaître un audit à son libellé. Premier fichier de tests
+  d'action de `projets/` (7 cas). Deux classes de débogage, `bbb` et `aaaa`, servies dans le HTML
+  depuis la veille, retirées. Sa leçon : **un espace de classes fermé rend les classes mortes
+  invisibles** — `--color-*: initial` fait qu'aucune règle ne répond à `aaaa`, donc rien ne le
+  signale, ni le navigateur, ni `tsc`, ni `eslint`.
+
 ---
 
 ## Points ouverts
@@ -360,12 +374,13 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   sans lecteur est une colonne qu'on relit un jour sans savoir pourquoi. Le geste manquant est donc
   **une phrase sur le pourquoi d'une cible**, et il se juge à l'usage, pas au schéma.
   → **ticket propre, C7 au plus tard ; ou jamais, si personne ne la réclame.**
-- **L'outil par défaut d'un type d'activité ne présélectionne rien.** `activity_types.default_tool_id`
-  existe depuis T1.2, `docs/04` §2 le dit « habituellement associé », et la fixture le pose sur les
-  deux types d'audit du brief. Le panneau de T4.4 ne l'a pas lu — la fiche ne le demandait pas,
-  règle 3. Trois lignes suffiraient, et la colonne n'a **aucun lecteur**. → **ticket propre, C7 au
-  plus tard** (destination posée le 14/08/2026, confirmée au découpage de C5 : aucune de ses six
-  fiches n'ouvre `activity-panel.tsx`).
+- **L'outil par défaut d'un type d'activité ne présélectionne toujours rien** — la moitié du point
+  s'est refermée le 21/08/2026. `activity_types.default_tool_id` a désormais **un lecteur** :
+  `listProjectRoadmap` le joint pour **nommer** le lien vers l'outil d'une activité, « Ouvrir dans
+  Ergonome ». Ce qui reste est le geste d'origine, et lui seul : le panneau de résultat (T4.4) ne
+  présélectionne pas cet outil dans sa liste, alors que le type de l'activité le désigne. Trois
+  lignes suffiraient toujours. → **ticket propre, C7 au plus tard** (destination posée le
+  14/08/2026, confirmée au découpage de C5 : aucune de ses six fiches n'ouvre `activity-panel.tsx`).
 - **La coquille de navigation reste focalisable derrière le voile, sans JavaScript.** La page porte
   `inert` quand un panneau est ouvert, mais la barre latérale vit dans `app/(app)/layout.tsx`. Avec
   JavaScript, `FocusTrap` la met hors d'atteinte et `aria-modal` la retire de l'arbre
@@ -384,6 +399,18 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   aucun écran ; et `persons.kind` sur les deux lectures de projet — `listProductProjects` et la liste
   transverse — qui affichent tous les membres à l'identique faute de remonter la colonne.
   → **ticket propre, C7** (destination du 14/08/2026, confirmée aux découpages de C5 et de C5bis).
+- **Le bloc annoncé « Projets liés » est retiré du rendu.** À la demande, le 21/08/2026 : la page
+  ne l'annonce plus, la rangée des blocs annoncés passe à deux cartes. Rien n'est perdu — la table
+  `project_links` est au modèle depuis T1.2 et le bloc revient avec son contenu réel. Ce qui
+  disparaît est **l'annonce**, pas la destination : c'est une carte d'attente en moins sur une page
+  qui en portait trois. → **C6.**
+- **Le filtre de la roadmap ne se partage plus par son adresse.** Il est repassé côté client le
+  21/08/2026, à la demande — un clic ne navigue plus, la position de page est conservée —, et
+  `ROADMAP_STATE_PARAM` a disparu avec `ROUTES.projectRoadmapState`. Trois propriétés tombent : le
+  filtre ne se copie plus, ne survit plus au rechargement, et n'existe plus sans JavaScript, où la
+  roadmap reste **entière et lisible** et les pastilles inertes. Le jour où une adresse de filtre
+  est réclamée, elle revient par `history.replaceState` **sans** rendre le clic navigant — la forme
+  qui donne les deux. → **ticket propre, C7 au plus tard ; ou jamais, si personne ne la réclame.**
 - **« Voir le journal » est dessiné sans être un lien.** La reprise de `project-v2` (20/08/2026)
   garde ce seul point d'entrée des cinq gestes que la maquette invente : c'est un `<span>` dans un
   `<p>`, ni focalisable ni annoncé comme un lien, portant « — à venir » en `sr-only`. Dette
@@ -396,9 +423,11 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   replié par défaut » ; le retrait tient — ton neutre, pastille grise, dernier de l'ordre — mais le
   repli, non. **Ce point remplace celui du `<summary>` sans marque visible**, qui portait sur un
   `<details>` qui n'existe plus. → **ticket propre, C7 au plus tard.**
-- **La barre d'ancres de la page projet n'a pas d'entrée active.** Elle demanderait un observateur
-  d'intersection, donc un composant client, pour une information décorative (20/08/2026). Le jour où
-  un second écran veut une barre d'ancres, la question se repose une fois pour les deux.
+- **La barre d'ancres de la page projet est retirée du rendu, et son entrée active reste à faire.**
+  Le point est **suspendu, pas refermé** (21/08/2026) : `components/projects/subnav.tsx` reste en
+  place sans appelant, et la question de l'entrée active — un observateur d'intersection, donc un
+  composant client, pour une information décorative — se reposera telle quelle le jour où la barre
+  revient. Les `id` des sections et le `scroll-mt-19` de `Section` restent posés, inertes.
   → **ticket barre latérale, C7 ou plus tôt** — même famille de coquille.
 - **Le contenu rédigé d'`/a-propos` reste à écrire.** La page a son en-tête et son état vide. Son
   contenu — ce qu'est Vision, le vocabulaire, ce qu'elle ne fait pas, l'état daté — ne demande

@@ -336,6 +336,45 @@ export function ActivityPanel({
         />
       </FormField>
 
+      {/* Le lien vers l'outil où le travail se fait (21/08/2026) — Ergonome
+          pour un audit UX, Everyone pour un audit d'accessibilité.
+
+          **À ne pas confondre avec « Lien vers le rapport »** du panneau de
+          résultat : celui-là pointe une mesure produite, donc n'existe qu'une
+          fois l'activité terminée ; celui-ci pointe l'espace de travail, et
+          vaut dès qu'une activité est prévue.
+
+          **Le champ est offert à tous les types, et il ne disparaît pas.**
+          Le masquer selon le type demanderait du JavaScript, et c'est
+          exactement ce que la case « à planifier » ci-dessus refuse de faire
+          pour la même raison. La note dit à qui il s'adresse ; une activité
+          sans outil le laisse vide, ce qui est un cas normal.
+
+          `type="url"` sert le clavier des mobiles ; la validation qui compte
+          est celle de `validateActivityForm`. */}
+      <FormField
+        label="Lien vers l'outil"
+        htmlFor="activite-lien"
+        note="Facultatif. Pour une activité outillée — l'audit dans Ergonome ou dans Everyone, par exemple. Vision renvoie vers l'outil, elle n'en reproduit pas le contenu."
+        error={errors.externalUrl}
+        errorId="activite-lien-erreur"
+      >
+        <input
+          id="activite-lien"
+          name="externalUrl"
+          type="url"
+          inputMode="url"
+          defaultValue={values.externalUrl}
+          autoComplete="off"
+          placeholder="https://"
+          aria-invalid={errors.externalUrl ? true : undefined}
+          aria-describedby={
+            errors.externalUrl ? "activite-lien-erreur" : undefined
+          }
+          className={`${CONTROL} ${borderOf(errors.externalUrl)}`}
+        />
+      </FormField>
+
       {/* Facultatif (`docs/03` §4). Sur le modèle de l'équipe de projet
           (T2.6) : les personnes viennent de la liste existante, aucune
           création à la volée (D19). Aucun rôle, aucune quotité : la case

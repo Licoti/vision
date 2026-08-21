@@ -45,9 +45,19 @@
  * titre dès qu'elle dépasse trois mots. Aucun couple de couleurs neuf :
  * `content-neutral-dark` sur `surface-neutral-pale`, 8,12:1.
  *
- * **`basis-full` plutôt qu'un conteneur autour du titre**, et c'est le HTML
- * servi qui l'impose : l'en-tête est déjà une boîte `flex-wrap`, la note y prend
- * donc sa propre ligne sans qu'aucune balise s'ajoute.
+ * **Le bloc titre est une colonne, et c'est ce qui tient l'action à droite**
+ * (21/08/2026). La note prenait sa ligne par `basis-full` dans une boîte
+ * `flex-wrap` — aucune balise ne s'ajoutait, l'argument était bon, mais
+ * `basis-full` étire le bloc titre à **toute** la largeur disponible : l'action
+ * n'avait plus de place sur la première ligne et `flex-wrap` la renvoyait
+ * dessous. « Ajouter une activité » se lisait donc **sous** la note, là où
+ * `docs/06` §5 la veut en tête de bloc et où la maquette la dessine.
+ *
+ * `flex-col` empile les deux sans balise de plus non plus, et `flex-1 min-w-0`
+ * donne au bloc titre la largeur **restante** plutôt que toute la largeur : la
+ * note s'y replie, l'action reste sur la ligne du titre. Le défaut était dans
+ * le socle, il est donc corrigé pour les cinq blocs qui portent une note et une
+ * action, pas pour la seule roadmap.
  */
 
 import type { ReactNode } from "react";
@@ -81,10 +91,12 @@ export function SectionHeader({
 }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div className="flex min-w-0 flex-wrap items-baseline gap-3">
-        <h2 className="flex items-center gap-2 text-xl font-bold text-content-neutral-darkest">{title}</h2>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <h2 className="flex items-center gap-2 text-xl font-bold text-content-neutral-darkest">
+          {title}
+        </h2>
         {note ? (
-          <p className="basis-full max-w-160 text-sm leading-175 text-content-neutral-dark">
+          <p className="max-w-160 text-sm leading-175 text-content-neutral-dark">
             {note}
           </p>
         ) : null}

@@ -536,6 +536,21 @@ const PROJECTS: {
  *
  * D14 — « Formation des équipes produit » est à planifier : `planned` sans
  * date, `isUnscheduled` vrai.
+ *
+ * **`externalUrl` — troisième écart aux adresses, 21/08/2026.** Les trois
+ * activités d'audit portent un lien vers l'outil où le travail se fait. C'est
+ * l'extension de l'arbitrage du 20/08/2026 qui a posé les `tools.base_url` sur
+ * `example.com` : le domaine est réservé à la documentation, l'adresse est
+ * plausible dans sa structure et prouvablement provisoire, incapable
+ * d'atteindre un tiers réel par accident.
+ *
+ * Sans elle, la branche neuve de la roadmap n'apparaîtrait dans **aucun HTML
+ * servi**, et le critère de validation ne se lirait nulle part — la raison
+ * exacte pour laquelle la quatrième piste de démarrage a été inventée le
+ * 20/08/2026. L'arbitrage de `RESULTS` juste en dessous ne bouge pas d'un mot :
+ * là, le brief nomme l'outil et jamais l'adresse d'un **rapport**, qui serait
+ * une valeur inventée ; ici, c'est l'espace de travail de l'outil, dont
+ * `tools.base_url` porte déjà la racine.
  */
 const ACTIVITIES: {
   project: string;
@@ -545,6 +560,7 @@ const ACTIVITIES: {
   periodStart?: string;
   periodEnd?: string;
   isUnscheduled?: boolean;
+  externalUrl?: string;
 }[] = [
   {
     project: "Refonte du parcours de virement",
@@ -559,6 +575,7 @@ const ACTIVITIES: {
     state: "done",
     periodStart: "2024-05-01",
     periodEnd: "2024-05-31",
+    externalUrl: "https://ergonome.example.com/audits/virement-2024",
   },
   {
     project: "Refonte du parcours de virement",
@@ -589,6 +606,7 @@ const ACTIVITIES: {
     state: "done",
     periodStart: "2026-06-01",
     periodEnd: "2026-06-30",
+    externalUrl: "https://everyone.example.com/audits/operations-2026",
   },
   {
     project: "Autonomie des opérations courantes",
@@ -597,12 +615,16 @@ const ACTIVITIES: {
     periodStart: "2026-08-01",
     periodEnd: "2026-08-31",
   },
+  /* **L'audit prévu est le cas que la colonne existe pour** : il n'a ni ne
+     peut avoir de résultat — `docs/03` §4 réserve celui-ci à l'état terminé —,
+     et il menait donc nulle part jusqu'ici. */
   {
     project: "Autonomie des opérations courantes",
     type: "Audit UX",
     state: "planned",
     periodStart: "2026-10-01",
     periodEnd: "2026-10-31",
+    externalUrl: "https://ergonome.example.com/audits/operations-2026-10",
   },
   {
     project: "Autonomie des opérations courantes",
@@ -633,6 +655,7 @@ const ACTIVITIES: {
     state: "planned",
     periodStart: "2026-09-01",
     periodEnd: "2026-09-30",
+    externalUrl: "https://ergonome.example.com/audits/declaration-2026-09",
   },
 ];
 
@@ -1245,6 +1268,7 @@ async function seed(): Promise<void> {
           periodStart: activity.periodStart ?? null,
           periodEnd: activity.periodEnd ?? null,
           isUnscheduled: activity.isUnscheduled ?? false,
+          externalUrl: activity.externalUrl ?? null,
         },
       };
     }),

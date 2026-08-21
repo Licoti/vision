@@ -11,7 +11,8 @@
  * empêcher. Un seul menu, un seul langage visuel.
  *
  * **Ses mesures sont celles de la demande** : 32×32, fond de surface, bordure de
- * 1px en couleur primaire, rayon de 8px. Elles s'obtiennent toutes par des
+ * 1px en couleur primaire, rayon de 8px — celles du rang `secondary`, qui reste
+ * son défaut ; le rang se choisit désormais par la prop `variant`. Elles s'obtiennent toutes par des
  * jetons existants — `h-8 w-8`, `bg-surface-neutral-pale`,
  * `border-border-primary-base`, `rounded-lg` —, donc aucune valeur visuelle
  * n'est écrite en dur (règle 2) et aucun septième substitut n'est inventé.
@@ -55,10 +56,11 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
-import { buttonClass } from "@/components/ui/button";
+import { buttonClass, type ButtonVariant } from "@/components/ui/button";
 
 export function ActionMenu({
   label,
+  variant = "secondary",
   children,
 }: {
   /**
@@ -69,6 +71,18 @@ export function ActionMenu({
    * plusieurs. Une roadmap en porte quinze.
    */
   label: string;
+  /**
+   * Le rang du bouton déclencheur (21/08/2026). Le défaut reste `secondary`,
+   * le carré à filet des deux premiers appelants — l'en-tête d'accompagnement
+   * et le bloc des indicateurs, qui n'en portent qu'un par écran.
+   *
+   * La roadmap demande `tertiary`, et la raison est le **nombre** : quinze
+   * carrés à filet dans une même liste dessinent une colonne de boîtes que rien
+   * ne justifie. Le gabarit ne bouge pas d'un pixel entre les deux rangs —
+   * chacun porte le même `border` d'un pixel, transparent pour le tertiaire —,
+   * si bien que l'échange ne déplace aucune entrée.
+   */
+  variant?: ButtonVariant;
   /** Les gestes, décidés par le serveur : des liens et des formulaires. */
   children: ReactNode;
 }) {
@@ -120,7 +134,7 @@ export function ActionMenu({
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen((was) => !was)}
-        className={buttonClass({ variant: "secondary", iconOnly: true })}
+        className={buttonClass({ variant, iconOnly: true })}
       >
         {/* Les trois points sont **décoratifs** : le bouton est nommé par son
             `aria-label`, et la couleur ne porte jamais seule (docs/06 §11). */}

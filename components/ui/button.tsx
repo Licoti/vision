@@ -62,6 +62,16 @@
  * le rang `tertiary` et les props d'icône de `Button` n'ont aucun point d'appel au
  * jour où ils sont écrits. Le troisième rang et l'icône sont l'objet même de la
  * demande ; les livrer sans eux aurait été livrer autre chose.
+ *
+ * **`tertiary` a trouvé son appelant le lendemain** (21/08/2026) : le kebab des
+ * entrées de roadmap, qui portait le rang secondaire — un carré à filet répété
+ * quinze fois dans une même liste. La variante sans appelant aura tenu un jour.
+ *
+ * **Deux classes de débogage retirées le même jour** : `bbb` sur `secondary` et
+ * `aaaa` sur `tertiary` étaient committées dans `VARIANT` et partaient telles
+ * quelles dans l'attribut `class` servi. Elles ne cassaient rien — l'espace de
+ * classes est fermé par `--color-*: initial`, donc aucune règle CSS ne leur
+ * répondait — et c'est bien le problème : rien ne les signalait.
  */
 
 import type { ButtonHTMLAttributes, ReactNode } from "react";
@@ -111,9 +121,9 @@ const VARIANT: Record<ButtonVariant, string> = {
   primary:
     "border-transparent bg-surface-primary-base text-content-neutral-pale hover:bg-surface-primary-dark disabled:opacity-60",
   secondary:
-    "border-content-neutral-normal bg-surface-neutral-pale text-content-neutral-dark hover:bg-surface-neutral-lighter disabled:opacity-60 bbb",
+    "border-content-neutral-normal bg-surface-neutral-pale text-content-neutral-dark hover:bg-surface-neutral-lighter disabled:opacity-60",
   tertiary:
-    "border-transparent text-content-primary-dark hover:bg-surface-neutral-lighter disabled:opacity-60 aaaa",
+    "border-transparent text-content-primary-dark hover:bg-surface-neutral-lighter disabled:opacity-60",
 };
 
 /**

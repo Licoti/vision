@@ -5575,3 +5575,154 @@ leur rendu n'a pas été vu. Ce qui manque est un jeu d'essai, pas du code.
 Le seuil de 250 reste franchi et attend la session de découpage de C6 — c'est le seul moment où le
 fichier se balaie. Le point ouvert du bouton en est sorti vers `HISTORIQUE-TICKETS.md`, deux points
 neufs y sont entrés.
+
+---
+
+## Reprise de la roadmap et dégraissage de la page projet — hors ticket, 21/08/2026
+
+Six gestes demandés d'un coup sur la page d'un accompagnement, tous sur la forme sauf un — le lien
+vers l'outil, qui ajoute une colonne. Ce qui suit ne consigne que ce qui a résisté ou ce qui a été
+tranché contre une règle écrite.
+
+### Le bouton n'avait jamais quitté le haut du bloc — c'est le socle qui le faisait tomber
+
+La demande disait « le bouton "Ajouter une activité" devrait être en haut à droite du bloc
+(actuellement il est sous le sous-titre) ». Il *était* déjà passé en `action` de `SectionHeader`,
+et depuis T3.2. Le défaut vivait deux étages plus bas, dans `components/ui/section.tsx` :
+
+```
+<div class="flex flex-wrap items-start justify-between gap-3">   ← l'en-tête
+  <div class="flex min-w-0 flex-wrap items-baseline">            ← le bloc titre
+    <h2>…</h2>
+    <p class="basis-full max-w-160 …">…</p>                      ← la note
+  </div>
+  {action}
+</div>
+```
+
+`basis-full` donnait à la note une largeur de **100 % du bloc titre**, ce qui étirait le bloc titre
+à toute la largeur de l'en-tête ; `flex-wrap` renvoyait alors l'action à la ligne suivante. Le
+commentaire du fichier justifiait `basis-full` par « la note prend sa propre ligne sans qu'aucune
+balise s'ajoute » — l'argument était juste, et sa conséquence latérale n'avait pas été vue.
+
+`flex-col` sur le bloc titre n'ajoute pas de balise non plus, et `flex-1 min-w-0` lui donne la
+largeur **restante** plutôt que toute la largeur. Deux mots changent, cinq blocs sont corrigés :
+Roadmap, Ressources, Indicateurs adoptés, Démarrage, et les blocs annoncés.
+
+**Leçon transportable** : chercher un défaut de placement là où le placement se décide, jamais là où
+il se voit. Le composant de page était innocent depuis le premier jour.
+
+### `aaaa` et `bbb` — un espace de classes fermé rend les classes mortes invisibles
+
+`components/ui/button.tsx` portait, dans `VARIANT`, `disabled:opacity-60 bbb` sur `secondary` et
+`disabled:opacity-60 aaaa` sur `tertiary`. Committées la veille, elles partaient telles quelles dans
+l'attribut `class` servi, sur **toutes** les balises à bouton de l'application.
+
+Rien ne les signalait, et c'est la conséquence directe d'une décision antérieure : `app/globals.css`
+pose `--color-*: initial`, donc l'espace de classes est fermé, donc aucune règle CSS ne répond à
+`aaaa` — pas d'erreur, pas d'avertissement, pas d'effet visible. `tsc` voit une chaîne, `eslint` ne
+lit pas les chaînes de classe. Le seul instrument qui les aurait vues est celui que le protocole
+demande déjà : **lire le HTML servi**.
+
+Le rang `tertiary`, qui devient ici le kebab de la roadmap, aurait donc servi `aaaa` quinze fois par
+page. Retirées.
+
+### Le filtre de roadmap quitte l'URL — trois propriétés perdues, nommées
+
+Le 20/08/2026 avait posé le filtre par pastilles dans `?etat=<clé>`, et le commentaire de
+`roadmap.tsx` revendiquait trois propriétés : le filtre se copie, se partage, survit au
+rechargement — et fonctionne sans une ligne de JavaScript. La demande du 21/08 les échange contre
+une seule : **l'URL ne change pas au clic, donc la position de page non plus.**
+
+L'arbitrage est celui de l'humain, et il se comprend : la roadmap vit au milieu d'une page longue,
+et chaque pose de filtre renvoyait en haut. Ce qu'il coûte est écrit ici plutôt que découvert plus
+tard. Sans JavaScript, la roadmap reste **entière et lisible** ; ce sont les pastilles qui
+deviennent inertes — le contenu ne disparaît jamais.
+
+**Le paramètre est retiré entièrement, pas conservé comme graine.** L'option de le garder comme état
+initial était tentante et fausse : deux sources pour un même filtre divergent au premier clic, et
+`closeHref` aurait reconduit une tranche que la personne venait de quitter. `ROADMAP_STATE_PARAM`,
+`ROUTES.projectRoadmapState` et `roadmapStateFromParam` disparaissent ensemble ; `closeHref` devient
+l'adresse nue.
+
+**La frontière serveur/client, elle, ne bouge pas.** `Roadmap` reste un composant serveur : il
+construit ses `<RoadmapEntry>` comme avant, avec leurs actions serveur liées et leurs `DrawerLink`,
+et les passe à `RoadmapFilter` en `ReactNode` accompagnés de leur clé de groupe. Le client décide
+laquelle paraît, et rien d'autre — pas de droit, pas de base, pas de contenu. C'est la règle
+d'`ActionMenu`, tenue une fois de plus, et c'est ce qui a permis de ne pas déplacer une ligne de
+logique métier.
+
+### `activities.external_url` — une colonne qui arrive avec son lecteur
+
+Le dépôt a une doctrine explicite contre la colonne sans lecteur (leçon de T5.2, redite par
+`starters` le 20/08). Celle-ci arrive dans le même geste que son champ de saisie, sa lecture et son
+rendu.
+
+**Elle n'est pas un doublon de `results.external_url`, et la distinction porte le besoin.** Le lien
+d'un résultat pointe un **rapport** : il n'existe qu'une fois l'activité terminée, `docs/03` §4
+réservant le résultat à cet état. Le lien d'une activité pointe l'**espace de travail** : il vaut
+dès qu'elle est prévue. C'est exactement le trou constaté — un audit à venir ne menait nulle part,
+et c'est le cas le plus fréquent d'une roadmap.
+
+**Elle reste au niveau 1 déclaratif de `docs/03` §5.** Une adresse saisie à la main, jamais
+construite avec le contexte du projet : ce serait le niveau 2, « lancement délégué », que D15 range
+après le POC. La règle est la même que celle que `starters` s'était donnée la veille pour
+`tools.base_url`.
+
+### `activity_types.default_tool_id` trouve son premier lecteur, et il ne fait qu'une chose
+
+La demande nommait les cas : « dans le cas où c'est un audit UX ou un audit d'accessibilité ».
+Reconnaître un audit par son **libellé** aurait été le chemin court, et il est faux : `label` est un
+texte de référentiel, que le domaine renomme quand il veut — l'amorçage a d'ailleurs renommé
+« Audit d'accessibilité » en « Everyone » côté `tools` cinq jours plus tôt.
+
+Ce qui distingue un audit en base est `default_tool_id`, posé sur les deux types par la fixture
+depuis T1.2 et **jamais lu**. Il ne décide de rien ici : il **nomme** le lien, « Ouvrir dans
+Ergonome ». Le lien, lui, se rend dès qu'il est renseigné, quel que soit le type — le conditionner
+masquerait une donnée que quelqu'un a saisie.
+
+La jointure porte `filter(tools)`, comme celle du résultat juste en dessous et pour la même raison.
+Le filtre est **infalsifiable par une donnée honnête** : la couche refuse déjà d'écrire un
+`default_tool_id` hors domaine. Le test le forge donc par `db`, hors couche scopée — troisième
+endroit du projet à contourner `assertPreconditions`, après `resources.test.ts` et le test jumeau de
+T4bis.6, et pour la même raison : prouver que la lecture tient quand même.
+
+### Le champ ne disparaît pas selon le type, et c'est une règle déjà écrite
+
+Le panneau d'activité ne masque aucun champ au clic : la case « à planifier » et la période se
+répondent en toutes lettres plutôt que de se cacher l'une l'autre, parce que **sans JavaScript un
+champ ne disparaît pas**. « Lien vers l'outil » suit. Sa note dit à qui il s'adresse ; une activité
+sans outil le laisse vide, ce qui est un cas normal.
+
+### Premier fichier de tests d'action de `projets/`, et une leçon sur le stub
+
+`app/(app)/projets/[id]/actions.test.ts` éprouve le droit **par l'action** : un membre non
+contributeur et un accompagnement archivé n'écrivent pas le lien, mesuré en base et non sur le
+chemin pris. Les trois neutralisations ont été faites — la porte de droit fait tomber deux tests, la
+lecture seule un seul, et rien d'autre.
+
+**Un huitième test a été écrit puis retiré**, et son retrait vaut d'être consigné : « sans session,
+rien n'est écrit » échouait, et il avait tort. `lib/auth/provider.ts` retombe délibérément sur la
+première personne du domaine quand le cookie manque — « tolérance propre au stub », documentée. Une
+requête sans cookie n'est donc pas anonyme au POC, elle est quelqu'un. Le figer en test aurait
+gravé un confort de développement qu'Entra ID retire en C7. La tolérance était écrite ; elle n'avait
+pas été comprise.
+
+### Une debris de base de test, et pourquoi elle a mordu ici
+
+Sept tests d'action ont d'abord échoué sur « Aucune personne courante ». La cause n'était pas dans le
+code : `resolveDomainId()` rend **le premier domaine actif de la base**, et douze domaines
+`__test__…` abandonnés par des exécutions interrompues traînaient sur la branche Neon de test. Le
+premier trouvé n'était pas celui de la fixture, donc la personne courante n'y existait pas.
+
+C'est une fragilité **structurelle** des tests d'action, pas un accident : tout fichier qui appelle
+`requireSession` suppose qu'exactement un domaine actif existe. `produits/[id]/actions.test.ts` en
+dépendait déjà sans le dire. La purge a suffi ; la fragilité reste, et elle se rappellera à la
+première exécution interrompue.
+
+### `ETAT.md` passe de 617 à 646 lignes
+
+Le seuil de 250 reste franchi et attend la session de découpage de C6 — c'est le seul moment où le
+fichier se balaie. Une ligne de journal entre, un point ouvert est **récrit** (`default_tool_id`, à
+moitié refermé), un autre est récrit en suspension (la barre d'ancres), deux points neufs entrent
+(« Projets liés » retiré, le filtre qui ne se partage plus).

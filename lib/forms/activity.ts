@@ -49,6 +49,7 @@
 
 import { activityState } from "@/lib/db/schema";
 import { isIsoDay, valueOrNull } from "@/lib/forms/project";
+import { isWebUrl } from "@/lib/forms/resource";
 import { isUuid } from "@/lib/uuid";
 
 /** `planned` · `in_progress` · `done` · `cancelled`. Dérivé du schéma (D43). */
@@ -68,6 +69,14 @@ export type ActivityFormValues = {
   periodEnd: string;
   approachId: string;
   objective: string;
+  /**
+   * Le lien vers l'outil où le travail se fait (21/08/2026) — Ergonome,
+   * Everyone. Facultatif, et **offert à tous les types** : le champ ne
+   * disparaît pas selon le type choisi, pour la raison que le panneau écrit
+   * déjà à propos de la case « à planifier » — sans JavaScript, un champ ne
+   * disparaît pas.
+   */
+  externalUrl: string;
   /** Facultatif (`docs/03` §4). Personnes déjà référencées dans le domaine — T3.6. */
   participantIds: string[];
 };
@@ -105,6 +114,7 @@ export const EMPTY_ACTIVITY_VALUES: ActivityFormValues = {
   periodEnd: "",
   approachId: "",
   objective: "",
+  externalUrl: "",
   participantIds: [],
 };
 
@@ -125,6 +135,7 @@ export function toActivityFormValues(row: {
   periodEnd: string | null;
   approachId: string | null;
   objective: string | null;
+  externalUrl: string | null;
   /** Le seul champ de ce formulaire qui ne vient pas d'une colonne
    *  d'`activities` : l'appelant le lit à côté, dans `activity_participants`. */
   participantIds: string[];
@@ -136,6 +147,7 @@ export function toActivityFormValues(row: {
     periodEnd: row.periodEnd ?? "",
     approachId: row.approachId ?? "",
     objective: row.objective ?? "",
+    externalUrl: row.externalUrl ?? "",
     participantIds: row.participantIds,
   };
 }
@@ -183,6 +195,7 @@ export function readActivityForm(formData: FormData): ActivityFormValues {
     periodEnd: field(formData, "periodEnd"),
     approachId: field(formData, "approachId"),
     objective: field(formData, "objective"),
+    externalUrl: field(formData, "externalUrl"),
     participantIds: fields(formData, "participantIds"),
   };
 }
@@ -257,6 +270,16 @@ export function validateActivityForm(
     values.periodEnd < values.periodStart
   ) {
     errors.periodEnd = "La fin de période ne peut pas précéder son début.";
+  }
+
+  // Le lien vers l'outil (21/08/2026) — facultatif, et refusé s'il n'est pas un
+  // lien web. `isWebUrl` vient de `lib/forms/resource.ts`, comme
+  // `lib/forms/result.ts` l'importe déjà pour la même colonne d'un autre objet :
+  // une seule définition de « ce qu'est une adresse acceptable », et un seul
+  // message à traduire le jour venu.
+  if (values.externalUrl && !isWebUrl(values.externalUrl)) {
+    errors.externalUrl =
+      "Cette adresse n'est pas un lien web : elle doit commencer par http:// ou https://.";
   }
 
   // Forme seulement, comme le reste de ce bloc : l'existence d'un participant
@@ -391,6 +414,7 @@ export type ActivityRowInput = {
   periodStart: string | null;
   periodEnd: string | null;
   isUnscheduled: boolean;
+  externalUrl: string | null;
 };
 
 /**
@@ -401,6 +425,7 @@ export type ActivityCurrentRow = ActivityCurrent & {
   activityTypeId: string;
   approachId: string | null;
   objective: string | null;
+  externalUrl: string | null;
 };
 
 /**
@@ -408,8 +433,9 @@ export type ActivityCurrentRow = ActivityCurrent & {
  *
  * Une re-soumission à l'identique ne doit **rien** écrire : ni `updated_at`
  * repoussé, ni recalcul de fraîcheur, ni ligne dans le journal de C6 pour une
- * modification qui n'en est pas une. Sept colonnes, toutes celles que ce
- * formulaire écrit — les comparer est plus honnête que de laisser la base
+ * modification qui n'en est pas une. Huit colonnes, toutes celles que ce
+ * formulaire écrit — la huitième est le lien vers l'outil, arrivé le
+ * 21/08/2026 — les comparer est plus honnête que de laisser la base
  * absorber une écriture vide.
  */
 export function activityRowUnchanged(
@@ -423,7 +449,8 @@ export function activityRowUnchanged(
     input.state === current.state &&
     input.periodStart === current.periodStart &&
     input.periodEnd === current.periodEnd &&
-    input.isUnscheduled === current.isUnscheduled
+    input.isUnscheduled === current.isUnscheduled &&
+    input.externalUrl === current.externalUrl
   );
 }
 
@@ -474,6 +501,7 @@ export function parseActivityForm(
       periodStart: period.periodStart,
       periodEnd: period.periodEnd,
       isUnscheduled: period.isUnscheduled,
+      externalUrl: valueOrNull(values.externalUrl),
     },
     participantIds: values.participantIds,
   };

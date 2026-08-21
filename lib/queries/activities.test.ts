@@ -85,6 +85,8 @@ type Fixture = {
   workshopActivityId: string;
   /** L'activité « Test utilisateur », terminée — porte le résultat dégradé. */
   userTestActivityId: string;
+  /** L'audit **prévu** : porte le lien vers l'outil, et son type a un outil. */
+  plannedAuditActivityId: string;
   /** L'unique activité du projet « Terminé seul » — porte le résultat archivé. */
   doneOnlyActivityId: string;
   /** L'outil du domaine — la cible de la liaison forgée sur `tools`. */
@@ -209,12 +211,18 @@ async function seedDomain(label: string): Promise<Fixture> {
     periodStart: "2026-12-01",
     periodEnd: "2026-12-31",
   });
-  await scope.insert(activities, {
+  /* L'audit prévu porte **le lien vers l'outil** (21/08/2026) : un audit à
+     venir mène désormais quelque part, ce qui est précisément le cas que
+     `results.external_url` ne couvrait pas — un résultat demande une activité
+     terminée. Son type recevra `default_tool_id` une fois l'outil créé, plus
+     bas : c'est lui qui **nomme** le lien. */
+  const plannedAuditActivity = await scope.insert(activities, {
     projectId: full.id,
     activityTypeId: audit.id,
     state: "planned",
     periodStart: "2026-10-01",
     periodEnd: "2026-10-31",
+    externalUrl: `https://ergonome.example.com/audits/${label}`,
   });
 
   /* --- En cours : ce qui a commencé en premier en tête, le sans-date en
@@ -224,12 +232,15 @@ async function seedDomain(label: string): Promise<Fixture> {
     activityTypeId: observation.id,
     state: "in_progress",
   });
+  /* L'atelier porte lui aussi un lien, et son type **n'a aucun outil par
+     défaut** : c'est la branche où le lien se rend sans pouvoir se nommer. */
   const workshopActivity = await scope.insert(activities, {
     projectId: full.id,
     activityTypeId: workshop.id,
     state: "in_progress",
     periodStart: "2026-08-01",
     periodEnd: "2026-08-31",
+    externalUrl: `https://exemple.invalid/atelier-${label}`,
   });
   await scope.insert(activities, {
     projectId: full.id,
@@ -302,6 +313,12 @@ async function seedDomain(label: string): Promise<Fixture> {
     kind: "audit",
   });
 
+  /* `default_tool_id` sur le type d'audit — la colonne posée en T1.2, qui a
+     trouvé son premier lecteur le 21/08/2026 : c'est elle qui nomme le lien
+     d'une activité outillée, « Ouvrir dans Ergonome ». La fixture d'amorçage
+     la pose de la même façon sur les deux types d'audit. */
+  await scope.update(activityTypes, audit.id, { defaultToolId: tool.id });
+
   /* Un outil archivé (T4bis.6), sur le modèle du type archivé plus haut :
      proposé à personne, sauf au résultat qui le porte déjà. */
   const retiredTool = await scope.insert(tools, {
@@ -347,6 +364,7 @@ async function seedDomain(label: string): Promise<Fixture> {
     accessibilityActivityId: accessibilityActivity.id,
     workshopActivityId: workshopActivity.id,
     userTestActivityId: userTestActivity.id,
+    plannedAuditActivityId: plannedAuditActivity.id,
     doneOnlyActivityId: doneOnlyActivity.id,
     toolId: tool.id,
     retiredToolId: retiredTool.id,
@@ -1026,6 +1044,99 @@ describe("listProjectRoadmap — étanchéité des résultats", () => {
       .map((activity) => activity.result?.label)
       .filter(Boolean);
     expect(labels.every((label) => label?.endsWith(" b"))).toBe(true);
+  });
+
+  /* ------------------------------------------------------------------------
+     Le lien vers l'outil, porté par l'activité elle-même (21/08/2026).
+
+     Trois branches, et elles ne se recouvrent pas : le lien nommé par l'outil
+     par défaut de son type, le lien qu'aucun outil ne nomme, et l'absence de
+     lien — qui reste le cas de la grande majorité des entrées.
+     ---------------------------------------------------------------------- */
+  test("une activité porte son lien, nommé par l'outil par défaut de son type", async () => {
+    const groups = await listProjectRoadmap(a.scope, a.fullId);
+    const entry = entryOf(groups, a.plannedAuditActivityId);
+
+    expect(entry?.externalUrl).toBe("https://ergonome.example.com/audits/a");
+    expect(entry?.defaultToolName).toBe("Ergonome a");
+  });
+
+  test("le lien vaut sur une activité **prévue**, là où un résultat exige `done`", async () => {
+    const groups = await listProjectRoadmap(a.scope, a.fullId);
+    const entry = entryOf(groups, a.plannedAuditActivityId);
+
+    // C'est tout le point du champ : `results.external_url` n'existe qu'une
+    // fois l'activité terminée, et un audit à venir ne menait donc nulle part.
+    expect(
+      groups.find((group) => group.key === "planned")?.activities,
+    ).toContainEqual(expect.objectContaining({ id: a.plannedAuditActivityId }));
+    expect(entry?.result).toBeNull();
+    expect(entry?.externalUrl).not.toBeNull();
+  });
+
+  test("un type sans outil par défaut rend le lien sans le nommer", async () => {
+    const entry = entryOf(
+      await listProjectRoadmap(a.scope, a.fullId),
+      a.workshopActivityId,
+    );
+
+    expect(entry?.externalUrl).toBe("https://exemple.invalid/atelier-a");
+    expect(entry?.defaultToolName).toBeNull();
+  });
+
+  test("une activité sans lien rend `null` des deux côtés", async () => {
+    const entry = entryOf(
+      await listProjectRoadmap(a.scope, a.fullId),
+      a.userTestActivityId,
+    );
+
+    expect(entry?.externalUrl).toBeNull();
+    expect(entry?.defaultToolName).toBeNull();
+  });
+
+  /* ------------------------------------------------------------------------
+     `filter(tools)` sur la **seconde** jointure d'outil — celle du type.
+
+     Même raison que pour celle du résultat, juste en dessous : la jointure
+     porte sur une clé primaire et la couche refuse déjà d'écrire un
+     `default_tool_id` hors domaine. Sans donnée illégitime, le filtre est
+     infalsifiable ; le test la forge donc par `db`, hors couche scopée.
+     ---------------------------------------------------------------------- */
+  test("un type pointant l'outil d'un autre domaine ne rend aucun nom", async () => {
+    const [forgedType] = await db
+      .insert(activityTypes)
+      .values({
+        domainId: b.domainId,
+        label: "Type à l'outil forgé b",
+        family: "evaluation",
+        // La liaison interdite : l'outil du domaine `a`.
+        defaultToolId: a.toolId,
+      })
+      .returning();
+
+    const [forgedActivity] = await db
+      .insert(activities)
+      .values({
+        domainId: b.domainId,
+        projectId: b.fullId,
+        activityTypeId: forgedType?.id as string,
+        state: "in_progress",
+        periodStart: "2027-02-01",
+        externalUrl: "https://exemple.invalid/forge-b",
+      })
+      .returning();
+
+    const entry = entryOf(
+      await listProjectRoadmap(b.scope, b.fullId),
+      forgedActivity?.id as string,
+    );
+
+    // L'entrée se lit — elle est bien du domaine `b` —, son lien aussi, mais
+    // le nom de l'outil voisin ne franchit pas la frontière. Le lien reste
+    // donc rendu, nommé par son geste : « Ouvrir l'outil ».
+    expect(entry?.typeLabel).toBe("Type à l'outil forgé b");
+    expect(entry?.externalUrl).toBe("https://exemple.invalid/forge-b");
+    expect(entry?.defaultToolName).toBeNull();
   });
 
   /* ------------------------------------------------------------------------

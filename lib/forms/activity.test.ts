@@ -52,6 +52,7 @@ function valid(overrides: Partial<ActivityFormValues> = {}): ActivityFormValues 
     periodEnd: "2026-08-31",
     approachId: APPROACH,
     objective: "Prioriser les chantiers du second semestre.",
+    externalUrl: "",
     participantIds: [],
     ...overrides,
   };
@@ -90,6 +91,7 @@ describe("readActivityForm", () => {
         periodEnd: "2026-08-31",
         approachId: APPROACH,
         objective: "Prioriser les chantiers.",
+        externalUrl: "https://ergonome.example.com/audits/42",
         participantIds: [PERSON_A, PERSON_B],
       }),
     );
@@ -101,6 +103,7 @@ describe("readActivityForm", () => {
       periodEnd: "2026-08-31",
       approachId: APPROACH,
       objective: "Prioriser les chantiers.",
+      externalUrl: "https://ergonome.example.com/audits/42",
       participantIds: [PERSON_A, PERSON_B],
     });
   });
@@ -160,6 +163,38 @@ describe("readActivityForm", () => {
 describe("validateActivityForm", () => {
   test("une saisie complète ne produit aucune erreur", () => {
     expect(validateActivityForm(valid())).toEqual({});
+  });
+
+  /* Le lien vers l'outil (21/08/2026). La règle est celle de
+     `results.external_url` et de `resources.url`, par le même `isWebUrl` :
+     facultatif, mais un lien web s'il est là. */
+  test("le lien vers l'outil est facultatif", () => {
+    expect(validateActivityForm(valid({ externalUrl: "" })).externalUrl).toBe(
+      undefined,
+    );
+  });
+
+  test("un lien vers l'outil bien formé passe", () => {
+    expect(
+      validateActivityForm(
+        valid({ externalUrl: "https://ergonome.example.com/audits/42" }),
+      ).externalUrl,
+    ).toBe(undefined);
+  });
+
+  test("un lien vers l'outil qui n'est pas un lien web est refusé", () => {
+    for (const value of [
+      "ergonome.example.com",
+      "javascript:alert(1)",
+      "ftp://ergonome.example.com",
+      "Ergonome",
+    ]) {
+      expect(
+        validateActivityForm(valid({ externalUrl: value })).externalUrl,
+      ).toBe(
+        "Cette adresse n'est pas un lien web : elle doit commencer par http:// ou https://.",
+      );
+    }
   });
 
   test("le type est obligatoire (D16)", () => {
@@ -395,6 +430,7 @@ describe("parseActivityForm", () => {
         periodEnd: "2026-03-31",
         approachId: APPROACH,
         objective: "Vérifier la compréhension du parcours.",
+        externalUrl: "https://ergonome.example.com/audits/42",
       }),
       TODAY,
     );
@@ -408,6 +444,7 @@ describe("parseActivityForm", () => {
       periodStart: "2026-03-02",
       periodEnd: "2026-03-31",
       isUnscheduled: false,
+      externalUrl: "https://ergonome.example.com/audits/42",
     });
   });
 
@@ -418,6 +455,10 @@ describe("parseActivityForm", () => {
     );
     expect(Object.keys(errors).length).toBeGreaterThan(0);
     expect(input).toBeNull();
+  });
+
+  test("un lien vers l'outil vide part à `null`", () => {
+    expect(parseActivityForm(minimal(), TODAY).input?.externalUrl).toBeNull();
   });
 
   test("une approche et un objectif vides partent à `null`", () => {
@@ -549,6 +590,7 @@ describe("toActivityFormValues", () => {
         periodEnd: null,
         approachId: null,
         objective: null,
+        externalUrl: null,
         participantIds: [],
       }),
     ).toEqual({
@@ -558,6 +600,7 @@ describe("toActivityFormValues", () => {
       periodEnd: "",
       approachId: "",
       objective: "",
+      externalUrl: "",
       participantIds: [],
     });
   });
@@ -571,6 +614,7 @@ describe("toActivityFormValues", () => {
         periodEnd: "2026-08-31",
         approachId: null,
         objective: null,
+        externalUrl: null,
         participantIds: [PERSON_A, PERSON_B],
       }).participantIds,
     ).toEqual([PERSON_A, PERSON_B]);
@@ -584,6 +628,7 @@ describe("toActivityFormValues", () => {
       periodEnd: "2026-08-31",
       approachId: APPROACH,
       objective: "Prioriser les chantiers du second semestre.",
+      externalUrl: "https://ergonome.example.com/audits/42",
       participantIds: [PERSON_A, PERSON_B],
     });
 
@@ -596,6 +641,7 @@ describe("toActivityFormValues", () => {
         periodEnd: values.periodEnd,
         approachId: values.approachId,
         objective: values.objective,
+        externalUrl: values.externalUrl,
         participantIds: values.participantIds,
       }),
     );
@@ -711,6 +757,7 @@ describe("activityRowUnchanged", () => {
     activityTypeId: TYPE,
     approachId: APPROACH,
     objective: "Prioriser les chantiers du second semestre.",
+    externalUrl: "https://ergonome.example.com/audits/42",
   };
 
   function calculated(overrides: Partial<ActivityRowInput> = {}) {
@@ -722,6 +769,7 @@ describe("activityRowUnchanged", () => {
       periodStart: existing.periodStart,
       periodEnd: existing.periodEnd,
       isUnscheduled: existing.isUnscheduled,
+      externalUrl: existing.externalUrl,
       ...overrides,
     };
   }
@@ -730,7 +778,7 @@ describe("activityRowUnchanged", () => {
     expect(activityRowUnchanged(calculated(), existing)).toBe(true);
   });
 
-  test("chacune des sept colonnes suffit à faire une modification", () => {
+  test("chacune des huit colonnes suffit à faire une modification", () => {
     const changes: Partial<ActivityRowInput>[] = [
       { activityTypeId: "3f2504e0-4f89-11d3-9a0c-0305e82c3313" },
       { approachId: null },
@@ -739,6 +787,10 @@ describe("activityRowUnchanged", () => {
       { periodStart: "2026-08-04" },
       { periodEnd: null },
       { isUnscheduled: true },
+      // La huitième, arrivée le 21/08/2026 : corriger le seul lien vers
+      // l'outil est une modification, et sans cette comparaison l'écriture
+      // serait silencieusement sautée.
+      { externalUrl: null },
     ];
 
     for (const change of changes) {

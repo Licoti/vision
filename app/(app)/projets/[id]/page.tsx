@@ -111,7 +111,6 @@ import { AdoptedIndicators } from "@/components/projects/adopted-indicators";
 import { Resources } from "@/components/projects/resources";
 import { Starters } from "@/components/projects/starters";
 import { Roadmap } from "@/components/projects/roadmap";
-import { Subnav } from "@/components/projects/subnav";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
 import { ActionMenu, MENU_ITEM_DANGER } from "@/components/ui/action-menu";
 import { Button, buttonClass } from "@/components/ui/button";
@@ -133,10 +132,7 @@ import {
 } from "@/lib/drawers/project";
 import { formatPeriod, formatRank } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
-import {
-  listProjectRoadmap,
-  roadmapStateFromParam,
-} from "@/lib/queries/activities";
+import { listProjectRoadmap } from "@/lib/queries/activities";
 import { listProjectAdoptions } from "@/lib/queries/indicators";
 import {
   findAccompanimentRank,
@@ -156,11 +152,15 @@ export const metadata = {
  * jusqu'à T4.1 et T5.4 ; ils portent désormais leur contenu réel, vivent dans
  * leurs composants et ont rejoint le rail droit.
  *
- * **Ils passent en trio d'une seule rangée** (20/08/2026, maquette
- * `project-v2`) : trois cartes courtes côte à côte, sous le bloc « Démarrage ».
- * Un bloc vide est un écran à part entière (règle 5) ; trois blocs vides empilés
- * à pleine largeur donnaient à la page un tiers d'attente pour un tiers de
- * contenu.
+ * **Ils passent en rangée** (20/08/2026, maquette `project-v2`) : des cartes
+ * courtes côte à côte, sous le bloc « Démarrage ». Un bloc vide est un écran à
+ * part entière (règle 5) ; des blocs vides empilés à pleine largeur donnaient à
+ * la page un tiers d'attente pour un tiers de contenu.
+ *
+ * **« Projets liés » en est sorti le 21/08/2026**, à la demande — masqué, pas
+ * livré : la table `project_links` existe au modèle et le bloc revient avec C6.
+ * Ce qui disparaît est l'annonce, pas la destination. La rangée passe de trois
+ * cartes à deux.
  *
  * **Le « geste » d'un bloc annoncé n'est pas rendu, sauf un.** La maquette pose
  * « + Relier un projet », « Relier l'outil de gestion → » et « Voir le
@@ -177,11 +177,6 @@ const REFERENCE_BLOCKS: {
   pending?: string;
 }[] = [
   {
-    title: "Projets liés",
-    description:
-      "Les autres accompagnements de ce produit s'afficheront ici, puis les liens déclarés vers d'autres projets, chacun avec sa raison.",
-  },
-  {
     title: "Budget",
     description:
       "La synthèse macro — alloué, consommé — s'affichera ici, avec le lien vers l'outil de gestion. Le suivi budgétaire est tenu là-bas ; Vision renvoie vers la source plutôt que d'en reproduire le détail.",
@@ -193,21 +188,6 @@ const REFERENCE_BLOCKS: {
     pending: "Voir le journal",
   },
 ];
-
-/**
- * Les quatre ancres de la barre collante, dans l'ordre de lecture de la page.
- *
- * Elles pointent les `id` que `Section` pose sur les quatre blocs qui en
- * portent un — « Activités », « Démarrage » à gauche, « Indicateurs » et
- * « Ressources » dans le rail. Les trois blocs annoncés n'en ont pas : on ne
- * fabrique pas de raccourci vers une attente.
- */
-const SUBNAV = [
-  { href: "#activites", label: "Activités" },
-  { href: "#demarrage", label: "Démarrage" },
-  { href: "#indicateurs", label: "Indicateurs" },
-  { href: "#ressources", label: "Ressources" },
-] as const;
 
 export default async function ProjectPage({
   params,
@@ -222,7 +202,6 @@ export default async function ProjectPage({
     archiver?: string;
     indicateur?: string;
     piste?: string;
-    etat?: string;
   }>;
 }) {
   const { id } = await params;
@@ -255,21 +234,7 @@ export default async function ProjectPage({
     archiver,
     indicateur,
     piste,
-    etat,
   } = await searchParams;
-
-  /* **`etat` n'est pas une clé de panneau**, et il n'entre donc ni dans le
-     décompte d'exclusivité ci-dessous ni dans `PROJECT_PANEL_PARAMS` : c'est le
-     filtre de la roadmap (`ROADMAP_STATE_PARAM`), et un filtre est une lecture.
-     Les deux mécanismes en découlent — fermer un panneau ne défait pas le
-     filtre, poser un filtre ne ferme aucun panneau. C'est la distinction que
-     `lib/navigation.ts` tient depuis le 17/08/2026 pour `?de=` et `?a=`, et que
-     `SKILL_PANEL_PARAM` a payée sur `/equipe` pour l'avoir failli perdre.
-
-     La valeur est **validée avant d'être crue** : une clé de groupe inconnue ne
-     filtre rien, exactement ce que la page fait déjà de toute valeur
-     d'`?activite=` qu'elle ne reconnaît pas. */
-  const roadmapState = roadmapStateFromParam(etat);
 
   /* **L'URL reste une adresse, elle n'est plus le mécanisme** (TD.2). Coller
      `?activite=nouvelle` ouvre encore le panneau, ici, au rendu serveur ; le
@@ -334,13 +299,12 @@ export default async function ProjectPage({
       initial={drawer}
       load={loadProjectDrawer.bind(null, project.id)}
       panelParams={PROJECT_PANEL_PARAMS}
-      /* **La fermeture reconduit le filtre**, comme `/equipe` reconduit ses
-         cinq clés (T5bis.4) : sans cela, refermer un panneau ouvert par son
-         adresse rendrait la roadmap entière et effacerait la tranche qu'on
-         était en train de lire (`docs/06` §9). Le chemin du clic, lui, n'en a
-         pas besoin — `DrawerHost` retire les clés de panneau une à une et
-         laisse `etat` en place. */
-      closeHref={ROUTES.projectRoadmapState(project.id, roadmapState)}
+      /* **La fermeture est l'adresse nue depuis le 21/08/2026** : elle
+         reconduisait le filtre de roadmap, qui a quitté l'URL pour l'état
+         client de `roadmap-filter.tsx`. Il n'y a plus rien à reconduire, et
+         c'est la propriété que ce déplacement cherchait — une seule source pour
+         le filtre, jamais deux qui divergent au premier clic. */
+      closeHref={ROUTES.project(project.id)}
     >
       <Breadcrumb
         items={[
@@ -504,11 +468,13 @@ export default async function ProjectPage({
           </FieldRow>
         </div>
 
-        {/* La barre d'ancres de la maquette. Elle vient après l'en-tête et
-            avant le corps : c'est le sommaire de ce qui suit, pas un onglet —
-            aucun bloc n'est masqué, tout reste sur une seule page (D30). */}
-        <Subnav entries={SUBNAV} />
-
+        {/* **La barre d'ancres a été retirée le 21/08/2026**, à la demande.
+            Elle vivait ici depuis la veille, d'après la maquette `project-v2`.
+            Elle ne laisse aucune dette : `components/projects/subnav.tsx` reste
+            en place, sans appelant, et revient d'une ligne. Les `id` des
+            sections restent posés — un ancrage qui ne coûte rien et qu'aucune
+            barre ne vise plus, `scroll-mt-19` compris, que le commentaire de
+            `Section` annonce déjà inerte en l'absence d'ancre. */}
         {/* **Deux colonnes** (maquette `project-v2`) : le récit à gauche, les
             blocs de référence chiffrés dans un rail de 380 px à droite. La
             roadmap garde donc sa position dominante — `docs/06` §5 et D31 — et
@@ -527,16 +493,11 @@ export default async function ProjectPage({
                 n'existe que pour qui peut écrire dans ce projet (D9) : le
                 composant ne connaît aucun droit, c'est ici qu'il se lit.
 
-                **`state` et `stateHref` ne sont pas des droits** : le filtre se
-                lit par tout le domaine, et l'adresse qu'il fabrique est celle
-                de cette page. Ils arrivent en props pour la même raison que les
-                droits — le composant ne connaît ni l'URL ni la session. */}
+                **Le filtre par état n'arrive plus d'ici** (21/08/2026) : il
+                vit dans l'état client de `roadmap-filter.tsx`, et cette page
+                n'a plus ni `state` ni `stateHref` à fabriquer. */}
             <Roadmap
               groups={roadmap}
-              state={roadmapState}
-              stateHref={(value) =>
-                ROUTES.projectRoadmapState(project.id, value)
-              }
               addHref={canWrite ? ROUTES.projectActivityNew(project.id) : null}
               editHref={
                 canWrite
@@ -579,9 +540,11 @@ export default async function ProjectPage({
               }
             />
 
-            {/* Les trois blocs annoncés, en une rangée. Leur ordre est celui de
-                `docs/06` §5 — projets liés, budget, journal. */}
-            <div className="grid gap-5 md:grid-cols-3">
+            {/* Les blocs annoncés, en une rangée. Leur ordre est celui de
+                `docs/06` §5 — budget, puis journal. Deux colonnes et non trois
+                depuis que « Projets liés » en est sorti : deux cartes dans une
+                grille de trois laisseraient un tiers de vide. */}
+            <div className="grid gap-5 md:grid-cols-2">
               {REFERENCE_BLOCKS.map((block) => (
                 <Section key={block.title}>
                   <SectionHeader title={block.title} />

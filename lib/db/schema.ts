@@ -964,6 +964,21 @@ export const activities = pgTable(
     /** D14 — le groupe « à planifier », pour les activités sans date. */
     isUnscheduled: boolean("is_unscheduled").notNull().default(false),
     cancellationReason: text("cancellation_reason"),
+    /**
+     * Le lien vers l'outil où le travail se fait — Ergonome pour un audit UX,
+     * Everyone pour un audit d'accessibilité (21/08/2026).
+     *
+     * **À ne pas confondre avec `results.external_url`**, qui pointe le
+     * *rapport* d'un résultat et n'existe donc qu'une fois l'activité terminée.
+     * Celui-ci pointe l'*espace de travail*, et vaut dès qu'une activité est
+     * prévue : c'est précisément le trou que la page laissait — un audit à
+     * venir ne menait nulle part.
+     *
+     * **Saisie à la main, jamais construite.** C'est le niveau 1 déclaratif de
+     * `docs/03` §5. Une adresse fabriquée à partir du contexte du projet serait
+     * le niveau 2, « lancement délégué », que D15 range après le POC.
+     */
+    externalUrl: text("external_url"),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     ...stamps,
   },

@@ -19,14 +19,19 @@
  * dedans le tri SQL de T3.1 — simplement aplati. Rien n'est retrié ici : un
  * ordre calculé par l'écran est un ordre qu'aucun test de lecture n'éprouve.
  *
- * **Le filtre passe par l'URL, sans une ligne de JavaScript** — le patron de la
- * frise de la page produit, et non le `onclick` de la maquette. Une pastille
- * est un lien vers `?etat=<clé>` ; « Toutes » est le lien vers l'adresse nue.
- * Il en découle trois propriétés que l'état client n'aurait pas données : le
- * filtre se copie, se partage et survit au rechargement ; il **n'entre pas dans
- * le décompte d'exclusivité des sept clés de panneau** (`ROADMAP_STATE_PARAM`),
- * si bien que fermer un panneau ne défait pas le filtre et que poser un filtre
- * ne ferme aucun panneau ; et la roadmap reste rendue sur le serveur.
+ * **Le filtre est repassé côté client le 21/08/2026, à la demande.** Il vivait
+ * dans `?etat=<clé>` depuis la veille, et chaque pastille était un lien : le
+ * rendu restait serveur, mais un clic était une navigation, donc un retour en
+ * haut de page. Sur un bloc qui vit au milieu d'une page longue, ce saut coûtait
+ * plus que ce que l'adresse partageable rapportait. Les trois propriétés
+ * perdues — copie, partage, repli sans JavaScript — sont nommées dans
+ * `roadmap-filter.tsx` et consignées au journal.
+ *
+ * **Les entrées restent rendues ici, sur le serveur.** Ce composant les
+ * construit comme avant, avec leurs actions serveur liées, et les passe à
+ * `RoadmapFilter` qui décide seulement laquelle paraît. C'est la frontière
+ * d'`ActionMenu`, tenue une fois de plus : le client arbitre l'affichage, il ne
+ * connaît ni droit, ni base, ni contenu.
  *
  * **Les décomptes ne sont pas un indice.** « Terminé 2 » compte des faits
  * saisis, il ne qualifie ni le projet ni personne : c'est une valeur de la
@@ -47,6 +52,14 @@
  * ne s'ouvre, ni ne se corrige, nulle part — et depuis que les gestes vivent
  * dans un menu, l'entrée ne porte alors même plus de bouton pour l'ouvrir.
  *
+ * **Une entrée peut porter un lien vers l'outil où le travail se fait**
+ * (21/08/2026) — Ergonome sur un audit UX, Everyone sur un audit
+ * d'accessibilité. À ne pas confondre avec le lien du **résultat** juste
+ * au-dessus : celui-là pointe le rapport d'une mesure et n'existe qu'une fois
+ * l'activité terminée, celui-ci pointe l'espace de travail et vaut dès qu'elle
+ * est prévue. C'est le trou que la page laissait — un audit à venir ne menait
+ * nulle part.
+ *
  * `transitionActivity`, `archiveActivity` et `archiveResult` sont les actions
  * serveur de `projets/[id]/actions.ts`, **non liées** : c'est ici, à l'intérieur
  * de la boucle sur les entrées, qu'elles sont liées à l'activité concernée — le
@@ -57,8 +70,6 @@
  * Le reste ne lit toujours aucune base : `groups` est ce que
  * `listProjectRoadmap` a déjà groupé et trié.
  */
-
-import Link from "next/link";
 
 import {
   ButtonIcon,
@@ -72,9 +83,13 @@ import {
   MENU_ITEM,
   MENU_ITEM_DANGER,
 } from "@/components/ui/action-menu";
-import { AvatarGroup } from "@/components/ui/avatar";
-import { BlockNote, EmptyState } from "@/components/ui/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ExternalLink } from "@/components/ui/external-link";
+import {
+  RoadmapFilter,
+  type RoadmapChip,
+  type RoadmapFilterEntry,
+} from "@/components/projects/roadmap-filter";
 import { Section, SectionHeader } from "@/components/ui/section";
 import { StatusPill } from "@/components/ui/status-pill";
 import { Tag } from "@/components/ui/tag";
@@ -160,8 +175,6 @@ type ArchiveResultAction =
 
 export function Roadmap({
   groups,
-  state,
-  stateHref,
   addHref,
   editHref,
   resultHref,
@@ -171,14 +184,6 @@ export function Roadmap({
   archiveResult,
 }: {
   groups: RoadmapGroup[];
-  /**
-   * L'état retenu, ou `null` pour la roadmap entière — **déjà validé** par
-   * `roadmapStateFromParam`. Le composant ne connaît pas l'URL, il connaît une
-   * clé de groupe : la même règle que pour les droits, qui arrivent en props.
-   */
-  state: RoadmapGroupKey | null;
-  /** L'adresse d'une pastille. `null` désigne « Toutes », donc l'adresse nue. */
-  stateHref: (state: RoadmapGroupKey | null) => string;
   /** L'ouverture du panneau de saisie, ou `null` pour qui ne peut pas écrire. */
   addHref: string | null;
   /**
@@ -222,22 +227,68 @@ export function Roadmap({
    */
   archiveResult: ArchiveResultAction;
 }) {
-  /* Les groupes retenus, **dans leur ordre de lecture** : le filtre choisit une
-     tranche, il ne réordonne rien. Un état demandé qu'aucune activité ne porte
-     rend une liste vide — l'état vide filtré ci-dessous, jamais un 404 : une
-     adresse qui ne montre rien est une lecture, pas une erreur (règle 5). */
-  const kept = state ? groups.filter((group) => group.key === state) : groups;
-
-  /* La liste à plat que la maquette dessine. Chaque entrée garde la clé de son
-     groupe : c'est elle qui décide de sa pastille, de son filet et des gestes
-     qu'elle offre — ce que l'intertitre décidait pour toute une tranche. */
-  const entries = kept.flatMap((group) =>
-    group.activities.map((activity) => ({ group, activity })),
-  );
-
   const total = groups.reduce(
     (count, group) => count + group.activities.length,
     0,
+  );
+
+  /* **La barre de filtre — « Toutes », puis un état par groupe peuplé.**
+     Aucune pastille pour un groupe vide : une roadmap sans activité annulée n'a
+     pas à porter un filtre « Annulé 0 », qui ne mènerait qu'à un écran vide. Ce
+     que la barre offre est exactement ce que la roadmap contient, et c'est ce
+     qui rend le décompte lisible sans le rendre normatif. */
+  const chips: RoadmapChip[] = [
+    { key: null, label: "Toutes", count: total, dot: "bg-surface-neutral-light" },
+    ...groups.map((group) => ({
+      key: group.key,
+      label: group.label,
+      count: group.activities.length,
+      dot: GROUP_TONE[group.key],
+    })),
+  ];
+
+  /* La liste à plat que la maquette dessine, **rendue ici, sur le serveur**, et
+     filtrée là-bas, sur le client. Chaque entrée garde la clé de son groupe :
+     c'est elle qui décide de sa pastille et des gestes qu'elle offre — ce que
+     l'intertitre décidait pour toute une tranche.
+
+     L'ordre est celui de `listProjectRoadmap`, simplement aplati. Rien n'est
+     retrié ici : un ordre calculé par l'écran est un ordre qu'aucun test de
+     lecture n'éprouve. */
+  const entries: RoadmapFilterEntry[] = groups.flatMap((group) =>
+    group.activities.map((activity) => ({
+      id: activity.id,
+      key: group.key,
+      node: (
+        <RoadmapEntry
+          activity={activity}
+          groupKey={group.key}
+          groupLabel={group.label}
+          transitionActivity={transitionActivity}
+          archiveActivity={archiveActivity}
+          archiveResult={archiveResult}
+          {...(editHref && group.key !== "cancelled"
+            ? { editHref: editHref(activity.id) }
+            : {})}
+          {...(cancelHref && CANCELLABLE.has(group.key)
+            ? { cancelHref: cancelHref(activity.id) }
+            : {})}
+          /* **Les deux gestes du résultat suivent le résultat, pas le
+             groupe** (T4bis.6). La **saisie** garde les quatre conditions de
+             T4.4 — le droit, l'état terminé, un type qui produit, aucun
+             résultat déjà posé. La **correction**, elle, ne demande que
+             l'existence du résultat : éditer la période d'une activité
+             terminée la redérive en « prévu » ou « en cours » sans toucher au
+             résultat, et l'enfermer dans le groupe « Terminé » le laisserait
+             orphelin. */
+          {...(resultHref &&
+          (activity.result !== null ||
+            (group.key === "done" && activity.producesResult))
+            ? { resultHref: resultHref(activity.id) }
+            : {})}
+        />
+      ),
+    })),
   );
 
   return (
@@ -253,64 +304,7 @@ export function Roadmap({
       />
 
       {groups.length > 0 ? (
-        <>
-          <StatusChips
-            groups={groups}
-            total={total}
-            state={state}
-            stateHref={stateHref}
-          />
-
-          {entries.length > 0 ? (
-            <ul role="list" className="flex flex-col">
-              {entries.map(({ group, activity }) => (
-                <RoadmapEntry
-                  key={activity.id}
-                  activity={activity}
-                  groupKey={group.key}
-                  groupLabel={group.label}
-                  transitionActivity={transitionActivity}
-                  archiveActivity={archiveActivity}
-                  archiveResult={archiveResult}
-                  {...(editHref && group.key !== "cancelled"
-                    ? { editHref: editHref(activity.id) }
-                    : {})}
-                  {...(cancelHref && CANCELLABLE.has(group.key)
-                    ? { cancelHref: cancelHref(activity.id) }
-                    : {})}
-                  /* **Les deux gestes du résultat suivent le résultat, pas le
-                     groupe** (T4bis.6). La **saisie** garde les quatre
-                     conditions de T4.4 — le droit, l'état terminé, un type qui
-                     produit, aucun résultat déjà posé. La **correction**, elle,
-                     ne demande que l'existence du résultat : éditer la période
-                     d'une activité terminée la redérive en « prévu » ou « en
-                     cours » sans toucher au résultat, et l'enfermer dans le
-                     groupe « Terminé » le laisserait orphelin. */
-                  {...(resultHref &&
-                  (activity.result !== null ||
-                    (group.key === "done" && activity.producesResult))
-                    ? { resultHref: resultHref(activity.id) }
-                    : {})}
-                />
-              ))}
-            </ul>
-          ) : (
-            /* Un état **filtré** vide, et non l'état vide du bloc : il y a des
-               activités, aucune dans cet état. Il dit donc le chemin du retour
-               plutôt que le geste de saisie — proposer « Ajouter une activité »
-               ici laisserait croire que le filtre a effacé quelque chose. */
-            <BlockNote>
-              Aucune activité dans cet état pour l&apos;instant.{" "}
-              <Link
-                href={stateHref(null)}
-                className="text-content-info-base underline"
-              >
-                Voir toute la roadmap
-              </Link>
-              .
-            </BlockNote>
-          )}
-        </>
+        <RoadmapFilter chips={chips} entries={entries} />
       ) : (
         <EmptyState
           level={3}
@@ -340,91 +334,6 @@ const CANCELLABLE = new Set<RoadmapGroupKey>([
   "unscheduled",
   "in_progress",
 ]);
-
-/**
- * La barre de filtre — « Toutes », puis un état par groupe **peuplé**.
- *
- * **Aucune pastille pour un groupe vide** : une roadmap sans activité annulée
- * n'a pas à porter un filtre « Annulé 0 », qui ne mènerait qu'à un écran vide.
- * Ce que la barre offre est exactement ce que la roadmap contient, et c'est ce
- * qui rend le décompte lisible sans le rendre normatif.
- *
- * **Des liens, jamais des boutons** : chacun mène à une adresse — la page du
- * projet portant `?etat=<clé>` — et se copie, se partage, s'ouvre dans un
- * onglet. La maquette en fait des `<button>` pilotés par un `onclick` ; les
- * trois propriétés y seraient perdues, et le filtre avec le JavaScript.
- *
- * **`Link` et non `<a>`**, comme les préréglages de la frise produit : la
- * navigation reste côté client, si bien que poser un filtre ne repart pas du
- * haut de la page — ce qui compte ici, la roadmap vivant sous une barre d'ancres
- * collante. L'adresse, elle, est la même : le repli sans JavaScript est un
- * `href` complet.
- *
- * `aria-current="page"` porte l'état retenu : la pastille active ne se signale
- * pas qu'à la couleur (`docs/06` §11) — la règle de `MainNav`.
- *
- * Le point coloré est **décoratif** : le libellé est écrit juste à côté.
- */
-function StatusChips({
-  groups,
-  total,
-  state,
-  stateHref,
-}: {
-  groups: RoadmapGroup[];
-  total: number;
-  state: RoadmapGroupKey | null;
-  stateHref: (state: RoadmapGroupKey | null) => string;
-}) {
-  const chips: {
-    key: RoadmapGroupKey | null;
-    label: string;
-    count: number;
-    dot: string;
-  }[] = [
-    {
-      key: null,
-      label: "Toutes",
-      count: total,
-      dot: "bg-surface-neutral-light",
-    },
-    ...groups.map((group) => ({
-      key: group.key,
-      label: group.label,
-      count: group.activities.length,
-      dot: GROUP_TONE[group.key],
-    })),
-  ];
-
-  return (
-    <ul role="list" className="flex flex-wrap gap-2">
-      {chips.map((chip) => {
-        const active = chip.key === state;
-        return (
-          <li key={chip.key ?? "toutes"}>
-            <Link
-              href={stateHref(chip.key)}
-              aria-current={active ? "page" : undefined}
-              className={[
-                "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium",
-                active
-                  ? "border-border-primary-base bg-surface-primary-base text-content-neutral-pale"
-                  : "border-surface-neutral-lighter bg-surface-neutral-pale text-content-neutral-dark",
-              ].join(" ")}
-            >
-              <span
-                aria-hidden="true"
-                className={`h-2 w-2 flex-none rounded-full ${chip.dot}`}
-              />
-              {chip.label}
-              <span className="font-bold">{chip.count}</span>
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
 
 /**
  * L'action d'ouverture du panneau, aux deux emplacements.
@@ -594,10 +503,10 @@ function RoadmapEntry({
     canArchiveActivity;
 
   return (
-    <li className="flex flex-wrap items-start gap-x-4 gap-y-3 border-t border-surface-neutral-lighter py-4">
+    <li className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-surface-neutral-lighter py-4">
       <span
         aria-hidden="true"
-        className={`mt-1.5 h-2 w-2 flex-none rounded-full ${GROUP_TONE[groupKey]}`}
+        className={`h-2 w-2 flex-none rounded-full ${GROUP_TONE[groupKey]}`}
       />
 
       <div className="min-w-55 flex-1">
@@ -618,6 +527,32 @@ function RoadmapEntry({
         {/* Le résultat (T4.3). Il ne croise jamais le motif d'annulation —
             seule une activité terminée porte un résultat (`docs/03` §4). */}
         {activity.result ? <Result result={activity.result} /> : null}
+        {/* Le lien vers l'outil où le travail se fait (21/08/2026) —
+            « Ouvrir dans Ergonome », « Ouvrir dans Everyone ».
+
+            **Il peut cohabiter avec le résultat juste au-dessus, et les deux
+            ne disent pas la même chose** : celui-là pointe le *rapport* d'une
+            mesure et n'existe qu'une fois l'activité terminée, celui-ci pointe
+            l'*espace de travail* et vaut dès qu'elle est prévue. C'est ce
+            second cas qui manquait — un audit à venir ne menait nulle part.
+
+            **Le nom de l'outil vient du type**, par `default_tool_id`, et non
+            d'une comparaison de libellés : « Audit UX » est un texte de
+            référentiel, que le domaine renomme quand il veut. Sans outil au
+            type, le lien se nomme par son geste plutôt que par une cible qu'on
+            ne sait pas nommer.
+
+            **Rendu dès qu'il est renseigné**, quel que soit le type : le
+            conditionner masquerait une donnée que quelqu'un a saisie. */}
+        {activity.externalUrl ? (
+          <p className="mt-1.5 text-xs leading-175 text-content-neutral-base">
+            <ExternalLink href={activity.externalUrl}>
+              {activity.defaultToolName
+                ? `Ouvrir dans ${activity.defaultToolName}`
+                : "Ouvrir l'outil"}
+            </ExternalLink>
+          </p>
+        ) : null}
         {/* `cancellationReason` n'est renseigné que dans ce groupe
             (`activities_cancelled_requires_reason`) : le motif remplace les
             gestes, il ne s'ajoute pas à côté d'eux. Texte, pas couleur seule
@@ -629,17 +564,18 @@ function RoadmapEntry({
         ) : null}
       </div>
 
-      {/* Facultatif (`docs/03` §4, T3.6) : la plupart des entrées n'ont aucun
-          participant, et `AvatarGroup` rend `null` sur une liste vide — la
-          colonne disparaît alors sans qu'une condition s'écrive ici. */}
-
-
       <span className="min-w-21 text-right text-xs whitespace-nowrap text-content-neutral-base">
         {period}
       </span>
 
       {hasGestures ? (
         <ActionMenu
+          /* Le rang discret, et c'est le **nombre** qui le demande : une
+             roadmap porte quinze de ces boutons, et quinze carrés à filet
+             dessinent une colonne de boîtes que rien ne justifie. Le gabarit
+             ne bouge pas — les trois rangs portent le même `border` d'un
+             pixel —, donc pas une entrée ne se déplace. */
+          variant="tertiary"
           label={`Options de l'activité ${activity.typeLabel} — ${period}`}
         >
           {editHref ? (

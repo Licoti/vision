@@ -277,6 +277,27 @@ export type RoadmapActivity = {
   approachLabel: string | null;
   /** Non nul seulement dans le groupe `cancelled` (`activities_cancelled_requires_reason`). */
   cancellationReason: string | null;
+  /**
+   * Le lien vers l'outil où le travail se fait (21/08/2026), saisi sur
+   * l'activité. **Distinct de `result.externalUrl`**, qui pointe le rapport
+   * d'une mesure et n'existe qu'une fois l'activité terminée : celui-ci vaut
+   * dès qu'elle est prévue.
+   */
+  externalUrl: string | null;
+  /**
+   * Le nom de l'outil **habituellement associé au type** — `Ergonome` sur un
+   * audit UX, `Everyone` sur un audit d'accessibilité (`docs/04` §2). Il ne
+   * sert qu'à **nommer** le lien ci-dessus : « Ouvrir dans Ergonome ».
+   *
+   * Il vient de `activity_types.default_tool_id`, colonne posée en T1.2 et qui
+   * **n'avait aucun lecteur** jusqu'ici. C'est ce qui évite de reconnaître un
+   * audit à son libellé : un libellé de référentiel se renomme, une clé
+   * étrangère non.
+   *
+   * Nul est un cas normal — la plupart des types n'ont pas d'outil, et un
+   * outil d'un autre domaine ou archivé ne se nomme pas non plus.
+   */
+  defaultToolName: string | null;
   /** Facultatif (`docs/03` §4), triés par nom. Vide la plupart du temps — T3.6. */
   participants: ActivityFormPerson[];
   /**
@@ -295,27 +316,6 @@ export type RoadmapGroup = {
   label: string;
   activities: RoadmapActivity[];
 };
-
-/**
- * La clé de groupe portée par une URL, reconnue ou écartée (20/08/2026).
- *
- * `?etat=` filtre la roadmap de la page projet (`ROADMAP_STATE_PARAM`). Toute
- * valeur que ce garde ne reconnaît pas ne filtre **rien** — la roadmap entière,
- * qui est l'état normal —, exactement ce que la page fait déjà de toute valeur
- * d'`?activite=` qu'elle ne reconnaît pas. Un filtre inconnu n'est pas une
- * erreur : c'est une adresse qui n'a rien demandé.
- *
- * Il vit ici et non dans `lib/navigation.ts` parce que le vocabulaire est
- * celui de cette lecture : le jour où un sixième groupe apparaît, les deux
- * listes doivent bouger ensemble, et elles sont alors sous les yeux.
- */
-export function roadmapStateFromParam(
-  value: string | undefined,
-): RoadmapGroupKey | null {
-  if (value === undefined) return null;
-  const found = GROUPS.find((group) => group.key === value);
-  return found ? found.key : null;
-}
 
 /** L'ordre de lecture de `docs/03` §6, et les libellés de l'interface. */
 const GROUPS: { key: RoadmapGroupKey; label: string }[] = [
@@ -392,6 +392,12 @@ export function listProjectRoadmap(
         isUnscheduled: activities.isUnscheduled,
         approachLabel: approaches.label,
         cancellationReason: activities.cancellationReason,
+        externalUrl: activities.externalUrl,
+        /* Le nom de l'outil du **type**, pas d'un résultat : deux colonnes
+           d'outil coexistent désormais dans cette lecture, et elles ne disent
+           pas la même chose. Celle-ci nomme l'espace de travail, celle de
+           `resultRows` nomme la source d'une mesure. */
+        defaultToolName: tools.name,
       })
       .from(activities)
       .innerJoin(
@@ -404,6 +410,15 @@ export function listProjectRoadmap(
       .leftJoin(
         approaches,
         and(eq(approaches.id, activities.approachId), filter(approaches)),
+      )
+      /* `filter(tools)` n'est pas une précaution de style : c'est la règle du
+         fichier, et la même que celle que la jointure des résultats documente
+         plus bas — un `default_tool_id` pointant l'outil d'un autre domaine
+         n'en rendrait pas le nom. `activityTypes` est déjà jointe pour le
+         libellé, donc rien ne s'ajoute qu'une table de référentiel. */
+      .leftJoin(
+        tools,
+        and(eq(tools.id, activityTypes.defaultToolId), filter(tools)),
       )
       .where(
         and(
@@ -546,6 +561,8 @@ export function listProjectRoadmap(
         isUnscheduled: row.isUnscheduled,
         approachLabel: row.approachLabel,
         cancellationReason: row.cancellationReason,
+        externalUrl: row.externalUrl,
+        defaultToolName: row.defaultToolName,
         participants: participantsByActivity.get(row.id) ?? [],
         result: resultByActivity.get(row.id) ?? null,
       });
