@@ -22,6 +22,14 @@
  * option, où elle se lit sans JavaScript, plutôt que dans un champ qui aurait
  * demandé un état client pour suivre le choix.
  *
+ * **Il puise dans le référentiel des personnes, il ne l'alimente plus**
+ * (T5bis.7, arbitrage (g) de C5bis). Le bloc « Ajouter une personne » de T2.6
+ * est parti dans `/equipe`, où une personne se crée avec son métier, sa
+ * disponibilité et ses compétences ; ce qui reste ici est **une désignation**,
+ * et chaque ligne porte de quoi la faire en connaissance de cause. Ce qu'elle
+ * ne porte pas : aucun niveau de compétence, aucun rapprochement avec les
+ * métiers déclarés du projet — D44 pose que les deux peuvent diverger.
+ *
  * Le filet des contrôles est plus sombre que celui des blocs, pour la raison
  * mesurée en T2.3 et reprise en T2.5 : la bordure d'un champ est la limite d'un
  * composant d'interface, elle se mesure à 3:1, et aucun jeton `border-*` du
@@ -31,6 +39,7 @@
 import Link from "next/link";
 import { useActionState, useId } from "react";
 
+import { AvailabilityDot } from "@/components/team/availability-dot";
 import { ACTION_LINK_SM } from "@/components/ui/action-link";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,13 +51,13 @@ import {
 
 import {
   EMPTY_PROJECT_VALUES,
-  PERSON_KIND_LABEL,
   TEAM_ROLES,
   TEAM_ROLE_LABEL,
   teamFieldName,
   type ProjectFormState,
   type ProjectFormValues,
 } from "@/lib/forms/project";
+import { ROUTES } from "@/lib/navigation";
 import type {
   ProjectFormPerson,
   ProjectFormProduct,
@@ -298,21 +307,46 @@ export function ProjectForm({
                 key={person.id}
                 className="flex flex-wrap items-center justify-between gap-3"
               >
-                <label
-                  htmlFor={id(`team-${person.id}`)}
-                  className="text-sm text-content-neutral-darkest"
-                >
-                  {person.fullName}
-                  {person.kind === "stakeholder" ? (
-                    <span className="text-xs text-content-neutral-dark">
-                      {" · côté entité"}
-                    </span>
-                  ) : null}
-                </label>
+                {/* Le nom seul reste dans le `<label>` : c'est le nom
+                    accessible du `select`, et le lui allonger du métier et de
+                    la disponibilité ferait annoncer un profil là où l'on
+                    demande « quel rôle pour cette personne ? ». Le second rang
+                    est donc un frère, désigné par `aria-describedby` — il se
+                    lit à l'œil comme à l'assistance, sans se confondre avec le
+                    nom du contrôle. */}
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <label
+                    htmlFor={id(`team-${person.id}`)}
+                    className="text-sm text-content-neutral-darkest"
+                  >
+                    {person.fullName}
+                    {person.kind === "stakeholder" ? (
+                      <span className="text-xs text-content-neutral-dark">
+                        {" · côté entité"}
+                      </span>
+                    ) : null}
+                  </label>
+                  <span
+                    id={id(`team-${person.id}-profil`)}
+                    className="flex flex-wrap items-center gap-2 text-xs text-content-neutral-base"
+                  >
+                    {person.jobLabel ?? "Métier non renseigné"}
+                    {/* Un intervenant côté entité n'a pas de disponibilité :
+                        c'est une propriété du centre, et la ligne n'en invente
+                        aucune (arbitrage (d) de C5bis). */}
+                    {person.availability ? (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <AvailabilityDot availability={person.availability} />
+                      </>
+                    ) : null}
+                  </span>
+                </span>
                 <select
                   id={id(`team-${person.id}`)}
                   name={teamFieldName(person.id)}
                   defaultValue={values.team[person.id] ?? "none"}
+                  aria-describedby={id(`team-${person.id}-profil`)}
                   className="rounded-lg border border-content-neutral-normal bg-surface-neutral-pale px-3 py-1.5 text-sm text-content-neutral-darkest"
                 >
                   {TEAM_ROLES.map((role) => (
@@ -326,87 +360,26 @@ export function ProjectForm({
           </div>
         ) : (
           <p className="text-sm text-content-neutral-dark">
-            {"Aucune personne référencée dans ce domaine. Le bloc ci-dessous permet d'en ajouter une."}
+            {"Aucune personne référencée dans ce domaine. Une personne se crée dans Équipe, et nulle part ailleurs."}
           </p>
         )}
+
+        {/* Le seul reste du bloc d'ajout : une adresse. Elle ouvre le panneau
+            de création d'`/equipe` au rendu serveur — même droit
+            `manageDomain` que ce formulaire — et quitte donc cette page : la
+            saisie en cours est perdue, comme elle l'est déjà par le « Créer un
+            produit » de l'état vide. */}
+        <p className="text-xs text-content-neutral-base">
+          <Link href={ROUTES.teamPersonNew} className={ACTION_LINK_SM}>
+            Ajouter une personne dans Équipe
+          </Link>
+        </p>
 
         {errors.team ? (
           <p className="text-xs font-semibold text-content-danger-dark">
             {errors.team}
           </p>
         ) : null}
-      </fieldset>
-
-      {/* D19 — être référencé et pouvoir se connecter sont deux choses
-          distinctes. Une personne ajoutée ici n'aura jamais de compte Vision.
-          Une seule par enregistrement : sans JavaScript, un champ répétable
-          n'existe pas. */}
-      <fieldset className={BLOCK}>
-        <legend className="text-2xs font-semibold text-content-neutral-dark uppercase">
-          Ajouter une personne
-        </legend>
-        <p className="text-xs text-content-neutral-dark">
-          {"Pour un intervenant qui n'est pas encore référencé. Il rejoint l'équipe de cet accompagnement et n'aura pas d'accès à Vision. Une personne par enregistrement."}
-        </p>
-
-        <FormField
-          label="Nom et prénom"
-          htmlFor={id("newPersonName")}
-          error={errors.newPerson}
-          errorId={errorId("newPerson")}
-        >
-          <input
-            id={id("newPersonName")}
-            name="newPersonName"
-            type="text"
-            defaultValue={values.newPersonName}
-            autoComplete="off"
-            aria-invalid={errors.newPerson ? true : undefined}
-            aria-describedby={
-              errors.newPerson ? errorId("newPerson") : undefined
-            }
-            className={`${CONTROL_TEXT} ${borderOf(errors.newPerson)}`}
-          />
-        </FormField>
-
-        <div className="flex flex-wrap gap-4">
-          <FormField
-            label="Rattachement"
-            htmlFor={id("newPersonKind")}
-            errorId={errorId("newPersonKind")}
-            className="flex-1"
-          >
-            <select
-              id={id("newPersonKind")}
-              name="newPersonKind"
-              defaultValue={values.newPersonKind}
-              className={`${CONTROL_TEXT} border-content-neutral-normal`}
-            >
-              {Object.entries(PERSON_KIND_LABEL).map(([kind, label]) => (
-                <option key={kind} value={kind}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </FormField>
-
-          <FormField
-            label="Rôle dans l'équipe"
-            htmlFor={id("newPersonRole")}
-            errorId={errorId("newPersonRole")}
-            className="flex-1"
-          >
-            <select
-              id={id("newPersonRole")}
-              name="newPersonRole"
-              defaultValue={values.newPersonRole}
-              className={`${CONTROL_TEXT} border-content-neutral-normal`}
-            >
-              <option value="member">{TEAM_ROLE_LABEL.member}</option>
-              <option value="contributor">{TEAM_ROLE_LABEL.contributor}</option>
-            </select>
-          </FormField>
-        </div>
       </fieldset>
 
       <div className="flex flex-wrap items-center gap-4">

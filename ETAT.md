@@ -2,10 +2,11 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 21/08/2026 — La page produit : hiérarchie, regroupement, second rang effacé, hors ticket.
-**Chantier en cours :** C5bis — Équipe : référentiel des personnes et des compétences
-**Ticket suivant :** **T5bis.7** — la sélection d'équipe du formulaire de projet, refondue
-(`tickets-C5bis.md`).
+**Dernière mise à jour :** 25/08/2026 — T5bis.7, la sélection d'équipe du formulaire de projet, refondue.
+**Chantier en cours :** aucun — C5bis est terminé, ses sept tickets livrés.
+**Ticket suivant :** **aucun.** Le prochain geste est la **session de découpage de C6** (liens et
+journal), qui écrira `tickets-C6.md` — et qui est le seul moment où `ETAT.md` se balaie, ce dont il
+a besoin : 694 lignes pour un seuil de 250.
 
 ---
 
@@ -21,7 +22,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **terminé** |
 | TD — Dette technique | TD.1, TD.2 | **terminé** |
 | TD — Couche de présentation | TD.3 → TD.6 | **terminé** |
-| C5bis — Équipe | T5bis.1 → T5bis.7 | **en cours** — T5bis.6 terminé |
+| C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
 | C6 — Liens et journal | à découper | à faire |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
@@ -364,6 +365,23 @@ détaillé vivent dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOU
   servi, et le second chemin — le lien inline du paragraphe d'absence — qui garde le geste
   atteignable sans JavaScript.
 
+- **T5bis.7 — 25/08/2026 — la sélection d'équipe du formulaire de projet, refondue.** Le dernier
+  ticket de C5bis, et celui qui fait cesser un doublon : le formulaire **puise** dans le référentiel
+  au lieu de le doubler. Chaque ligne porte le métier et la disponibilité à côté du nom — deux
+  valeurs **reportées**, jamais un tri ni un rapprochement avec les métiers déclarés (D44) —, et le
+  bloc « Ajouter une personne » de T2.6 disparaît (arbitrage (g)), remplacé par un lien vers
+  `/equipe?profil=nouveau`. Quatre arbitrages rendus avant écriture, dont **la septième lecture** :
+  `jobs` est lu **deux fois**, une fois pour les cases à cocher avec l'exception nominative de
+  T4bis.1, une fois `includeArchived` pour les seuls libellés — sans quoi le métier d'une personne
+  s'afficherait ou non **selon le projet qu'on est en train de modifier**. C'est le précédent des
+  entités, resservi. Referme deux points ouverts d'un coup, et le second sans l'avoir cherché :
+  « on n'ajoute qu'une personne par enregistrement », et **`PERSON_KIND_LABEL` en deux exemplaires
+  divergents** — l'écran qui portait l'autre vocabulaire n'existe plus, l'arbitrage éditorial n'a
+  plus d'objet. Sa propriété la mieux payée est une **non-lecture** : `readProjectForm` ne connaît
+  plus `newPersonName`, si bien qu'une soumission forgée ne se heurte à aucun refus — elle n'a nulle
+  part où aller. **Mesuré** : POST forgé avec étape témoin, `persons` à 13 avant et après,
+  `projects` de 11 à 12.
+
 ---
 
 ## Points ouverts
@@ -476,13 +494,6 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
 - **Le contenu rédigé d'`/a-propos` reste à écrire.** La page a son en-tête et son état vide. Son
   contenu — ce qu'est Vision, le vocabulaire, ce qu'elle ne fait pas, l'état daté — ne demande
   aucune lecture en base. → **ticket propre, C7 au plus tard.**
-- **On n'ajoute qu'une personne par enregistrement.** Le bloc d'ajout de T2.6 crée une personne, et
-  pour en ajouter deux il faut enregistrer puis rouvrir le formulaire. La limite est écrite dans
-  l'écran, et **sa raison a disparu le 14/08** : le champ répétable exigeait le JavaScript que la
-  cinquième discipline interdisait. Le découpage de C5bis la referme autrement qu'en la levant :
-  l'arbitrage (g) sort la création d'une personne du formulaire de projet, et une limite sur un bloc
-  qui n'existe plus n'a plus d'objet. → **T5bis.7.**
-
 - **Corriger une personne du centre en intervenant côté entité lui laisse ses compétences.**
   `parsePersonForm` efface la disponibilité quand le genre devient `stakeholder` — sans ce `null`
   explicite, le `CHECK` `persons_availability_requires_center` refuserait l'écriture. Rien
@@ -493,14 +504,10 @@ Un point qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas ba
   demandait pas (règle 3), et le second serait une cascade, que l'arbitrage (f) de C4bis écarte.
   Aucune donnée n'est perdue ; l'état est incohérent avec l'arbitrage (d), qu'il n'a pas les moyens
   de tenir. → **ticket propre, C7 au plus tard.**
-- **`PERSON_KIND_LABEL` existe en deux exemplaires, et ils ne disent pas la même chose.** Le point
-  était « une constante mal placée » ; il est **récrit le 20/08/2026** après mesure, et c'est autre
-  chose. `lib/forms/project.ts:28` dit « Côté centre de compétence » / « Côté entité » ;
-  `lib/forms/person.ts:64` dit « Membre du centre » / « Intervenant côté entité ». Les réunir dans
-  `lib/format.ts` — où vivent `formatIndicatorDirection`, `formatResourceType` et désormais
-  `formatStarterKind` — n'est donc **pas un déplacement, c'est trancher un vocabulaire** : deux
-  écrans changeraient de mots. Le bloc « Démarrage » a ouvert `lib/format.ts` et n'a pas fait ce
-  geste, qui n'est pas technique. → **arbitrage éditorial, puis un ticket propre, C7 au plus tard.**
+- **`PERSON_KIND_LABEL` vit dans `lib/forms/person.ts` et non dans `lib/format.ts`.** Ce qui reste du
+  point refermé par T5bis.7 : les libellés d'énuméré vivent dans `lib/format.ts` depuis T5.1, et les
+  deux mots du genre sont ailleurs. Ce n'est plus un vocabulaire à trancher — il n'y en a plus qu'un —,
+  c'est un déplacement. → **au prochain ticket qui ouvre `lib/format.ts`.**
 - **`uiLayerSeal` ne scelle pas `components/shell/`.** Les trois groupes interdits sont ceux que la
   fiche de TD.6 énumère ; la coquille applicative — `breadcrumb.tsx`, `main-nav.tsx` — n'y est pas,
   et rien n'empêcherait `components/ui/` de l'importer. La propriété est vraie aujourd'hui, donc ce

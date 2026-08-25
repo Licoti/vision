@@ -2451,6 +2451,22 @@ posés dans un domaine-sonde de T5bis.4, archivés de même ; une liaison `proje
 où ils occupaient encore la place. Conservés tels quels : un point refermé documente comment il
 l%s été.)*
 
+- ~~**On n'ajoute qu'une personne par enregistrement.**~~ **Refermé le 25/08/2026 par T5bis.7.** Le
+  point ne s'est pas levé, il a perdu son objet : l'arbitrage (g) de C5bis a sorti la création d'une
+  personne du formulaire de projet, et une limite sur un bloc qui n'existe plus ne limite rien. La
+  raison d'origine — un champ répétable exige le JavaScript que la cinquième discipline interdisait —
+  n'a jamais été contredite ; elle est devenue sans emploi. `/equipe` crée une personne avec son
+  métier, sa disponibilité et ses compétences, autant de fois qu'on veut.
+
+- ~~**`PERSON_KIND_LABEL` existe en deux exemplaires, et ils ne disent pas la même chose.**~~
+  **Refermé le 25/08/2026 par T5bis.7, sans que l'arbitrage éditorial ait eu à être rendu.** Le point
+  demandait de trancher un vocabulaire : « Côté centre de compétence » / « Côté entité »
+  (`lib/forms/project.ts`) contre « Membre du centre » / « Intervenant côté entité »
+  (`lib/forms/person.ts`). Le premier est parti **avec l'écran qui l'affichait** — le `select`
+  « Rattachement » du bloc d'ajout —, et il ne reste qu'une version. Ce qui subsiste n'est plus un
+  vocabulaire mais un rangement : ces libellés vivraient mieux dans `lib/format.ts`, où sont ceux des
+  autres énumérés. Le point ouvert récrit dans `ETAT.md` ne dit plus que cela.
+
 - ~~**Le bouton primaire et le secondaire s'écrivent aussi en deux attributs, hors de portée de
   `socleLock`.**~~ **Refermé le 21/08/2026, hors ticket.** Trois composants de
   `components/projects/` — `AddActivity`, `LinkResource`, `AdoptIndicator` — portaient la forme du
@@ -3248,3 +3264,97 @@ rangent hors de la saisie ; ils ne protègent pas.
   n'est neuf par la position ; mesurés quand même.
 
 **960 tests, 33 fichiers, verts.** `lint --max-warnings=0` et `tsc --noEmit` sans une ligne.
+
+---
+
+## T5bis.7 — La sélection d'équipe du formulaire de projet, refondue — 25/08/2026
+
+**Le dernier ticket de C5bis**, et celui qui fait cesser un doublon vieux de T2.6 : le formulaire
+d'accompagnement **doublait** le référentiel des personnes au lieu d'y puiser. Il portait un bloc
+« Ajouter une personne » qui écrivait dans `persons` — une par enregistrement, sans métier, sans
+disponibilité, sans compétence — et une liste d'équipe qui ne disait que des noms.
+
+### Ce que le ticket a fait
+
+**La ligne d'équipe porte désormais le métier et la disponibilité**, à côté du nom et de la mention
+« côté entité » déjà présente. Deux valeurs **reportées** du référentiel, jamais un tri, jamais un
+décompte, jamais un rapprochement avec les métiers déclarés du projet : D44 pose que les deux peuvent
+diverger, et un écran qui signalerait l'écart rouvrirait la décision. Aucun niveau de compétence
+n'entre dans le formulaire — choisir une équipe n'est pas comparer des personnes.
+
+**Le bloc « Ajouter une personne » disparaît** (arbitrage (g) de C5bis). Cinq noms partent avec lui :
+`newPersonName`, `newPersonKind`, `newPersonRole`, `NewPersonInput` et `addManualPerson`. À leur
+place, un lien `ACTION_LINK_SM` vers `/equipe?profil=nouveau`, qui ouvre le panneau de création au
+rendu serveur, sous le même droit `manageDomain` que ce formulaire.
+
+`syncMembers`, `project_members` et le contrat d'équipe n'ont pas changé d'une ligne. Aucune
+migration.
+
+### Quatre arbitrages rendus avant écriture
+
+**(1) `jobs` est lu deux fois, et c'est la seule forme qui tienne.** La lecture proposée aux cases à
+cocher porte l'exception nominative de T4bis.1 : elle écarte les métiers archivés, sauf ceux que le
+projet édité porte déjà. Y prendre le **libellé** du métier d'une personne aurait fait dépendre
+l'affichage d'un profil du projet qu'on est en train de modifier — le même écran, deux rendus. La
+seconde lecture est `includeArchived: true` et ne propose rien : c'est **exactement** le précédent
+des entités, écrit dans le docblock de cette fonction depuis T2.6. Sept lectures scopées, toujours
+aucune jointure.
+
+**(2) Les deux exports devenus morts sont retirés.** `PERSON_KIND_LABEL` et `isPersonKind` n'avaient
+plus d'appelant ; le type `PersonKind` reste, `lib/queries/activities.ts` l'importe pour ses
+participants. Effet voulu : il ne reste qu'un `PERSON_KIND_LABEL` dans le dépôt, et le point ouvert
+des deux exemplaires divergents se referme **sans qu'un arbitrage éditorial ait à être rendu**.
+
+**(3) Le lien pointe le panneau, pas la page.** `ROUTES.teamPersonNew` plutôt que `ROUTES.team` : le
+geste demandé est « créer une personne », et l'adresse qui le porte existe depuis T5bis.6. Elle quitte
+la page et perd la saisie en cours — comme le fait déjà le « Créer un produit » de l'état vide, et
+c'est consigné plutôt que corrigé par un `target="_blank"` que le dépôt réserve aux outils externes.
+
+**(4) Le nom accessible du `select` ne change pas.** Le `<label>` garde le nom seul ; le métier et la
+disponibilité sont un rang frère, relié par `aria-describedby`. Un `<label>` qui les aurait avalés
+ferait annoncer un profil entier là où l'on demande « quel rôle pour cette personne ? ».
+`AvailabilityDot` est réemployé tel quel — il rend la pastille **et** le mot.
+
+### Ce qui vaut d'être retenu
+
+**Une non-lecture vaut mieux qu'un refus.** Le critère du ticket demandait qu'un POST forgé portant
+encore `newPersonName` ne crée aucune personne. Il n'y a pas de garde qui le refuse : `readProjectForm`
+ne lit plus ce champ, `ProjectFormValues` n'a plus de clé où le mettre, `ProjectInput` est passé de
+cinq clés à quatre. Un refus se raisonne, se contourne et se teste ; **une clé qui n'existe pas n'a
+nulle part où aller**. Le cas de test qui le prouve est celui de la liste exhaustive des clés, où les
+trois champs retirés sont désormais postés en champs forgés.
+
+**Un test de libellé archivé ne mord que sur le bon `keep`.** Le premier jet éprouvait la septième
+lecture avec le `keep` complet de la fixture — qui garde le métier **et** la personne. Les deux
+façons d'écrire la carte des libellés y rendaient le même résultat, et la mise en défaut ne tombait
+pas. Le seul appel qui distingue est celui qui rappelle **la personne sans son métier**.
+
+### Les quatre disciplines
+
+- **Le critère se lit dans le HTML servi.** `/projets/nouveau` et `/projets/<id>/modifier`,
+  `<script>` retirés : **zéro** occurrence de `newPerson` (dans le DOM comme dans la charge RSC), le
+  lien `profil=nouveau` présent une fois, et les dix lignes d'équipe portant chacune son métier et,
+  pour une personne du centre, le mot entier de sa disponibilité. Les deux intervenants côté entité
+  portent « · côté entité », « Métier non renseigné » et **aucune** disponibilité. Le `<label>` nomme
+  le `select` du seul nom, l'`aria-describedby` pointe le rang du profil, la pastille est
+  `aria-hidden`.
+- **Le droit s'éprouve par l'action.** POST forgé en `multipart/form-data` sur `createProject`, les
+  quatre champs `$ACTION_*` recopiés du balisage — `$ACTION_REF_1` **posté vide**, faute de quoi Next
+  rend un 500 « Failed to find Server Action » qu'on prendrait pour un refus (T4.4, T5.3, T5bis.6).
+  **Étape témoin d'abord** : une soumission sans les champs forgés rend 303 et crée l'accompagnement.
+  Puis la forgée, avec `newPersonName`, `newPersonKind`, `newPersonRole` : 303 elle aussi, et
+  **`persons` immobile à 13** — `projects` passe de 11 à 12. Les deux accompagnements de sonde ont
+  été archivés, et la liaison posée pour servir la branche « personne archivée déjà portée » retirée.
+- **Les tests se mettent en défaut.** Quatre neutralisations, chacune sur ce qu'elle devait :
+  la carte des libellés pointée sur `jobRows` fait tomber le seul cas du métier archivé ;
+  `availability: null` en dur fait tomber le seul cas de la personne du centre ; `newPersonName`
+  relu dans `readProjectForm` fait tomber les deux cas qui portent sur les clés lues, et eux seuls ;
+  une cinquième clé rendue à `ProjectInput` fait tomber le seul cas de `parseProjectForm`.
+- **Le contraste se mesure.** Deux couples de texte sur `surface-neutral-pale`, le fond exact du bloc
+  d'équipe : `content-neutral-base` **4,98:1**, `content-neutral-dark` **8,12:1**. Les trois couleurs
+  de pastille d'`AvailabilityDot` sont déjà mesurées **sur ce même fond** depuis T5bis.2 — aucun
+  couple n'est neuf par la position, aucun jeton n'est ajouté, aucun septième substitut n'est inventé.
+
+**959 tests, 33 fichiers, verts.** `lint --max-warnings=0` et `tsc --noEmit` sans une ligne. Le
+décompte perd un test et c'est voulu : quatre cas retirés avec le bloc d'ajout, trois cas neufs sur
+le métier et la disponibilité.

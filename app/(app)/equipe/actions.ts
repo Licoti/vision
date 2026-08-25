@@ -255,7 +255,7 @@ async function openPersonSkill(
  * Créer une personne.
  *
  * **Un seul lieu de création, et c'est ici** (arbitrage (g) de C5bis) : T5bis.7
- * retirera le bloc « Ajouter une personne » du formulaire de projet, ce qui
+ * a retiré le bloc « Ajouter une personne » du formulaire de projet, ce qui
  * referme le point ouvert « on n'ajoute qu'une personne par enregistrement » —
  * sa limitation n'a plus d'objet une fois la création partie ailleurs.
  *

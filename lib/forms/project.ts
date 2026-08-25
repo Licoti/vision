@@ -13,22 +13,26 @@
  *
  * Un projet écrit cinq tables là où un produit en écrivait une. La forme des
  * valeurs le reflète : la ligne `projects` d'un côté, les liaisons de l'autre.
+ *
+ * **Il n'en écrit plus une sixième depuis T5bis.7** : le bloc « Ajouter une
+ * personne » est parti dans `/equipe` (arbitrage (g) de C5bis), et avec lui les
+ * trois champs `newPerson*`. Ce module ne les lit plus — c'est la seule défense
+ * qui vaille contre une soumission forgée : un champ qu'on ne lit pas ne peut
+ * pas devenir une ligne, là où un refus se raisonne et se contourne.
  */
 
 import { personKind } from "@/lib/db/schema";
 import { isUuid } from "@/lib/uuid";
 
-/** `center` · `stakeholder`. Dérivé du schéma, jamais réécrit à la main. */
-export type PersonKind = (typeof personKind.enumValues)[number];
-
 /**
- * D19 — une personne peut être référencée sans compte. Le libellé dit de quel
- * côté elle se tient, seule chose que le formulaire ait besoin d'en savoir.
+ * `center` · `stakeholder`. Dérivé du schéma, jamais réécrit à la main.
+ *
+ * **Le seul reste du bloc d'ajout**, retiré en T5bis.7 : `lib/queries/activities.ts`
+ * l'importe pour ses participants. Le `PERSON_KIND_LABEL` qui vivait ici est
+ * parti avec l'écran qui l'affichait — il n'en reste qu'un dans le dépôt, celui
+ * de `lib/forms/person.ts`, et le vocabulaire cesse d'exister en deux versions.
  */
-export const PERSON_KIND_LABEL: Record<PersonKind, string> = {
-  center: "Côté centre de compétence",
-  stakeholder: "Côté entité",
-};
+export type PersonKind = (typeof personKind.enumValues)[number];
 
 /* ==========================================================================
    L'équipe
@@ -51,10 +55,6 @@ export const TEAM_ROLE_LABEL: Record<TeamRole, string> = {
 
 export function isTeamRole(value: string): value is TeamRole {
   return (TEAM_ROLES as readonly string[]).includes(value);
-}
-
-export function isPersonKind(value: string): value is PersonKind {
-  return (personKind.enumValues as readonly string[]).includes(value);
 }
 
 /** Le préfixe des champs d'équipe : `team:{personId}`. */
@@ -82,14 +82,9 @@ export type ProjectFormValues = {
   approachIds: string[];
   /** `personId` → rôle saisi. Les personnes hors équipe y figurent aussi. */
   team: Record<string, string>;
-  newPersonName: string;
-  newPersonKind: string;
-  newPersonRole: string;
 };
 
-export type ProjectFormErrors = Partial<
-  Record<keyof ProjectFormValues | "newPerson", string>
->;
+export type ProjectFormErrors = Partial<Record<keyof ProjectFormValues, string>>;
 
 /**
  * L'état que `useActionState` fait circuler entre le formulaire et l'action.
@@ -114,9 +109,6 @@ export const EMPTY_PROJECT_VALUES: ProjectFormValues = {
   jobIds: [],
   approachIds: [],
   team: {},
-  newPersonName: "",
-  newPersonKind: "stakeholder",
-  newPersonRole: "member",
 };
 
 /** Le champ, lu et rogné. Absent ou d'un type inattendu, il vaut « vide ». */
@@ -149,6 +141,11 @@ function fields(formData: FormData, name: string): string[] {
  * champs d'équipe font exception à la lecture nommée — ils sont ouverts par
  * construction, une par personne du domaine — mais pas à la vérification : la
  * clé doit avoir la forme d'un identifiant, la valeur appartenir à l'énuméré.
+ *
+ * **`newPersonName` en est la démonstration** : reposté par une soumission
+ * forgée, il traverse cette fonction sans être lu, donc sans atteindre aucune
+ * clé de `ProjectFormValues`, donc sans exister pour la suite. Le cas de test
+ * qui le prouve est celui de la liste exhaustive des clés.
  */
 export function readProjectForm(formData: FormData): ProjectFormValues {
   const team: Record<string, string> = {};
@@ -169,9 +166,6 @@ export function readProjectForm(formData: FormData): ProjectFormValues {
     jobIds: fields(formData, "jobIds"),
     approachIds: fields(formData, "approachIds"),
     team,
-    newPersonName: field(formData, "newPersonName"),
-    newPersonKind: field(formData, "newPersonKind") || "stakeholder",
-    newPersonRole: field(formData, "newPersonRole") || "member",
   };
 }
 
@@ -268,20 +262,6 @@ export function validateProjectForm(
     errors.team = "Un rôle d'équipe n'existe pas.";
   }
 
-  // Le nom vide n'est pas une erreur : c'est un bloc d'ajout qu'on n'a pas
-  // rempli. Rempli, en revanche, il doit l'être correctement.
-  if (values.newPersonName) {
-    if (!isPersonKind(values.newPersonKind)) {
-      errors.newPerson = "Le rattachement de cette personne n'existe pas.";
-    } else if (
-      !isTeamRole(values.newPersonRole) ||
-      values.newPersonRole === "none"
-    ) {
-      errors.newPerson =
-        "Une personne ajoutée rejoint l'équipe : membre, ou contributeur.";
-    }
-  }
-
   return errors;
 }
 
@@ -303,20 +283,19 @@ export type ProjectRowInput = {
 /** Une désignation d'équipe, telle qu'elle part en base. */
 export type ProjectMemberInput = { personId: string; isContributor: boolean };
 
-/** La personne ajoutée à la main (D19). Une par soumission, au plus. */
-export type NewPersonInput = {
-  fullName: string;
-  kind: PersonKind;
-  isContributor: boolean;
-};
-
-/** Tout ce que l'action doit écrire, réparti par table. */
+/**
+ * Tout ce que l'action doit écrire, réparti par table.
+ *
+ * **Quatre clés depuis T5bis.7, et plus cinq** : la personne ajoutée à la main
+ * est partie avec son bloc (arbitrage (g) de C5bis). Ce formulaire **désigne**
+ * des personnes, il n'en crée aucune — et il ne peut plus en créer, faute d'une
+ * clé où la porter.
+ */
 export type ProjectInput = {
   row: ProjectRowInput;
   jobIds: string[];
   approachIds: string[];
   members: ProjectMemberInput[];
-  newPerson: NewPersonInput | null;
 };
 
 /**
@@ -357,18 +336,6 @@ export function parseProjectForm(formData: FormData): {
     members.push({ personId, isContributor: role === "contributor" });
   }
 
-  const newPerson: NewPersonInput | null =
-    values.newPersonName &&
-    isPersonKind(values.newPersonKind) &&
-    isTeamRole(values.newPersonRole) &&
-    values.newPersonRole !== "none"
-      ? {
-          fullName: values.newPersonName,
-          kind: values.newPersonKind,
-          isContributor: values.newPersonRole === "contributor",
-        }
-      : null;
-
   return {
     values,
     errors,
@@ -385,7 +352,6 @@ export function parseProjectForm(formData: FormData): {
       jobIds: values.jobIds,
       approachIds: values.approachIds,
       members,
-      newPerson,
     },
   };
 }

@@ -3,7 +3,7 @@
 /**
  * Le panneau qui saisit une **personne** — le premier écran d'écriture de la
  * page Équipe, et celui qui referme le point ouvert de T2.6 : une personne se
- * crée ici, et T5bis.7 retirera le bloc « Ajouter une personne » du formulaire
+ * crée ici, et T5bis.7 a retiré le bloc « Ajouter une personne » du formulaire
  * de projet (arbitrage (g)).
  *
  * **Aucun écran de plus** (`docs/06` §2) : c'est la page Équipe, plus un

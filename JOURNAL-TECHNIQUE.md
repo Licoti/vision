@@ -6076,3 +6076,64 @@ Le seuil de 250 reste franchi et attend la session de découpage de C6. Rien ne 
 page produit en est à sa huitième reprise hors ticket depuis le 17/08/2026**, et c'est un fait qui
 mérite d'être écrit : ses écarts ne passent par aucun point ouvert, donc par aucune destination de
 chantier. Le jour où C6 se découpe, c'est cette page qu'il faudra regarder en premier.
+
+---
+
+## T5bis.7 — la sélection d'équipe du formulaire de projet, 25/08/2026
+
+### Un champ qu'on ne lit pas est plus sûr qu'un champ qu'on refuse
+
+Le critère du ticket — « un POST forgé portant encore `newPersonName` ne crée aucune personne » —
+n'a **aucune garde** qui le tienne, et c'est délibéré. `readProjectForm` ne lit plus le champ,
+`ProjectFormValues` n'a plus de clé où le ranger, `ProjectInput` passe de cinq clés à quatre. Un
+refus est du code : il se lit, se raisonne, se contourne, et il faut un test pour prouver qu'il
+s'exécute. Une clé absente n'a nulle part où aller, et c'est le compilateur qui le tient.
+**Mesuré quand même**, parce qu'une propriété structurelle qu'on n'éprouve pas est une propriété
+qu'on croit : POST forgé avec étape témoin, `persons` à 13 avant et après.
+
+### Un test sur une exception nominative ne mord que sur le bon `keep`
+
+`listProjectFormOptions` lit désormais `jobs` **deux fois** : une fois pour les cases à cocher, avec
+l'exception nominative de T4bis.1, une fois `includeArchived: true` pour les seuls libellés. Le cas
+qui devait prouver la seconde a d'abord été écrit avec `d.keep`, le `keep` complet de la fixture —
+qui garde le métier **et** la personne. Les deux façons d'écrire la carte des libellés y rendaient le
+même résultat : la neutralisation ne faisait rien tomber, et le test aurait été vert des deux côtés
+de la question qu'il prétendait trancher. **Le seul appel qui distingue rappelle la personne sans son
+métier.** → règle transportable : un test qui éprouve une lecture parallèle à une liste filtrée doit
+choisir un filtre où **les deux divergent**, sinon il mesure leur intersection.
+
+### Trois neutralisations sur quatre étaient aussi des erreurs de typage
+
+`newPersonName` relu dans `readProjectForm`, une cinquième clé rendue à `ProjectInput`,
+`availability: null` en dur : les trois font tomber les tests attendus **et** `tsc`. Ce n'est pas une
+faiblesse de la mise en défaut — le témoin reste concluant —, mais cela dit quelque chose sur ce que
+ces tests gardent réellement : ils gardent le **contenu** (le bon libellé, la bonne valeur), le
+typage garde la **forme**. Le seul témoin qui ne soit pas rattrapé par `tsc` est celui de la carte
+des libellés, qui compile parfaitement et ne se voit qu'au test.
+
+### Le lien vers `/equipe` perd la saisie en cours, et rien ne le corrige
+
+Partir du formulaire pour créer une personne quitte la page : `useActionState` ne conserve rien à
+travers une navigation. Le fait est **exactement celui du « Créer un produit »** de l'état vide de
+`/projets/nouveau`, présent depuis T2.6 et jamais signalé. `target="_blank"` le corrigerait, mais
+`components/ui/external-link.tsx` réserve cette forme aux outils externes et le dit dans son
+docblock ; l'inventer ici pour un lien interne serait une seconde manière de partir d'une page.
+→ **dette assumée, sans échéance.**
+
+### `PERSON_KIND_LABEL` : le point s'est refermé sans qu'on tranche le vocabulaire
+
+Le point ouvert demandait un arbitrage éditorial entre « Côté centre de compétence » / « Côté
+entité » et « Membre du centre » / « Intervenant côté entité ». Il n'a pas été rendu : le premier
+couple est parti **avec le `select` qui l'affichait**. C'est le cas le plus économique de résolution
+d'une divergence — **supprimer l'un des deux écrans plutôt que réconcilier les deux textes** —, et il
+ne se présente que parce que le ticket retirait déjà l'écran. Ce qui reste est un rangement, pas une
+décision : les libellés d'énuméré vivent dans `lib/format.ts` depuis T5.1, et ces deux mots sont
+ailleurs.
+
+### `ETAT.md` reste à 694 lignes, et C5bis se termine
+
+Le seuil de 250 est franchi depuis longtemps ; **la session de découpage de C6 est le seul moment où
+le fichier se balaie**, et elle est désormais le prochain geste — plus aucun ticket n'attend dans
+`tickets-C5bis.md`. Deux points ouverts partent dans `HISTORIQUE-TICKETS.md` avec ce ticket, un
+troisième est récrit plus court.
+

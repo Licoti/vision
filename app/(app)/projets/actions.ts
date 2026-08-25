@@ -41,6 +41,14 @@
  *
  * Aucune suppression, jamais (règle 4) : la couche n'expose pas de `delete`, et
  * ce qui est archivé se rétablit.
+ *
+ * **Aucune écriture dans `persons`, jamais non plus** — depuis T5bis.7, et c'est
+ * l'arbitrage (g) de C5bis : une personne se crée dans `/equipe`, et nulle part
+ * ailleurs. Ces deux actions **désignent** des personnes du domaine, qu'elles
+ * confrontent au domaine avant d'écrire ; `persons` n'apparaît plus ici que dans
+ * `checkReferences`, en lecture. Le bloc « Ajouter une personne » du formulaire
+ * l'écrivait, et une soumission forgée ne peut plus le rejouer : le champ n'est
+ * plus lu par `lib/forms/project.ts`.
  */
 
 import { eq, inArray } from "drizzle-orm";
@@ -305,32 +313,6 @@ async function syncMembers(
   }
 }
 
-/**
- * La personne ajoutée à la main, s'il y en a une (D19).
- *
- * `source: "manual"` et `hasAccess: false` tiennent les deux contraintes
- * `CHECK` de `persons` : pas d'identifiant annuaire sans annuaire, pas de rôle
- * de domaine sans accès. Être référencé et pouvoir se connecter restent deux
- * choses distinctes — cette personne n'apparaîtra jamais dans `/dev/session`.
- */
-async function addManualPerson(
-  session: Session,
-  input: ProjectInput,
-): Promise<{ personId: string; isContributor: boolean } | null> {
-  if (!input.newPerson) return null;
-
-  const created = await session.db.insert(persons, {
-    source: "manual",
-    fullName: input.newPerson.fullName,
-    kind: input.newPerson.kind,
-    hasAccess: false,
-    domainRole: null,
-    isActive: true,
-  });
-
-  return { personId: created.id, isContributor: input.newPerson.isContributor };
-}
-
 /* ==========================================================================
    Le tronc commun
    ========================================================================== */
@@ -475,15 +457,11 @@ export async function createProject(
   formData: FormData,
 ): Promise<ProjectFormState> {
   const outcome = await submit(formData, async (session, input) => {
-    const manual = await addManualPerson(session, input);
     const created = await session.db.insert(projects, input.row);
 
     await syncJobs(session, created.id, input.jobIds);
     await syncApproaches(session, created.id, input.approachIds);
-    await syncMembers(session, created.id, [
-      ...input.members,
-      ...(manual ? [manual] : []),
-    ]);
+    await syncMembers(session, created.id, input.members);
 
     return { projectId: created.id, productIds: [input.row.productId] };
   });
@@ -516,8 +494,6 @@ export async function updateProject(
       };
     }
 
-    const manual = await addManualPerson(session, input);
-
     // `input.row` ne porte que les colonnes du ticket : `update` refuse `id` et
     // `archivedAt`, et rien d'autre ne peut s'y glisser depuis le formulaire —
     // `readProjectForm` ne lit que ce qu'il connaît. `last_activity_at` reste
@@ -527,10 +503,7 @@ export async function updateProject(
 
     await syncJobs(session, id, input.jobIds);
     await syncApproaches(session, id, input.approachIds);
-    await syncMembers(session, id, [
-      ...input.members,
-      ...(manual ? [manual] : []),
-    ]);
+    await syncMembers(session, id, input.members);
 
     return {
       projectId: id,

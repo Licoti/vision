@@ -394,6 +394,8 @@ type FormFixture = {
   inactivePersonId: string;
   /** Désactivée, non gardée : elle doit rester absente. */
   otherInactivePersonId: string;
+  /** Côté entité : ni métier design, ni disponibilité (arbitrage (d)). */
+  stakeholderPersonId: string;
 };
 
 let d: FormFixture;
@@ -440,15 +442,35 @@ async function seedFormDomain(): Promise<FormFixture> {
     label: "Approche archivée d",
   });
 
+  /* Le métier et la disponibilité entrent dans la fixture en T5bis.7 : le
+     formulaire les affiche désormais à côté de chaque nom, et une colonne qui
+     n'est jamais peuplée par la fixture est une colonne dont le test ne dit
+     rien. */
   const livePerson = await scope.insert(persons, {
     fullName: "Personne vivante d",
     source: "manual",
     kind: "center",
+    jobId: liveJob.id,
+    availability: "partial",
   });
+  /* Sur le métier **qui sera archivé** : c'est cette ligne qui éprouve la
+     septième lecture de `listProjectFormOptions`. Rappelée par `keep`, elle
+     doit continuer de dire de quel métier elle relève — un libellé pris dans
+     la liste proposée au choix la laisserait muette. */
   const archivedPerson = await scope.insert(persons, {
     fullName: "Personne archivée d",
     source: "manual",
     kind: "center",
+    jobId: archivedJob.id,
+    availability: "available",
+  });
+  /* Un intervenant côté entité : le `CHECK` `persons_availability_requires_center`
+     lui refuse une disponibilité, et `docs/04` §2 ne lui donne pas de métier
+     design. Les deux colonnes rendues nulles sont sa propriété, pas un oubli. */
+  const stakeholderPerson = await scope.insert(persons, {
+    fullName: "Personne côté entité d",
+    source: "manual",
+    kind: "stakeholder",
   });
   // Désactivée sans être archivée : `is_active` et `archived_at` sont deux
   // conditions distinctes, et l'exception doit lever les deux.
@@ -523,6 +545,7 @@ async function seedFormDomain(): Promise<FormFixture> {
     archivedPersonId: archivedPerson.id,
     inactivePersonId: inactivePerson.id,
     otherInactivePersonId: otherInactivePerson.id,
+    stakeholderPersonId: stakeholderPerson.id,
   };
 }
 
@@ -991,5 +1014,59 @@ describe("listProjectFormOptions — les valeurs archivées", () => {
     });
 
     expect(empty).toEqual(bare);
+  });
+});
+
+/* ==========================================================================
+   Le métier et la disponibilité d'une personne — T5bis.7
+
+   Le formulaire **puise** dans le référentiel au lieu de le doubler : chaque
+   ligne dit de quel métier relève la personne et si elle est disponible. Ce
+   sont deux valeurs **reportées**, jamais un tri ni un rapprochement avec les
+   métiers déclarés du projet (D44, garde-fous 2 et 3).
+   ========================================================================== */
+
+describe("listProjectFormOptions — le métier et la disponibilité", () => {
+  /** La personne cherchée dans la liste rendue, ou `undefined`. */
+  async function personIn(keep: ProjectFormKeep | undefined, id: string) {
+    const options = await listProjectFormOptions(d.scope, keep);
+    return options.people.find((person) => person.id === id);
+  }
+
+  test("une personne du centre porte son métier et sa disponibilité", async () => {
+    const person = await personIn(undefined, d.livePersonId);
+
+    expect(person?.jobLabel).toBe("Métier vivant d");
+    expect(person?.availability).toBe("partial");
+  });
+
+  test("un intervenant côté entité n'a ni l'un ni l'autre", async () => {
+    const person = await personIn(undefined, d.stakeholderPersonId);
+
+    // Deux nuls qui sont une propriété, pas une donnée manquante : `docs/04` §2
+    // pour le métier, l'arbitrage (d) de C5bis pour la disponibilité.
+    expect(person?.jobLabel).toBeNull();
+    expect(person?.availability).toBeNull();
+  });
+
+  test("un métier archivé se dit encore sur la personne qui le porte", async () => {
+    /* La propriété qu'achète la septième lecture, et **le seul appel qui
+       distingue les deux façons d'écrire cette carte** : le `keep` rappelle la
+       personne, jamais son métier. La liste proposée au choix n'a donc aucune
+       raison de rétablir `archivedJob`, et un libellé qu'on y prendrait serait
+       nul. Il vient d'une lecture qui ne propose rien.
+
+       `d.keep` ne convient pas ici : il garde le métier **et** la personne,
+       si bien que les deux écritures rendraient le même libellé et que la mise
+       en défaut ne mordrait pas. */
+    const options = await listProjectFormOptions(d.scope, {
+      personIds: [d.archivedPersonId],
+    });
+    const person = options.people.find((row) => row.id === d.archivedPersonId);
+
+    expect(person?.jobLabel).toBe("Métier archivé d");
+    // Le métier reste hors des valeurs **proposées**, et c'est ce qui donne au
+    // cas sa force : la carte des libellés ne s'aligne pas sur la liste.
+    expect(options.jobs.map((row) => row.id)).not.toContain(d.archivedJobId);
   });
 });

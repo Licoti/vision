@@ -15,7 +15,6 @@ import { describe, expect, test } from "vitest";
 import {
   EMPTY_PROJECT_VALUES,
   isIsoDay,
-  isPersonKind,
   isTeamRole,
   parseProjectForm,
   readProjectForm,
@@ -45,9 +44,6 @@ function valid(overrides: Partial<ProjectFormValues> = {}): ProjectFormValues {
     jobIds: [JOB],
     approachIds: [APPROACH],
     team: { [PERSON]: "contributor", [OTHER_PERSON]: "none" },
-    newPersonName: "",
-    newPersonKind: "stakeholder",
-    newPersonRole: "member",
     ...overrides,
   };
 }
@@ -109,18 +105,27 @@ describe("readProjectForm", () => {
     expect(values.sponsor).toBe("Marc Tellier");
   });
 
-  test("un formulaire vide rend les valeurs vides, rôles d'ajout compris", () => {
+  test("un formulaire vide rend les valeurs vides", () => {
     expect(readProjectForm(new FormData())).toEqual(EMPTY_PROJECT_VALUES);
   });
 
   test("ne lit rien d'autre que les champs du ticket", () => {
-    // Un champ caché ajouté par n'importe qui ne doit pas devenir une colonne.
+    /* Un champ caché ajouté par n'importe qui ne doit pas devenir une colonne.
+       **Les trois champs du bloc d'ajout y sont, et c'est le cas qui compte
+       depuis T5bis.7** : une soumission forgée peut encore les poster — le
+       balisage de T2.6 a été servi pendant deux semaines —, et ce qui les rend
+       inoffensifs n'est pas un refus mais une non-lecture. Un refus se raisonne
+       et se contourne ; une clé absente de `ProjectFormValues` n'a nulle part
+       où aller. */
     const values = readProjectForm(
       form({
         name: "Refonte",
         domainId: "un-autre-domaine",
         id: "forcé",
         lastActivityAt: "2026-01-01",
+        newPersonName: "Marc Tellier",
+        newPersonKind: "stakeholder",
+        newPersonRole: "contributor",
       }),
     );
 
@@ -129,9 +134,6 @@ describe("readProjectForm", () => {
       "expectedEndOn",
       "jobIds",
       "name",
-      "newPersonKind",
-      "newPersonName",
-      "newPersonRole",
       "objective",
       "productId",
       "sponsor",
@@ -272,31 +274,6 @@ describe("validateProjectForm", () => {
     ).toBeDefined();
   });
 
-  test("ignore le bloc d'ajout tant qu'aucun nom n'est saisi", () => {
-    expect(
-      validateProjectForm(
-        valid({ newPersonName: "", newPersonKind: "inconnu", newPersonRole: "chef" }),
-      ).newPerson,
-    ).toBeUndefined();
-  });
-
-  test("refuse un rattachement hors de l'énuméré sur une personne ajoutée", () => {
-    expect(
-      validateProjectForm(
-        valid({ newPersonName: "Marc Tellier", newPersonKind: "externe" }),
-      ).newPerson,
-    ).toBeDefined();
-  });
-
-  test("refuse d'ajouter une personne hors de l'équipe", () => {
-    // Ajouter quelqu'un et ne pas l'y mettre n'a pas de sens : le seul chemin
-    // vers `persons` passe par une désignation.
-    expect(
-      validateProjectForm(
-        valid({ newPersonName: "Marc Tellier", newPersonRole: "none" }),
-      ).newPerson,
-    ).toBeDefined();
-  });
 
   test("signale chaque champ fautif séparément", () => {
     const errors = validateProjectForm(
@@ -338,19 +315,13 @@ describe("isIsoDay", () => {
   });
 });
 
-describe("isTeamRole et isPersonKind", () => {
+describe("isTeamRole", () => {
   test("les rôles d'équipe sont les trois valeurs de l'écran", () => {
     expect(isTeamRole("none")).toBe(true);
     expect(isTeamRole("member")).toBe(true);
     expect(isTeamRole("contributor")).toBe(true);
     expect(isTeamRole("Member")).toBe(false);
     expect(isTeamRole("")).toBe(false);
-  });
-
-  test("les rattachements suivent l'énuméré du schéma", () => {
-    expect(isPersonKind("center")).toBe(true);
-    expect(isPersonKind("stakeholder")).toBe(true);
-    expect(isPersonKind("externe")).toBe(false);
   });
 });
 
@@ -384,7 +355,6 @@ describe("parseProjectForm", () => {
     expect(input?.jobIds).toEqual([JOB]);
     expect(input?.approachIds).toEqual([APPROACH]);
     expect(input?.members).toEqual([{ personId: PERSON, isContributor: true }]);
-    expect(input?.newPerson).toBeNull();
   });
 
   test("la ligne ne porte que les colonnes du ticket", () => {
@@ -443,23 +413,33 @@ describe("parseProjectForm", () => {
     ]);
   });
 
-  test("la personne ajoutée à la main sort du bloc d'ajout", () => {
+  test("les champs du bloc d'ajout ne portent plus rien à écrire", () => {
+    /* T5bis.7 — le seul chemin vers `persons` était cette cinquième clé, et
+       elle n'existe plus : une soumission qui poste encore les trois champs
+       rend exactement les quatre autres, et une équipe inchangée. C'est ce que
+       `Object.keys` prouve et qu'un `toBeUndefined()` sur une clé absente ne
+       prouverait pas — il passerait aussi sur une faute de frappe. */
     const { input } = parseProjectForm(
       form({
         productId: PRODUCT,
         name: "Refonte",
         statusId: STATUS,
+        [teamFieldName(PERSON)]: "member",
         newPersonName: "  Marc Tellier  ",
         newPersonKind: "stakeholder",
         newPersonRole: "contributor",
       }),
     );
 
-    expect(input?.newPerson).toEqual({
-      fullName: "Marc Tellier",
-      kind: "stakeholder",
-      isContributor: true,
-    });
+    expect(Object.keys(input ?? {}).sort()).toEqual([
+      "approachIds",
+      "jobIds",
+      "members",
+      "row",
+    ]);
+    expect(input?.members).toEqual([
+      { personId: PERSON, isContributor: false },
+    ]);
   });
 
   test("`input` est nul dès qu'une erreur est signalée", () => {

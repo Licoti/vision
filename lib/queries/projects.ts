@@ -34,6 +34,7 @@ import {
   approaches,
   entities,
   jobs,
+  personAvailability,
   personKind,
   persons,
   products,
@@ -492,11 +493,24 @@ export type ProjectFormProduct = {
   entityLabel: string;
 };
 
-/** Une personne du domaine, telle qu'elle se désigne dans une équipe. */
+/**
+ * Une personne du domaine, telle qu'elle se désigne dans une équipe.
+ *
+ * **Le métier et la disponibilité y sont depuis T5bis.7**, et pour une raison
+ * qui n'est pas décorative : le formulaire ne crée plus de personne
+ * (arbitrage (g) de C5bis), il **puise** dans le référentiel — le choix se fait
+ * donc en connaissance de cause, sans quitter l'écran. Ni l'un ni l'autre n'est
+ * un critère de tri ni un rapprochement avec les métiers déclarés du projet :
+ * D44 pose que les deux peuvent diverger.
+ */
 export type ProjectFormPerson = {
   id: string;
   fullName: string;
   kind: (typeof personKind.enumValues)[number];
+  /** Nul : une personne hors centre n'a pas de métier design (`docs/04` §2). */
+  jobLabel: string | null;
+  /** Nulle pour un intervenant côté entité — arbitrage (d) de C5bis. */
+  availability: (typeof personAvailability.enumValues)[number] | null;
 };
 
 /** Tout ce que les deux écrans de saisie proposent au choix. */
@@ -526,16 +540,19 @@ export type ProjectFormKeep = {
  * Les référentiels et les personnes du domaine, pour la création comme pour
  * l'édition.
  *
- * **Aucune jointure** : six lectures scopées, et l'entité de chaque produit
- * rapprochée en mémoire. C'est ce qui permet à cette fonction de ne pas passer
- * par `joinedRead` — elle n'en a pas besoin, et le chemin le plus sûr reste
- * celui que la couche filtre d'elle-même.
+ * **Aucune jointure** : sept lectures scopées, l'entité de chaque produit et le
+ * métier de chaque personne rapprochés en mémoire. C'est ce qui permet à cette
+ * fonction de ne pas passer par `joinedRead` — elle n'en a pas besoin, et le
+ * chemin le plus sûr reste celui que la couche filtre d'elle-même.
  *
- * Les entités sont lues **archivées comprises**, et elles seules : le libellé
- * d'entité est ici descriptif, pas proposé au choix. Un produit rattaché à une
- * entité archivée doit continuer de dire de quelle entité il relève, plutôt
- * que de s'afficher amputé — c'est le contraire du cas d'une valeur qu'on
- * offrirait à la sélection.
+ * **Deux référentiels sont lus archivés compris, et ce sont les deux qui
+ * décrivent au lieu de proposer** : les entités, et — depuis T5bis.7 — les
+ * métiers, dans une lecture **qui n'est pas celle des cases à cocher**. Un
+ * produit rattaché à une entité archivée doit continuer de dire de quelle entité
+ * il relève ; une personne dont le métier a été archivé doit continuer de dire
+ * lequel. C'est le contraire du cas d'une valeur qu'on offrirait à la sélection,
+ * et c'est pourquoi `jobs` est lu **deux fois** : la liste proposée garde son
+ * exception nominative, la carte des libellés n'en a pas besoin.
  *
  * **Les cinq valeurs proposées, elles, reçoivent une exception nominative**
  * (T4bis.1) : celles que la ligne éditée porte déjà restent dans leur liste —
@@ -572,6 +589,7 @@ export async function listProjectFormOptions(
     entityRows,
     statusRows,
     jobRows,
+    jobLabelRows,
     approachRows,
     personRows,
   ] = await Promise.all([
@@ -609,6 +627,13 @@ export async function listProjectFormOptions(
         : {}),
       orderBy: [asc(jobs.position), asc(jobs.label)],
     }),
+    /* La seconde lecture de `jobs`, **et elle ne propose rien** : elle nomme le
+       métier des personnes, comme `entities` nomme celui des produits. Sans
+       elle, le libellé viendrait de la liste ci-dessus — donc d'une liste
+       filtrée par l'exception nominative de T4bis.1 —, et le métier d'une
+       personne s'afficherait ou non selon le projet qu'on est en train de
+       modifier. */
+    scope.list(jobs, { includeArchived: true }),
     scope.list(approaches, {
       ...(keptApproaches
         ? {
@@ -636,6 +661,7 @@ export async function listProjectFormOptions(
   ]);
 
   const entityLabels = new Map(entityRows.map((row) => [row.id, row.label]));
+  const jobLabels = new Map(jobLabelRows.map((row) => [row.id, row.label]));
 
   return {
     products: productRows.map((product) => ({
@@ -650,6 +676,8 @@ export async function listProjectFormOptions(
       id: row.id,
       fullName: row.fullName,
       kind: row.kind,
+      jobLabel: row.jobId ? (jobLabels.get(row.jobId) ?? null) : null,
+      availability: row.availability,
     })),
   };
 }
