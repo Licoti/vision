@@ -26,8 +26,9 @@
  * l'ordre en groupes de `docs/03` §6 (point 4), la jauge North Star et l'écart
  * chiffré de la maquette **refusés** (D39, voir `adopted-indicators.tsx`), et
  * les cinq gestes que la maquette dessine sans qu'ils existent — quatre retirés,
- * un dessiné sans lien (voir `REFERENCE_BLOCKS`). Consignés dans
- * `JOURNAL-TECHNIQUE.md`.
+ * un dessiné sans lien. Consignés dans `JOURNAL-TECHNIQUE.md`. **Le cinquième
+ * est branché depuis T6.3** : « Voir le journal » est devenu le `<summary>` du
+ * bloc « Journal », et il ne reste des cinq que les quatre retraits.
  *
  * **Le cadre de `Section` monte au format de la page produit** par le même
  * geste : c'est ce qui **referme le point ouvert d'`ETAT.md`** sur la
@@ -109,6 +110,7 @@ import {
 import { restoreProject } from "../actions";
 import { AdoptedIndicators } from "@/components/projects/adopted-indicators";
 import { Resources } from "@/components/projects/resources";
+import { Journal } from "@/components/projects/journal";
 import { Starters } from "@/components/projects/starters";
 import { Roadmap } from "@/components/projects/roadmap";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
@@ -134,6 +136,7 @@ import { formatPeriod, formatRank } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
 import { listProjectRoadmap } from "@/lib/queries/activities";
 import { listProjectAdoptions } from "@/lib/queries/indicators";
+import { listProjectJournal } from "@/lib/queries/journal";
 import {
   findAccompanimentRank,
   findProjectDetail,
@@ -162,30 +165,30 @@ export const metadata = {
  * Ce qui disparaît est l'annonce, pas la destination. La rangée passe de trois
  * cartes à deux.
  *
- * **Le « geste » d'un bloc annoncé n'est pas rendu, sauf un.** La maquette pose
- * « + Relier un projet », « Relier l'outil de gestion → » et « Voir le
- * journal → » : aucun des trois n'a de route, et une affordance qui ne répond
- * pas est pire qu'une absence (`docs/06` §9). Arbitré le 20/08/2026 : les deux
- * premiers disparaissent, le troisième est **dessiné sans être un lien** — C6
- * livre le journal, et le point d'entrée est déjà à sa place. Il n'est donc pas
- * une ancre : un `<a>` sans `href` n'est pas focalisable et ne promet rien.
+ * **« Journal » en sort à son tour, et par l'inverse : il est livré** (T6.3).
+ * Il portait le seul « geste » dessiné de la rangée — « Voir le journal »,
+ * arbitré le 20/08/2026 en `<span>` plutôt qu'en `<a>` sans `href`, parce
+ * qu'une affordance qui ne répond pas est pire qu'une absence (`docs/06` §9).
+ * La promesse d'alors était que C6 livre le journal et que le point d'entrée
+ * soit déjà à sa place : il est devenu le `<summary>` de
+ * `components/projects/journal.tsx`. **`pending` disparaît avec lui** — il
+ * n'avait que cet appelant, et une capacité sans appelant est celle que le
+ * ticket suivant emploierait de travers.
+ *
+ * **Il en reste un, et la rangée n'en est plus une.** Une seule carte dans une
+ * grille de deux laisserait une moitié de vide, exactement ce que le tour
+ * précédent refusait pour deux cartes dans une grille de trois : « Budget » se
+ * rend donc seul, sur toute la largeur de la colonne. Il reste annoncé jusqu'à
+ * C7 (D28).
  */
 const REFERENCE_BLOCKS: {
   title: string;
   description: string;
-  /** Le point d'entrée dessiné, pas encore branché. Un seul, et c'est C6. */
-  pending?: string;
 }[] = [
   {
     title: "Budget",
     description:
       "La synthèse macro — alloué, consommé — s'affichera ici, avec le lien vers l'outil de gestion. Le suivi budgétaire est tenu là-bas ; Vision renvoie vers la source plutôt que d'en reproduire le détail.",
-  },
-  {
-    title: "Journal",
-    description:
-      "Qui a modifié quoi, et quand. Une information de contrôle, en dernier : elle sert à retrouver l'origine d'une saisie, pas à comprendre l'accompagnement.",
-    pending: "Voir le journal",
   },
 ];
 
@@ -267,18 +270,24 @@ export default async function ProjectPage({
 
   const request = projectRequestFromParams(asked);
 
-  /* Cinq lectures indépendantes, un seul aller-retour : les ressources
+  /* Six lectures indépendantes, un seul aller-retour : les ressources
      rejoignent le rang et la roadmap plutôt que d'attendre leur tour (T4.1),
-     les adoptions les rejoignent à leur tour (T5.4), et les pistes de démarrage
-     en dernier (20/08/2026). Celle-ci ne prend pas d'identifiant : c'est un
-     référentiel du domaine, le même sur tous les accompagnements. */
-  const [rank, roadmap, projectResources, adoptions, starters] =
+     les adoptions les rejoignent à leur tour (T5.4), les pistes de démarrage
+     ensuite (20/08/2026), et le journal en dernier (T6.3). Les pistes ne
+     prennent pas d'identifiant : c'est un référentiel du domaine, le même sur
+     tous les accompagnements.
+
+     **Le journal n'attend aucun droit** : sa lecture est ouverte à tout le
+     domaine (D9), archivé compris, et il part donc dans le même vol que les
+     cinq autres plutôt que derrière un `canWrite`. */
+  const [rank, roadmap, projectResources, adoptions, starters, journal] =
     await Promise.all([
       findAccompanimentRank(session.db, project),
       listProjectRoadmap(session.db, project.id),
       listProjectResources(session.db, project.id),
       listProjectAdoptions(session.db, project.id),
       listStarters(session.db),
+      listProjectJournal(session.db, project.id),
     ]);
 
   /* La roadmap et les pistes sont **déjà lues** pour l'écran : la résolution
@@ -540,36 +549,29 @@ export default async function ProjectPage({
               }
             />
 
-            {/* Les blocs annoncés, en une rangée. Leur ordre est celui de
-                `docs/06` §5 — budget, puis journal. Deux colonnes et non trois
-                depuis que « Projets liés » en est sorti : deux cartes dans une
-                grille de trois laisseraient un tiers de vide. */}
-            <div className="grid gap-5 md:grid-cols-2">
-              {REFERENCE_BLOCKS.map((block) => (
-                <Section key={block.title}>
-                  <SectionHeader title={block.title} />
-                  <BlockNote>{block.description}</BlockNote>
-                  {/* Dessiné, pas branché : voir l'en-tête de
-                      `REFERENCE_BLOCKS`. Un `<span>` et non un `<a>` — sans
-                      `href`, une ancre n'est ni focalisable ni annoncée comme
-                      un lien, et la mention dit à qui écoute que le geste
-                      n'existe pas encore. */}
-                  {/* **`content-neutral-base` et non `-normal`, et c'est une
-                      mesure qui l'impose** : `content-neutral-normal` sur
-                      `surface-neutral-pale` tombe à **3,88:1**, sous la limite
-                      du texte courant. Le jeton retenu tient à 4,98:1 — celui
-                      de la ligne « Type · Activité » d'une ressource, sur la
-                      même surface. */}
-                  {block.pending ? (
-                    <p className="text-xs font-semibold text-content-neutral-base">
-                      {block.pending}
-                      <span aria-hidden="true"> →</span>
-                      <span className="sr-only"> — à venir</span>
-                    </p>
-                  ) : null}
-                </Section>
-              ))}
-            </div>
+            {/* Le bloc annoncé, **au singulier depuis T6.3**. La grille a
+                disparu avec le second : une carte dans une grille de deux
+                laisserait une moitié de vide, ce que le tour précédent refusait
+                déjà pour deux cartes dans une grille de trois. Le `map` reste —
+                c'est lui qui rend le retour de « Projets liés » et l'arrivée de
+                « Budget » sans qu'une balise bouge. */}
+            {REFERENCE_BLOCKS.map((block) => (
+              <Section key={block.title}>
+                <SectionHeader title={block.title} />
+                <BlockNote>{block.description}</BlockNote>
+              </Section>
+            ))}
+
+            {/* **Le journal en dernier** (`docs/06` §5) : c'est une information
+                de contrôle, pas de compréhension, et sa place dans le document
+                le dit avant que son contenu ne le dise.
+
+                Aucun droit ne lui est passé, et il n'y en a aucun à passer : le
+                bloc ne s'écrit pas, sa lecture est ouverte à tout le domaine
+                (D9), et un accompagnement archivé garde son journal comme il
+                garde sa roadmap (règle 4, T4bis.3). C'est le seul bloc de cette
+                page que `canWrite` ne touche pas. */}
+            <Journal events={journal} />
           </div>
 
           {/* Le rail droit. Les deux blocs qui portent des chiffres reportés,

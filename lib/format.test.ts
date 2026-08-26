@@ -28,6 +28,7 @@ import { describe, expect, test } from "vitest";
 import {
   formatDateMonth,
   formatDay,
+  formatEventDay,
   formatIndicatorDirection,
   formatMonthTick,
   formatPeriodShort,
@@ -47,6 +48,33 @@ describe("formatDay", () => {
     // Le piège du fuseau, en plus serré qu'au mois : sans `timeZone: "UTC"`,
     // un serveur à l'ouest rendrait « 31 décembre 2025 ».
     expect(formatDay("2026-01-01")).toBe("1 janvier 2026");
+  });
+});
+
+describe("formatEventDay", () => {
+  test("rend le jour d'un horodatage, pas celui d'une colonne `date`", () => {
+    // `events.occurred_at` arrive en `Date` : c'est toute la raison de cette
+    // seconde porte sur le même formateur (T6.3).
+    expect(formatEventDay(new Date("2026-08-27T14:32:00Z"))).toBe(
+      "27 août 2026",
+    );
+  });
+
+  test("le même formateur, donc le même fuseau", () => {
+    // Le piège du fuseau, à sa forme la plus serrée : un horodatage de fin de
+    // journée. Sans `timeZone: "UTC"`, un serveur à l'ouest rendrait
+    // « 31 décembre 2025 » d'un instant qui est le 1er janvier.
+    expect(formatEventDay(new Date("2026-01-01T00:30:00Z"))).toBe(
+      "1 janvier 2026",
+    );
+  });
+
+  test("l'heure ne paraît jamais", () => {
+    // Deux instants du même jour rendent la même chaîne : c'est l'arbitrage
+    // (1) du ticket, et non un effet de bord du formateur.
+    expect(formatEventDay(new Date("2026-08-27T01:00:00Z"))).toBe(
+      formatEventDay(new Date("2026-08-27T23:00:00Z")),
+    );
   });
 });
 

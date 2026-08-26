@@ -2772,6 +2772,25 @@ posés dans un domaine-sonde de T5bis.4, archivés de même ; une liaison `proje
 où ils occupaient encore la place. Conservés tels quels : un point refermé documente comment il
 l%s été.)*
 
+- ~~**« Voir le journal » est dessiné sans être un lien.**~~ **Refermé le 27/08/2026 par T6.3, à
+  l'endroit exact où il avait été posé.** Le point disait une dette d'interface arbitrée le
+  20/08/2026 : la maquette `project-v2` dessinait trois gestes sans route, deux avaient été retirés,
+  et le troisième était rendu en `<span>` dans un `<p>` — ni focalisable, ni annoncé comme un lien,
+  portant « — à venir » en `sr-only`. L'arbitrage tenait sur une promesse : *C6 livre le journal, et
+  le point d'entrée est déjà à sa place.* Il l'était : « Voir le journal » est devenu le `<summary>`
+  du bloc, sans changer de place dans la page. `pending` a disparu de `REFERENCE_BLOCKS` avec son
+  seul appelant, et la rangée des blocs annoncés a perdu sa grille en même temps que sa seconde
+  carte.
+
+- ~~**`lib/format.ts` écrit son insécable en caractère.**~~ **Refermé le 27/08/2026 par T6.3**, la
+  moitié mécanique d'un point qui en portait deux. U+00A0 vivait en caractère dans
+  `formatResultValue` depuis T4.3, quand `lib/journal.ts` l'écrit `"\u00A0"` sous le nom `NBSP`
+  depuis T6.1 : deux écritures d'une seule règle, dont l'une invisible à l'œil dans un source comme
+  dans un navigateur. Le remplacement était sûr parce que `lib/format.test.ts` éprouvait déjà la
+  propriété **sur le point de code** — un test qui aurait attendu l'espace ordinaire serait passé le
+  jour où la règle aurait sauté. L'autre moitié du point, `PERSON_KIND_LABEL`, reste ouverte dans
+  `ETAT.md` : elle demande un vocabulaire tranché, pas un déplacement.
+
 - ~~**On n'ajoute qu'une personne par enregistrement.**~~ **Refermé le 25/08/2026 par T5bis.7.** Le
   point ne s'est pas levé, il a perdu son objet : l'arbitrage (g) de C5bis a sorti la création d'une
   personne du formulaire de projet, et une limite sur un bloc qui n'existe plus ne limite rien. La
@@ -3732,6 +3751,77 @@ tests** : 11 pour `lib/journal.ts`, 10 pour les cinq gestes, 6 pour `record` dan
 
 **Le commentaire faux de `scoped.ts` refermé, autrement que prévu.** Il disait « les 22 », la fiche
 annonçait 25, **elles sont 30**. Le compte a été **retiré** plutôt que corrigé une troisième fois.
+
+---
+
+## T6.3 — Le bloc « Journal » sur la page projet — 27/08/2026
+
+**Ce que le ticket ouvre.** La première lecture d'`events`. La table est au schéma depuis T1.2, T6.1
+et T6.2 lui ont donné ses quatorze points d'écriture, et **personne ne la lisait**.
+`listProjectJournal(scope, projectId)` par `joinedRead` : les événements du projet, du plus récent au
+plus ancien, le nom de l'acteur joint sur `persons`. Le bloc est un `<details>` **fermé**, en dernier
+de la colonne de gauche — `docs/06` §5 : *une information de contrôle, pas de compréhension.*
+
+**Le point ouvert se referme exactement là où il avait été posé.** « Voir le journal » était dessiné
+depuis le 20/08/2026 **sans être un lien** — un `<span>` dans un `<p>`, ni focalisable ni annoncé,
+portant « — à venir » en `sr-only`. Il est devenu le `<summary>` du bloc. L'affordance qui ne
+répondait pas répond, et `pending` disparaît de `REFERENCE_BLOCKS` avec son seul appelant : une
+capacité sans appelant est celle que le ticket suivant emploierait de travers.
+
+**Quatre arbitrages tranchés avant écriture.** (1) La date se lit **au jour, en UTC** — seconde
+entorse bornée au mois de D13, de la même nature que celle de `formatDay` : un événement est un fait
+daté ponctuel, et le mois retirerait au bloc sa raison d'être. (2) Le formatage vit dans
+`lib/format.ts`, qui **referme au passage la dette de l'insécable** écrit en caractère depuis T4.3 ;
+`PERSON_KIND_LABEL` reste ouvert, un vocabulaire restant à trancher. (3) `SectionHeader` apprend `as`
+et `mark`, comme `BlockDivider` le 18/08 — plutôt que de recopier dans `components/projects/` une
+signature de socle qu'**aucun motif de `socleLock` ne rattrape**. (4) La rangée des blocs annoncés
+perd sa grille : une carte dans une grille de deux laisserait une moitié de vide, ce que le tour
+précédent refusait déjà pour deux cartes dans une grille de trois.
+
+**Ce que la lecture ne rend pas, et c'est délibéré.** Ni `verb`, ni `target_type`, ni `target_id` :
+la phrase figée les dit déjà, et les interdits de la fiche écartent tout lien vers l'objet touché —
+la page n'affiche plus l'activité archivée ni la ressource retirée dont une ligne peut parler. Les
+rendre aurait posé trois colonnes sans lecteur, celles que T5.2 a refusées dans `starters`. **Aucun
+décompte non plus**, ni sur le `<summary>` ni ailleurs : c'est l'écart assumé avec « Indicateurs
+associés », qui en porte un — compter les événements d'un projet serait une mesure d'activité par
+projet, que `docs/06` §10 refuse.
+
+**Deux mises en défaut ont corrigé les tests, pas le code.** La première neutralisation —
+`filter(events)` retiré — **n'a fait tomber aucun test** : la ligne forgée censée l'éprouver portait
+*aussi* le projet de l'autre domaine, si bien qu'`eq(events.projectId, …)` l'écartait avant que le
+filtre de domaine ait à la voir. C'est la leçon de T5bis.3 resservie — *un filtre qu'aucune ligne
+forgée ne vise n'est pas éprouvé*. Réécrite pour ne franchir la frontière que sur `domain_id`, elle
+tombe seule. La troisième — `eq(events.projectId, …)` retiré — faisait tomber **deux** tests :
+l'état vide se lisait sur un projet de `b`, un domaine qui porte une ligne forgée. Un **troisième
+domaine sans aucun événement** l'a rendue isolée. Sans ces deux corrections, deux des trois
+étanchéités étaient des tests qui ne mesuraient pas ce qu'ils annonçaient.
+
+**Le HTML servi, mesuré.** Le journal démarre vide sur les **cinq** projets de la fixture — vérifié
+un par un, c'est le premier rendu de tous. La sonde a donc archivé puis rétabli un accompagnement par
+le **vrai point d'entrée HTTP**, en rejouant le formulaire servi en multipart : le chemin sans
+JavaScript. Elle a rendu, dans l'ordre, le bloc en dernier après « Budget », un `<details>` **sans
+`open`** dont les deux entrées sont **dans le document**, l'ordre du plus récent au plus ancien, le
+nom de l'acteur joint, et le journal d'un projet **archivé** — la lecture est ouverte à tout le
+domaine (D9). Sous une identité **sans aucun droit d'écriture**, les deux entrées se lisent à
+l'identique et aucun geste n'apparaît. La donnée métier est revenue exactement où elle était :
+bandeau d'archivage parti, « Modifier » revenu.
+
+**L'étape témoin a fait son travail.** La même action de rétablissement, frappée en **urlencodé**,
+rend **200 et 68 209 octets** — la page entière — et **n'écrit rien** : le projet est resté archivé.
+Sans ce témoin, le 200 du multipart qui a réussi et le 200 de l'urlencodé qui n'a rien fait auraient
+été indiscernables.
+
+**Contraste mesuré, pas affirmé.** Les trois jetons du bloc sur `surface-neutral-pale` :
+`content-neutral-darkest` **17,87:1**, `content-neutral-dark` **8,12:1**, `content-neutral-base`
+**4,98:1**. Aucun couple neuf par la position, et les deux derniers retrouvent au centième les
+valeurs que le dépôt annonçait déjà — ce qui vaut contrôle de la méthode.
+
+**Le droit ne s'éprouve pas par l'action ici, et c'est dit plutôt que simulé.** T6.3 n'ajoute aucune
+action serveur ni aucun point d'entrée HTTP : il n'y a rien à frapper. Ce que le ticket devait tenir
+— le bloc se lit sans droit d'écriture, et sur un accompagnement archivé — se lit dans le HTML servi.
+
+**+11 tests, 1028 verts** (8 sur `listProjectJournal`, 3 sur `formatEventDay`). `npm run lint`
+(`--max-warnings=0`), `npm run test` et `tsc` au vert.
 
 ---
 

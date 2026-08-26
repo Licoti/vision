@@ -2,10 +2,10 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 26/08/2026 — T6.2 terminé. Balayé au découpage de C6 (25/08), seul
+**Dernière mise à jour :** 27/08/2026 — T6.3 terminé. Balayé au découpage de C6 (25/08), seul
 moment où ce fichier se balaie : de 701 lignes à moins de 250.
 **Chantier en cours :** **C6 — Liens et journal**, sept tickets dans `tickets-C6.md`.
-**Ticket suivant :** **T6.3 — le bloc « Journal » sur la page projet.**
+**Ticket suivant :** **T6.4 — les liens déduits, et le retour du bloc « Projets liés ».**
 
 ---
 
@@ -30,6 +30,10 @@ moment où ce fichier se balaie : de 701 lignes à moins de 250.
 
 *(une ligne par **chantier clos**, et une par ticket du chantier en cours. Le récit détaillé vit
 dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`.)*
+
+- **T6.3 — le bloc « Journal » sur la page projet, 27/08/2026.** `listProjectJournal`, le `<details>`
+  fermé en dernier, « Voir le journal » **devenu le `<summary>`** ; `SectionHeader` apprend `as` et
+  `mark`. **Deux mises en défaut ont corrigé les tests.** Sonde d'archivage. +11, 1028 verts.
 
 - **T6.2 — le journal : activités, ressources, résultats, relevés, 26/08/2026.** Les quatre
   `target_type` restants, **quatorze** points d'appel là où la fiche en annonçait treize, six noms et
@@ -70,8 +74,8 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   formulaire de projet qui **puise** enfin dans le référentiel. Dérogation bornée par six garde-fous.
 - **Reprise d'interface hors ticket — seize gestes, du 17 au 21/08/2026.** Menu « … » de la roadmap,
   « Vision produit » puis sa reprise `northstar-v2`, « Personae », « Use Cases » et « Démarrage »
-  (migrations 0005 à 0008), page projet passée à `project-v2`, bouton à trois rangs, roadmap reprise,
-  entités en `/administration`, hiérarchie de la page produit. Récit dans `HISTORIQUE-TICKETS.md`.
+  (migrations 0005 à 0008), page projet en `project-v2`, bouton à trois rangs, roadmap reprise,
+  entités en `/administration`, hiérarchie de la page produit.
 
 ---
 
@@ -100,9 +104,6 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 - **Le bloc « Projets liés » est retiré du rendu.** À la demande, le 21/08/2026 : la rangée des blocs
   annoncés passe à deux cartes. `project_links` est au modèle depuis T1.2 ; ce qui disparaît est
   l'annonce, pas la destination. → **T6.4.**
-- **« Voir le journal » est dessiné sans être un lien.** Un `<span>` dans un `<p>`, ni focalisable ni
-  annoncé, portant « — à venir » en `sr-only`. Dette d'interface assumée et bornée, arbitrée avec
-  l'humain ; elle se referme le jour où le journal a son écran. → **T6.3.**
 - **Une piste de démarrage ne mène pas à l'activité qu'elle suggère.** `starters` ne porte
   **volontairement aucun `activity_type_id`** — une colonne sans lecteur est celle qu'on relit un jour
   sans savoir pourquoi (T5.2). Le geste coûterait une colonne et trois lignes ; à joindre au point
@@ -135,10 +136,9 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   `parsePersonForm` efface la disponibilité — le `CHECK` l'exige — mais rien d'équivalent n'existe
   pour `person_skills` : les liaisons restent affichées et **illisibles en écriture**. Aucune donnée
   perdue. → **ticket propre, C7 au plus tard.**
-- **`lib/format.ts` porte deux dettes.** `PERSON_KIND_LABEL` vit dans `lib/forms/person.ts` quand les
-  libellés d'énuméré vivent là depuis T5.1 — un déplacement, plus un vocabulaire à trancher depuis
-  T5bis.7. Et son insécable est écrit **en caractère**, là où le journal l'écrit `"\u00A0"` sous le
-  nom `NBSP`. → **au prochain ticket qui l'ouvre.**
+- **`lib/format.ts` porte une dette, et non plus deux** — T6.3 a refermé l'insécable.
+  `PERSON_KIND_LABEL` vit dans `lib/forms/person.ts` : un déplacement, **plus un vocabulaire à
+  trancher depuis T5bis.7**, et c'est lui qui l'a laissé ouvert. → **ce ticket-là.**
 - **L'en-tête de `schema.ts` dit « les 26 tables métier », elles sont 30.** Chiffre faux d'une famille
   qui en compte quatre — `scoped.ts` disait 22, la fiche de C6 annonçait 25 puis « treize points
   d'appel » pour quatorze. T6.1 a **retiré** le compte plutôt que de le corriger ; le même geste

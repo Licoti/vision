@@ -6405,3 +6405,65 @@ avait été décrit au journal sans être fait. Les deux fichiers du périmètre
 deux autres, plus `administration/actions.test.ts`, restent (règle 3). La leçon n'est pas sur le
 nettoyage : **une correction consignée n'est pas une correction faite**, et le seul moyen de le savoir
 est de rouvrir le fichier.
+
+---
+
+## T6.3 — Le bloc « Journal » sur la page projet
+
+**Une ligne forgée qui franchit deux frontières n'éprouve aucun filtre.** La mise en défaut de
+`filter(events)` est passée **au vert** : aucun test n'est tombé. La ligne censée l'éprouver portait
+le domaine de `b` **et** le projet de `b`, si bien qu'`eq(events.projectId, …)` l'écartait avant que
+le filtre de domaine ait à la voir. C'est la leçon de T5bis.3 resservie — *un filtre qu'aucune ligne
+forgée ne vise n'est pas éprouvé* —, mais sous une forme qu'elle n'avait pas encore prise : ici la
+ligne existait, elle visait le bon filtre en intention, et **un second filtre la rattrapait en
+amont**. Corrigée pour ne franchir la frontière que sur `domain_id` — projet de `a`, acteur nul —,
+elle tombe seule. Le corollaire mérite d'être écrit : *une ligne forgée doit être taillée contre
+l'ordre des filtres, pas seulement contre le filtre qu'on vise.*
+
+**Un test d'état vide peut voler la chute d'un test d'étanchéité.** Retirer `eq(events.projectId, …)`
+faisait tomber **deux** cas : l'étanchéité de projet, et « un projet sans événement rend un tableau
+vide » — parce que ce dernier se lisait sur un projet de `b`, un domaine qui porte une ligne forgée.
+La chute n'était pas fausse, elle était **non isolée**, et une chute non isolée ne désigne plus le
+filtre qu'elle éprouve. Un **troisième domaine, sans aucun événement**, a rendu l'état vide
+indépendant. Coût : une ligne de fixture. Bénéfice : trois neutralisations, trois chutes d'un test
+chacune.
+
+**Le témoin urlencodé a rendu 200 et 68 209 octets sans rien écrire.** Le rétablissement frappé en
+urlencodé rend la **page entière** — ce qui ressemble beaucoup à un succès — et le projet est resté
+archivé. C'est une quatrième forme du piège que `ETAT.md` recense : après le « 200 muet » et le
+« 404 malgré le bon identifiant », le **200 volumineux**. La règle ne change pas ; sa surface
+d'attaque s'élargit. Le multipart rejoué depuis le formulaire servi, lui, écrit — et c'est le chemin
+sans JavaScript, donc le vrai point d'entrée.
+
+**La date au jour en UTC affiche « la veille » pendant deux heures.** Arbitrage (1) du ticket : le
+jour, en UTC, comme `formatDay`. La sonde l'a rendu visible sans qu'on l'ait cherché — un événement
+écrit le **27/08/2026 à 00:29** heure de Paris se lit « **26 août 2026** », l'instant étant le 26 à
+22:29 UTC. Ce n'est pas un défaut du formateur : c'est le prix, nommé d'avance, du refus d'introduire
+`Europe/Paris` pour une seule fonction là où les quatre autres forcent `UTC`. Il se paie sur la
+tranche 00:00–02:00 locale, et il se lèverait le jour où le dépôt se donnerait un fuseau d'affichage.
+**Le noter ici plutôt que de le découvrir en C7** : c'est la même question qui reviendra au flux
+global de T6.6, où les dates se comparent entre elles.
+
+**Deux lignes d'`events` de sonde restent en base de développement, et c'est voulu.** Archiver puis
+rétablir a écrit deux événements que **rien ne peut retirer** : `events` ne porte pas d'`archived_at`,
+la couche n'expose aucun `delete` générique, et C6 s'interdit de lui en ajouter. La donnée métier,
+elle, est revenue exactement où elle était. C'est la première sonde du dépôt qui ne s'annule pas
+entièrement, et la propriété est celle que D22 demande — un journal en écriture seule. La base de
+développement est jetable (`ETAT.md`) ; en production, la trace serait juste.
+
+**Trois écarts de périmètre, tous assumés à l'avance.** La fiche nommait trois fichiers ; le ticket en
+touche six. `components/ui/section.tsx` reçoit `as` et `mark` — récrire l'en-tête dans
+`components/projects/` aurait recopié la signature `h2 text-xl font-bold text-content-neutral-darkest`
+du socle, et **aucun motif de `socleLock` ne la garde** : le bouton, le lien d'action et la pastille
+de statut ont leur gardien, le titre de bloc n'en a pas. C'est un trou du cliquet de TD.6, révélé par
+ce ticket et non comblé par lui — il n'entre pas dans le périmètre, et il rejoint les motifs qu'un
+ticket ouvrant `eslint.config.mjs` pourra poser. `lib/format.ts` et son test reçoivent
+`formatEventDay` et la fermeture de la dette d'insécable, qu'`ETAT.md` promettait « au prochain
+ticket qui l'ouvre ».
+
+**Ni `verb`, ni `target_type`, ni `target_id` ne sont rendus.** La phrase figée les dit déjà, et les
+interdits de la fiche écartent tout lien vers l'objet touché — la page n'affiche plus l'activité
+archivée ni la ressource retirée dont une ligne peut parler, et un lien qui ne mène à rien est pire
+qu'une absence (`docs/06` §9). Les rendre aurait posé **trois colonnes sans lecteur**, celles que
+T5.2 a refusées dans `starters`. Le jour où le journal gagnera un écran propre — il n'en a pas et
+n'en demande pas —, la question se reposera entière.

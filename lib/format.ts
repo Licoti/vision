@@ -10,6 +10,22 @@ import type { IndicatorDirection } from "@/lib/queries/indicators";
 import type { ResourceType } from "@/lib/queries/resources";
 import type { StarterKind } from "@/lib/queries/starters";
 
+/**
+ * L'espace insécable, U+00A0 — **écrit en échappement, jamais en caractère**
+ * (T6.3).
+ *
+ * Il vivait ici en caractère depuis T4.3, et `lib/journal.ts` l'écrit sous ce
+ * nom depuis T6.1 : deux écritures pour une seule règle, dont l'une invisible.
+ * `ETAT.md` promettait le geste « au prochain ticket qui l'ouvre » — c'est
+ * celui-ci. Dans un source comme dans un navigateur, l'insécable et l'espace
+ * ordinaire sont indiscernables à l'œil, et une règle qu'on ne peut pas voir
+ * est une règle qui saute au premier copier-coller.
+ *
+ * **Rien d'autre ne change** : `lib/format.test.ts` éprouve déjà la propriété
+ * sur le point de code, et c'est ce test qui rend le remplacement mécanique.
+ */
+const NBSP = "\u00A0";
+
 const MONTH = new Intl.DateTimeFormat("fr-FR", {
   month: "long",
   year: "numeric",
@@ -60,6 +76,32 @@ const DAY = new Intl.DateTimeFormat("fr-FR", {
 /** « 31 mai 2024 ». Reçoit la chaîne `YYYY-MM-DD` d'une colonne `date`. */
 export function formatDay(value: string): string {
   return DAY.format(parseDay(value));
+}
+
+/**
+ * « 27 août 2026 » — le jour d'un **horodatage**, pour le journal (T6.3).
+ *
+ * `events.occurred_at` est un `timestamp with time zone`, non une colonne
+ * `date` : il arrive en `Date` et n'a pas de chaîne `YYYY-MM-DD` à donner à
+ * `formatDay`. D'où cette seconde porte sur le **même** formateur — la règle du
+ * fuseau ne se réécrit pas, elle se partage.
+ *
+ * **Au jour, et c'est la seconde entorse bornée au mois de D13.** La première
+ * est `formatDay` — la date de mesure d'un résultat. Celle-ci a la même nature
+ * et la même limite : un événement de journal est un **fait daté ponctuel**,
+ * pas une période d'accompagnement. Et le mois lui retirerait sa raison d'être
+ * — dix lignes disant « août 2026 » ne retrouvent l'origine d'aucune saisie,
+ * quand le bloc existe pour cela (`docs/06` §5 : *une information de
+ * contrôle*).
+ *
+ * **Au jour et non à l'heure, et le fuseau en décide.** Les quatre formateurs
+ * de ce module forcent `UTC` ; une heure affichée en UTC serait fausse pour qui
+ * la lit, et la corriger demanderait `Europe/Paris` — la première rupture du
+ * dépôt avec l'UTC, pour une précision que « retrouver l'origine d'une saisie »
+ * ne réclame pas. Arbitrage (1) de T6.3.
+ */
+export function formatEventDay(value: Date): string {
+  return DAY.format(value);
 }
 
 /**
@@ -412,5 +454,5 @@ export function formatResultValue(
   const number = Number.isFinite(parsed) ? DECIMAL.format(parsed) : value;
 
   if (!unit) return number;
-  return unit.startsWith("/") ? `${number}${unit}` : `${number} ${unit}`;
+  return unit.startsWith("/") ? `${number}${unit}` : `${number}${NBSP}${unit}`;
 }

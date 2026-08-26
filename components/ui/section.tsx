@@ -58,6 +58,21 @@
  * note s'y replie, l'action reste sur la ligne du titre. Le défaut était dans
  * le socle, il est donc corrigé pour les cinq blocs qui portent une note et une
  * action, pas pour la seule roadmap.
+ *
+ * **`SectionHeader` sait être le `<summary>` d'un `<details>`** (T6.3), comme
+ * `BlockDivider` l'a appris le 18/08/2026 pour la page produit. Le besoin est
+ * le même — un bloc replié par défaut, sans une ligne de JavaScript —, et le
+ * porter ici plutôt que de récrire l'en-tête dans `components/projects/` évite
+ * la recopie de signature que TD.3 → TD.6 ont passé six tickets à retirer,
+ * **et qu'aucun motif de `socleLock` ne rattrape** : le `h2` du bloc n'a pas de
+ * gardien, contrairement au bouton ou à la pastille de statut.
+ *
+ * Le titre ne change alors ni de contenu ni de rang — seule sa balise
+ * enveloppante change, et avec elle le curseur. **Le triangle natif du
+ * navigateur disparaît dès que `<summary>` cesse d'être `display: list-item`**,
+ * ce que fait `flex` ; la marque de repli se passe donc en `mark`, et se
+ * retourne sur `group-open`. Sans cela, un contenu replié n'annoncerait plus
+ * qu'il l'est.
  */
 
 import type { ReactNode } from "react";
@@ -81,18 +96,41 @@ export function Section({
 }
 
 export function SectionHeader({
+  mark,
   title,
   note,
   action,
+  as = "div",
 }: {
+  /**
+   * Une marque décorative devant le titre — le chevron d'un bloc repliable.
+   * **Elle sort de l'arbre d'accessibilité**, comme celle de `BlockHeader` :
+   * l'état ouvert ou fermé, c'est `<summary>` qui l'expose, et la couleur ne
+   * porte jamais seule (`docs/06` §11).
+   */
+  mark?: ReactNode;
   title: string;
   note?: string;
   action?: ReactNode;
+  /** `summary` quand l'en-tête ouvre et referme le bloc qu'il annonce. */
+  as?: "div" | "summary";
 }) {
+  const Wrapper = as;
+
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3">
+    <Wrapper
+      className={
+        as === "summary"
+          ? /* `list-none` et le pseudo-élément WebKit retirent la puce que
+               certains navigateurs laissent malgré `flex` — la parade de
+               `BlockDivider`, éprouvée depuis le 18/08/2026. */
+            "flex cursor-pointer list-none flex-wrap items-start justify-between gap-3 [&::-webkit-details-marker]:hidden"
+          : "flex flex-wrap items-start justify-between gap-3"
+      }
+    >
       <div className="flex min-w-0 flex-1 flex-col">
         <h2 className="flex items-center gap-2 text-xl font-bold text-content-neutral-darkest">
+          {mark ? <span aria-hidden="true">{mark}</span> : null}
           {title}
         </h2>
         {note ? (
@@ -102,6 +140,6 @@ export function SectionHeader({
         ) : null}
       </div>
       {action}
-    </div>
+    </Wrapper>
   );
 }
