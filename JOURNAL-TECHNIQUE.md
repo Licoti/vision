@@ -6308,3 +6308,100 @@ depuis le projet ; il ne se fige pas.
 porte le déplacement de trois personnes n'a pas de cible unique. Y poser l'identifiant du projet
 aurait rendu la colonne lisible et **fausse** — elle aurait désigné un projet sous un `target_type`
 qui annonce un membre.
+
+---
+
+## T6.2 — Le journal : activités, ressources, résultats, relevés
+
+**La fiche annonce treize points d'appel ; ils sont quatorze**, et le compte est dans la fiche
+elle-même : cinq sur l'activité (`create`, `update`, `transition`, `cancel`, `archive`), trois sur la
+ressource, trois sur le résultat, trois sur le relevé. **Quatrième chiffre faux de la même famille** —
+`scoped.ts` disait « les 22 » pour 26 puis 30, la fiche de C6 annonçait 25 tables, l'en-tête de
+`schema.ts` en dit encore 26. Le motif se répète : un nombre écrit en prose ne se recompte jamais au
+moment où il devient faux. Les quatorze ont été posés ; le treize de la fiche n'a pas été « respecté »
+en en sacrifiant un.
+
+**Deux portes rendent désormais le libellé du type, et c'est une lecture de plus, pas trois.**
+Une activité n'a pas de nom : ce que le journal fige est le libellé de son **type**, seule
+désignation stable (arbitrage (a) du plan, tranché avec l'humain). `checkReferences` lisait déjà la
+ligne du type pour la valider et la jetait — elle la rend maintenant, et les deux gestes de
+formulaire ne relisent rien. `openActivity`, elle, ajoute un `find` : c'est **la seule lecture neuve
+du ticket**, et elle ne coûte que sur les trois gestes de cycle de vie, après les trois refus. Le
+repli sur la chaîne vide n'est atteignable par aucun chemin — `activity_type_id` est `not null` et sa
+clé étrangère est scopée — mais une phrase **figée** ne doit en aucun cas porter « undefined ».
+
+**Le journal ne redécide rien, et la seule condition neuve n'en est pas une.** `updateActivity`
+journalise sur `rowChanged || participantsChanged` — exactement la condition qui décidait déjà de
+`refresh`. Ce que l'écran tient pour un changement, le journal le tient pour un geste : sans cela, un
+participant ajouté sans qu'aucune date ne bouge ne laisserait aucune trace. Ce que la fiche écarte
+est la « modification qui n'en est pas une », les deux gardes à faux — mesuré à zéro ligne, décompte
+avant et après. **Aucun `target_type` `member` sur les participants d'une activité** : T6.1 a posé ce
+nom sur l'équipe du **projet**, et l'étendre aurait été une règle neuve (règle 3).
+
+**`statePhrase` ne passe pas par `DEEDS`, et le refus est typographique.** « en cours » n'est pas un
+participe, et « terminée » ne se forme pas depuis « terminé » par la règle régulière que `head`
+suppose. Les trois états portent donc leur mot **déjà accordé**, plutôt qu'une seconde mécanique
+d'accord pour trois valeurs. `JournalState` est un `Extract` de `ActivityState` sur les trois états
+réellement atteignables : **jamais `planned`**, que rien ne fait atteindre — `transitionActivity` ne
+vise que `in_progress` et `done`, `cancelActivity` que `cancelled`. Un quatrième nom sans appelant est
+celui que le ticket suivant emploierait de travers, et c'est la discipline que `lib/journal.ts` tenait
+déjà sur ses noms d'objets.
+
+**L'insécable a gagné une position que la typographie n'exige pas.** Il est posé devant le tiret
+d'incise du motif d'annulation — « Activité annulée : Audit UX — Reporté à 2027 » — alors que le
+français prend là une espace ordinaire. La raison est la frise repliée de T6.3 : un tiret rejeté seul
+en début de ligne se lit comme une puce, et la phrase paraît coupée. Écart mineur, assumé, et le
+commentaire de `NBSP` le dit plutôt que de le laisser deviner.
+
+**Le seul cas du dépôt où un événement n'a pas de projet, et il ne se lira jamais à l'écran.** Les
+trois gestes du relevé posent `product_id` et laissent `project_id` **nul** — `docs/04` §4 le prévoit
+par « nul pour les événements de niveau produit ». Lui attribuer l'un des accompagnements du produit
+aurait été choisir arbitrairement, et la frise de T6.3 aurait affiché ce choix comme un fait. La
+conséquence est voulue et écrite dans le code : **un relevé n'apparaît pas dans la frise de la page
+projet** ; il apparaît dans le flux global de T6.6, qui nomme le produit quand le projet manque.
+Aucun écran ne dira jamais cette propriété — seul le décompte en base la porte, et c'est un test.
+
+**Le forgeage d'une action à `FormData` demande le multipart, et `encodeReply` l'écrit mieux qu'une
+main.** T5bis.6 avait rejoué ses six points d'entrée « en multipart » sans dire comment ; T6.1 avait
+frappé en `text/plain` des fonctions **sans** `FormData`. Les deux règles ne se contredisent pas :
+la charge est le tableau d'arguments encodé en Flight, et **c'est la présence d'un `FormData` dans ce
+tableau qui fait basculer l'encodage en multipart**. Le harnais de ce ticket appelle donc
+`encodeReply` de `react-server-dom-turbopack` (compilé dans `next/dist`) et laisse `fetch` poser la
+frontière multipart : `createReading` se frappe ainsi, `archiveReading` et `transitionActivity` en
+`text/plain`, sans qu'on choisisse.
+
+**Et les identifiants d'action de `.next/server/` ne sont pas ceux du serveur de développement.**
+La première frappe a rendu « Server action not found » en 404 avec un identifiant pourtant **présent**
+dans `.next/server/server-reference-manifest.json` : ce manifeste est celui du **build**, et le
+serveur de développement lit `.next/dev/server/`. Les deux jeux d'identifiants coexistent sur le
+disque et se ressemblent trait pour trait. **Un 404 « action introuvable » ne dit pas que l'action
+n'existe pas** — il dit qu'elle n'existe pas *sous cet identifiant-là, pour ce serveur-là*. Sans
+étape témoin, il aurait passé pour un refus de droit.
+
+**Quatre gestes frappés sur le vrai point d'entrée HTTP, et le code ne dit toujours rien.**
+`createReading` forgé sous une identité sans droit rend **200** et 280 octets — la saisie rendue avec
+son message —, quand le même geste sous le responsable rend **200** et 65 222 octets. `archiveReading`
+et `transitionActivity` forgés rendent **200** et **78 octets** : la charge du rien. Et la **même**
+charge de 78 octets sort d'une transition légitime mais déjà faite, qui n'est pas un refus. Trois
+situations, un seul code, deux tailles : **seul le décompte en base les sépare** — 0 événement écrit
+dans les deux refus, 0 dans le geste sans effet, 1 dans chacun des quatre témoins.
+
+**Les états vides ont été atteints en archivant, et rien n'est resté.** Arbitrage (d) : trois des
+cinq états vides jamais rendus se joignaient à ce ticket, ceux que les relevés atteignent. Les cinq
+relevés vivants du domaine ont été archivés par la couche scopée — jamais par l'action, qui aurait
+écrit des lignes de journal à retirer ensuite —, les trois états lus dans le HTML servi, puis les
+cinq rétablis : « Aucun relevé pour l'instant : cette mesure n'est pas encore située dans le temps »
+(North Star), « Aucun relevé » (carte d'indicateur), « Aucun relevé pour l'instant. Un indicateur
+sans relevé n'est pas situé sur l'axe du temps. » (panneau « Gérer les relevés »). Les deux qui
+restent — la **cible** absente d'une North Star, la personne dans aucune équipe — ne s'atteignent par
+aucun geste de relevé : ils tiennent à `project_indicators` et à `project_members`, et repartent vers
+T6.6.
+
+**Un point ouvert disait qu'un fichier était corrigé ; il ne l'était pas.** `ETAT.md` annonçait
+« trois fichiers » nettoyant sur `if (!f?.domainId) return` et affirmait que
+`app/(app)/projets/actions.test.ts` « retient désormais le domaine dès sa création ». **Ils sont
+quatre, et celui-là porte encore la formule** — dans un fichier que T6.1 venait de créer. Le geste
+avait été décrit au journal sans être fait. Les deux fichiers du périmètre de T6.2 sont corrigés ; les
+deux autres, plus `administration/actions.test.ts`, restent (règle 3). La leçon n'est pas sur le
+nettoyage : **une correction consignée n'est pas une correction faite**, et le seul moyen de le savoir
+est de rouvrir le fichier.

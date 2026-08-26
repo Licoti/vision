@@ -3732,3 +3732,73 @@ tests** : 11 pour `lib/journal.ts`, 10 pour les cinq gestes, 6 pour `record` dan
 
 **Le commentaire faux de `scoped.ts` refermé, autrement que prévu.** Il disait « les 22 », la fiche
 annonçait 25, **elles sont 30**. Le compte a été **retiré** plutôt que corrigé une troisième fois.
+
+---
+
+## T6.2 — Le journal : activités, ressources, résultats, relevés — 26/08/2026
+
+**Ce que le ticket branche.** Les quatre `event_target_type` restants — `activity`, `resource`,
+`result`, `indicator_reading` — et le journal cesse d'être partiel. **Quatorze points d'appel**, là où
+la fiche en annonçait treize : cinq sur l'activité, trois sur la ressource, trois sur le résultat,
+trois sur le relevé. Aucun mécanisme neuf, aucune migration, aucun écran, aucune lecture.
+
+**Six noms et une troisième forme de phrase.** `JournalKind` passe de deux à six, chaque nom arrivant
+avec le geste qui l'écrit — « Activité », « Ressource » (féminins), « Résultat », « Relevé »
+(masculins) : les deux genres ont un appelant parmi les quatre neufs, comme T6.1 l'avait établi sur
+deux. `statePhrase(state, label, reason?)` porte les deux gestes de cycle de vie sous le **gabarit
+d'`objectPhrase`**, l'état à la place du participe : « Activité en cours : Audit UX », « Activité
+terminée : Audit UX », « Activité annulée : Audit UX — Reporté à 2027 ». `JournalState` est un
+`Extract` sur les trois états **réellement atteignables** : jamais `planned`, que rien ne fait
+atteindre.
+
+**Quatre arbitrages tranchés avant écriture.** Le libellé figé d'une activité est celui de son
+**type**, seul (une activité n'a pas de nom ; la période aurait figé une valeur, que D22 refuse) ; la
+phrase d'état reprend le gabarit existant plutôt qu'une formulation littérale plus lourde ;
+`updateActivity` journalise dès que **la ligne ou les participants** ont bougé — la condition qui
+décidait déjà de `refresh` —, pour qu'un participant ajouté ne reste pas sans trace ; et trois des
+cinq états vides jamais rendus se joignent à ce ticket, ceux que les relevés atteignent.
+
+**Une seule lecture ajoutée au fichier.** `checkReferences` lisait déjà la ligne du type et la
+jetait : elle la rend, et les deux gestes de formulaire ne relisent rien. `openActivity` ajoute un
+`find` — la seule lecture neuve —, après ses trois refus : on ne lit un libellé qu'une fois établi
+qu'on a le droit d'y toucher.
+
+**Le seul cas du dépôt où un événement n'a pas de projet.** Les trois gestes du relevé posent
+`product_id` et laissent `project_id` **nul**, ce que `docs/04` §4 prévoit. Conséquence voulue et
+écrite dans le code : un relevé n'apparaît pas dans la frise de la page projet (T6.3), il apparaît
+dans le flux global (T6.6). **Aucun écran ne dira jamais cette propriété** — seul le décompte en base
+la porte, et c'est un test.
+
+### Les quatre disciplines
+
+- **Le critère se compte en base**, geste par geste, sur la vraie base et les vraies portes : une
+  ligne et une seule, le bon verbe, le bon `target_type`, le bon `target_id`, l'acteur, la phrase au
+  caractère près — insécable compris, éprouvé sur son point de code.
+- **Le droit s'éprouve par l'action.** Quatre gestes frappés sur le **vrai point d'entrée HTTP** du
+  serveur de développement, chacun encadré de son étape témoin. `createReading` forgé sous une
+  identité sans droit rend **200** et 280 octets, le même sous le responsable **200** et 65 222 ;
+  `archiveReading` et `transitionActivity` forgés rendent **200** et **78 octets** — et la même charge
+  de 78 octets sort d'une transition légitime **déjà faite**, qui n'est pas un refus. Trois
+  situations, un seul code : seul le décompte en base les sépare. **Aucune ligne de sonde ne reste** —
+  activité et relevé de sonde effacés, cinq relevés rétablis, journal ramené à zéro.
+- **Les tests se mettent en défaut.** Trois neutralisations, trois chutes isolées : retirer le
+  `record` de `transitionActivity` fait tomber son seul cas ; forcer le journal d'`updateActivity`
+  fait tomber le seul cas « re-soumission à l'identique » ; retirer le `productId` de `createReading`
+  fait tomber le seul cas « `project_id` nul, `product_id` posé ».
+- **Le contraste ne se mesure pas** : ce ticket ne rend aucun pixel.
+
+**1017 tests, 35 fichiers, verts.** `lint --max-warnings=0` et `tsc --noEmit` sans une ligne. **+31
+tests** : 8 pour `lib/journal.ts`, 17 pour les onze gestes de la page projet, 6 pour les trois du
+relevé.
+
+**Trois états vides lus pour la première fois**, en archivant les cinq relevés du domaine par la
+couche scopée — jamais par l'action, qui aurait écrit des lignes à retirer ensuite —, puis en
+rétablissant : « Aucun relevé pour l'instant : cette mesure n'est pas encore située dans le temps »,
+« Aucun relevé », « Aucun relevé pour l'instant. Un indicateur sans relevé n'est pas situé sur l'axe
+du temps. » Les deux autres repartent vers T6.6.
+
+**Deux comptes faux relevés, un seul corrigeable.** La fiche annonçait treize points d'appel pour
+quatorze — quatrième chiffre de la même famille que « les 22 » de `scoped.ts` et « les 26 » de
+`schema.ts`. Et le point ouvert sur `if (!f?.domainId) return` annonçait trois fichiers pour quatre,
+en affirmant qu'un cinquième était corrigé alors qu'il ne l'était pas. **Une correction consignée
+n'est pas une correction faite.**

@@ -119,6 +119,24 @@
  *
  * **Aucune suppression, jamais** (règle 4) : la couche n'expose pas de `delete`,
  * et ce fichier ne lui en demande pas. Ce qui se retire s'archive.
+ *
+ * **Onze de ces écritures laissent une trace depuis T6.2**, et c'est la seule
+ * chose que ce ticket ajoute : cinq sur l'activité, trois sur la ressource,
+ * trois sur le résultat. `session.db.record` est `insert(events, …)` avec
+ * `actor_id` posé depuis le contexte ; **la décision de journaliser et la phrase
+ * appartiennent à l'action**, seule à connaître le vocabulaire (arbitrage (a) de
+ * `tickets-C6.md`). Le prix est nommé : un geste qui oublierait d'appeler
+ * `record` ne laisserait pas de trace, et rien ne le signalerait.
+ *
+ * **Le journal ne redécide rien.** Chaque appel est posé **après** l'écriture
+ * qu'il raconte et après la porte qui l'autorise : un refus n'a jamais de ligne
+ * à écrire parce qu'il n'atteint jamais l'appel, et aucun contrôle n'a été
+ * déplacé, dupliqué ni ajouté pour lui. La seule condition neuve de ce fichier
+ * est celle d'`updateActivity`, et elle existait déjà sous un autre nom — c'est
+ * celle qui décide de `refresh`.
+ *
+ * **`product_id` reste nul sur les onze** : le produit se déduit du projet, et
+ * le figer serait faux le jour où l'accompagnement change de produit (D20).
  */
 
 import { and, eq } from "drizzle-orm";
@@ -172,6 +190,7 @@ import {
   readResultForm,
   type ResultFormState,
 } from "@/lib/forms/result";
+import { objectPhrase, statePhrase } from "@/lib/journal";
 import { ROUTES } from "@/lib/navigation";
 
 /**
@@ -259,11 +278,18 @@ async function openProject(
  * `find` rend les lignes archivées, et c'est voulu : une activité qui pointe un
  * type archivé depuis reste modifiable sans qu'on lui impose d'en changer
  * (T3.4). Ce que l'on ne **propose** pas, on continue de l'accepter.
+ *
+ * **Elle rend aussi le libellé du type** (T6.2) : une activité n'a pas de nom,
+ * et c'est ce libellé que le journal fige comme désignation de ce qui a été
+ * touché. La ligne est **déjà lue ici** ; la jeter puis la relire au point
+ * d'appel serait une seconde lecture de la même ligne dans la même soumission,
+ * donc une occasion de divergence. Il est vide quand le type est inconnu — le
+ * cas où l'appelant rend ses erreurs et n'écrit rien.
  */
 async function checkReferences(
   session: Session,
   input: ActivityRowInput,
-): Promise<ActivityFormErrors> {
+): Promise<{ errors: ActivityFormErrors; typeLabel: string }> {
   const errors: ActivityFormErrors = {};
 
   const [type, approach] = await Promise.all([
@@ -280,7 +306,7 @@ async function checkReferences(
     errors.approachId = "Cette approche n'existe pas dans ce domaine.";
   }
 
-  return errors;
+  return { errors, typeLabel: type?.label ?? "" };
 }
 
 /**
@@ -394,12 +420,25 @@ export async function createActivity(
   );
   if (!input) return { values, errors };
 
-  const unknown = await checkReferences(session, input);
+  const { errors: unknown, typeLabel } = await checkReferences(session, input);
   if (Object.keys(unknown).length > 0) return { values, errors: unknown };
 
   try {
     const created = await session.db.insert(activities, { projectId, ...input });
     await syncParticipants(session, created.id, participantIds);
+
+    /* **Une seule ligne, participants compris** — la forme de `createProject`
+       en T6.1 : le journal est une trace de geste, pas de table, et une
+       création n'a pas d'avant à comparer. Le `target_type` `member` reste ce
+       que T6.1 en a fait, l'équipe du **projet** ; l'étendre aux participants
+       d'une activité serait une règle neuve (règle 3). */
+    await session.db.record({
+      projectId,
+      verb: "created",
+      targetType: "activity",
+      targetId: created.id,
+      summary: objectPhrase("activity", "created", typeLabel),
+    });
   } catch (error) {
     return scopeRefusal(error, formData);
   }
@@ -485,7 +524,7 @@ export async function updateActivity(
   );
   if (!input) return { values, errors };
 
-  const unknown = await checkReferences(session, input);
+  const { errors: unknown, typeLabel } = await checkReferences(session, input);
   if (Object.keys(unknown).length > 0) return { values, errors: unknown };
 
   // Une re-soumission à l'identique n'écrit rien sur la ligne : ni
@@ -515,6 +554,25 @@ export async function updateActivity(
       activityId,
       participantIds,
     );
+
+    /* **La condition n'est pas neuve** : c'est exactement celle qui décide de
+       `refresh` deux lignes plus bas. Ce que l'écran tient pour un changement,
+       le journal le tient pour un geste — sans quoi un participant ajouté sans
+       qu'une date bouge ne laisserait aucune trace. Ce que la fiche écarte est
+       la « modification qui n'en est pas une », les deux gardes à faux.
+
+       Le libellé figé est celui d'**après** le geste : un changement de type
+       est une correction fréquente, et écrire l'ancien serait une « valeur
+       avant », que D22 refuse. */
+    if (rowChanged || participantsChanged) {
+      await session.db.record({
+        projectId,
+        verb: "updated",
+        targetType: "activity",
+        targetId: activityId,
+        summary: objectPhrase("activity", "updated", typeLabel),
+      });
+    }
   } catch (error) {
     return scopeRefusal(error, formData);
   }
@@ -558,13 +616,28 @@ export async function updateActivity(
  * **Une activité déjà archivée est refusée d'entrée**, et T4bis.4 s'en repose :
  * l'archivage n'a donc aucun contrôle d'idempotence à écrire, et `archive()`
  * ne toucherait de toute façon rien (son filtre porte `is null`).
+ *
+ * **Elle rend le libellé du type** (T6.2), comme `checkReferences` pour les deux
+ * gestes de formulaire : c'est la désignation que le journal fige, une activité
+ * n'ayant pas de nom. C'est **la seule lecture que ce ticket ajoute au
+ * fichier**, et elle ne coûte que sur les trois gestes qui écrivent. Elle est
+ * placée **après** les trois refus, jamais avant : on ne lit un libellé qu'une
+ * fois établi qu'on a le droit d'y toucher.
+ *
+ * `find` rend les lignes archivées, et c'est voulu ici comme ailleurs : un type
+ * archivé depuis reste la désignation de l'activité qui le porte. Le repli sur
+ * la chaîne vide n'est atteignable par aucun chemin — `activity_type_id` est
+ * `not null` et sa clé étrangère est scopée — mais une phrase **figée** ne doit
+ * en aucun cas porter « undefined ».
  */
 async function openActivity(
   session: Session,
   activityId: string,
-): Promise<
-  { activity: Row<typeof activities>; project: Row<typeof projects> } | null
-> {
+): Promise<{
+  activity: Row<typeof activities>;
+  project: Row<typeof projects>;
+  typeLabel: string;
+} | null> {
   const activity = await session.db.find(activities, activityId);
   if (!activity || activity.archivedAt !== null) return null;
   if (!session.can.writeProject(activity.projectId)) return null;
@@ -572,7 +645,9 @@ async function openActivity(
   const project = await session.db.find(projects, activity.projectId);
   if (!project || project.archivedAt !== null) return null;
 
-  return { activity, project };
+  const type = await session.db.find(activityTypes, activity.activityTypeId);
+
+  return { activity, project, typeLabel: type?.label ?? "" };
 }
 
 /**
@@ -600,7 +675,7 @@ export async function transitionActivity(
 
   const gate = await openActivity(session, activityId);
   if (!gate) return;
-  const { activity, project } = gate;
+  const { activity, project, typeLabel } = gate;
 
   if (!canTransitionActivity(activity.state, target)) return;
   if (target === "done" && activity.periodEnd === null) return;
@@ -608,6 +683,19 @@ export async function transitionActivity(
   await session.db.update(activities, activityId, {
     state: target,
     ...(target === "in_progress" ? { isUnscheduled: false } : {}),
+  });
+
+  /* **Le verbe est `state_changed`**, le troisième de l'énuméré, et il n'a que
+     deux appelants dans tout le produit — celui-ci et l'annulation.
+     `canTransitionActivity` a déjà écarté les deux transitions qui ne font
+     rien : rien n'est journalisé qui n'a pas eu lieu, et la garde qui le
+     garantit est **au-dessus**, là où elle était déjà. */
+  await session.db.record({
+    projectId: activity.projectId,
+    verb: "state_changed",
+    targetType: "activity",
+    targetId: activityId,
+    summary: statePhrase(target, typeLabel),
   });
 
   refresh(activity.projectId, project.productId);
@@ -650,7 +738,7 @@ export async function cancelActivity(
   if (!gate) {
     return { message: "Cette activité ne peut pas être annulée." };
   }
-  const { activity, project } = gate;
+  const { activity, project, typeLabel } = gate;
 
   if (!canTransitionActivity(activity.state, "cancelled")) {
     return {
@@ -666,6 +754,20 @@ export async function cancelActivity(
   await session.db.update(activities, activityId, {
     state: "cancelled",
     cancellationReason: reason,
+  });
+
+  /* **Le motif entre dans la phrase, et c'est la fiche qui l'exige** : une
+     annulation dit quelque chose, là où l'archivage dit qu'une saisie n'aurait
+     pas dû avoir lieu. Il est **figé** comme le libellé — il disparaîtrait de la
+     trace le jour où l'activité serait corrigée. Il est déjà validé au-dessus :
+     ce qui arrive ici a franchi `validateCancellationReason` et le `CHECK`
+     `activities_cancelled_requires_reason`. */
+  await session.db.record({
+    projectId: activity.projectId,
+    verb: "state_changed",
+    targetType: "activity",
+    targetId: activityId,
+    summary: statePhrase("cancelled", typeLabel, reason),
   });
 
   refresh(activity.projectId, project.productId);
@@ -724,7 +826,7 @@ export async function archiveActivity(activityId: string): Promise<void> {
 
   const gate = await openActivity(session, activityId);
   if (!gate) return;
-  const { activity, project } = gate;
+  const { activity, project, typeLabel } = gate;
 
   const attached = await session.db.count(results, {
     where: eq(results.activityId, activityId),
@@ -732,6 +834,17 @@ export async function archiveActivity(activityId: string): Promise<void> {
   if (attached > 0) return;
 
   await session.db.archive(activities, activityId);
+
+  /* `openActivity` refuse d'entrée une activité déjà archivée : ce geste n'a
+     aucun contrôle d'idempotence à écrire, et le journal n'en hérite aucun.
+     C'est la propriété sur laquelle T4bis.4 se reposait déjà. */
+  await session.db.record({
+    projectId: activity.projectId,
+    verb: "archived",
+    targetType: "activity",
+    targetId: activityId,
+    summary: objectPhrase("activity", "archived", typeLabel),
+  });
 
   refresh(activity.projectId, project.productId);
 }
@@ -879,7 +992,18 @@ export async function createResource(
   if (Object.keys(misplaced).length > 0) return { values, errors: misplaced };
 
   try {
-    await session.db.insert(resources, { projectId, ...input });
+    /* La ligne écrite est **retenue** depuis T6.2 : `target_id` la désigne, et
+       elle n'existe qu'ici — une ressource ne se retrouve par aucune clé
+       naturelle. */
+    const created = await session.db.insert(resources, { projectId, ...input });
+
+    await session.db.record({
+      projectId,
+      verb: "created",
+      targetType: "resource",
+      targetId: created.id,
+      summary: objectPhrase("resource", "created", input.title),
+    });
   } catch (error) {
     if (error instanceof DomainScopeError) {
       return resourceRefusal(
@@ -977,6 +1101,22 @@ export async function updateResource(
         "Cette ressource n'existe plus dans cet accompagnement.",
       );
     }
+
+    /* Le titre figé est celui de la **ligne rendue par `update`**, jamais celui
+       du `gate` : c'est le nom d'après le geste, et écrire celui d'avant serait
+       une « valeur avant », que D22 refuse.
+
+       **Aucun contrôle d'idempotence** n'est ajouté ici, pas plus que T4bis.5
+       n'en avait posé : `activityRowUnchanged` existe pour `updateActivity`
+       parce que la fraîcheur d'un produit en dépend, et l'inventer pour la
+       ressource serait une règle neuve dans un ticket de trace (règle 3). */
+    await session.db.record({
+      projectId,
+      verb: "updated",
+      targetType: "resource",
+      targetId: resourceId,
+      summary: objectPhrase("resource", "updated", updated.title),
+    });
   } catch (error) {
     if (error instanceof DomainScopeError) {
       return resourceRefusal(
@@ -1037,6 +1177,16 @@ export async function archiveResource(
   if ("message" in gate) return;
 
   await session.db.archive(resources, resourceId);
+
+  /* `openResource` refuse d'entrée une ressource déjà archivée : le geste ne
+     s'exécute qu'une fois, et le journal n'a aucune garde à ajouter. */
+  await session.db.record({
+    projectId,
+    verb: "archived",
+    targetType: "resource",
+    targetId: resourceId,
+    summary: objectPhrase("resource", "archived", gate.resource.title),
+  });
 
   revalidatePath(ROUTES.project(projectId));
 }
@@ -1169,7 +1319,20 @@ export async function createResult(
   }
 
   try {
-    await session.db.insert(results, { activityId, ...input });
+    const created = await session.db.insert(results, { activityId, ...input });
+
+    /* `results` n'a **pas** de `project_id` — un résultat pend à l'activité qui
+       l'a produite —, mais l'événement en porte un : c'est le projet **reçu**,
+       celui qu'`openProject` vient d'autoriser et auquel `checkResultActivity`
+       a rapproché l'activité. Sans lui, le résultat n'apparaîtrait dans la
+       frise d'aucune page projet (T6.3). */
+    await session.db.record({
+      projectId,
+      verb: "created",
+      targetType: "result",
+      targetId: created.id,
+      summary: objectPhrase("result", "created", input.label),
+    });
   } catch (error) {
     /* La règle de T1.3, laissée refuser et rendue lisible. Elle traverse deux
        tables — le résultat et l'état de son activité —, ce qu'aucune clé
@@ -1358,6 +1521,16 @@ export async function updateResult(
         "Ce résultat n'existe plus sur cette activité.",
       );
     }
+
+    // Le libellé figé est celui d'**après** le geste, comme `updateResource` :
+    // celui d'avant serait une « valeur avant », que D22 refuse.
+    await session.db.record({
+      projectId,
+      verb: "updated",
+      targetType: "result",
+      targetId: resultId,
+      summary: objectPhrase("result", "updated", updated.label),
+    });
   } catch (error) {
     if (error instanceof IntegrityError) {
       return resultRefusal(
@@ -1433,6 +1606,16 @@ export async function archiveResult(
   if ("message" in gate) return;
 
   await session.db.archive(results, resultId);
+
+  /* `openResult` refuse d'entrée un résultat déjà archivé : aucune garde
+     d'idempotence à ajouter, ici pas plus qu'aux deux autres rangements. */
+  await session.db.record({
+    projectId,
+    verb: "archived",
+    targetType: "result",
+    targetId: resultId,
+    summary: objectPhrase("result", "archived", gate.result.label),
+  });
 
   revalidatePath(ROUTES.project(projectId));
 }

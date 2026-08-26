@@ -13,14 +13,14 @@
  * règle sauterait. D'où les deux assertions jumelles — ce que la chaîne est, et
  * ce qu'elle n'est pas (leçon de `lib/format.test.ts`).
  *
- * Ils ne couvrent **que les deux formes de ce ticket**. Les quatre noms de
- * T6.2 n'existent pas encore, et un fichier de tests n'est pas une invitation à
- * les inventer.
+ * Ils couvrent **les trois formes et les six noms**. Les quatre noms de T6.2
+ * sont arrivés avec les gestes qui les écrivent, et la troisième forme —
+ * `statePhrase` — avec les deux seuls gestes qui font *atteindre un état*.
  */
 
 import { describe, expect, test } from "vitest";
 
-import { objectPhrase, teamPhrase } from "./journal";
+import { objectPhrase, statePhrase, teamPhrase } from "./journal";
 
 const NBSP = "\u00A0";
 
@@ -67,6 +67,121 @@ describe("objectPhrase — un objet nommé, et ce qui lui est arrivé", () => {
     // Ce que la chaîne **n'est pas** : sans cette assertion, une espace
     // ordinaire passerait, elle est indiscernable de la bonne.
     expect(phrase).not.toContain("créé :");
+  });
+});
+
+describe("objectPhrase — les quatre objets de T6.2", () => {
+  /**
+   * **Les deux genres ont un appelant parmi les quatre noms neufs**, sans quoi
+   * la moitié de la mécanique d'accord serait à la merci du premier qui s'en
+   * servirait — la propriété que T6.1 avait établie sur deux noms.
+   */
+  test("les deux genres, sur les quatre noms", () => {
+    expect(objectPhrase("activity", "created", "Audit UX")).toBe(
+      `Activité créée${NBSP}: Audit UX`,
+    );
+    expect(objectPhrase("resource", "updated", "Compte rendu")).toBe(
+      `Ressource modifiée${NBSP}: Compte rendu`,
+    );
+    expect(objectPhrase("result", "created", "Score d'audit")).toBe(
+      `Résultat créé${NBSP}: Score d'audit`,
+    );
+    expect(objectPhrase("indicator_reading", "archived", "Autonomie")).toBe(
+      `Relevé archivé${NBSP}: Autonomie`,
+    );
+  });
+
+  test("les trois gestes de chaque objet ne se confondent pas", () => {
+    for (const kind of ["activity", "resource", "result", "indicator_reading"] as const) {
+      const phrases = new Set([
+        objectPhrase(kind, "created", "X"),
+        objectPhrase(kind, "updated", "X"),
+        objectPhrase(kind, "archived", "X"),
+      ]);
+      expect(phrases.size).toBe(3);
+    }
+  });
+
+  /**
+   * **Le nom de l'objet distingue les six**, et c'est ce qui rend une frise
+   * mêlée lisible : « Activité créée » et « Ressource créée » ne se lisent pas
+   * l'une pour l'autre, quand bien même le libellé serait le même.
+   */
+  test("les six noms produisent six phrases distinctes", () => {
+    const phrases = new Set(
+      (
+        [
+          "project",
+          "member",
+          "activity",
+          "resource",
+          "result",
+          "indicator_reading",
+        ] as const
+      ).map((kind) => objectPhrase(kind, "updated", "X")),
+    );
+    expect(phrases.size).toBe(6);
+  });
+});
+
+describe("statePhrase — l'état qu'une activité vient d'atteindre", () => {
+  test("les trois états, accordés au féminin d'« Activité »", () => {
+    expect(statePhrase("in_progress", "Audit UX")).toBe(
+      `Activité en cours${NBSP}: Audit UX`,
+    );
+    expect(statePhrase("done", "Audit UX")).toBe(
+      `Activité terminée${NBSP}: Audit UX`,
+    );
+    expect(statePhrase("cancelled", "Audit UX")).toBe(
+      `Activité annulée${NBSP}: Audit UX`,
+    );
+  });
+
+  test("le motif d'annulation entre dans la phrase", () => {
+    expect(statePhrase("cancelled", "Audit UX", "Reporté à 2027")).toBe(
+      `Activité annulée${NBSP}: Audit UX${NBSP}— Reporté à 2027`,
+    );
+  });
+
+  /**
+   * **Un motif absent ne laisse pas de tiret nu.** Les deux transitions de
+   * `transitionActivity` n'en ont aucun ; une phrase finissant par « — »
+   * paraîtrait tronquée en frise.
+   */
+  test("sans motif, aucun tiret", () => {
+    expect(statePhrase("done", "Audit UX")).not.toContain("—");
+    expect(statePhrase("cancelled", "Audit UX", null)).not.toContain("—");
+    expect(statePhrase("cancelled", "Audit UX", "")).not.toContain("—");
+  });
+
+  test("les deux insécables : devant les deux-points, devant le tiret", () => {
+    const phrase = statePhrase("cancelled", "Audit UX", "Reporté");
+
+    expect(phrase.charCodeAt(phrase.indexOf(":") - 1)).toBe(0xa0);
+    expect(phrase.charCodeAt(phrase.indexOf("—") - 1)).toBe(0xa0);
+    // Ce que la chaîne **n'est pas** : une espace ordinaire est indiscernable
+    // de la bonne, et passerait le jour où la règle sauterait.
+    expect(phrase).not.toContain("annulée :");
+    expect(phrase).not.toContain("UX —");
+  });
+
+  /**
+   * **Un état atteint n'est pas une correction de saisie.** `transitionActivity`
+   * et `updateActivity` écrivent sur le même objet, sous deux verbes de
+   * l'énuméré : si leurs phrases se confondaient, la frise ne dirait plus
+   * lequel des deux gestes a eu lieu.
+   */
+  test("« Activité terminée » ne se confond avec aucun geste de correction", () => {
+    const states = ["in_progress", "done", "cancelled"] as const;
+    const deeds = ["created", "updated", "archived"] as const;
+
+    for (const state of states) {
+      for (const deed of deeds) {
+        expect(statePhrase(state, "X")).not.toBe(
+          objectPhrase("activity", deed, "X"),
+        );
+      }
+    }
   });
 });
 

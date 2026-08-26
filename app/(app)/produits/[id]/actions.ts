@@ -68,6 +68,19 @@
  *
  * **Aucune suppression, jamais** (règle 4) : la couche n'expose pas de `delete`,
  * et ce fichier ne lui en demande pas. Ce qui se retire s'archive.
+ *
+ * **Trois écritures laissent une trace depuis T6.2, et trois seulement** : les
+ * relevés. Ce sont les seuls événements du produit — `project_id` nul,
+ * `product_id` posé, le cas que `docs/04` §4 prévoit par « nul pour les
+ * événements de niveau produit ».
+ *
+ * **Les cinq autres objets de ce fichier n'en laissent aucune**, et ce n'est pas
+ * un oubli : l'indicateur, la North Star, le persona, ses traits et le use case
+ * ne sont pas dans les six `event_target_type` (arbitrage (b) de
+ * `tickets-C6.md`). Le journal est la trace des objets de l'**accompagnement**,
+ * pas du référentiel ni de la définition d'un produit. Point ouvert pour C7 —
+ * pas un manque de ce chantier, et surtout pas quelque chose qu'un ticket
+ * voisin ajoute « pendant qu'il y est » (règle 3).
  */
 
 import { and, eq } from "drizzle-orm";
@@ -108,6 +121,7 @@ import {
   readUseCaseForm,
   type UseCaseFormState,
 } from "@/lib/forms/use-case";
+import { objectPhrase } from "@/lib/journal";
 import { ROUTES } from "@/lib/navigation";
 import { listProductPersonas } from "@/lib/queries/personas";
 
@@ -623,7 +637,30 @@ export async function createReading(
   if (!input) return { values, errors };
 
   try {
-    await session.db.insert(indicatorReadings, { indicatorId, ...input });
+    const created = await session.db.insert(indicatorReadings, {
+      indicatorId,
+      ...input,
+    });
+
+    /* **`project_id` est nul, `product_id` est posé** — le cas que `docs/04` §4
+       prévoit par « nul pour les événements de niveau produit », et le seul du
+       produit qui l'atteigne. Un relevé ne vit sur aucun accompagnement : lui en
+       attribuer un serait choisir arbitrairement parmi ceux du produit.
+
+       **La conséquence se lit d'avance et elle est voulue** : un relevé
+       n'apparaît pas dans la frise de la page projet (T6.3), il apparaît dans
+       le flux global (T6.6), qui nomme le produit quand `project_id` manque.
+
+       La phrase nomme l'**indicateur** : un relevé n'a pas de nom propre, et
+       « Relevé créé : 62 » ne désignerait rien. La porte le rend déjà — aucune
+       lecture n'est ajoutée. */
+    await session.db.record({
+      productId,
+      verb: "created",
+      targetType: "indicator_reading",
+      targetId: created.id,
+      summary: objectPhrase("indicator_reading", "created", gate.indicator.label),
+    });
   } catch (error) {
     return readingScopeRefusal(error, formData);
   }
@@ -681,6 +718,21 @@ export async function updateReading(
     if (!updated) {
       return readingRefusal(formData, "Ce relevé n'existe plus sur ce produit.");
     }
+
+    /* Le libellé figé est celui de l'indicateur, **pas** la valeur ni la date :
+       ce que la phrase désigne est ce qui a été touché, et une valeur écrite là
+       serait la « valeur après » que D22 refuse.
+
+       Le nom de l'indicateur ne se corrige pas ici (`indicator_id` n'est pas un
+       champ du formulaire) : la désignation d'avant et celle d'après sont la
+       même, et la question du nom figé ne se pose pas comme sur la ressource. */
+    await session.db.record({
+      productId,
+      verb: "updated",
+      targetType: "indicator_reading",
+      targetId: readingId,
+      summary: objectPhrase("indicator_reading", "updated", gate.indicator.label),
+    });
   } catch (error) {
     return readingScopeRefusal(error, formData);
   }
@@ -734,6 +786,16 @@ export async function archiveReading(
   if ("message" in gate) return;
 
   await session.db.archive(indicatorReadings, readingId);
+
+  /* `openReading` refuse d'entrée un relevé déjà archivé : aucune garde
+     d'idempotence à ajouter. */
+  await session.db.record({
+    productId,
+    verb: "archived",
+    targetType: "indicator_reading",
+    targetId: readingId,
+    summary: objectPhrase("indicator_reading", "archived", gate.indicator.label),
+  });
 
   revalidatePath(ROUTES.product(productId));
 }

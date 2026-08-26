@@ -26,6 +26,11 @@
  * absence celui d'un refus : une action qui rend un état n'a rien écrit. Les
  * deux mesures se prennent quand même en base, jamais sur la seule promesse du
  * chemin pris.
+ *
+ * **T6.2 y ajoute les trois gestes du relevé**, les seuls événements de niveau
+ * produit du dépôt. Le critère se compte en base — une ligne, une seule —, et
+ * l'un de ses points **ne se lira jamais nulle part ailleurs** : `project_id`
+ * nul et `product_id` posé. Aucun écran ne le dira.
  */
 
 import { and, eq, isNull } from "drizzle-orm";
@@ -36,6 +41,8 @@ import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
 import {
   domains,
   entities,
+  events,
+  indicatorReadings,
   indicators,
   personaTraits,
   personas,
@@ -97,15 +104,27 @@ vi.mock("next/navigation", () => ({
 
 const {
   archivePersona,
+  archiveReading,
   archiveUseCase,
   createPersona,
+  createReading,
   createUseCase,
   setNorthStar,
   updatePersona,
+  updateReading,
   updateUseCase,
 } = await import("./actions");
 
 const suffix = Math.random().toString(36).slice(2, 10);
+
+/**
+ * L'insécable de `lib/journal.ts`, **en échappement**.
+ *
+ * Écrit en caractère, il est indiscernable d'une espace ordinaire dans un
+ * fichier source : un test qui attendrait la seconde passerait le jour où la
+ * règle sauterait, et celui qui la lirait ne saurait pas laquelle il attend.
+ */
+const NBSP = "\u00A0";
 
 type Fixture = {
   domainId: string;
@@ -124,11 +143,24 @@ type Fixture = {
 
 let f: Fixture;
 
+/**
+ * Le domaine créé, **retenu hors de la fixture** — T6.2.
+ *
+ * `afterAll` nettoyait sur `if (!f?.domainId) return` : quand `beforeAll`
+ * échoue **après** la création du domaine, `f` reste indéfinie, le nettoyage se
+ * saute, et le domaine résiduel fait tomber le fichier suivant par la
+ * résolution « premier domaine actif **par nom** » (`resolveDomainId`). La
+ * variable est posée à la ligne d'après la création : entre les deux, rien ne
+ * peut échouer.
+ */
+let createdDomainId: string | null = null;
+
 beforeAll(async () => {
   const domain = await superAdmin.createDomain({
     name: `__test__actions__${suffix}`,
     competenceCenterName: `Centre ${suffix}`,
   });
+  createdDomainId = domain.id;
   const scope = forDomain({ domainId: domain.id });
 
   const person = (fullName: string, domainRole: "domain_manager" | "member") =>
@@ -216,8 +248,12 @@ beforeAll(async () => {
 }, 180_000);
 
 afterAll(async () => {
-  if (!f?.domainId) return;
+  if (!createdDomainId) return;
+  /* `events` et `indicator_readings` en tête depuis T6.2 : les deux tables que
+     ce ticket écrit, et que ce nettoyage ne connaissait pas. */
   const tables = [
+    events,
+    indicatorReadings,
     useCasePersonas,
     useCases,
     personaTraits,
@@ -231,10 +267,48 @@ afterAll(async () => {
     persons,
   ];
   for (const table of tables) {
-    await db.delete(table).where(eq(table.domainId, f.domainId));
+    await db.delete(table).where(eq(table.domainId, createdDomainId));
   }
-  await db.delete(domains).where(eq(domains.id, f.domainId));
+  await db.delete(domains).where(eq(domains.id, createdDomainId));
 });
+
+/* ==========================================================================
+   Le journal — ce que la base porte, jamais le chemin pris (T6.2)
+   ========================================================================== */
+
+type EventRow = {
+  verb: string;
+  targetType: string;
+  targetId: string | null;
+  actorId: string | null;
+  projectId: string | null;
+  productId: string | null;
+  summary: string;
+};
+
+/** Toutes les lignes du journal du domaine, de la plus ancienne à la dernière. */
+async function journal(): Promise<EventRow[]> {
+  return db
+    .select({
+      verb: events.verb,
+      targetType: events.targetType,
+      targetId: events.targetId,
+      actorId: events.actorId,
+      projectId: events.projectId,
+      productId: events.productId,
+      summary: events.summary,
+    })
+    .from(events)
+    .where(eq(events.domainId, f.domainId))
+    .orderBy(events.occurredAt, events.createdAt);
+}
+
+/** Les lignes qu'un geste vient d'écrire — le décompte avant, le décompte après. */
+async function written(gesture: () => Promise<unknown>): Promise<EventRow[]> {
+  const before = await journal();
+  await gesture();
+  return (await journal()).slice(before.length);
+}
 
 /** Le drapeau tel qu'il est en base, sans passer par une lecture d'écran. */
 async function northStarOf(productId: string): Promise<string | null> {
@@ -1192,5 +1266,195 @@ describe("archiveUseCase — le rangement", () => {
     } finally {
       await clearUseCases();
     }
+  });
+});
+
+/* ==========================================================================
+   Le journal du relevé — trois gestes, et le seul cas de niveau produit
+
+   **Ils vivent sur la page produit**, donc `project_id` est nul et `product_id`
+   porté : exactement le cas que `docs/04` §4 prévoit par « nul pour les
+   événements de niveau produit ». La conséquence se lit d'avance et elle est
+   voulue — un relevé n'apparaît pas dans la frise de la page projet (T6.3), il
+   apparaît dans le flux global (T6.6).
+   ========================================================================== */
+
+const EMPTY_READING = { values: {} as never, errors: {} };
+
+/** Le formulaire de relevé tel que le panneau le soumettrait. */
+function readingForm(entries: Record<string, string>): FormData {
+  const data = new FormData();
+  for (const [name, value] of Object.entries(entries)) data.append(name, value);
+  return data;
+}
+
+/** Un relevé neuf sur l'indicateur de la fixture. */
+async function freshReading(readOn: string): Promise<{ id: string }> {
+  return f.scope.insert(indicatorReadings, {
+    indicatorId: f.indicatorId,
+    value: "62",
+    readOn,
+  });
+}
+
+describe("createReading — ce que le journal porte", () => {
+  test("une ligne, et une seule, avec son verbe et sa phrase", async () => {
+    currentPerson = f.managerId;
+
+    const lines = await written(() =>
+      createReading(
+        f.productId,
+        f.indicatorId,
+        EMPTY_READING,
+        readingForm({ value: "62", readOn: "2026-05-31" }),
+      ),
+    );
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("created");
+    expect(lines[0]?.targetType).toBe("indicator_reading");
+    expect(lines[0]?.actorId).toBe(f.managerId);
+    // La phrase nomme l'**indicateur** : un relevé n'a pas de nom propre, et
+    // « Relevé créé : 62 » ne désignerait rien.
+    expect(lines[0]?.summary).toBe(`Relevé créé${NBSP}: Autonomie ${suffix}`);
+
+    const [row] = await db
+      .select({ id: indicatorReadings.id })
+      .from(indicatorReadings)
+      .where(
+        and(
+          eq(indicatorReadings.indicatorId, f.indicatorId),
+          eq(indicatorReadings.readOn, "2026-05-31"),
+        ),
+      );
+    expect(lines[0]?.targetId).toBe(row?.id);
+  });
+
+  /**
+   * **Le cas qu'aucun écran ne dira jamais**, et le seul du dépôt : un
+   * événement sans projet. Y poser arbitrairement l'un des accompagnements du
+   * produit serait un mensonge que la frise de T6.3 afficherait fidèlement.
+   */
+  test("`project_id` est nul, `product_id` est posé", async () => {
+    currentPerson = f.managerId;
+
+    const lines = await written(() =>
+      createReading(
+        f.productId,
+        f.indicatorId,
+        EMPTY_READING,
+        readingForm({ value: "70", readOn: "2026-06-30" }),
+      ),
+    );
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.projectId).toBeNull();
+    expect(lines[0]?.productId).toBe(f.productId);
+  });
+});
+
+describe("updateReading et archiveReading", () => {
+  test("la correction écrit `updated`, sans jamais porter la valeur", async () => {
+    currentPerson = f.managerId;
+    const reading = await freshReading("2026-07-31");
+
+    const lines = await written(() =>
+      updateReading(
+        f.productId,
+        reading.id,
+        EMPTY_READING,
+        readingForm({ value: "88", readOn: "2026-08-31" }),
+      ),
+    );
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("updated");
+    expect(lines[0]?.targetType).toBe("indicator_reading");
+    expect(lines[0]?.targetId).toBe(reading.id);
+    expect(lines[0]?.summary).toBe(`Relevé modifié${NBSP}: Autonomie ${suffix}`);
+    /* Ni la valeur d'avant ni celle d'après : le journal n'est pas un
+       historique (D22), et la phrase désigne ce qui a été touché. */
+    expect(lines[0]?.summary).not.toContain("88");
+    expect(lines[0]?.summary).not.toContain("62");
+  });
+
+  test("le rangement écrit `archived`", async () => {
+    currentPerson = f.managerId;
+    const reading = await freshReading("2026-09-30");
+
+    const lines = await written(() => archiveReading(f.productId, reading.id));
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("archived");
+    expect(lines[0]?.targetType).toBe("indicator_reading");
+    expect(lines[0]?.targetId).toBe(reading.id);
+    expect(lines[0]?.projectId).toBeNull();
+    expect(lines[0]?.productId).toBe(f.productId);
+    expect(lines[0]?.summary).toBe(`Relevé archivé${NBSP}: Autonomie ${suffix}`);
+  });
+});
+
+/* ==========================================================================
+   Le droit s'éprouve par l'action, jamais par l'écran
+   ========================================================================== */
+
+describe("un refus n'écrit ni le relevé ni l'événement", () => {
+  test("un membre sans accompagnement n'écrit rien", async () => {
+    currentPerson = f.outsiderId;
+
+    let state: { message?: string } | undefined;
+    const lines = await written(async () => {
+      state = await createReading(
+        f.productId,
+        f.indicatorId,
+        EMPTY_READING,
+        readingForm({ value: "99", readOn: "2026-10-31" }),
+      );
+    });
+
+    // L'étape témoin : sans elle, un refus et une panne seraient indiscernables.
+    expect(state?.message).toContain("réservée au responsable de domaine");
+
+    expect(lines).toHaveLength(0);
+    const forged = await db
+      .select({ id: indicatorReadings.id })
+      .from(indicatorReadings)
+      .where(
+        and(
+          eq(indicatorReadings.indicatorId, f.indicatorId),
+          eq(indicatorReadings.readOn, "2026-10-31"),
+        ),
+      );
+    expect(forged).toHaveLength(0);
+  });
+
+  /**
+   * **Le relevé d'un indicateur d'un autre produit ne se corrige pas depuis
+   * celui-ci** — `openReading` remonte la chaîne. Le refus est muet ; seul le
+   * décompte le dit.
+   */
+  test("un relevé d'un autre produit n'est ni corrigé ni journalisé", async () => {
+    currentPerson = f.managerId;
+    const stranger = await f.scope.insert(indicatorReadings, {
+      indicatorId: f.otherProductIndicatorId,
+      value: "12",
+      readOn: "2026-11-30",
+    });
+
+    const lines = await written(() =>
+      updateReading(
+        f.productId,
+        stranger.id,
+        EMPTY_READING,
+        readingForm({ value: "1000", readOn: "2026-11-30" }),
+      ),
+    );
+
+    expect(lines).toHaveLength(0);
+    const [row] = await db
+      .select({ value: indicatorReadings.value })
+      .from(indicatorReadings)
+      .where(eq(indicatorReadings.id, stranger.id));
+    expect(row?.value).toBe("12.0000");
   });
 });

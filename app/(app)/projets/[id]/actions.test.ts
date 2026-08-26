@@ -13,6 +13,14 @@
  * qui existait déjà. C'est précisément ce que ces tests éprouvent : le champ
  * neuf n'ouvre aucune porte, il passe par `openProject` comme les sept autres.
  *
+ * **T6.2 y ajoute les onze gestes du journal** — cinq sur l'activité, trois sur
+ * la ressource, trois sur le résultat. Le critère de la fiche **se compte en
+ * base**, l'écran ne portant encore rien : après chaque geste, une ligne
+ * d'`events` et une seule, avec son verbe, son `target_type`, son `target_id`,
+ * son acteur et sa phrase. `written()` prend le décompte avant et rend la
+ * tranche écrite — exiger le nombre *et* lire ce qu'il porte, sans relire la
+ * table deux fois.
+ *
  * **Ce qui est mesuré est la base, jamais le chemin pris.** Un refus se lit à
  * ce qu'aucune ligne n'a bougé ; une écriture, à ce que la colonne porte la
  * valeur attendue. `ok` et `message` sont des indices, la table est la preuve.
@@ -34,11 +42,14 @@ import {
   activityTypes,
   domains,
   entities,
+  events,
   persons,
   products,
   projectMembers,
   projectStatuses,
   projects,
+  resources,
+  results,
 } from "@/lib/db/schema";
 
 /** Qui la requête prétend être. Chaque test la pose avant d'appeler l'action. */
@@ -55,11 +66,32 @@ vi.mock("next/headers", () => ({
 
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
-const { createActivity, updateActivity } = await import("./actions");
+const {
+  createActivity,
+  updateActivity,
+  transitionActivity,
+  cancelActivity,
+  archiveActivity,
+  createResource,
+  updateResource,
+  archiveResource,
+  createResult,
+  updateResult,
+  archiveResult,
+} = await import("./actions");
 
 const suffix = Math.random().toString(36).slice(2, 10);
 
 const LINK = "https://ergonome.example.com/audits/eprouve";
+
+/**
+ * L'insécable de `lib/journal.ts`, **en échappement**.
+ *
+ * Écrit en caractère, il est indiscernable d'une espace ordinaire dans un
+ * fichier source : un test qui attendrait la seconde passerait le jour où la
+ * règle sauterait, et celui qui la lirait ne saurait pas laquelle il attend.
+ */
+const NBSP = "\u00A0";
 
 type Fixture = {
   domainId: string;
@@ -69,17 +101,32 @@ type Fixture = {
   projectId: string;
   archivedProjectId: string;
   typeId: string;
+  /** Le libellé du type, celui que le journal fige — T6.2. */
+  typeLabel: string;
   /** Une activité vivante du projet ouvert, pour éprouver la correction. */
   activityId: string;
 };
 
 let f: Fixture;
 
+/**
+ * Le domaine créé, **retenu hors de la fixture** — T6.2.
+ *
+ * `afterAll` nettoyait sur `if (!f?.domainId) return` : quand `beforeAll`
+ * échoue **après** la création du domaine, `f` reste indéfinie, le nettoyage se
+ * saute, et le domaine résiduel fait tomber le fichier suivant par la
+ * résolution « premier domaine actif **par nom** » (`resolveDomainId`). La
+ * variable est posée à la ligne d'après la création : entre les deux, rien ne
+ * peut échouer.
+ */
+let createdDomainId: string | null = null;
+
 beforeAll(async () => {
   const domain = await superAdmin.createDomain({
     name: `__test__projet_actions__${suffix}`,
     competenceCenterName: `Centre ${suffix}`,
   });
+  createdDomainId = domain.id;
   const scope = forDomain({ domainId: domain.id });
 
   const person = (fullName: string) =>
@@ -148,13 +195,19 @@ beforeAll(async () => {
     projectId: project.id,
     archivedProjectId: archivedProject.id,
     typeId: type.id,
+    typeLabel: type.label,
     activityId: activity.id,
   };
 }, 180_000);
 
 afterAll(async () => {
-  if (!f?.domainId) return;
+  if (!createdDomainId) return;
+  /* `events` en tête : ses clés étrangères cascadent, mais le nettoyage ne s'en
+     remet pas à une cascade — ce qui est écrit explicitement se relit. */
   const tables = [
+    events,
+    results,
+    resources,
     activities,
     projectMembers,
     projects,
@@ -165,10 +218,54 @@ afterAll(async () => {
     persons,
   ];
   for (const table of tables) {
-    await db.delete(table).where(eq(table.domainId, f.domainId));
+    await db.delete(table).where(eq(table.domainId, createdDomainId));
   }
-  await db.delete(domains).where(eq(domains.id, f.domainId));
+  await db.delete(domains).where(eq(domains.id, createdDomainId));
 });
+
+/* ==========================================================================
+   Le journal — ce que la base porte, jamais le chemin pris (T6.2)
+   ========================================================================== */
+
+type EventRow = {
+  verb: string;
+  targetType: string;
+  targetId: string | null;
+  actorId: string | null;
+  projectId: string | null;
+  productId: string | null;
+  summary: string;
+};
+
+/** Toutes les lignes du journal du domaine, de la plus ancienne à la dernière. */
+async function journal(): Promise<EventRow[]> {
+  return db
+    .select({
+      verb: events.verb,
+      targetType: events.targetType,
+      targetId: events.targetId,
+      actorId: events.actorId,
+      projectId: events.projectId,
+      productId: events.productId,
+      summary: events.summary,
+    })
+    .from(events)
+    .where(eq(events.domainId, f.domainId))
+    .orderBy(events.occurredAt, events.createdAt);
+}
+
+/**
+ * Les lignes qu'un geste vient d'écrire — le décompte avant, le décompte après.
+ *
+ * **C'est le critère de la fiche, rendu réutilisable** : « une ligne d'`events`
+ * et une seule ». Aucune branche de redirection, à la différence de
+ * `projets/actions.test.ts` : aucune de ces onze actions ne redirige (TD.2).
+ */
+async function written(gesture: () => Promise<unknown>): Promise<EventRow[]> {
+  const before = await journal();
+  await gesture();
+  return (await journal()).slice(before.length);
+}
 
 /** Le formulaire tel que le panneau le soumettrait. */
 function form(entries: Record<string, string>): FormData {
@@ -373,5 +470,454 @@ describe("updateActivity — la correction du lien", () => {
       .from(activities)
       .where(eq(activities.id, f.activityId));
     expect(row?.externalUrl).toBeNull();
+  });
+});
+
+/* ==========================================================================
+   Le journal — les onze points d'appel de T6.2
+
+   **Une ligne, une seule, le bon verbe, le bon `target_type`, le bon
+   `target_id`.** Chaque geste part d'une ligne à lui : la fixture est partagée,
+   et un test qui se reposerait sur l'état laissé par le précédent mesurerait
+   l'ordre d'exécution plutôt que la règle.
+   ========================================================================== */
+
+const EMPTY = { values: {} as never, errors: {} };
+
+/** Une activité neuve, à l'état voulu — chaque geste de cycle de vie a la sienne. */
+async function freshActivity(
+  overrides: Record<string, unknown> = {},
+): Promise<{ id: string }> {
+  return f.scope.insert(activities, {
+    projectId: f.projectId,
+    activityTypeId: f.typeId,
+    state: "planned",
+    periodStart: "2026-12-01",
+    periodEnd: "2026-12-31",
+    ...overrides,
+  });
+}
+
+/** Une ressource neuve, reliée au projet ouvert. */
+async function freshResource(title: string): Promise<{ id: string }> {
+  return f.scope.insert(resources, {
+    projectId: f.projectId,
+    title,
+    url: "https://exemple.invalid/doc",
+    resourceType: "pdf",
+  });
+}
+
+/** Un résultat neuf sur une activité terminée — la seule qui en accepte un. */
+async function freshResult(
+  label: string,
+): Promise<{ activityId: string; resultId: string }> {
+  const activity = await freshActivity({ state: "done" });
+  const result = await f.scope.insert(results, {
+    activityId: activity.id,
+    label,
+    value: "62",
+    measuredOn: "2026-05-31",
+  });
+  return { activityId: activity.id, resultId: result.id };
+}
+
+describe("le journal de l'activité — cinq gestes", () => {
+  test("`createActivity` écrit une ligne, et une seule", async () => {
+    currentPerson = f.contributorId;
+
+    const lines = await written(() =>
+      createActivity(f.projectId, EMPTY, saisie()),
+    );
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("created");
+    expect(lines[0]?.targetType).toBe("activity");
+    expect(lines[0]?.actorId).toBe(f.contributorId);
+    expect(lines[0]?.projectId).toBe(f.projectId);
+    // Le produit se déduit du projet : le figer serait faux le jour où
+    // l'accompagnement change de produit (D20).
+    expect(lines[0]?.productId).toBeNull();
+    expect(lines[0]?.summary).toBe(`Activité créée${NBSP}: ${f.typeLabel}`);
+
+    // `target_id` désigne bien la ligne écrite, pas le projet.
+    const [row] = await db
+      .select({ id: activities.id })
+      .from(activities)
+      .where(
+        and(
+          eq(activities.domainId, f.domainId),
+          eq(activities.periodStart, "2026-11-01"),
+        ),
+      );
+    expect(lines[0]?.targetId).toBe(row?.id);
+
+    await clear();
+  });
+
+  test("`updateActivity` écrit `updated` quand la ligne bouge", async () => {
+    currentPerson = f.contributorId;
+    const activity = await freshActivity();
+
+    const lines = await written(() =>
+      updateActivity(
+        f.projectId,
+        activity.id,
+        EMPTY,
+        form({
+          activityTypeId: f.typeId,
+          periodStart: "2026-12-01",
+          periodEnd: "2027-01-31",
+        }),
+      ),
+    );
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("updated");
+    expect(lines[0]?.targetType).toBe("activity");
+    expect(lines[0]?.targetId).toBe(activity.id);
+    expect(lines[0]?.summary).toBe(`Activité modifiée${NBSP}: ${f.typeLabel}`);
+  });
+
+  /**
+   * **Une modification qui n'en est pas une n'écrit rien.** C'est le cas que
+   * T3.4 avait fermé et que le journal technique annonçait ; la propriété se
+   * vérifie, elle ne se suppose pas.
+   */
+  test("une re-soumission à l'identique n'écrit aucune ligne", async () => {
+    currentPerson = f.contributorId;
+    const activity = await freshActivity();
+    const identique = () =>
+      form({
+        activityTypeId: f.typeId,
+        periodStart: "2026-12-01",
+        periodEnd: "2026-12-31",
+      });
+
+    // La première soumission ne change rien non plus : la ligne est déjà celle-là.
+    const lines = await written(() =>
+      updateActivity(f.projectId, activity.id, EMPTY, identique()),
+    );
+
+    expect(lines).toHaveLength(0);
+  });
+
+  /**
+   * **Un participant ajouté est un changement**, même si aucune date ne bouge :
+   * c'est la condition qui décide déjà de `refresh`, et le journal la reprend
+   * telle quelle plutôt que d'en inventer une seconde.
+   */
+  test("un participant ajouté seul écrit quand même la ligne", async () => {
+    currentPerson = f.contributorId;
+    const activity = await freshActivity();
+
+    const lines = await written(() =>
+      updateActivity(
+        f.projectId,
+        activity.id,
+        EMPTY,
+        form({
+          activityTypeId: f.typeId,
+          periodStart: "2026-12-01",
+          periodEnd: "2026-12-31",
+          participantIds: f.contributorId,
+        }),
+      ),
+    );
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("updated");
+    // **Jamais `member`** : ce `target_type` est l'équipe du **projet** (T6.1),
+    // et l'étendre aux participants d'une activité serait une règle neuve.
+    expect(lines[0]?.targetType).toBe("activity");
+  });
+
+  test("`transitionActivity` écrit `state_changed`, et la phrase nomme l'état", async () => {
+    currentPerson = f.contributorId;
+    const activity = await freshActivity();
+
+    const started = await written(() =>
+      transitionActivity(activity.id, "in_progress"),
+    );
+    expect(started).toHaveLength(1);
+    expect(started[0]?.verb).toBe("state_changed");
+    expect(started[0]?.targetType).toBe("activity");
+    expect(started[0]?.targetId).toBe(activity.id);
+    expect(started[0]?.summary).toBe(`Activité en cours${NBSP}: ${f.typeLabel}`);
+
+    const finished = await written(() => transitionActivity(activity.id, "done"));
+    expect(finished).toHaveLength(1);
+    expect(finished[0]?.summary).toBe(
+      `Activité terminée${NBSP}: ${f.typeLabel}`,
+    );
+  });
+
+  /**
+   * **Rien n'est journalisé qui n'a pas eu lieu.** `canTransitionActivity`
+   * écarte la transition impossible bien avant l'écriture, et le journal
+   * n'ajoute aucune garde : il hérite de celle-là.
+   */
+  test("une transition impossible n'écrit rien", async () => {
+    currentPerson = f.contributorId;
+    const activity = await freshActivity({ state: "done" });
+
+    expect(
+      await written(() => transitionActivity(activity.id, "in_progress")),
+    ).toHaveLength(0);
+  });
+
+  test("`cancelActivity` écrit `state_changed`, motif compris", async () => {
+    currentPerson = f.contributorId;
+    const activity = await freshActivity();
+
+    const lines = await written(() =>
+      cancelActivity(
+        activity.id,
+        {},
+        form({ cancellationReason: "Reporté à 2027" }),
+      ),
+    );
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("state_changed");
+    expect(lines[0]?.summary).toBe(
+      `Activité annulée${NBSP}: ${f.typeLabel}${NBSP}— Reporté à 2027`,
+    );
+  });
+
+  test("`archiveActivity` écrit `archived`", async () => {
+    currentPerson = f.contributorId;
+    const activity = await freshActivity();
+
+    const lines = await written(() => archiveActivity(activity.id));
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("archived");
+    expect(lines[0]?.targetType).toBe("activity");
+    expect(lines[0]?.targetId).toBe(activity.id);
+    expect(lines[0]?.summary).toBe(`Activité archivée${NBSP}: ${f.typeLabel}`);
+  });
+
+  /**
+   * Un résultat vivant s'oppose au rangement (T4bis.4). Le geste ne fait rien —
+   * le journal non plus.
+   */
+  test("un archivage refusé par un résultat vivant n'écrit rien", async () => {
+    currentPerson = f.contributorId;
+    const { activityId } = await freshResult(`Bloquant ${suffix}`);
+
+    expect(await written(() => archiveActivity(activityId))).toHaveLength(0);
+  });
+});
+
+describe("le journal de la ressource — trois gestes", () => {
+  test("`createResource` écrit `created`, et la phrase porte le titre", async () => {
+    currentPerson = f.contributorId;
+
+    const lines = await written(() =>
+      createResource(
+        f.projectId,
+        { values: {} as never, errors: {} },
+        form({
+          title: `Compte rendu ${suffix}`,
+          url: "https://exemple.invalid/cr",
+          resourceType: "pdf",
+        }),
+      ),
+    );
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("created");
+    expect(lines[0]?.targetType).toBe("resource");
+    expect(lines[0]?.projectId).toBe(f.projectId);
+    expect(lines[0]?.summary).toBe(
+      `Ressource créée${NBSP}: Compte rendu ${suffix}`,
+    );
+
+    const [row] = await db
+      .select({ id: resources.id })
+      .from(resources)
+      .where(
+        and(
+          eq(resources.domainId, f.domainId),
+          eq(resources.title, `Compte rendu ${suffix}`),
+        ),
+      );
+    expect(lines[0]?.targetId).toBe(row?.id);
+  });
+
+  /**
+   * **Le titre figé est celui d'après le geste** : celui d'avant serait une
+   * « valeur avant », que D22 refuse.
+   */
+  test("`updateResource` fige le titre d'**après** la correction", async () => {
+    currentPerson = f.contributorId;
+    const resource = await freshResource(`Avant ${suffix}`);
+
+    const lines = await written(() =>
+      updateResource(
+        f.projectId,
+        resource.id,
+        { values: {} as never, errors: {} },
+        form({
+          title: `Après ${suffix}`,
+          url: "https://exemple.invalid/doc",
+          resourceType: "pdf",
+        }),
+      ),
+    );
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("updated");
+    expect(lines[0]?.targetId).toBe(resource.id);
+    expect(lines[0]?.summary).toBe(`Ressource modifiée${NBSP}: Après ${suffix}`);
+    expect(lines[0]?.summary).not.toContain("Avant");
+  });
+
+  test("`archiveResource` écrit `archived`", async () => {
+    currentPerson = f.contributorId;
+    const resource = await freshResource(`À ranger ${suffix}`);
+
+    const lines = await written(() =>
+      archiveResource(f.projectId, resource.id),
+    );
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("archived");
+    expect(lines[0]?.targetType).toBe("resource");
+    expect(lines[0]?.targetId).toBe(resource.id);
+    expect(lines[0]?.summary).toBe(
+      `Ressource archivée${NBSP}: À ranger ${suffix}`,
+    );
+  });
+});
+
+describe("le journal du résultat — trois gestes", () => {
+  /**
+   * `results` n'a **pas** de `project_id` — un résultat pend à son activité —,
+   * mais l'événement en porte un : sans lui, le résultat n'apparaîtrait dans la
+   * frise d'aucune page projet (T6.3).
+   */
+  test("`createResult` écrit `created`, et l'événement porte le projet", async () => {
+    currentPerson = f.contributorId;
+    const activity = await freshActivity({ state: "done" });
+
+    const lines = await written(() =>
+      createResult(
+        f.projectId,
+        activity.id,
+        { values: {} as never, errors: {} },
+        form({
+          label: `Score d'audit ${suffix}`,
+          value: "62",
+          measuredOn: "2026-05-31",
+        }),
+      ),
+    );
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("created");
+    expect(lines[0]?.targetType).toBe("result");
+    expect(lines[0]?.projectId).toBe(f.projectId);
+    expect(lines[0]?.summary).toBe(
+      `Résultat créé${NBSP}: Score d'audit ${suffix}`,
+    );
+
+    const [row] = await db
+      .select({ id: results.id })
+      .from(results)
+      .where(eq(results.activityId, activity.id));
+    expect(lines[0]?.targetId).toBe(row?.id);
+  });
+
+  test("`updateResult` fige le libellé d'**après** la correction", async () => {
+    currentPerson = f.contributorId;
+    const { activityId, resultId } = await freshResult(`Avant ${suffix}`);
+
+    const lines = await written(() =>
+      updateResult(
+        f.projectId,
+        activityId,
+        resultId,
+        { values: {} as never, errors: {} },
+        form({
+          label: `Après ${suffix}`,
+          value: "70",
+          measuredOn: "2026-05-31",
+        }),
+      ),
+    );
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("updated");
+    expect(lines[0]?.targetId).toBe(resultId);
+    expect(lines[0]?.summary).toBe(`Résultat modifié${NBSP}: Après ${suffix}`);
+  });
+
+  test("`archiveResult` écrit `archived`", async () => {
+    currentPerson = f.contributorId;
+    const { activityId, resultId } = await freshResult(`À ranger ${suffix}`);
+
+    const lines = await written(() =>
+      archiveResult(f.projectId, activityId, resultId),
+    );
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("archived");
+    expect(lines[0]?.targetType).toBe("result");
+    expect(lines[0]?.targetId).toBe(resultId);
+    expect(lines[0]?.summary).toBe(
+      `Résultat archivé${NBSP}: À ranger ${suffix}`,
+    );
+  });
+});
+
+/* ==========================================================================
+   Le droit s'éprouve par l'action, jamais par l'écran
+   ========================================================================== */
+
+describe("un refus n'écrit ni la ligne métier ni l'événement", () => {
+  test("un membre non contributeur ne relie pas de ressource", async () => {
+    currentPerson = f.outsiderId;
+
+    let state: { message?: string } | undefined;
+    const lines = await written(async () => {
+      state = await createResource(
+        f.projectId,
+        { values: {} as never, errors: {} },
+        form({
+          title: `Forgée ${suffix}`,
+          url: "https://exemple.invalid/forge",
+          resourceType: "pdf",
+        }),
+      );
+    });
+
+    // L'étape témoin : sans elle, un refus et une panne seraient indiscernables.
+    expect(state?.message).toContain("réservé au responsable de domaine");
+
+    expect(lines).toHaveLength(0);
+    const forged = await db
+      .select({ id: resources.id })
+      .from(resources)
+      .where(
+        and(
+          eq(resources.domainId, f.domainId),
+          eq(resources.title, `Forgée ${suffix}`),
+        ),
+      );
+    expect(forged).toHaveLength(0);
+  });
+
+  test("un accompagnement archivé ne reçoit ni saisie ni événement", async () => {
+    currentPerson = f.contributorId;
+
+    let state: { message?: string } | undefined;
+    const lines = await written(async () => {
+      state = await createActivity(f.archivedProjectId, EMPTY, saisie());
+    });
+
+    expect(state?.message).toContain("archivé");
+    expect(lines).toHaveLength(0);
   });
 });
