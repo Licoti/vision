@@ -3679,3 +3679,56 @@ pas. Le seul appel qui distingue est celui qui rappelle **la personne sans son m
 **959 tests, 33 fichiers, verts.** `lint --max-warnings=0` et `tsc --noEmit` sans une ligne. Le
 décompte perd un test et c'est voulu : quatre cas retirés avec le bloc d'ajout, trois cas neufs sur
 le métier et la disponibilité.
+
+---
+
+## T6.1 — Le journal : la couche d'écriture, et les gestes du projet — 26/08/2026
+
+**Ce que le ticket pose.** `record()` devient la seizième entrée de `forDomain` — `insert(events, …)`
+avec `actor_id` posé depuis le contexte, sans une précondition neuve : les quatre clés étrangères
+d'`events` étaient déjà dérivées par `parentChecksOf`. `lib/journal.ts` (neuf) compose les phrases,
+pur et testé. Cinq points d'appel dans `app/(app)/projets/actions.ts`. Rien de visible, comme T1.2.
+
+**Deux formes de phrase, pas cinq.** `objectPhrase(kind, deed, label)` porte les quatre gestes du
+projet, `teamPhrase(moves)` la composition d'équipe. Le participe s'accorde sur une table qui donne
+le nom français et son genre, et **les deux genres ont un appelant dans ce ticket** — « Accompagnement
+créé », « Équipe modifiée ». La phrase d'équipe est **conjuguée, jamais accordée** : `persons` ne
+porte aucun genre, et « ajoutée » comme « ajouté » misgenderait une personne sur deux. Les noms se
+groupent par mouvement — « Camille Roux et Rudy Zourane rejoignent l'équipe » —, jamais une clause par
+personne.
+
+**Quatre arbitrages d'écriture.** `target_id` nul sur la ligne d'équipe (un diff de plusieurs
+personnes n'a pas de cible unique) ; `product_id` nul sur les cinq gestes (le produit se joint depuis
+le projet, et D20 le rend mouvant) ; le nom figé d'`updateProject` est celui **d'après** le geste (le
+précédent serait une « valeur avant », que D22 refuse) ; `createProject` n'écrit qu'une ligne, équipe
+comprise.
+
+### Les quatre disciplines
+
+- **Le critère se compte en base** — l'écran ne porte rien. Les cinq gestes frappés sur le **vrai
+  point d'entrée HTTP** du serveur de développement, décompte avant et après :
+  `created`/`project`/cible = le projet créé · `updated`/`project` · `linked`/`member`/cible **nulle**,
+  phrase « Équipe modifiée : Awa Diallo rejoint l'équipe ; Yanis Bertin la quitte ; Sofia Marchand
+  change de rôle » — **une ligne pour trois mouvements** · `archived`/`project` · `updated`/`project`
+  portant « Accompagnement rétabli ». `product_id` nul partout, acteur juste partout. **Aucune ligne
+  de sonde ne reste** : le projet créé effacé, l'équipe rendue à ses quatre contributeurs, le journal
+  ramené à zéro.
+- **Le droit s'éprouve par l'action.** Trois frappes par geste — témoin négatif, forge, témoin
+  positif. Le forgé sous une identité sans `manageDomain` n'écrit **ni le projet ni l'événement**, à
+  chaque fois. **Et le code HTTP ne le dit jamais** : `archiveProject` rend **200** au membre refusé
+  comme au responsable qui archive. Le rétablissement, frappé en `text/plain` selon la règle, rend
+  **404 en urlencodé avec le bon identifiant** — soit exactement ce que rend un identifiant inconnu.
+- **Les tests se mettent en défaut.** Quatre neutralisations, chacune sur ce qu'elle devait :
+  `record` court-circuitant `insert` fait tomber les **trois** cas d'étanchéité, et eux seuls ;
+  retirer le `.references()` d'`events.projectId` en fait tomber **un** (la variante de T5bis.1, qui
+  ne casse pas la compilation) ; le `null` de `teamPhrase` retiré fait tomber le seul cas pur ; la
+  garde d'`updateProject` retirée fait tomber les deux cas où l'équipe ne bouge pas. **La troisième a
+  corrigé le code** : elle a montré que la règle vivait à deux endroits, contre ce qu'un commentaire
+  affirmait.
+- **Le contraste ne se mesure pas** : ce ticket ne rend aucun pixel.
+
+**986 tests, 35 fichiers, verts.** `lint --max-warnings=0` et `tsc --noEmit` sans une ligne. **+27
+tests** : 11 pour `lib/journal.ts`, 10 pour les cinq gestes, 6 pour `record` dans la couche.
+
+**Le commentaire faux de `scoped.ts` refermé, autrement que prévu.** Il disait « les 22 », la fiche
+annonçait 25, **elles sont 30**. Le compte a été **retiré** plutôt que corrigé une troisième fois.

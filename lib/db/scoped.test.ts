@@ -712,6 +712,143 @@ describe("les compétences portées", () => {
 });
 
 /* ==========================================================================
+   Le journal — T6.1
+
+   `record` n'est pas une écriture de plus : c'est `insert(events, …)` avec
+   `actor_id` posé depuis le contexte. Ce qui s'éprouve ici n'est donc pas un
+   mécanisme neuf, c'est que `record` **emprunte bien** celui d'`insert` — et
+   les trois cas d'étanchéité sont ce qui le prouve. S'ils passaient tous,
+   `record` aurait pris un chemin qu'`insert` n'a pas.
+   ========================================================================== */
+
+describe("le journal", () => {
+  /** Le scope tel qu'une session le construit : un domaine, et une personne. */
+  const signed = () => forDomain({ domainId: a.domainId, actorId: a.personId });
+
+  test("une ligne porte le domaine, l'acteur du contexte, et sa phrase", async () => {
+    const written = await signed().record({
+      projectId: a.projectId,
+      verb: "created",
+      targetType: "project",
+      targetId: a.projectId,
+      summary: "Accompagnement créé\u00A0: Projet a",
+    });
+
+    // Le constat se fait par le client brut : lire par la couche qu'on teste
+    // ne prouverait rien si son filtre était rompu.
+    const rows = await db.select().from(events).where(eq(events.id, written.id));
+    const row = rows[0];
+    expect(row?.domainId).toBe(a.domainId);
+    expect(row?.actorId).toBe(a.personId);
+    expect(row?.createdBy).toBe(a.personId);
+    expect(row?.projectId).toBe(a.projectId);
+    expect(row?.productId).toBeNull();
+    expect(row?.verb).toBe("created");
+    expect(row?.targetType).toBe("project");
+    expect(row?.targetId).toBe(a.projectId);
+    expect(row?.summary).toBe("Accompagnement créé\u00A0: Projet a");
+    expect(row?.occurredAt).toBeInstanceOf(Date);
+  });
+
+  /* Les trois clés étrangères d'`events` sont dérivées du schéma par
+     `parentChecksOf` : aucune liste n'est écrite à la main. **Un cas par clé,
+     et non trois assertions dans un cas** — sinon neutraliser l'une ferait
+     tomber le même test que neutraliser les deux autres, et la mise en défaut
+     ne désignerait plus rien (leçon de T5bis.1). */
+
+  test("un `project_id` d'un autre domaine est refusé", async () => {
+    const before = await db.select().from(events);
+
+    await expect(
+      signed().record({
+        projectId: b.projectId,
+        verb: "updated",
+        targetType: "project",
+        targetId: b.projectId,
+        summary: "Ligne forgée",
+      }),
+    ).rejects.toThrow(DomainScopeError);
+
+    // La base l'aurait acceptée : sa clé étrangère ignore le domaine.
+    expect(await db.select().from(events)).toHaveLength(before.length);
+  });
+
+  test("un `product_id` d'un autre domaine est refusé", async () => {
+    const before = await db.select().from(events);
+
+    await expect(
+      signed().record({
+        productId: b.productId,
+        verb: "created",
+        targetType: "indicator_reading",
+        targetId: null,
+        summary: "Ligne forgée",
+      }),
+    ).rejects.toThrow(DomainScopeError);
+
+    expect(await db.select().from(events)).toHaveLength(before.length);
+  });
+
+  /**
+   * L'acteur ne vient pas de l'appelant — il vient du contexte. Le forger
+   * demande donc de forger le **scope**, et c'est bien ce qu'une session
+   * compromise ferait. `assertPreconditions` le confronte au domaine comme
+   * n'importe quel parent : `actor_id` est une clé étrangère sur `persons`.
+   */
+  test("un acteur d'un autre domaine est refusé, scope forgé compris", async () => {
+    const before = await db.select().from(events);
+
+    await expect(
+      forDomain({ domainId: a.domainId, actorId: b.personId }).record({
+        projectId: a.projectId,
+        verb: "archived",
+        targetType: "project",
+        targetId: a.projectId,
+        summary: "Ligne forgée",
+      }),
+    ).rejects.toThrow(DomainScopeError);
+
+    expect(await db.select().from(events)).toHaveLength(before.length);
+  });
+
+  /**
+   * `actorId` est facultatif : l'amorçage et les écritures système n'ont pas de
+   * personne courante, et `actor_id` est nullable pour cette raison. Une ligne
+   * sans acteur reste une ligne — T6.3 la lira « par l'amorçage » plutôt que de
+   * la faire disparaître.
+   */
+  test("un scope sans acteur écrit une ligne sans acteur", async () => {
+    const written = await a.scope.record({
+      projectId: a.projectId,
+      verb: "updated",
+      targetType: "project",
+      targetId: a.projectId,
+      summary: "Ligne de l'amorçage",
+    });
+
+    const rows = await db.select().from(events).where(eq(events.id, written.id));
+    expect(rows[0]?.actorId).toBeNull();
+    expect(rows[0]?.domainId).toBe(a.domainId);
+  });
+
+  test("une lecture d'un domaine ne voit pas le journal de l'autre", async () => {
+    await forDomain({ domainId: b.domainId, actorId: b.personId }).record({
+      projectId: b.projectId,
+      verb: "created",
+      targetType: "project",
+      targetId: b.projectId,
+      summary: "Accompagnement créé\u00A0: Projet b",
+    });
+
+    const mine = await a.scope.list(events);
+    expect(mine.every((row) => row.domainId === a.domainId)).toBe(true);
+    expect(mine.map((row) => row.summary)).not.toContain(
+      "Accompagnement créé\u00A0: Projet b",
+    );
+  });
+});
+
+/* ==========================================================================
    Contraintes de typage — vérifiées par `tsc --noEmit`, jamais exécutées
    ========================================================================== */
 

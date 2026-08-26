@@ -6237,3 +6237,74 @@ Le point est reconduit quand même, et la raison est écrite dans sa fiche : pos
 une **règle métier neuve dans un ticket de trace** (règle 3). Ce qui compte n'est pas la décision,
 c'est que la question se soit posée — **une vérification qui ne trouve rien deux fois de suite cesse
 d'être une vérification** si on ne la refait pas la troisième.
+
+---
+
+## T6.1 — Le journal : la couche d'écriture, et les gestes du projet
+
+**Le compte de tables de `scoped.ts` était faux pour la troisième fois, et il a été retiré plutôt que
+corrigé.** T5bis.1 avait constaté « les 22 » quand elles étaient 26, sans pouvoir toucher le fichier
+(règle 3), et laissé la correction au premier ticket qui l'ouvrirait. La fiche de C6 annonce 25.
+**Elles sont 30**, mesurées : 31 `pgTable` dans `schema.ts`, moins `domains`. Trois chiffres, trois
+erreurs, et le motif est le même à chaque fois — un nombre dans un commentaire vieillit à chaque
+migration, et personne ne le recompte en écrivant la migration. Ce qui se relit désormais dans
+`ScopedTable` est la **règle**, que `schema.ts` tient table par table. **L'en-tête de `schema.ts` dit
+toujours « les 26 tables métier » et n'a pas été touché** : le fichier est hors du périmètre de cette
+fiche. Le prochain ticket qui ouvre `schema.ts` a la même occasion — et la même leçon.
+
+**L'écart à `docs/04` §4 est arbitré, et son prix est nommé.** Le document écrit que le journal est
+« alimenté par la couche d'accès ». L'**écriture** y est bien — `record` est `insert(events, …)` avec
+`actor_id` posé depuis le contexte, et rien ne contourne `assertPreconditions`. Le **déclenchement**
+n'y est pas : c'est l'action qui décide de journaliser, parce qu'elle seule connaît le vocabulaire —
+« Statut passé à Terminé » plutôt que « Projet modifié ». Conséquence assumée : **un geste qui oublie
+d'appeler `record` ne laisse pas de trace, et rien ne le signale.** L'alternative — journaliser dans
+`insert`/`update`/`archive` — n'aurait pas ce trou, mais aurait composé `summary` depuis une table de
+libellés par table, sans savoir ce que le geste voulait dire. Arbitrage (a) de `tickets-C6.md`.
+
+**Un test qui tombe seul ne prouve pas que la règle vit à un seul endroit, et une mise en défaut l'a
+montré.** `lib/journal.ts` affirmait porter la règle « une équipe qui n'a pas changé n'écrit rien »
+« à un seul endroit ». Neutraliser le `null` de `teamPhrase` n'a fait tomber **que** le test pur : le
+test d'action, lui, est passé — parce que `teamSummary` sort plus tôt, pour s'épargner une lecture de
+`persons` dont il connaît le résultat. Deux gardes, donc, dont une seule décide. Les deux
+commentaires ont été récrits : celui de `teamPhrase` dit qu'il décide, celui de `teamSummary` dit
+qu'il n'épargne qu'une lecture, et la seconde neutralisation — retirer la garde de `updateProject` —
+fait bien tomber les deux cas qui la visent. **La phrase « cette règle vit ici » ne se croit pas : on
+la neutralise, et on regarde qui tombe.**
+
+**L'insécable s'écrit en échappement, et `lib/format.ts` fait l'inverse.** Les phrases du journal
+portent U+00A0 devant « : » et « ; ». Il est écrit `"\u00A0"` sous un nom, `NBSP`, dans les trois
+fichiers neufs — parce qu'en caractère il est **invisible** dans un source, et que le premier
+copier-coller le remplacerait par une espace ordinaire sans que rien ne le dise. `lib/format.ts` le
+porte en caractère depuis T4.3, et son propre fichier de tests explique pourquoi c'est un piège.
+Hors périmètre (règle 3) : signalé, pas corrigé. → **au prochain ticket qui ouvre `lib/format.ts`.**
+
+**Un domaine de test résiduel fait tomber le fichier suivant, et un `beforeAll` qui échoue en laisse
+un.** Le piège de `resolveDomainId` — « le premier domaine actif **par nom** » — était déjà consigné
+le 18/08/2026, avec sa parade : un nom qui trie en tête, et une garde qui échoue en nommant la cause.
+Il manquait la moitié amont. `app/(app)/projets/actions.test.ts` nettoyait dans `afterAll` sur
+`if (!f?.domainId) return` : quand `beforeAll` a échoué **après** la création du domaine — un `CHECK`
+mal compris, `persons_role_requires_access` —, `f` est restée indéfinie, le nettoyage s'est sauté, et
+onze tests se sont ensuite plaints d'un journal vide sans qu'aucun ne nomme la cause. **Le domaine
+est désormais retenu dès sa création, dans une variable que `afterAll` lit sans passer par la
+fixture.** Les fichiers voisins portent la même formule et le même trou.
+
+**Le code HTTP d'une action serveur ne dit rien de ce qu'elle a écrit, et l'archivage l'a prouvé.**
+Le POST forgé d'`archiveProject` sous une identité sans droit rend **200** — exactement le code que
+rend la soumission du responsable qui archive vraiment. Les deux sont indiscernables, et seul le
+décompte en base les sépare. Sur `updateProject`, le membre reçoit **404**, non pas parce qu'il est
+refusé mais parce que la page de modification est en 404 pour lui : le code décrit le rendu, jamais
+l'écriture. Et le témoin le plus net vient du rétablissement : la **même** action, frappée avec le
+**bon** identifiant mais en **urlencodé**, rend 404 — soit exactement ce que rend un identifiant
+inconnu. La règle « une fonction serveur se frappe en `text/plain` » n'est pas une préférence de
+forme : sans elle, un refus, une panne et une erreur d'encodage se ressemblent tous les trois.
+
+**`product_id` reste nul sur les cinq gestes, et c'est un arbitrage.** La colonne est facultative
+(`docs/04` §4) et sert à T6.6 quand `project_id` est nul — le cas des relevés, en T6.2. La remplir
+sur un événement de projet serait stocker une valeur **dérivable**, que D20 rend mouvante : un
+accompagnement change de produit, et l'événement resterait accroché à l'ancien. Le produit se joint
+depuis le projet ; il ne se fige pas.
+
+**`target_id` est nul sur la ligne d'équipe, et la colonne est nullable pour ce cas.** Une ligne qui
+porte le déplacement de trois personnes n'a pas de cible unique. Y poser l'identifiant du projet
+aurait rendu la colonne lisible et **fausse** — elle aurait désigné un projet sous un `target_type`
+qui annonce un membre.

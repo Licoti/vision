@@ -42,6 +42,13 @@
  * Aucune suppression, jamais (règle 4) : la couche n'expose pas de `delete`, et
  * ce qui est archivé se rétablit.
  *
+ * **Les quatre gestes laissent une trace depuis T6.1**, et c'est l'action qui la
+ * décide : `scope.record()` écrit, mais la **phrase** appartient à qui connaît
+ * le vocabulaire (arbitrage (a) de `tickets-C6.md`). Le prix est nommé — un
+ * geste qui oublierait d'appeler `record` ne laisserait pas de trace, et rien ne
+ * le signalerait. **Une ligne par geste**, jamais une par colonne ; l'équipe
+ * fait exception parce qu'elle porte un autre objet, jamais une par personne.
+ *
  * **Aucune écriture dans `persons`, jamais non plus** — depuis T5bis.7, et c'est
  * l'arbitrage (g) de C5bis : une personne se crée dans `/equipe`, et nulle part
  * ailleurs. Ces deux actions **désignent** des personnes du domaine, qu'elles
@@ -76,6 +83,7 @@ import {
   type ProjectFormState,
   type ProjectInput,
 } from "@/lib/forms/project";
+import { objectPhrase, teamPhrase } from "@/lib/journal";
 import { ROUTES } from "@/lib/navigation";
 import { findProjectLinks } from "@/lib/queries/projects";
 
@@ -274,28 +282,52 @@ async function syncApproaches(
   }
 }
 
-/** Le diff de l'équipe. Le rôle change sans que la ligne soit refaite. */
+/**
+ * Ce que le diff d'équipe a déplacé — des `personId`, jamais des noms.
+ *
+ * Le diff sait **qui** a bougé ; il ne sait pas comment on l'appelle. La
+ * traduction en phrase est le travail de `teamSummary`, qui lit les noms une
+ * fois : mêler les deux ferait de `syncMembers` une fonction qui écrit et qui
+ * raconte.
+ */
+type TeamDiff = {
+  arrived: string[];
+  left: string[];
+  rerolled: string[];
+};
+
+/**
+ * Le diff de l'équipe. Le rôle change sans que la ligne soit refaite.
+ *
+ * **Elle rend désormais ce qu'elle a déplacé** (T6.1) : le journal doit dire
+ * « Camille Roux rejoint l'équipe », ce qu'aucun appelant ne peut savoir depuis
+ * la seule saisie — il faudrait relire l'état d'avant, que cette fonction est
+ * la seule à avoir eu sous les yeux.
+ */
 async function syncMembers(
   session: Session,
   projectId: string,
   wanted: readonly { personId: string; isContributor: boolean }[],
-): Promise<void> {
+): Promise<TeamDiff> {
   const current = await session.db.list(projectMembers, {
     where: eq(projectMembers.projectId, projectId),
   });
 
   const target = new Map(wanted.map((member) => [member.personId, member]));
+  const moved: TeamDiff = { arrived: [], left: [], rerolled: [] };
 
   for (const row of current) {
     const kept = target.get(row.personId);
     if (!kept) {
       await session.db.unlink(projectMembers, row.id);
+      moved.left.push(row.personId);
       continue;
     }
     if (kept.isContributor !== row.isContributor) {
       await session.db.update(projectMembers, row.id, {
         isContributor: kept.isContributor,
       });
+      moved.rerolled.push(row.personId);
     }
   }
 
@@ -310,7 +342,52 @@ async function syncMembers(
         isContributor: member.isContributor,
       })),
     );
+    moved.arrived.push(...added.map((member) => member.personId));
   }
+
+  return moved;
+}
+
+/**
+ * La phrase du diff d'équipe, ou `null` si rien n'a bougé — T6.1.
+ *
+ * **Les noms sont lus une fois, archivés compris.** `includeArchived` n'est pas
+ * une commodité : le nom d'une personne rangée depuis est exactement ce qui
+ * disparaîtrait autrement, et `summary` est figé pour cette raison
+ * (arbitrage (e) de `tickets-C6.md`). Une phrase qui perdrait son nom au premier
+ * archivage ne serait pas une trace.
+ *
+ * Le repli « personne inconnue » n'est atteignable par aucun chemin — règle 4,
+ * `persons` ne se supprime pas, et les deux origines des identifiants sont
+ * scopées : la saisie est passée par `checkReferences`, les retraits viennent de
+ * `project_members`. Il est là parce qu'une phrase **figée** ne doit en aucun
+ * cas porter « undefined ».
+ */
+async function teamSummary(
+  session: Session,
+  moved: TeamDiff,
+): Promise<string | null> {
+  /* Ce retour n'est **pas** la règle « une équipe qui n'a pas changé n'écrit
+     rien » — celle-ci se décide dans `teamPhrase`, qui rend `null` sur un diff
+     vide. Il n'épargne qu'une lecture de `persons` dont on connaît d'avance le
+     résultat : zéro ligne. Neutraliser ce retour ne change aucun comportement,
+     neutraliser le `null` de `teamPhrase` en change un. */
+  const touched = [...moved.arrived, ...moved.left, ...moved.rerolled];
+  if (touched.length === 0) return null;
+
+  const people = await session.db.list(persons, {
+    where: inArray(persons.id, touched),
+    includeArchived: true,
+  });
+  const nameOf = new Map(people.map((row) => [row.id, row.fullName]));
+  const named = (ids: readonly string[]): string[] =>
+    ids.map((id) => nameOf.get(id) ?? "personne inconnue");
+
+  return teamPhrase({
+    arrived: named(moved.arrived),
+    left: named(moved.left),
+    rerolled: named(moved.rerolled),
+  });
 }
 
 /* ==========================================================================
@@ -463,6 +540,18 @@ export async function createProject(
     await syncApproaches(session, created.id, input.approachIds);
     await syncMembers(session, created.id, input.members);
 
+    /* **Une seule ligne**, même quand la création lie une équipe : la fiche ne
+       pose le diff d'équipe que sur la correction, et une création n'a pas
+       d'avant à comparer. Le geste est « l'accompagnement a été créé », et son
+       équipe initiale en fait partie. */
+    await session.db.record({
+      projectId: created.id,
+      verb: "created",
+      targetType: "project",
+      targetId: created.id,
+      summary: objectPhrase("project", "created", created.name),
+    });
+
     return { projectId: created.id, productIds: [input.row.productId] };
   });
 
@@ -503,7 +592,36 @@ export async function updateProject(
 
     await syncJobs(session, id, input.jobIds);
     await syncApproaches(session, id, input.approachIds);
-    await syncMembers(session, id, input.members);
+    const moved = await syncMembers(session, id, input.members);
+
+    /* **Une ligne pour le geste, une pour l'équipe si elle a bougé** — jamais
+       une par colonne, sans quoi une correction de formulaire en écrirait sept
+       et la frise deviendrait illisible. L'équipe fait exception parce qu'elle
+       porte un **autre objet** (`member`), pas parce qu'elle a changé.
+
+       Le nom figé est celui **d'après** le geste : écrire celui d'avant serait
+       une « valeur avant », que D22 refuse. */
+    await session.db.record({
+      projectId: id,
+      verb: "updated",
+      targetType: "project",
+      targetId: id,
+      summary: objectPhrase("project", "updated", updated.name),
+    });
+
+    /* `target_id` est **nul** : un diff qui porte plusieurs personnes n'a pas
+       de cible unique, et la colonne est nullable pour ce cas. Y poser le
+       projet mentirait sur ce que l'identifiant désigne. */
+    const team = await teamSummary(session, moved);
+    if (team) {
+      await session.db.record({
+        projectId: id,
+        verb: "linked",
+        targetType: "member",
+        targetId: null,
+        summary: team,
+      });
+    }
 
     return {
       projectId: id,
@@ -601,6 +719,14 @@ export async function archiveProject(
 
   await session.db.archive(projects, projectId);
 
+  await session.db.record({
+    projectId,
+    verb: "archived",
+    targetType: "project",
+    targetId: projectId,
+    summary: objectPhrase("project", "archived", project.name),
+  });
+
   refreshAround(projectId, project.productId);
   /* **Le panneau se referme sur ce succès, et non plus sur une navigation**
      (TD.2). `redirect` était la fermeture ; elle ne peut plus l'être sans
@@ -626,7 +752,25 @@ export async function restoreProject(projectId: string): Promise<void> {
   if ("message" in gate) return;
   const { session, project } = gate;
 
-  await session.db.restore(projects, projectId);
+  const restored = await session.db.restore(projects, projectId);
+
+  /* **Rien n'est journalisé qui n'a pas eu lieu.** `restore` porte un filtre
+     `is not null` : rétablir un accompagnement vivant ne touche aucune ligne et
+     rend `undefined`. Le verbe reste `updated` — le cinquième de l'énuméré ne
+     nomme pas le rétablissement, et c'est la **phrase** qui distingue « rétabli »
+     de « modifié ».
+
+     `refreshAround` reste inconditionnel : ce qu'il revalide ne dépend pas de
+     ce que le journal a écrit, et le changer serait hors fiche (règle 3). */
+  if (restored) {
+    await session.db.record({
+      projectId,
+      verb: "updated",
+      targetType: "project",
+      targetId: projectId,
+      summary: objectPhrase("project", "restored", restored.name),
+    });
+  }
 
   refreshAround(projectId, project.productId);
 }

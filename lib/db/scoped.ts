@@ -40,7 +40,7 @@ import {
 import { getTableConfig, type PgColumn, type PgTable } from "drizzle-orm/pg-core";
 
 import { db, type Database } from "./client";
-import { activities, domains, entities, projects, results } from "./schema";
+import { activities, domains, entities, events, projects, results } from "./schema";
 
 /* ==========================================================================
    Erreurs
@@ -98,7 +98,15 @@ function isReferenceViolation(error: unknown): boolean {
    Ce qu'est une table scopée
    ========================================================================== */
 
-/** Toute table métier : un identifiant, un domaine. Les 22 sauf `domains`. */
+/**
+ * Toute table métier : un identifiant, un domaine. Toutes sauf `domains`.
+ *
+ * **Sans le compte**, et c'est la correction (T6.1). La phrase disait « les 22 » ;
+ * elles étaient 26 quand T5bis.1 l'a constaté sans pouvoir la toucher, la fiche de
+ * C6 en annonçait 25, et elles sont 30 au jour où l'on écrit. Un nombre dans un
+ * commentaire vieillit à chaque migration, et il a menti deux fois avant celle-ci :
+ * ce qui se relit ici est la **règle**, que `schema.ts` tient table par table.
+ */
 export type ScopedTable = PgTable & {
   id: PgColumn;
   domainId: PgColumn;
@@ -167,6 +175,24 @@ export type UpdateValues<T extends ScopedTable> = Partial<
 >;
 
 export type Row<T extends ScopedTable> = InferSelectModel<T>;
+
+/**
+ * Une ligne de journal, telle qu'un geste la dicte — T6.1.
+ *
+ * Cinq colonnes sont retirées à l'appelant, et chacune pour sa raison :
+ * `domain_id` et `created_by` appartiennent à la couche comme partout ailleurs ;
+ * `actor_id` est **posé depuis le contexte**, sans quoi une action pourrait
+ * signer au nom d'un autre ; `occurred_at` est la date du geste, que
+ * `defaultNow()` pose et qu'une soumission n'a pas à forger ; `id`, `created_at`
+ * et `updated_at` ne se choisissent nulle part.
+ *
+ * Ce qui reste est exactement ce que le geste sait et que la couche ignore : où
+ * il a eu lieu, ce qu'il a fait, à quoi, et la phrase qui le dit.
+ */
+export type JournalEntry = Except<
+  InsertValues<typeof events>,
+  "actorId" | "id" | "createdAt" | "updatedAt" | "occurredAt"
+>;
 
 /* ==========================================================================
    Introspection du schéma
@@ -753,6 +779,39 @@ export function forDomain(scope: Scope) {
     }
   }
 
+  /* ---------------------------------------------------------------------
+     Le journal — T6.1
+     --------------------------------------------------------------------- */
+
+  /**
+   * Écrit une ligne du journal `events`.
+   *
+   * **Ce n'est pas une écriture de plus : c'est `insert(events, …)` avec
+   * `actor_id` posé depuis le contexte.** Elle hérite donc gratuitement des
+   * trois préconditions de la couche — `assertNoForcedDomain`, et
+   * `assertPreconditions` qui confronte `project_id`, `product_id` et
+   * `actor_id` au domaine, les clés étrangères d'`events` étant déjà dérivées
+   * par `parentChecksOf`. **Aucune précondition neuve n'est écrite** : s'il en
+   * fallait une, ce serait le signe que `record` a pris un chemin qu'`insert`
+   * n'a pas.
+   *
+   * **La décision de journaliser n'est pas ici, et c'est un arbitrage** —
+   * arbitrage (a) de `tickets-C6.md`. `docs/04` §4 écrit « alimenté par la
+   * couche d'accès » : l'**écriture** y est, le **déclenchement** n'y est pas.
+   * Journaliser depuis `insert` / `update` / `archive` aurait composé `summary`
+   * depuis une table de libellés par table, sans savoir ce que le geste voulait
+   * dire — « Projet modifié » là où l'action sait dire « Statut passé à
+   * Terminé ». Seule l'action connaît le vocabulaire, donc seule l'action
+   * appelle.
+   *
+   * **Le prix est nommé : un geste qui oublie d'appeler `record` ne laisse pas
+   * de trace, et rien ne le signale.** On préfère une phrase juste qu'on peut
+   * oublier à une phrase creuse qu'on ne peut pas.
+   */
+  async function record(entry: JournalEntry): Promise<Row<typeof events>> {
+    return insert(events, { ...entry, actorId } as InsertValues<typeof events>);
+  }
+
   return {
     domainId,
     actorId,
@@ -770,6 +829,7 @@ export function forDomain(scope: Scope) {
     refreshLastActivity,
     unlink,
     deleteRow,
+    record,
   };
 }
 
