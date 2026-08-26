@@ -6137,3 +6137,103 @@ le fichier se balaie**, et elle est désormais le prochain geste — plus aucun 
 `tickets-C5bis.md`. Deux points ouverts partent dans `HISTORIQUE-TICKETS.md` avec ce ticket, un
 troisième est récrit plus court.
 
+
+---
+
+## C6 (découpage) — 25/08/2026
+
+### L'écart à `docs/04` §4 : le journal s'écrit dans la couche, il ne s'y déclenche pas
+
+`docs/04` §4 écrit que le journal `events` est « alimenté par la couche d'accès ». Le découpage
+retient une forme qui en tient la moitié et pas l'autre, et il vaut mieux l'écrire que le laisser
+découvrir au premier ticket : **l'écriture reste dans `lib/db/scoped.ts`** — `record()` est
+`insert(events, …)` avec `actor_id` posé depuis le contexte, donc `domain_id` posé par la couche,
+`assertNoForcedDomain` et `assertPreconditions` traversés comme pour n'importe quelle table — **mais
+le déclenchement appartient à l'action.**
+
+La raison n'est pas de commodité, elle est dans le schéma : `summary` est décrit comme une « phrase
+lisible, figée à l'écriture ». Une couche générique qui journaliserait depuis `insert`, `update` et
+`archive` ne connaît que la table touchée et les colonnes reçues ; elle écrirait « Projet modifié »
+là où l'écran attend « Statut passé à *Terminé* », et « Activité modifiée » là où le geste était une
+annulation avec son motif. La phrase juste exige de savoir ce que le geste **voulait dire**, ce qui
+n'existe qu'au point d'appel.
+
+**Le prix est nommé, et il est réel : un geste qui oublie d'appeler `record` ne laisse pas de trace,
+et rien ne le signale** — ni `tsc`, ni ESLint, ni un test qui ne sait pas qu'il devrait exister.
+C'est l'inverse exact du choix automatique, qui n'oublie rien et ne dit rien de juste. L'arbitrage
+préfère une phrase juste qu'on peut oublier à une phrase creuse qu'on ne peut pas, et il accepte que
+la garantie repose sur les fiches de T6.1 et T6.2 plutôt que sur le compilateur.
+
+**Une piste, si l'oubli devient réel** : une règle ESLint qui exigerait un `record` dans toute
+fonction `"use server"` qui appelle `insert`, `update` ou `archive`. Elle n'est pas écrite —
+`socleLock` et `spacingScaleLock` ont montré qu'une règle se paie en témoins positifs et négatifs, et
+il n'y a rien à garder tant que rien n'a été oublié.
+
+### Les six `event_target_type` disent le périmètre du journal, et le schéma le disait déjà
+
+L'énuméré compte six valeurs — `project`, `activity`, `resource`, `result`, `indicator_reading`,
+`member` — écrites en T1.2 d'après `docs/04` §4. Depuis, six objets sont nés qui n'y figurent pas :
+persona, use case, indicateur, personne, entité, vision produit. **Ce n'est pas un retard de
+l'énuméré, c'est la définition du journal** : la trace des objets de l'accompagnement, celle qui
+nourrit la frise de la page projet et le flux global. Étendre l'énuméré aurait doublé le nombre de
+points d'appel et mêlé le référentiel à l'accompagnement dans un même flux.
+
+Conséquence à connaître : **archiver une entité, corriger un persona ou renommer un indicateur ne
+laissent aucune trace**, et continueront de n'en laisser aucune après C6. Point ouvert, C7.
+
+### Le journal démarrera vide, et c'est la troisième fois qu'on l'écrit
+
+Le découpage de C4bis l'avait posé pour l'archivage ; il vaut pour tout ce qui a été écrit de C2 à
+C5bis, plus seize reprises hors ticket. **Aucun rattrapage rétroactif n'est prévu** : reconstituer
+des événements depuis `created_at` inventerait un acteur — l'amorçage n'écrit aucun `created_by`
+(T1.5) — et une phrase que personne n'a produite. La conséquence pratique est un critère de
+validation : T6.3 et T6.6 se valideraient sur une absence si rien n'écrivait avant eux, ce qui est la
+raison pour laquelle les deux tickets d'écriture viennent en tête du chantier.
+
+### Une collision de nom était déjà posée, et le découpage l'évite plutôt que de la corriger
+
+`findProjectLinks()` existe dans `lib/queries/projects.ts` depuis T2.6 et désigne les **liaisons du
+formulaire de projet** — métiers, approches, membres. Rien à voir avec `project_links`, les liens
+déclarés entre deux projets. Renommer l'existant aurait été un geste hors périmètre (règle 3) dans
+tous les tickets de C6 ; les lectures neuves s'appellent donc `listRelatedProjects` et
+`listDeclaredLinks`. **Le nom occupé n'est pas rendu, il est contourné** — et il reste un piège de
+lecture pour qui ouvrira `projects.ts` en cherchant les liens de C6.
+
+### `ETAT.md` : de 701 lignes à 247, et le classement des postes se confirme
+
+Le fichier était à **701 lignes** pour un seuil de 250 — le dépassement le plus large jamais atteint,
+huit chantiers et seize reprises hors ticket s'y étant accumulés depuis le balayage du 17/08/2026.
+Les trois postes, mesurés, dans l'ordre que le découpage de C4bis avait établi :
+
+- **Le repliage rend le plus** : la section « Journal des tickets » passe de **351 lignes à 38** —
+  27 lignes de ticket parties verbatim dans `HISTORIQUE-TICKETS.md`, neuf lignes de chantier à leur
+  place, dont une pour les seize reprises hors ticket qui n'appartiennent à aucun chantier.
+  **313 lignes rendues, soit 69 % des 454 qu'il fallait trouver.**
+- **La récriture vient juste après**, et elle a dû faire le tiers restant : les 33 points ouverts
+  récrits rendent **131 lignes** — la section b de 129 à 68, la section c de 120 à 61, la section a
+  de 28 à 17 — **sans qu'aucun point ne disparaisse ni ne perde sa destination**. Le décompte a été
+  vérifié des deux côtés : 3 + 18 + 12 avant, 3 + 18 + 12 après.
+- **La sortie des points refermés n'a rien rendu cette fois** : il n'y en avait aucun. T5bis.7 avait
+  fermé les deux siens en même temps qu'il les livrait, et rien n'était resté barré.
+
+**Ce qui se confirme est la leçon de C4bis, à une échelle six fois plus grande : le seuil de
+250 lignes dit quand agir, jamais quoi replier.** Un addendum coûte une ligne à l'écrire et n'en
+coûte aucune à ne pas replier — c'est exactement pourquoi il faut un moment nommé pour le faire, et
+pourquoi ce moment est la session de découpage.
+
+### Deux points ouverts trouvent leur ticket, et un troisième s'est vérifié au lieu de se supposer
+
+Les deux points portant `→ C6` reçoivent leur numéro : le bloc « Projets liés » retiré du rendu le
+21/08/2026 va en **T6.4**, et « Voir le journal » dessiné sans être un lien va en **T6.3** — il y
+devient le `<summary>` du bloc, ce qui referme la dette d'interface exactement là où elle avait été
+posée.
+
+Le troisième est plus intéressant, parce qu'il a failli passer inaperçu : le point sur le
+rétablissement d'un accompagnement sous un produit archivé porte « C7 au plus tard », et les
+découpages de C5 et de C5bis l'avaient reconduit en vérifiant qu'aucune de leurs fiches n'ouvrait
+`archiveProject` ni `restoreProject`. **Cette fois, une fiche les ouvre** : T6.1 touche
+`app/(app)/projets/actions.ts` pour y poser quatre appels de journal, dont un dans `restoreProject`.
+Le point est reconduit quand même, et la raison est écrite dans sa fiche : poser le garde-fou serait
+une **règle métier neuve dans un ticket de trace** (règle 3). Ce qui compte n'est pas la décision,
+c'est que la question se soit posée — **une vérification qui ne trouve rien deux fois de suite cesse
+d'être une vérification** si on ne la refait pas la troisième.

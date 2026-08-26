@@ -151,6 +151,327 @@ portaient en plus vivent dans le récit ci-dessous, ticket par ticket.)*
 *(les deux lignes ci-dessus repliées d'`ETAT.md` le 17/08/2026, geste 1 de la session de découpage de
 C5bis. T5.1 à T5.5 y étaient déjà, versées au balayage de T5.5.)*
 
+*(les vingt-sept lignes ci-dessous repliées d'`ETAT.md` le 25/08/2026, geste 1 de la session de
+découpage de C6 : les quatre tickets TD hors chantier — TD.2, TD.3, TD.5 et TD.6, TD.1 ayant sa
+ligne plus haut —, les sept tickets de C5bis, et les seize reprises hors ticket du 17 au
+21/08/2026. Elles sont reprises **verbatim** — le récit détaillé de
+la plupart d'entre elles vit plus bas dans ce fichier, et celles qui n'en ont pas sont ici leur
+seule trace, ce qui est la raison de les déplacer plutôt que de les résumer.)*
+
+- **TD.2 — 18/08/2026 — les panneaux s'ouvrent côté client.** Ticket **hors chantier**. L'ouverture
+  d'un panneau naviguait : aller-retour serveur, page re-rendue, URL réécrite. Elle est désormais un
+  état client — coquille montée avant l'appel, corps renvoyé **rendu** par une fonction serveur, URL
+  inchangée. D30 ne bouge pas (il ne parle que de « panneau plutôt que page ») ; c'est l'invariant
+  d'implémentation de T3.2 qui se retourne. Les treize URL d'ouverture restent des **adresses**
+  valides et traversent la **même** résolution que le clic. Écarts assumés : le Retour navigateur ne
+  referme plus, et deux jetons de mouvement sont posés faute que le design system en porte.
+- **T5bis.1 — 17/08/2026 — le schéma : compétences, niveaux, profil.** Trois tables, deux colonnes et
+  leur `CHECK`, migration **`0004`** — la fiche annonçait `0003`, déjà pris. Écarts : présentations et
+  disponibilités **inventées** contre la règle de tête de `seed.ts` ; mise en défaut de la fiche
+  corrigée, la sienne ne compilant pas.
+- **T5bis.2 — 17/08/2026 — l'entrée « Équipe » et la liste.** Cinquième entrée contre les « quatre »
+  de `docs/06` §8, `listTeam` en deux lectures fixes portant cinq `filter()`, la pastille de
+  disponibilité. Sa leçon : **une jointure scopée ne se met en défaut que sur une ligne forgée**, et
+  forgée sur **une seule** colonne — sinon un autre filtre la rattrape et sa chute ne prouve rien.
+- **Menu « … » sur les cartes de roadmap — hors ticket, le 17/08/2026.** Les sept gestes empilés à
+  droite d'une entrée passent sous un bouton unique : `indicator-menu.tsx` promu en
+  `components/ui/action-menu.tsx`, seul menu de l'application — ce qui **corrige au passage un
+  contraste de bordure à 1,33:1** porté par les deux menus North Star. « Annuler » sort en
+  `ConfirmPanel` (`?annuler=<id>`), son motif étant obligatoire : `cancelActivity` passe du refus
+  muet au `ConfirmState`.
+- **« Vision produit » — hors ticket, le 18/08/2026.** Le bloc de tête ne disait que la mesure, il
+  porte la question : `products.vision` (migration **0005**), panneau `?vision=modifier` sous
+  `manageDomain` — seul geste du bloc hors du droit dérivé —, puis `★ North Star` et « Indicateurs
+  associés », chaque carte nommant son accompagnement. Deux écarts consignés. Sa leçon est dans le
+  harnais : **`resolveDomainId` rend le premier domaine actif *par nom***, et le fichier de tests
+  voisin ne passait que par chance alphabétique.
+- **L'ordre et le nom des trois blocs de la page produit — hors ticket, le 18/08/2026.** La frise
+  remonte en deuxième position sous « Accompagnements en cours » et s'ouvre sur l'année en cours
+  (`defaultWindow`, migration nulle) ; la liste descend en dernière sous « Tous les
+  accompagnements » ; le formulaire de fenêtre au mois passe sous `SHOW_MONTH_RANGE`. L'ordre rend à
+  `docs/06` §6 la place qu'il réclamait ; le nom et le cadrage restent hors document. Sa leçon :
+  **`timelineWindow` borne, il n'écarte pas** — sans repli hors-axe, un produit terminé en 2024
+  s'ouvrirait sur une fenêtre d'un seul mois, mesuré à `firstMonth: '2026-02'`.
+- **Le bloc « Vision produit » sur `northstar-v2` — hors ticket, le 18/08/2026.** Surtitre en
+  capitales et kebab en absolu à la place de `BlockHeader`, barre d'accent en dégradé, vision en 30
+  pixels, **North Star dans une carte blanche**, décompte sur l'intertitre du rang 3, pastille de
+  cible passée à gauche et crochet d'écart « +14 pts » sur la courbe. Poppins passe aussi en famille
+  secondaire, dans `tokens.css` et nulle part ailleurs. Le bloc **quitte le langage d'en-tête
+  commun** que le 17/08 lui avait donné : écart assumé, les deux blocs voisins gardent
+  `BlockHeader`. Sa leçon : **une carte qui change de fond emporte tout ce qui se peignait du fond
+  d'avant** — deux pastilles de cible et l'anneau des points se peignaient en
+  `surface-primary-lighter` pour rester lisibles par-dessus les filets, et auraient dessiné trois
+  rectangles bleus sur la carte blanche.
+- **Le bloc « Personae » — hors ticket, le 18/08/2026.** La page disait pourquoi le produit existe
+  et ce qu'il mesure, jamais **pour qui** : `personas` et `persona_traits` (migration **0006**),
+  cartes en grille sous « Vision produit », fiche en panneau (`?fiche=<id>`) et saisie en panneau
+  (`?persona=nouveau|<id>`) — **deux clés pour un même objet, parce que ce sont deux droits** : la
+  fiche se lit par tout le domaine (D9), la saisie suit le droit dérivé des accompagnements. Le
+  décompte d'exclusivité passe de cinq clés à sept sans qu'un caractère change. Sa leçon est dans
+  le modèle : **les trois zones de texte arrivent en base comme des lignes identifiées**, et le
+  `syncTraits` rapproche sur `(kind, label)` plutôt que de remplacer — sans ce diff, un use case
+  qui désignera un irritant désignerait une ligne que la correction suivante efface.
+- **Le bloc « Use Cases » — hors ticket, le 19/08/2026.** La page disait pourquoi le produit
+  existe, ce qu'il mesure et pour qui ; elle ne disait pas **comment il est construit** :
+  `use_cases` et `use_case_personas` (migration **0007**), cartes compactes en **ligne défilante**
+  sous « Personae », fiche en panneau (`?scenario=<id>`) et saisie en panneau
+  (`?usecase=nouveau|<id>`) — **deux clés pour deux droits**, la séparation de `persona`/`fiche`
+  reprise sans l'inventer. Le décompte d'exclusivité passe de sept à neuf clés sans qu'un caractère
+  change, pour la troisième fois. **Le modèle tient la promesse écrite le 18/08** : rien n'a été
+  repris, le rattachement passe par une table de liaison — jamais une colonne — pour qu'une
+  fonctionnalité ou un méga-parcours soit demain **une table de plus**, et aucune n'est créée
+  aujourd'hui (leçon de T5.2). Sa porte propre est la troisième : **les `personaIds` viennent du
+  formulaire, pas d'une liaison serveur**, donc ils se confrontent aux personae vivants du produit
+  reçu — et avant toute écriture, faute de transaction. Sa leçon est double, et les deux se
+  mesurent : **`react-hooks/rules-of-hooks` prend tout `useX` pour un crochet**, ce qui a fait
+  céder la convention de nom du dépôt en deux fichiers ; et **`now()` est le temps de la
+  transaction**, si bien qu'un `insertMany` donne le même horodatage à toutes ses lignes et laisse
+  l'UUID trancher — les deux use cases de la fixture se lisent dans l'ordre inverse du fichier, et
+  deux commentaires ont été corrigés après mesure.
+- **T5bis.3 — 18/08/2026 — les filtres de la liste.** Cinq clés dans l'URL, sans une ligne de
+  JavaScript : `q`, `metier`, `competence` (répétable), `niveau`, `dispo`. La conjonction est **un
+  `exists` par compétence cochée** — la seule forme qui dise « les deux » sans `group by` ni
+  `having count(*)`, donc sans le décompte qu'interdit le garde-fou 2 ; mesuré sur la fixture, 3 ∩ 3
+  = 1. `listTeamFilterOptions` ne propose que les valeurs qu'une personne vivante porte, sauf
+  l'échelle, proposée entière parce que « au moins ce niveau » est un seuil. Trois écarts consignés,
+  dont `q` contre la convention française des autres clés. Sa leçon vaut pour tout ticket qui ajoute
+  un `filter()` : **un filtre de domaine qu'aucune ligne forgée ne vise n'est pas éprouvé** — le
+  retirer ne fait tomber aucun test. Deux lignes forgées de plus (une personne d'un autre domaine
+  portant une liaison du domaine, une autre portant un de ses métiers) rendent les **onze**
+  neutralisations concluantes, chacune sur son seul test.
+- **T5bis.4 — 19/08/2026 — la fiche, en panneau.** `/equipe` devient la **troisième page hôte** :
+  `<DrawerHost>`, `lib/drawers/team.tsx`, `loadTeamDrawer`, et une carte dont la ligne entière est
+  un `DrawerLink`. `findPersonDetail` rend le profil, les compétences par rang décroissant et les
+  accompagnements du plus récent au plus ancien. **Un accompagnement d'un produit archivé y reste**,
+  là où `listProjects` l'écarte : divergence assumée, la personne l'a mené. Sa singularité est
+  l'adresse de repli — seule des trois pages hôtes, elle **reconduit les cinq filtres** dans
+  `closeHref` et dans chaque lien de ligne, parce qu'ici l'URL nue effacerait la recherche que le
+  panneau vient de servir (`docs/06` §9). Sa leçon est dans le harnais : **une fonction serveur se
+  frappe en `text/plain`, jamais en urlencodé** — la charge est le tableau d'arguments encodé en
+  Flight, et l'urlencodé rend un **404** là où TD.1 avait connu un 200 muet ; sans étape témoin, ni
+  l'un ni l'autre ne prouve un refus.
+
+- **TD.3 — 19/08/2026 — le bouton et le lien d'action.** Ticket **hors chantier**. Les trois chaînes
+  de geste étaient à **vingt-sept** copies et non vingt-quatre : `app/(app)/equipe/page.tsx` en avait
+  acquis trois le jour même de l'audit, et il **entre au périmètre** sur arbitrage humain — laissées
+  là, `socleLock` les ferait tomber en TD.6. `components/ui/button.tsx` porte `Button` pour les neuf
+  `<button>` et `BUTTON_PRIMARY`/`BUTTON_SECONDARY` pour les huit balises qui n'en sont pas ;
+  `ACTION_LINK_SM` rejoint `ACTION_LINK`. **Vingt-trois adresses mesurées, vingt-et-une au HTML
+  strictement identique**, et les deux écarts sont ceux annoncés : la dérivée de `/dev/session`
+  (contraste recalculé, 12,97:1 → **13,65:1**) et les cinq `underline-offset-2` que
+  `readings-panel.tsx` perd en cessant de redéfinir `ACTION_LINK`. Sa leçon est dans l'instrument :
+  **le HTML servi en développement n'est pas déterministe** — la charge RSC embarquée change
+  d'identifiants de rangée à chaque requête —, si bien qu'une comparaison brute mesure le bruit ; le
+  DOM seul, `<script>` retirés, l'est. Et il **se met en défaut avant d'être cru** : un `rounded-xl`
+  témoin dans la variante a fait bouger **les vingt captures** alors posées — chaque écran porte au
+  moins le skip-link, si bien qu'aucune ne pouvait rester muette.
+
+- **TD.5 — 19/08/2026 — le garde-fou de la règle 2 sur les espacements.** Ticket **hors chantier**.
+  `spacingScaleLock` ferme le seul trou de la règle 2 — `--spacing` est un **pas**, pas une échelle —
+  en trois clauses : multiplicateur fractionnaire hors `0.5`/`1.5`, dimension arbitraire sans jeton,
+  épaisseur de bordure brute. **39 valeurs arrondies dans 12 fichiers**, au plus proche et à égalité
+  vers le bas, plus `border-l-3` → `border-l-[length:var(--border-width-2)]`, à rendu identique. Trois
+  arbitrages rendus avant écriture : aucune exception pour le rythme du bloc « Vision produit », les
+  gabarits de grille restent des **points d'arrêt de mise en page** (arbitrage de T1.6), et la clause
+  3 est une clause de plus que la fiche — sans elle, la correction rediverge. Sa mise en défaut n'est
+  pas un témoin mais **l'inventaire lui-même** : la règle devait tomber sur les 12 fichiers relevés au
+  `grep` et sur eux seuls, ce qu'elle a fait à quatre nœuds près — **ESLint signale un nœud, pas une
+  occurrence**, et quatre `className` portaient deux classes fautives. Sa leçon est dans la portée du
+  sélecteur : **une classe écrite hors d'un attribut `className` échappe aux trois clauses**, mesuré
+  par sonde — la même limite attend `socleLock` en TD.6.
+
+- **TD.6 — 19/08/2026 — le garde-fou du socle.** Ticket **hors chantier**, dernier des quatre et le
+  seul qui ne retire rien : `socleLock` garde **six signatures** hors de `components/ui/`,
+  `uiLayerSeal` scelle le socle contre les requêtes en valeur, les composants métier et les actions,
+  et `--max-warnings=0` ferme le script `lint`. Deux arbitrages rendus avant écriture :
+  `app/(app)/projets/page.tsx` **entre au périmètre** — ses deux contrôles recopiés faisaient échouer
+  la règle, exactement le cas que TD.3 avait tranché sur `equipe/page.tsx` —, et la signature de
+  `BlockNote` porte sur les **variantes retirées** par TD.4 et non sur celle qui reste, indiscernable
+  de quatre paragraphes qui disent l'inverse d'une absence. **Son piège vaut pour toute règle à
+  venir : le format plat d'ESLint écrase la valeur d'une règle, il ne la fusionne pas** — écrit
+  naïvement, `socleLock` désactivait les trois clauses de TD.5 partout hors du socle, sans qu'aucun
+  message ne le dise ; la reprise de `SPACING_CLAUSES` est mesurée des deux côtés de la frontière.
+  Neuf témoins positifs, neuf témoins négatifs **tirés du dépôt vivant**, tous concluants. Deux
+  écarts de rendu, sur `/projets` seulement et annoncés d'avance : un attribut `class` réordonné,
+  et `w-full` gagné par les deux listes déroulantes de filtre — le rendu que `/equipe` sert déjà.
+
+- **Les indicateurs associés repliés par défaut — hors ticket, le 18/08/2026.** Le rang 3 du bloc
+  « Vision produit » devient un `<details>` fermé, dont `BlockDivider` sait être le `<summary>` — la
+  question du produit reste seule à l'écran, ses cartes tiennent à un clic. Sa leçon :
+  **`display: flex` retire à `<summary>` le triangle natif du navigateur**, ce que le `<details>` de
+  la roadmap projet croyait conserver ; la marque de repli se pose donc en `mark`, comme le ★.
+
+- **L'audit de la couche de présentation — hors ticket, le 18/08/2026.** Pas une ligne de code : un
+  constat, une doctrine, trois fiches. Il dément la prémisse — **3,9 classes en moyenne par
+  `className`**, **zéro** violation de couleur — et chiffre la dette : le **bouton** recopié 24 fois et
+  **déjà dérivé**, l'état vide de bloc en **cinq variantes**, `ACTION_LINK` **redivergé** six jours
+  après son extraction. Trois niveaux tranchés — composant, constante de classes, rien — `@apply` et la
+  taxonomie de l'atomic design écartés, les dossiers ne bougent pas. Sa leçon est celle de T4.2,
+  vérifiée cette fois contre le dépôt lui-même : **le coût n'est pas le balisage dupliqué mais les
+  choix mesurés qu'il porte** — et un socle qu'on ne voit nulle part ne protège personne.
+
+- **T5bis.5 — 19/08/2026 — le radar des compétences.** Le second dessin du projet, après la frise :
+  `lib/queries/radar.ts` pur et testé, un SVG à `viewBox` rendu sur le serveur, et **le texte hors du
+  SVG** — les libellés d'axe sont du HTML posé aux coordonnées mêmes des axes, la séparation qui avait
+  rendu `path` possible à la courbe d'indicateurs. **Un écart de périmètre, arbitré avant écriture** :
+  `lib/queries/team.ts` et son test entrent, faute de quoi `maxRank` n'aurait eu d'autre source que le
+  plus haut rang **de la personne** — un profil « Intermédiaire partout » s'y dessinerait plein, soit
+  l'indice calculé que D39 interdit. En dessous de trois compétences, aucun radar, et **aucune phrase
+  ne le remplace**. Sa leçon est dans le balisage, et rien d'autre ne l'aurait trouvée : **React 19
+  traite `<title>` en balise de métadonnée jusque dans un `<svg>`, et deux enfants la vident** —
+  `<title>… de {fullName}</title>` rend `<title></title>`, donc un `role="img"` sans nom accessible,
+  avec `tsc` et `eslint` au vert. La seconde se mesure : **un test d'étanchéité sur un maximum exige
+  deux échelles différentes**, deux domaines amorcés à l'identique rendant la fuite indiscernable.
+
+- **La pastille de statut, seule forme du statut — hors ticket, le 19/08/2026.** La page produit
+  dessinait la même donnée de deux façons dans deux blocs consécutifs : pastille pleine dans la
+  frise, point de 8 px dans la liste. `StatusDot` et sa table `DOT` disparaissent,
+  `components/ui/status-dot.tsx` devient `status-pill.tsx` et porte `StatusPill` ; quatre écrans
+  s'y alignent et **perdent le point médian** qui séparait deux suites de texte et n'a plus de rôle
+  entre une pastille et une période. Septième clause de `socleLock`. Le périmètre est arbitré :
+  `Tag`, `AvailabilityDot`, le sens d'un indicateur et les chips de filtre **ne bougent pas**. Sa
+  leçon est dans la mesure : **le diff avant/après du DOM servi est la seule preuve qu'un
+  remplacement n'a rien déplacé d'autre** — huit hunks sur quatre adresses, et le bloc de la frise
+  **absent du diff**, ce qu'aucune lecture du code n'aurait établi.
+
+- **T5bis.6 — 20/08/2026 — l'écriture : créer une personne, corriger son profil, poser ses
+  compétences.** Les six gestes sur les deux objets, et C5bis cesse de livrer un référentiel qu'un
+  script seul alimente. **Deux clés de la fiche étaient devenues indisponibles**, le découpage ayant
+  précédé T5bis.3 et T5bis.4 : `personne=<uuid>` désigne la fiche en lecture, `competence` est le
+  filtre conjonctif répétable. Trois arbitrages rendus avant écriture — `profil` (`nouveau` |
+  identifiant) pour la saisie, parce que ce sont **deux droits** et qu'une clé unique aurait fait
+  tomber la fiche avec le droit d'écrire ; `maitrise` pour la compétence, sa valeur restant
+  polymorphe ; `archiver=<uuid>` plutôt que `=confirmation`, `/equipe` n'ayant pas d'objet de page.
+  Un quatrième écart, de périmètre : `person-detail.tsx` entre, le câblage des six gestes vers la
+  carte passant par lui (précédent de TD.3). Le décompte d'exclusivité passe **d'une clé à quatre
+  sans qu'un caractère change**, pour la quatrième fois. Sa propriété la mieux payée est un
+  non-geste : **une compétence ne se déplace pas** — le panneau de correction ne rend aucun contrôle
+  de compétence, et `lockedSkillId` ignore ce que le formulaire porterait plutôt que de le refuser,
+  la seule forme qui ne puisse pas se tromper. Sa leçon est dans le harnais, et c'est un **troisième
+  200 muet** après ceux de TD.1 et de T5bis.4 : `$ACTION_REF_1` est rendu **sans attribut `value`**,
+  un extracteur qui l'exige le saute, et Next répond `Failed to find Server Action` — un 500 que
+  seule l'étape témoin distingue d'un refus.
+
+- **Le bloc « Démarrage » — hors ticket, le 20/08/2026.** La page disait ce qui **a été fait** ;
+  elle ne disait pas ce qu'on **peut** faire. `starters` et `starter_kind` (migration **0008**),
+  quatre pistes amorcées, une carte par piste avec son lien sortant et un panneau « en savoir plus »
+  (`?piste=<id>`). Quatre arbitrages rendus avant écriture — référentiel neuf plutôt que dérivation
+  d'`activity_types`, même liste sur tous les accompagnements, adresses provisoires sur
+  `example.com`, carte plus panneau. **Une seule clé d'URL là où Personae et Use Cases en ont deux**,
+  et c'est la conséquence exacte de leur règle : la paire « une clé pour lire, une clé pour écrire »
+  n'a rien à séparer quand il n'y a pas d'écriture — `starters` est un référentiel, D25 lui donne son
+  écran en C7. Le décompte d'exclusivité passe **de six à sept clés sans qu'un caractère change**,
+  pour la cinquième fois. Sept écarts consignés, dont l'ordre de `docs/06` §5 : le bloc passe devant
+  « Ressources », D31 ne tenant que sur la position dominante de la roadmap. Sa propriété la mieux
+  payée est la forme de sa lecture : **`listStarters` ne prend aucun identifiant**, si bien que rien
+  n'y regarde le projet et que la jauge de complétion interdite est **non représentable**. Sa leçon
+  est dans la mise en défaut : **neutraliser un critère de tri secondaire ne prouve rien en une
+  exécution** — l'ordre rendu sans départage est arbitraire mais **stable**, celui de l'insertion,
+  et la fixture doit insérer les ex æquo à rebours de l'alphabet pour que la neutralisation morde.
+- **La page d'un accompagnement passe à `project-v2` — hors ticket, le 20/08/2026.** La maquette de
+  Claude Design transposée, à fonctionnalités et à données constantes : en-tête en carte (statut,
+  période et rang sur une ligne, geste principal en bouton primaire, « Archiver » sous un menu),
+  **barre d'ancres collante** (`subnav.tsx`), corps à **deux colonnes** avec un rail de 380 px,
+  roadmap en **liste à plat filtrée par pastilles**, « Démarrage » en cartes, blocs annoncés en trio.
+  `ROADMAP_STATE_PARAM` (`etat`) est la **huitième clé de la page et la première qui n'ouvre rien** :
+  hors de `PROJECT_PANEL_PARAMS` et du décompte d'exclusivité, reconduite par `closeHref`.
+  `listProjectAdoptions` gagne `is_north_star` — une colonne dans un `select` existant, aucune
+  migration. Quatre arbitrages rendus avant écriture, dont **le refus d'étendre la dérogation D39** :
+  ni jauge ni « Encore 14 pts », alors que `targetGap` et `axisScale` les rendraient en trois lignes.
+  Referme le point ouvert sur `Section`/`Block` — la page projet monte au format produit. Sa leçon :
+  **une maquette faite hors du produit dessine ses interdits en toute bonne foi, et les dessine
+  bien** ; ce qui permet de trancher n'est pas de relire la règle, c'est que la question se pose
+  « étend-on la dérogation ? » plutôt que « peut-on ? ».
+- **Le bouton, composant unique à trois rangs — hors ticket, le 21/08/2026.** `buttonClass()`
+  rend la chaîne pour toute balise, `Button` couvre les `<button>` et place l'icône, `ButtonIcon`
+  porte le glyphe ; `BUTTON_PRIMARY` et `BUTTON_SECONDARY` disparaissent. La doctrine du 18/08 sur
+  `@apply` **est maintenue**, pour une raison neuve : c'est aussi ce que la documentation de Tailwind
+  déconseille, et la fonction de variantes est le standard qu'ont formalisé `cva` et
+  `tailwind-variants`. Aucune ligne de CSS écrite. Trois écritures rentrent au socle **par
+  disparition** — les trois coquilles à deux attributs (le point ouvert se referme comme il le
+  prescrivait), les deux boutons icône seule, et `disabled:opacity-60` recopié quatre fois. Deux
+  écarts assumés à la demande : `tertiary` et les props d'icône de `Button` n'ont **aucun appelant**
+  au jour où ils sont écrits. **34 balises bougent, et pas une de plus** : dépouillées de leur
+  attribut `class`, elles sont strictement identiques des deux côtés. Sa leçon est dans
+  l'instrument : **`tr` mappe caractère à caractère**, si bien que `tr '>' '>\n'` vaut `tr '>' '>'`
+  — un comptage plausible et nul, que seul le témoin `rounded-xl` a redressé.
+
+- **La roadmap reprise, la page projet dégraissée — hors ticket, le 21/08/2026.** Six gestes à la
+  demande : lignes centrées, kebab en `tertiary` (premier appelant du rang écrit la veille sans
+  aucun), « Ajouter une activité » remonté en haut à droite, **`activities.external_url`** avec son
+  champ et son lien sortant, filtre de roadmap repassé **côté client**, « Projets liés » et la barre
+  d'ancres retirés du rendu. Le bouton n'avait jamais bougé du code : c'est `SectionHeader` qui le
+  faisait tomber — `basis-full` sur la note étirait le bloc titre à toute la largeur, `flex-wrap`
+  renvoyait l'action dessous. **Un défaut de socle, corrigé pour les cinq blocs à la fois.**
+  `activity_types.default_tool_id` trouve son **premier lecteur** : il nomme le lien, « Ouvrir dans
+  Ergonome », et c'est ce qui évite de reconnaître un audit à son libellé. Premier fichier de tests
+  d'action de `projets/` (7 cas). Deux classes de débogage, `bbb` et `aaaa`, servies dans le HTML
+  depuis la veille, retirées. Sa leçon : **un espace de classes fermé rend les classes mortes
+  invisibles** — `--color-*: initial` fait qu'aucune règle ne répond à `aaaa`, donc rien ne le
+  signale, ni le navigateur, ni `tsc`, ni `eslint`.
+
+- **Administration : le référentiel des entités — hors ticket, le 21/08/2026.** `entities` recevait
+  ses lignes de `scripts/seed.ts` et **d'aucune écriture applicative** depuis T1.2. L'écran de D25
+  arrive, **avancé de C7 sur un seul référentiel** : lister (archivées comprises), ajouter, corriger,
+  archiver, rétablir, et **supprimer** — écart à la règle 4 arbitré par l'humain, borné à une ligne
+  que rien ne référence et tenu par quatre choses : `DeletableTable`, la clé étrangère `restrict`, le
+  décompte et le panneau. `docs/06` §8 obtient son entrée de navigation, et **l'interdit de lecture
+  en base de T1.6 tombe pour la coquille** — la carte de la personne courante, elle, reste dehors
+  (règle 3). Deux décomptes par ligne, parce qu'une entité dont tous les produits sont rangés est
+  archivable sans être supprimable. Sa leçon est dans un `catch` : **une clé `restrict` rend `23001`
+  et non `23503`**, et Drizzle enveloppe l'erreur du pilote dans un `DrizzleQueryError` sans `code` —
+  un `catch` sur un code d'erreur est du code que seul le test qui le provoque met en défaut.
+
+- **Un seul bloc d'accompagnements sur la page produit — hors ticket, le 21/08/2026.**
+  « Accompagnements en cours » et « Tous les accompagnements » lisaient le même tableau, dans le même
+  ordre, vers la même destination de clic : le doublon, assumé depuis T5.5, est refermé. Le second
+  disparaît, le premier perd « en cours » de son titre et reçoit ce qui n'existait que là —
+  **l'objectif et l'équipe** sur chaque ligne (colonne de 280 à 352 px, filets d'axe suivis),
+  une section **« Sans date »** hors du filtre, et l'état vide qui porte le geste (`addHref`, idiome
+  de `Personas`). Le filtre d'échelle passe **côté client** : les préréglages étaient des liens vers
+  `?de=&a=`, donc une navigation — l'URL changeait, le défilement repartait en haut. Le serveur rend
+  désormais **une frise par préréglage** et `ScaleSwitch` monte la bonne, si bien que le calcul reste
+  entier dans `lib/queries/timeline.ts` : **960 tests passent sans qu'une ligne de test bouge**, ce
+  qui est la preuve que rien n'a changé de place. `de`, `a`, `productRoadmapWindow` et le formulaire
+  « De / à » disparaissent avec l'URL qu'ils écrivaient. Sa leçon : **une frise pré-rendue par
+  fenêtre coûte une charge RSC, jamais un DOM** — c'est ce qui évite d'embarquer le schéma de la base
+  dans le paquet du navigateur pour un `useState`.
+
+- **La page produit : hiérarchie, regroupement, second rang effacé — hors ticket, le 21/08/2026.**
+  Quatre gestes dans la foulée du bloc unique d'accompagnements, le même jour. **« Accompagnements »
+  remonte** juste sous « Vision produit » — ce qu'on fait sur ce produit se lit avant ce que le
+  produit est — et **rend les avatars d'équipe** reçus le matin : trop de place pour ce qu'ils
+  disaient. **« Personae » et « Use Cases » fusionnent** en « Utilisateurs et usages », deux rangs à
+  intertitre dans une seule carte : la distinction reste entière, le nombre de cartes tombe de
+  quatre à trois. Les deux composants perdent leur coquille et deviennent `PersonasRank` /
+  `UseCasesRank` ; **leurs états vides passent d'`EmptyState` à `BlockNote`**, ce qui est le critère
+  déjà écrit dans `empty-state.tsx` — un rang qui a son intertitre n'a pas de titre à redonner à son
+  quart vide — et évite au passage deux `h3` empilés. Les deux « Ajouter » entrent dans **un seul
+  menu ⋮** en haut du bloc, au rang **tertiaire**, comme celui de « Vision produit » : c'est le rang
+  des gestes de bloc, arbitré ce jour. En en-tête de page, **« Modifier ce produit » et « Archiver »
+  entrent dans un kebab `secondary`** — la forme de la page projet —, et « Nouvel accompagnement »
+  reste seul visible. Sa leçon : **un menu ne rend ses entrées qu'ouvert**, donc un geste qui n'existe
+  que là est invisible au `curl` ; c'est le bouton et son `aria-label` qui se lisent dans le HTML
+  servi, et le second chemin — le lien inline du paragraphe d'absence — qui garde le geste
+  atteignable sans JavaScript.
+
+- **T5bis.7 — 25/08/2026 — la sélection d'équipe du formulaire de projet, refondue.** Le dernier
+  ticket de C5bis, et celui qui fait cesser un doublon : le formulaire **puise** dans le référentiel
+  au lieu de le doubler. Chaque ligne porte le métier et la disponibilité à côté du nom — deux
+  valeurs **reportées**, jamais un tri ni un rapprochement avec les métiers déclarés (D44) —, et le
+  bloc « Ajouter une personne » de T2.6 disparaît (arbitrage (g)), remplacé par un lien vers
+  `/equipe?profil=nouveau`. Quatre arbitrages rendus avant écriture, dont **la septième lecture** :
+  `jobs` est lu **deux fois**, une fois pour les cases à cocher avec l'exception nominative de
+  T4bis.1, une fois `includeArchived` pour les seuls libellés — sans quoi le métier d'une personne
+  s'afficherait ou non **selon le projet qu'on est en train de modifier**. C'est le précédent des
+  entités, resservi. Referme deux points ouverts d'un coup, et le second sans l'avoir cherché :
+  « on n'ajoute qu'une personne par enregistrement », et **`PERSON_KIND_LABEL` en deux exemplaires
+  divergents** — l'écran qui portait l'autre vocabulaire n'existe plus, l'arbitrage éditorial n'a
+  plus d'objet. Sa propriété la mieux payée est une **non-lecture** : `readProjectForm` ne connaît
+  plus `newPersonName`, si bien qu'une soumission forgée ne se heurte à aucun refus — elle n'a nulle
+  part où aller. **Mesuré** : POST forgé avec étape témoin, `persons` à 13 avant et après,
+  `projects` de 11 à 12.
+
 ---
 
 ## Journal des tickets — récit détaillé
