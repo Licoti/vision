@@ -4,9 +4,9 @@
  * Sa segmentation obéit à la règle de `docs/06` §5 : **un récit dominant, des
  * blocs de référence autour.** T2.4 pose l'en-tête d'identité, T3.1 branche la
  * roadmap, T4.1 le premier des blocs de référence — « Ressources », en tête du
- * tableau de `docs/06` §5 et jamais avant le récit. Les trois derniers restent
- * des états vides annoncés, dans leur ordre définitif — un bloc vide est un
- * écran à part entière, pas une page incomplète (règle 5).
+ * tableau de `docs/06` §5 et jamais avant le récit. **Les cinq portent leur
+ * contenu depuis T7.1**, qui livre le dernier, « Budget » (D28) : plus aucun
+ * bloc de ce tableau n'est une annonce.
  *
  * **Elle passe à `docs/design/maquettes/blocs/project-v2` le 20/08/2026**, hors
  * ticket, et c'est le plus large changement de forme qu'un écran de Vision ait
@@ -59,7 +59,11 @@
  * n'a pas de résultat et corrige quand elle en porte un. `?archiver=confirmation`
  * ouvre le panneau de confirmation de T4bis.2, repris tel quel. `?lien=nouveau`
  * ouvre celui de T6.5, et `?lien=<identifiant de liaison>` le rouvre sur la
- * raison à corriger — la forme d'`?ressource=`, jusqu'au nom de la clé. La page
+ * raison à corriger — la forme d'`?ressource=`, jusqu'au nom de la clé.
+ * `?budget=saisie` ouvre le dernier (T7.1), et il reprend la forme d'`archiver`
+ * plutôt que celle de `ressource` : **une seule valeur d'ouverture**, parce
+ * qu'il n'y a rien à désigner — `budgets_project_unique` fait qu'un projet
+ * porte au plus un budget, et une seule action le crée ou le corrige. La page
  * reste rendue derrière eux, et porte alors l'attribut HTML
  * `inert` — c'est l'ordre du DOM qui décide de la tabulation, et `inert` est ce
  * qui empêche d'entrer au clavier dans le contenu masqué par le voile.
@@ -70,8 +74,11 @@
  * le filtre, poser un filtre ne ferme aucun panneau — la distinction que
  * `?de=`/`?a=` tiennent sur la page produit.
  *
- * **Les quatre clés sont mutuellement exclusives, et le sont par une règle unique :
- * plusieurs présentes ensemble n'ouvrent rien** (T4.2). Deux `role="dialog"` ou
+ * **Les clés sont mutuellement exclusives, et le sont par une règle unique :
+ * plusieurs présentes ensemble n'ouvrent rien** (T4.2). **Sans le compte** : la
+ * phrase disait « les quatre », elles sont neuf depuis T7.1 — un nombre dans un
+ * commentaire vieillit à chaque ticket, et le geste du dépôt est de le retirer
+ * (T6.1). Deux `role="dialog"` ou
  * deux `inert` concurrents ne se rattrapent pas après coup, et aucune préséance
  * n'est inventée entre des gestes de même rang — c'est déjà ce que la page fait
  * de toute valeur d'`?activite=` qu'elle ne reconnaît pas. T4.4 a tenu la règle
@@ -113,6 +120,7 @@ import {
 } from "./actions";
 import { restoreProject } from "../actions";
 import { AdoptedIndicators } from "@/components/projects/adopted-indicators";
+import { Budget } from "@/components/projects/budget";
 import { Resources } from "@/components/projects/resources";
 import { Journal } from "@/components/projects/journal";
 import { RelatedProjects } from "@/components/projects/related";
@@ -124,10 +132,8 @@ import { Button, buttonClass } from "@/components/ui/button";
 import { DrawerHost, DrawerLink } from "@/components/ui/drawer";
 import { ArchivedNotice } from "@/components/ui/archived-notice";
 import { AvatarGroup } from "@/components/ui/avatar";
-import { BlockNote } from "@/components/ui/empty-state";
 import { Field, FieldRow } from "@/components/ui/field";
 import { Page, PageHeader } from "@/components/ui/page";
-import { Section, SectionHeader } from "@/components/ui/section";
 import { StatusPill } from "@/components/ui/status-pill";
 import { Tag } from "@/components/ui/tag";
 import { loadProjectDrawer } from "./drawers";
@@ -140,6 +146,7 @@ import {
 import { formatPeriod, formatRank } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
 import { listProjectRoadmap } from "@/lib/queries/activities";
+import { findProjectBudget } from "@/lib/queries/budgets";
 import { listProjectAdoptions } from "@/lib/queries/indicators";
 import { listProjectJournal } from "@/lib/queries/journal";
 import { listDeclaredLinks, listRelatedProjects } from "@/lib/queries/links";
@@ -155,52 +162,6 @@ export const metadata = {
   title: "Projet — Vision",
 };
 
-/**
- * Les trois blocs **annoncés** de `docs/06` §5, dans son ordre — fréquence de
- * consultation. « Ressources » et « Indicateurs adoptés » les précédaient ici
- * jusqu'à T4.1 et T5.4 ; ils portent désormais leur contenu réel, vivent dans
- * leurs composants et ont rejoint le rail droit.
- *
- * **Ils passent en rangée** (20/08/2026, maquette `project-v2`) : des cartes
- * courtes côte à côte, sous le bloc « Démarrage ». Un bloc vide est un écran à
- * part entière (règle 5) ; des blocs vides empilés à pleine largeur donnaient à
- * la page un tiers d'attente pour un tiers de contenu.
- *
- * **« Projets liés » en est sorti le 21/08/2026**, à la demande — masqué, pas
- * livré : ce qui disparaissait était l'annonce, pas la destination. La rangée
- * passait de trois cartes à deux. **La promesse est tenue par T6.4** : le bloc
- * est revenu au rendu avec ses liens déduits, il se rend au-dessus de cette
- * liste-ci, et il n'y entre pas — un bloc qui porte son contenu n'annonce plus
- * rien. **T6.5 lui a donné sa seconde moitié** : `project_links` a enfin un
- * lecteur, et le bloc porte les deux natures que `docs/06` §5 lui promettait.
- *
- * **« Journal » en sort à son tour, et par l'inverse : il est livré** (T6.3).
- * Il portait le seul « geste » dessiné de la rangée — « Voir le journal »,
- * arbitré le 20/08/2026 en `<span>` plutôt qu'en `<a>` sans `href`, parce
- * qu'une affordance qui ne répond pas est pire qu'une absence (`docs/06` §9).
- * La promesse d'alors était que C6 livre le journal et que le point d'entrée
- * soit déjà à sa place : il est devenu le `<summary>` de
- * `components/projects/journal.tsx`. **`pending` disparaît avec lui** — il
- * n'avait que cet appelant, et une capacité sans appelant est celle que le
- * ticket suivant emploierait de travers.
- *
- * **Il en reste un, et la rangée n'en est plus une.** Une seule carte dans une
- * grille de deux laisserait une moitié de vide, exactement ce que le tour
- * précédent refusait pour deux cartes dans une grille de trois : « Budget » se
- * rend donc seul, sur toute la largeur de la colonne. Il reste annoncé jusqu'à
- * C7 (D28).
- */
-const REFERENCE_BLOCKS: {
-  title: string;
-  description: string;
-}[] = [
-  {
-    title: "Budget",
-    description:
-      "La synthèse macro — alloué, consommé — s'affichera ici, avec le lien vers l'outil de gestion. Le suivi budgétaire est tenu là-bas ; Vision renvoie vers la source plutôt que d'en reproduire le détail.",
-  },
-];
-
 export default async function ProjectPage({
   params,
   searchParams,
@@ -215,6 +176,7 @@ export default async function ProjectPage({
     indicateur?: string;
     piste?: string;
     lien?: string;
+    budget?: string;
   }>;
 }) {
   const { id } = await params;
@@ -248,6 +210,7 @@ export default async function ProjectPage({
     indicateur,
     piste,
     lien,
+    budget: budgetParam,
   } = await searchParams;
 
   /* **L'URL reste une adresse, elle n'est plus le mécanisme** (TD.2). Coller
@@ -262,10 +225,10 @@ export default async function ProjectPage({
      T4.4). Côté clic, elle est devenue structurelle — l'état ne porte qu'une
      demande à la fois.
 
-     **Le décompte passe de sept à huit clés sans qu'un caractère de sa logique
-     change** (T6.5, `lien`) : c'est la propriété pour laquelle T4.4 l'avait
-     écrit en décompte plutôt qu'en comparaison, vérifiée pour la sixième
-     fois. */
+     **Le décompte passe de huit à neuf clés sans qu'un caractère de sa logique
+     change** (T7.1, `budget`) : c'est la propriété pour laquelle T4.4 l'avait
+     écrit en décompte plutôt qu'en comparaison, vérifiée pour la septième
+     fois — et c'est la dernière, la page projet n'ayant plus de bloc à ouvrir. */
   const keys = {
     activite,
     ressource,
@@ -275,6 +238,7 @@ export default async function ProjectPage({
     indicateur,
     piste,
     lien,
+    budget: budgetParam,
   };
   const conflict =
     Object.values(keys).filter((value) => value !== undefined).length > 1;
@@ -296,7 +260,10 @@ export default async function ProjectPage({
      c'est ce qui garantit qu'ils sont toujours vrais, et le coût est celui que
      `docs/04` §5 accepte à quinze projets. Les liens **déclarés** (T6.5), eux,
      se lisent en une requête sur `project_links` — dans les deux sens, la
-     lecture étant symétrique. */
+     lecture étant symétrique. Le **budget** rejoint le vol en dernier (T7.1) :
+     c'est une lecture de plus dans le même aller-retour, pas un tour de plus, et
+     elle est ouverte à tout le domaine comme les autres — un accompagnement se
+     lit entier, seul le geste tombe avec le droit. */
   const [
     rank,
     roadmap,
@@ -306,6 +273,7 @@ export default async function ProjectPage({
     journal,
     related,
     declared,
+    budget,
   ] = await Promise.all([
     findAccompanimentRank(session.db, project),
     listProjectRoadmap(session.db, project.id),
@@ -315,6 +283,7 @@ export default async function ProjectPage({
     listProjectJournal(session.db, project.id),
     listRelatedProjects(session.db, project.id),
     listDeclaredLinks(session.db, project.id),
+    findProjectBudget(session.db, project.id),
   ]);
 
   /* La roadmap et les pistes sont **déjà lues** pour l'écran : la résolution
@@ -606,18 +575,27 @@ export default async function ProjectPage({
               }
             />
 
-            {/* Le bloc annoncé, **au singulier depuis T6.3**. La grille a
-                disparu avec le second : une carte dans une grille de deux
-                laisserait une moitié de vide, ce que le tour précédent refusait
-                déjà pour deux cartes dans une grille de trois. Le `map` reste —
-                c'est lui qui rend le retour de « Projets liés » et l'arrivée de
-                « Budget » sans qu'une balise bouge. */}
-            {REFERENCE_BLOCKS.map((block) => (
-              <Section key={block.title}>
-                <SectionHeader title={block.title} />
-                <BlockNote>{block.description}</BlockNote>
-              </Section>
-            ))}
+            {/* **Le dernier bloc de `docs/06` §5, et il porte enfin son
+                contenu** (T7.1, D28). Il était le seul qui restait annoncé, et
+                la rangée des blocs annoncés disparaît avec lui : `REFERENCE_BLOCKS`
+                et son `map` s'en vont, un tableau vide et une boucle dessus
+                étant une annonce que plus personne ne lit.
+
+                À sa place exacte — après « Projets liés », avant « Journal ».
+                Dans la colonne du récit et non dans le rail : il porte quatre
+                couples nom/valeur et un lien sortant en rangée, qui ne tiennent
+                pas sur 380 px.
+
+                Le point d'entrée tombe avec le **même** `canWrite` que les onze
+                gestes qui précèdent — le droit d'écrire dans ce projet (D9,
+                arbitrage (e) : `writeProject`, jamais `manageDomain`) et la
+                lecture seule d'un accompagnement archivé (T4bis.3) —, et
+                **aucune condition ne s'ajoute ici**. C'est la propriété que ce
+                `&&` cherchait, tenue pour un douzième geste. */}
+            <Budget
+              budget={budget}
+              editHref={canWrite ? ROUTES.projectBudget(project.id) : null}
+            />
 
             {/* **Le journal en dernier** (`docs/06` §5) : c'est une information
                 de contrôle, pas de compréhension, et sa place dans le document

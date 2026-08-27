@@ -39,10 +39,13 @@
  * pour qu'elle n'ait qu'une adresse. Les trois panneaux disparaissent aussi du
  * rendu, et les gestes de roadmap avec eux ; ce n'est pas ce rendu qui protège.
  *
- * **Sept écritures ajoutent ou corrigent ; trois retirent** (T4bis.4, T4bis.5,
- * T4bis.6). `archiveActivity`, `archiveResource` et `archiveResult` sont les
- * seuls gestes de ce fichier qui sortent une ligne du récit, et les seuls
- * appelants d'`archive()` ici. Ils ne suppriment rien (règle 4) et ne cascadent
+ * **Les écritures ajoutent ou corrigent ; trois retirent** (T4bis.4, T4bis.5,
+ * T4bis.6). **Sans le compte** : la phrase disait « sept » quand elle a été
+ * écrite, l'adoption et le lien déclaré l'ont dépassée, et T7.1 y ajoute le
+ * budget — un nombre dans un commentaire vieillit à chaque ticket, et le geste
+ * du dépôt est de le retirer (T6.1). `archiveActivity`, `archiveResource` et
+ * `archiveResult` sont les seuls gestes de ce fichier qui sortent une ligne du
+ * récit, et les seuls appelants d'`archive()` ici. Ils ne suppriment rien (règle 4) et ne cascadent
  * sur rien (arbitrage (f)) : archiver une activité laisse ses ressources avec
  * leur `activity_id` et leur `archived_at` nul.
  *
@@ -137,6 +140,22 @@
  *
  * **`product_id` reste nul sur les onze** : le produit se déduit du projet, et
  * le figer serait faux le jour où l'accompagnement change de produit (D20).
+ *
+ * **Saisir le budget (T7.1)** est la dernière écriture de ce fichier, et la
+ * seule qui ne soit ni tout à fait une création ni tout à fait une correction :
+ * `budgets_project_unique` fait qu'un projet porte **au plus un** budget, si
+ * bien que `saveProjectBudget` cherche la ligne **par le projet** et l'écrit ou
+ * la récrit. Il n'y a donc ni identifiant à recevoir ni cible à rapprocher de la
+ * page — et pas de porte de plus : `openProject` suffit, là où la ressource,
+ * l'adoption et le lien en demandaient une seconde.
+ *
+ * **Elle ne laisse aucune trace au journal**, et c'est un arbitrage, pas un
+ * oubli (arbitrage (d) de `tickets-C7.md`) : `budget` n'est pas l'un des six
+ * `event_target_type`, et l'ouvrir pour un seul objet demanderait une migration
+ * d'énuméré quand six autres objets écrivent déjà sans trace. Le point ouvert
+ * d'`ETAT.md` se récrit avec un septième nom ; il ne se referme pas à moitié.
+ * C'est la seule écriture de ce fichier dont l'absence de `record` soit voulue,
+ * et elle est écrite ici pour qu'on ne la prenne pas pour un manque.
  */
 
 import { and, eq } from "drizzle-orm";
@@ -150,6 +169,7 @@ import {
   activityParticipants,
   activityTypes,
   approaches,
+  budgets,
   indicators,
   projectIndicators,
   projectLinks,
@@ -166,6 +186,13 @@ import {
   type AdoptionFormState,
   type AdoptionRowInput,
 } from "@/lib/forms/adoption";
+import {
+  parseBudgetForm,
+  readBudgetForm,
+  type BudgetFormErrors,
+  type BudgetFormState,
+  type BudgetRowInput,
+} from "@/lib/forms/budget";
 import {
   activityRowUnchanged,
   canTransitionActivity,
@@ -2391,4 +2418,174 @@ export async function removeProjectLink(
   });
 
   refreshLink(projectId, gate.link.toProjectId);
+}
+
+/* ==========================================================================
+   Le budget — T7.1
+
+   `budgets` était au schéma depuis la migration `0000` et n'avait jamais reçu
+   une ligne : c'est la dernière promesse non tenue de `docs/06` §5, et D28 la
+   voulait en dernier.
+
+   **Un seul geste, là où les autres blocs en ont trois.** Ni retrait ni
+   archivage (arbitrage (c) de `tickets-C7.md`) : `budgets` ne porte pas
+   d'`archived_at`, et lui en ajouter un serait une seconde migration que le
+   chantier n'attend pas. `unlink` n'est pas employé non plus — l'exception de
+   C6 était argumentée sur une **table de liaison**, et `budgets` n'en est pas
+   une, puisqu'elle porte des valeurs propres. Un budget saisi par erreur se
+   **corrige** : toutes ses colonnes de valeur sont nullables, et le formulaire
+   vidé les remet à `null`. C'est le chemin de rattrapage, et il est complet.
+
+   **Aucune ligne de journal** (arbitrage (d)). `budget` n'est pas l'un des six
+   `event_target_type`, et l'ajouter demanderait une migration d'énuméré pour un
+   seul objet quand persona, use case, indicateur, personne, entité et vision
+   produit n'en ont pas. Le point ouvert d'`ETAT.md` se récrit avec un
+   **septième** nom ; il ne se referme pas à moitié.
+   ========================================================================== */
+
+/**
+ * Un refus qui n'appartient à aucun champ — jumeau d'`adoptionRefusal`.
+ *
+ * La saisie revient telle quelle : Vision ne jette jamais en silence ce qui a
+ * été tapé, y compris quand ce qu'elle refuse n'est pas la saisie.
+ */
+function budgetRefusal(formData: FormData, message: string): BudgetFormState {
+  return { values: readBudgetForm(formData), errors: {}, message };
+}
+
+/**
+ * L'outil reçu, rapproché du domaine courant.
+ *
+ * Un identifiant inconnu — ou d'un autre domaine, que la couche ne distingue
+ * pas — produit un message de champ, jamais une exception.
+ * `assertPreconditions` reste le second filet, pas le premier.
+ *
+ * Un outil **archivé** est refusé pour la raison de `checkAdoptionIndicator` :
+ * le panneau ne le propose pas, et rien ne justifie de l'accepter par requête.
+ *
+ * **`keptToolId` est l'exception nominative** (T4bis.6, transposée). Un budget
+ * dont l'outil a été archivé depuis garde son outil sélectionné dans le
+ * panneau — `listResultToolOptions` le lui rend nommément ; le refuser à la
+ * re-soumission rendrait toute correction impossible sans changer d'outil.
+ * L'exception est **nominative** : elle n'accepte que la valeur déjà portée par
+ * la ligne, et n'ouvre la porte à aucun autre archivé. Une **saisie** n'en passe
+ * aucune, n'ayant aucune valeur antérieure à préserver.
+ */
+async function checkBudgetTool(
+  session: Session,
+  input: BudgetRowInput,
+  keptToolId: string | null = null,
+): Promise<BudgetFormErrors> {
+  if (!input.toolId) return {};
+
+  const tool = await session.db.find(tools, input.toolId);
+  if (!tool || (tool.archivedAt !== null && tool.id !== keptToolId)) {
+    return { toolId: "Cet outil n'existe pas dans ce domaine." };
+  }
+
+  return {};
+}
+
+/**
+ * Le seul écran que cette écriture change.
+ *
+ * Ce n'est **pas** `refresh` : `last_activity_at` n'a pas bougé — un budget
+ * n'est pas un fait d'accompagnement —, et revalider la liste des projets ferait
+ * croire le contraire au lecteur de ce fichier (la leçon de T4.2). Ce n'est pas
+ * non plus `refreshAdoption` : la page du **produit** n'affiche aucun budget, et
+ * la revalider serait annoncer une conséquence qui n'existe pas.
+ */
+function refreshBudget(projectId: string): void {
+  revalidatePath(ROUTES.project(projectId));
+}
+
+/**
+ * Saisir ou corriger le budget d'un accompagnement — **un seul geste, une seule
+ * ligne**.
+ *
+ * `budgets_project_unique` fait qu'un projet porte au plus un budget : il n'y a
+ * donc pas d'identifiant à recevoir, pas de cible à rapprocher de la page, et
+ * pas de demande forgée à écarter de ce côté — la ligne se cherche **par le
+ * projet**. C'est ce qui distingue cette action des trois gestes de la ressource
+ * ou de l'adoption, et c'est une propriété de la table, pas un choix.
+ *
+ * `projectId` est lié côté serveur ; `previous` est l'état que `useActionState`
+ * fait circuler, dont l'action n'a pas besoin — la saisie repart du `FormData` à
+ * chaque soumission.
+ *
+ * **Ce qui protège est `openProject`, et lui seul** : le droit `writeProject`
+ * est interrogé sur le `projectId` **reçu**, quel qu'il soit. L'identifiant lié
+ * n'est pas un secret — Next le sérialise en clair dans un champ `$ACTION_…`, et
+ * une soumission peut le réécrire.
+ *
+ * **Le droit est `writeProject`, jamais `manageDomain`** (arbitrage (e)) : le
+ * budget est une propriété de l'**accompagnement**, ce qui le sépare de la
+ * vision produit, propriété du produit. C'est le droit des ressources, des
+ * résultats et des adoptions (D9, D23), et inventer un troisième niveau pour lui
+ * serait ce que D9 refuse.
+ *
+ * **Une soumission entièrement vide est acceptée**, et c'est le geste qui défait
+ * : les cinq colonnes repassent à `null`, la ligne reste. Refuser le formulaire
+ * vide fermerait le seul rattrapage d'une saisie erronée.
+ */
+export async function saveProjectBudget(
+  projectId: string,
+  _previous: BudgetFormState,
+  formData: FormData,
+): Promise<BudgetFormState> {
+  const session = await requireSession();
+
+  const gate = await openProject(
+    session,
+    projectId,
+    "La saisie du budget est réservée au responsable de domaine et aux contributeurs désignés de cet accompagnement.",
+  );
+  if ("message" in gate) return budgetRefusal(formData, gate.message);
+
+  const { values, errors, input } = parseBudgetForm(formData);
+  if (!input) return { values, errors };
+
+  /* La ligne déjà en place, s'il y en a une. `list` et non `find` : la clé de
+     recherche est le projet, pas l'identifiant du budget — et `budgets` n'a pas
+     d'`archived_at`, donc la couche n'a rien à écarter. L'`unique` garantit
+     qu'il y en a zéro ou une ; en prendre la première ne masque aucun cas. */
+  const held = await session.db.list(budgets, {
+    where: eq(budgets.projectId, projectId),
+  });
+  const current = held[0] ?? null;
+
+  const unknown = await checkBudgetTool(
+    session,
+    input,
+    current?.toolId ?? null,
+  );
+  if (Object.keys(unknown).length > 0) return { values, errors: unknown };
+
+  try {
+    /* **Créer ou corriger la même ligne**, et c'est ce que la fiche demande :
+       un seul geste, un seul formulaire, une seule adresse. `insert` ne peut
+       jamais heurter `budgets_project_unique`, la lecture qui précède ayant
+       déjà tranché — et si une soumission concurrente la posait entre les deux,
+       la contrainte refuserait plutôt que de créer un doublon. */
+    if (current) {
+      await session.db.update(budgets, current.id, input);
+    } else {
+      await session.db.insert(budgets, { projectId, ...input });
+    }
+  } catch (error) {
+    if (error instanceof DomainScopeError) {
+      return budgetRefusal(
+        formData,
+        "Une référence de ce formulaire n'appartient pas au domaine : la saisie n'a pas été enregistrée.",
+      );
+    }
+    throw error;
+  }
+
+  refreshBudget(projectId);
+
+  /* Le panneau se referme sur ce succès (TD.2) : `revalidatePath` porte l'arbre
+     réactualisé, ce qui a été saisi paraît dans son bloc, et c'est toute la
+     confirmation (`docs/06` §9). */
+  return { values, errors: {}, ok: true };
 }

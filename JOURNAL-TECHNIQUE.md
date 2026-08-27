@@ -6893,3 +6893,153 @@ ticket posées.
 
 C'est le dernier repli de ce genre : `docs/05` §5 n'a pas de huitième chantier, et la section
 « Journal des tickets » restera donc bornée par construction.
+
+---
+
+## T7.1 — Le budget : le dernier bloc de la page projet — 28/08/2026
+
+### Deux fichiers hors des sept de la fiche, et les deux raisons ne sont pas de même rang
+
+**`lib/drawers/types.ts` n'était pas un choix.** Une neuvième clé d'URL exige
+`| { kind: "budget" }` dans `ProjectDrawerRequest` et `"budget"` dans `PROJECT_KINDS` : sans le
+second, `asProjectRequest` rétrécit la demande et la renvoie à `null`, si bien que **l'adresse
+ouvrirait le panneau et le clic ne l'ouvrirait pas**. La fiche nomme `lib/drawers/project.tsx` sans
+son jumeau de typage ; c'est une omission de la fiche, pas un débordement du ticket.
+
+**`lib/forms/budget.ts` et son test sont un arbitrage, et il a été rendu faute de pouvoir poser la
+question.** Le dossier `lib/forms/` porte treize modules dont l'en-tête dit la même phrase — *ni
+base, ni Next, ni React* — et sa raison d'être est que la règle **s'énonce et s'éprouve seule, sans
+branche Neon ni fixture**. Deux conséquences si la validation était allée dans `actions.ts` : les
+vingt-deux tests de forme n'auraient plus tourné que contre une base réelle, et `budget-panel.tsx`,
+composant client, aurait dû importer `BudgetFormState` depuis un fichier `"use server"` de
+2 394 lignes. Le coût de l'écart est un fichier de plus au périmètre ; le coût de son absence était
+une règle qu'on ne peut plus mettre en défaut sans base. **Écart assumé, à relire si la convention
+du dossier change.**
+
+### `unit` ne se saisit pas, et c'est la leçon de T5.2 prise dans l'autre sens
+
+`budget_unit` est un énuméré à **une seule valeur**, `days`, et `budgets.unit` est `not null` avec ce
+défaut. Un `<select>` d'une option n'offre aucun choix : il occupe une ligne de formulaire et fait
+croire à une décision. Le champ n'est donc pas rendu, et `readBudgetForm` **ne lit pas** la clé —
+un test le fige, en soumettant `unit=euros` et en vérifiant que la valeur lue ne la porte pas. Sans
+ce refus nommé, un champ ajouté par n'importe qui deviendrait une colonne écrite.
+
+L'unité se **lit** en revanche : « 140 » sans unité ne dit rien. C'est l'inverse exact de
+l'arbitrage (i) du chantier — là-bas une colonne sans lecteur, ici une colonne sans écrivain — et
+les deux se justifient par la même phrase : ce qui n'a ni lecteur ni raison d'être saisi est ce
+qu'on relit un jour sans savoir pourquoi.
+
+`BUDGET_UNIT_LABEL` vit dans `components/projects/budget.tsx` et non dans `lib/format.ts`, qui n'est
+pas au périmètre. C'est un `Record<BudgetUnit, string>` **exhaustif à la compilation** : le jour où
+l'énuméré gagne une valeur, le fichier cesse de compiler plutôt que de rendre un montant muet. Il
+rejoindra `PERSON_KIND_LABEL` dans `lib/format.ts` en T7.9 — point ouvert récrit dans `ETAT.md`.
+
+### Un budget entièrement vide est une saisie valide, et c'est le seul geste qui défait
+
+L'arbitrage (c) du chantier interdit le retrait : `budgets` n'a pas d'`archived_at`, n'en reçoit pas
+— ce serait une seconde migration —, et `unlink` ne s'applique pas puisque la table porte des
+valeurs propres et n'est pas une table de liaison. Reste la correction. Elle ne suffit que si vider
+un champ **efface la colonne** : c'est pourquoi les cinq membres de `BudgetRowInput` sont `| null`
+et pourquoi `validateBudgetForm` ne rend **aucune** erreur sur un formulaire vide. Refuser la
+soumission vide aurait laissé un montant erroné en base pour toujours, sans qu'aucun écran ne le
+signale.
+
+Conséquence à connaître : `saveProjectBudget` distingue **le projet sans ligne** (le bloc rend son
+état vide) du **projet dont la ligne est toute nulle** (le bloc rend « Non renseigné » quatre fois).
+Les deux se ressemblent à l'écran et ne sont pas le même état ; un test de la lecture les sépare.
+
+### Le 200 muet, une quatrième fois — et l'étape témoin l'a rendu lisible
+
+Le POST forgé sur `saveProjectBudget` sous une identité sans `writeProject` rend **HTTP 200**,
+exactement comme celui qui écrit. C'est le piège que TD.1, T5bis.4 et T5bis.6 ont payé faute d'étape
+témoin, et il n'a rien perdu de sa force. Ce qui tranche est le décompte en base : `BUDGETS=0` → `1`
+sous le contributeur, puis la même charge sous une non-contributrice avec des valeurs `999999`, et
+la ligne **intacte à 140.0000**. Le refus figurait bien dans le corps de la réponse, mais le lire
+n'aurait rien prouvé — une réponse peut porter un message et avoir écrit quand même.
+
+### `text/plain` ne conduit pas une action de formulaire, et c'est mesuré
+
+La fiche de T7.1 demande le POST forgé « en **`text/plain`** ». Cette recette est celle de T6.1, et
+elle vise les **fonctions serveur** — `loadProjectDrawer` —, dont la charge est un tableau
+d'arguments JSON. Une action de formulaire reçoit un `FormData`. Les deux ne sont pas
+interchangeables, et plutôt que de l'affirmer, la mesure a été prise :
+
+- `Content-Type: text/plain` **+ en-tête `next-action`** : la requête **atteint bien l'action** — la
+  pile d'erreur nomme `readBudgetForm` puis `field` —, et rend **HTTP 500**,
+  `TypeError: Cannot read properties of undefined (reading 'get')` : le second argument arrive en
+  objet nu, et `formData.get` n'existe pas. **Rien n'est écrit** : le budget reste à `140 jours`,
+  relu dans le HTML servi juste après. La porte de droit avait pourtant été franchie — l'identité
+  était celle du contributeur —, donc le 500 vient de la **forme de la charge**, pas d'un refus.
+- La même charge **sans** l'en-tête `next-action` rend **HTTP 200 et 94 536 octets**, c'est-à-dire
+  la page entière. C'est le piège que T6.1 avait déjà relevé, et il ressemble à un succès.
+
+La discipline est donc tenue par l'autre chemin : la charge a été rejouée **en multipart**, avec les
+champs `$ACTION_REF_1`, `$ACTION_1:0`, `$ACTION_1:1` et `$ACTION_KEY` relevés dans le balisage servi
+— ce qu'envoie un navigateur sans JavaScript, la recette de T4.2. **L'écart au libellé de la fiche
+est ici, la vérification est complète.** À retenir pour les tickets suivants : la recette dépend du
+**type de point d'entrée**, et écrire « en `text/plain` » sans distinguer les deux fera perdre du
+temps à qui la suivra.
+
+Constat de passage, et il vaut d'être écrit : `$ACTION_1:1` porte
+`["28b79f40-…",{"values":{…},"errors":{}}]` — l'identifiant du projet lié **en clair dans le
+balisage servi**. Le rappel de contexte d'`ETAT.md` l'affirmait ; c'est mesuré.
+
+### La jointure sur `tools` n'a rien qui la rattrape
+
+`listProjectResources` portait deux `leftJoin` filtrés, et T4.1 avait relevé que **retirer l'un
+seul ne faisait rien tomber** : l'autre le rattrapait. `findProjectBudget` n'a qu'une table jointe.
+`filter(tools)` est donc le seul rempart, et son retrait produit une fuite lisible sur l'écran le
+plus consulté du produit — mesuré : un budget du domaine `b` rendant `Gestion a`.
+
+Il reste **infalsifiable par une donnée honnête** : la jointure porte sur une clé primaire, et
+`assertPreconditions` refuse d'écrire un `tool_id` hors domaine. Le test écrit donc par `db` direct,
+hors couche scopée — le second endroit du dépôt à le faire, après `resources.test.ts`, et pour la
+même raison : *un filtre qu'aucune ligne forgée ne vise n'est pas éprouvé.*
+
+### Aucun filtre d'archivage sur l'outil, et ce n'est pas un oubli
+
+La lecture rend le nom d'un outil **archivé** ; le panneau, lui, ne le propose pas — sauf exception
+nominative sur celui que la ligne porte déjà. Deux règles opposées sur la même table, et c'est
+voulu : *on décrit, on ne propose pas.* Un outil rangé reste l'outil qui a produit ce relevé, alors
+qu'il n'a plus à être offert au choix. C'est la distinction que `listProjectResources` tient depuis
+T4.1 pour les types d'activité, appliquée telle quelle.
+
+Sans l'exception nominative, un budget dont l'outil est archivé après coup ne se corrigerait plus
+sans changer d'outil : le panneau le rendrait sélectionné et l'action le refuserait. `checkBudgetTool`
+reçoit donc `keptToolId`, et **une saisie n'en passe aucune** — elle n'a pas de valeur antérieure à
+préserver.
+
+### Cinq chiffres faux dans des commentaires, retirés plutôt que corrigés
+
+L'ajout d'une neuvième clé a rendu faux, d'un coup : « les vingt et une constantes »
+(`lib/navigation.ts`), « les huit panneaux » (`lib/drawers/types.ts`), « les six panneaux
+d'écriture » (`lib/drawers/project.tsx`) et « les quatre clés » (`app/(app)/projets/[id]/page.tsx`).
+Un cinquième l'était **avant** ce ticket : « sept écritures ajoutent ou corrigent » dans
+`actions.ts`, dépassé par l'adoption puis par le lien déclaré.
+
+Les cinq vivent dans des fichiers du périmètre, et les cinq ont été **retirés**, jamais mis à jour —
+le geste de T6.1 sur `scoped.ts` et sur `drawers/project.tsx`. Corriger un nombre le rend faux au
+ticket suivant ; le retirer laisse la règle, que le code tient. C'est la même famille que le point
+ouvert d'`ETAT.md` sur l'en-tête de `schema.ts` (« les 26 tables », elles sont 30), qui reste ouvert
+à T7.10 : celui-là est hors périmètre ici.
+
+### Un fichier du périmètre n'a pas bougé, et c'est un constat
+
+`app/(app)/projets/[id]/drawers.tsx` est nommé par la fiche et n'a reçu aucune ligne. Le point
+d'entrée serveur des panneaux rétrécit la demande (`asProjectRequest`), vérifie la forme de l'UUID,
+relit la session, retrouve le projet et délègue — rien de tout cela ne dépend du nombre de panneaux.
+C'est exactement la propriété que TD.2 cherchait en sortant la résolution de la page, et c'est la
+première fois qu'un ticket l'observe sur un panneau **neuf**.
+
+### `ETAT.md` : 250 lignes tout juste, et six points resserrés pour y tenir
+
+L'entrée de journal de T7.1 portait le fichier à 253 lignes pour un seuil de 250. Il n'était pas
+question de balayer — c'est le geste de la session de découpage, pas celui d'un ticket. Six points
+ont donc été **resserrés sans rien perdre de leur fait** : la formulation raccourcie, la destination
+conservée, aucune mesure ni aucun chiffre supprimé. Résultat : **250 lignes**, la limite atteinte et
+non franchie.
+
+C'est la seconde fois que le seuil mord, après T6.7. La différence est qu'il n'y a plus de repli de
+chantier disponible : `docs/05` §5 n'a pas de huitième chantier, C7 en compte neuf après celui-ci,
+et chaque ticket ajoutera sa ligne. **Le prochain qui dépassera n'aura que le resserrement**, et il
+s'épuisera. → à nommer au découpage de C8.

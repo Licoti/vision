@@ -51,18 +51,27 @@ export type ProductDrawerRequest =
   | { kind: "useCaseDetail"; id: string };
 
 /**
- * Les huit panneaux de la page projet, sur la même forme.
+ * Les panneaux de la page projet, sur la même forme — **sans le compte**, et
+ * c'est le geste de T6.1 sur `scoped.ts` : la phrase a dit « les six », puis
+ * « les huit », et T7.1 en ajoute un neuvième. Un nombre dans un commentaire
+ * vieillit à chaque ticket ; ce qui se relit ici est la règle.
  *
- * **Le septième est le seul en lecture seule** (20/08/2026) : `starter` ouvre le
- * détail d'une piste de démarrage, que tout le domaine lit (D9), là où les sept
- * autres ouvrent une écriture ou une confirmation. Il n'a pas de jumeau
- * d'écriture — la paire « une clé pour lire, une clé pour écrire » de la page
- * produit n'a rien à séparer sur un référentiel dont D25 donne l'écran à C7.
+ * **`starter` est le seul en lecture seule** (20/08/2026) : il ouvre le détail
+ * d'une piste de démarrage, que tout le domaine lit (D9), là où les autres
+ * ouvrent une écriture ou une confirmation. Il n'a pas de jumeau d'écriture —
+ * la paire « une clé pour lire, une clé pour écrire » de la page produit n'a
+ * rien à séparer sur un référentiel dont D25 donne l'écran à C7.
  *
- * **`link` est le huitième** (T6.5), et la paire n'a rien à y séparer non plus,
- * pour la raison inverse : un lien déclaré n'a pas de fiche, il se lit dans le
- * bloc. `id` y est facultatif — la valeur porte le cas dans l'URL, `nouveau`
- * contre un identifiant de `project_links` —, et son absence dit « déclarer ».
+ * **`link`** (T6.5) n'a rien à y séparer non plus, pour la raison inverse : un
+ * lien déclaré n'a pas de fiche, il se lit dans le bloc. `id` y est facultatif
+ * — la valeur porte le cas dans l'URL, `nouveau` contre un identifiant de
+ * `project_links` —, et son absence dit « déclarer ».
+ *
+ * **`budget` n'en prend aucun** (T7.1), comme `archive` : l'objet visé est le
+ * projet de la page. Ce n'est pas un choix d'interface mais une propriété de la
+ * table — `budgets_project_unique` fait qu'un projet porte **au plus un**
+ * budget, si bien qu'il n'y a rien à désigner et qu'une seule action crée ou
+ * corrige la même ligne.
  */
 export type ProjectDrawerRequest =
   | { kind: "archive" }
@@ -72,7 +81,8 @@ export type ProjectDrawerRequest =
   | { kind: "resource"; id?: string | undefined }
   | { kind: "activity"; id?: string | undefined }
   | { kind: "starter"; id: string }
-  | { kind: "link"; id?: string | undefined };
+  | { kind: "link"; id?: string | undefined }
+  | { kind: "budget" };
 
 /**
  * Les quatre panneaux de la page **Équipe** — T5bis.4, puis T5bis.6.
@@ -201,6 +211,7 @@ const PROJECT_KINDS = [
   "activity",
   "starter",
   "link",
+  "budget",
 ] as const;
 
 const TEAM_KINDS = ["personDetail", "person", "skill", "archive"] as const;

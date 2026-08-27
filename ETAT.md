@@ -2,11 +2,11 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 27/08/2026, session de découpage de C7. Balayé à cette occasion, seul
-moment où il l'est.
+**Dernière mise à jour :** 28/08/2026, fin de T7.1. Dernier balayage : découpage de C7.
 **Chantier en cours :** **C7 — Finitions**, dix tickets, découpés dans `tickets-C7.md`. **Dernier
 chantier du POC** — `docs/05` §5 n'en a pas de huitième.
-**Ticket suivant :** **T7.1 — le budget : le dernier bloc de la page projet** (D28).
+**Ticket suivant :** **T7.2 — entité et métier : les deux filtres manquants, et la répartition par
+entité** (`docs/06` §4).
 
 ---
 
@@ -23,7 +23,7 @@ chantier du POC** — `docs/05` §5 n'en a pas de huitième.
 | TD — Dette technique et couche de présentation | TD.1 → TD.6 | **terminé** |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
-| C7 — Finitions | T7.1 → T7.10 | **en cours** |
+| C7 — Finitions | T7.1 → T7.10 | **en cours** — T7.1 livré |
 | C8 — après le POC | **à découper** | à faire |
 
 ---
@@ -61,6 +61,10 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   après six chantiers au schéma : `record()` seizième entrée de `forDomain`, cinq verbes, six
   `target_type`, dix-neuf points d'appel. Puis le bloc « Journal », les quatre règles de lien déduit
   **en SQL**, les liens déclarés, et la vue d'ensemble entière. **Aucune migration**, comme annoncé.
+- **T7.1 — le budget, le 28/08/2026.** `budgets` reçoit sa première ligne après sept chantiers au
+  schéma : **plus aucun bloc de `docs/06` §5 n'est une annonce**, `REFERENCE_BLOCKS` disparaît avec
+  le dernier. Neuvième clé d'URL, décompte d'exclusivité inchangé pour la **septième** fois. Ni
+  migration ni ligne de journal (arbitrage (d)) ; 45 tests neufs.
 - **Reprise d'interface hors ticket — seize gestes, du 17 au 21/08/2026.** Menu « … » de la roadmap,
   « Vision produit » et sa reprise `northstar-v2`, « Personae », « Use Cases », « Démarrage »
   (migrations 0005 à 0008), page projet en `project-v2`, bouton à trois rangs, entités en
@@ -77,10 +81,10 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 ### a. À trancher — sinon les tickets suivants héritent du problème
 
 - **Cinq points ont perdu leur chantier quand C7 s'est découpé, et C8 les reprend** : le **SSO**
-  (D37, sorti de C7), les **sept objets non journalisés** que la fiche de C6 promettait à C7, les
-  **six clés naturelles** de l'amorçage, et deux replis — la **carte qui ne se détache d'aucun
-  fond** et le **filtre de roadmap dans l'URL**. `docs/05` §5 s'arrête à sept chantiers : **C8 est
-  hors POC, et il reste entièrement à découper.** → **session de découpage de C8.**
+  (D37), les **sept objets non journalisés** promis à C7 par la fiche de C6, les **six clés
+  naturelles** de l'amorçage, la **carte qui ne se détache d'aucun fond** et le **filtre de roadmap
+  dans l'URL**. `docs/05` §5 s'arrête à sept chantiers : **C8 est hors POC et reste entièrement à
+  découper.** → **session de découpage de C8.**
 
 - **Les secrets Neon n'ont jamais été tournés.** Deux chaînes ont transité en clair le 12/08/2026.
   Hors dépôt — `.env.local` seul —, mais valides. **Reportées deux fois** : au découpage de C6, puis
@@ -119,9 +123,9 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   `parsePersonForm` efface la disponibilité — le `CHECK` l'exige — mais rien d'équivalent n'existe
   pour `person_skills` : les liaisons restent affichées et **illisibles en écriture**. Aucune donnée
   perdue. → **T7.9.**
-- **`lib/format.ts` porte une dette.** `PERSON_KIND_LABEL` vit dans `lib/forms/person.ts` : un
-  déplacement, **plus un vocabulaire à trancher** — T5bis.7 a refermé la duplication, pas les mots.
-  → **T7.9.**
+- **Deux libellés vivent hors de `lib/format.ts`** : `PERSON_KIND_LABEL` (`lib/forms/person.ts`) —
+  un déplacement **plus un vocabulaire à trancher**, T5bis.7 ayant refermé la duplication et pas les
+  mots — et `BUDGET_UNIT_LABEL` (`components/projects/budget.tsx`), hors périmètre de T7.1. → **T7.9.**
 - **Une piste de démarrage ne mène pas à l'activité qu'elle suggère.** `starters` ne porte
   **volontairement aucun `activity_type_id`** — une colonne sans lecteur est celle qu'on relit un jour
   sans savoir pourquoi (T5.2). Le geste coûte une colonne, une migration et trois lignes. → **T7.10.**
@@ -171,11 +175,11 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   remonte ; il ne le referme pas, aucun neuvième jeton ne s'inventant. → **design system, sinon C8.**
 - **Le design system a huit manques, et aucun n'a été inventé.** Trois élévations et deux gradients
   nommés sans valeur ; aucun jeton de bordure de contrôle, de bordure d'erreur, d'interlettrage, de
-  voile au-delà de 40 %, de séparateur, de mouvement (`--duration-drawer` et `--easing-drawer` sont
+  voile au-delà de 40 %, de séparateur, de mouvement (`--duration-drawer`, `--easing-drawer` sont
   dans `app/tokens.css` faute de mieux) ; **`--number-*` s'arrête à 100 px** quand dix-neuf valeurs
-  légitimes vivent au-delà. **Six substituts mesurés** dans `form-field.tsx` et `panel.tsx` —
-  `content-neutral-normal` 3,88:1, `content-danger-base` 5,19:1, `content-neutral-dark` 3,05:1,
-  `content-neutral-base` 4,98:1. **Aucun neuvième ne s'invente.** → **design system.**
+  légitimes vivent au-delà. **Six substituts mesurés** — `content-neutral-normal` 3,88:1,
+  `content-danger-base` 5,19:1, `content-neutral-dark` 3,05:1, `content-neutral-base` 4,98:1.
+  **Aucun neuvième ne s'invente.** → **design system.**
 - **Le filtre de la roadmap ne se partage plus par son adresse.** Repassé côté client à la demande :
   il ne se copie plus, ne survit plus au rechargement, n'existe plus sans JavaScript. Une adresse
   reviendrait par `history.replaceState`, **sans** rendre le clic navigant. L'arbitrage du 21/08 est
@@ -187,12 +191,12 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 - **La base de développement a dérivé de la fixture, et c'est acté. Elle est jetable** — la règle 4
   protège la donnée métier, pas une fixture locale. Un critère passé ne s'y relit pas nécessairement,
   et **une comparaison avant/après n'y vaut que si rien n'a bougé entre les deux mesures**. Pas de
-  `db:reset`. → **sans échéance ; un ticket d'outillage si le besoin devient réel.**
+  `db:reset`. → **sans échéance ; outillage si le besoin devient réel.**
 - **L'amorçage rapproche par clé naturelle, donc un renommage recrée — et c'est arrivé.** La clé des
   activités, étendue à `projet · type · période`, atténue sans éliminer : un renommage a laissé deux
   lignes en base de développement, l'ancienne orpheline — sans conséquence en production, où
-  l'amorçage ne tourne pas. **Refermé pour les entités seules.** Aucun ticket de C7 ne porte les six
-  restants, et la base de développement est jetable. → **C8.**
+  l'amorçage ne tourne pas. **Refermé pour les entités seules** ; les six restants n'ont pas de
+  ticket en C7, et la base de développement est jetable. → **C8.**
 - **Deux gabarits de grille portent une dimension en dur, et c'est un arbitrage.**
   `indicators.tsx:495` et `:585` disent à quelle largeur une carte cesse de tenir : un **point d'arrêt
   de mise en page**, pas une valeur de thème (T1.6), hors de la clause 2 de `spacingScaleLock` par
@@ -201,12 +205,11 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 - **La création d'un projet n'est pas atomique, et ne peut pas l'être.** `neon-http` n'a pas de
   transaction interactive — la couche n'a que `batch`. La parade est de tout confronter au domaine
   **avant** d'écrire et d'ordonner les ajouts avant les retraits (T3.6). Reste ouvert : une écriture
-  qui réussit puis dont la suivante échoue — **dont la ligne de journal d'un geste**. → **le jour où
-  la couche exposera une transaction.**
+  qui réussit puis dont la suivante échoue. → **le jour où la couche exposera une transaction.**
 - **La fixture est incomplète sur les ressources et les résultats.** Les deux résultats factices
   n'ont pas de lien profond, trois des quatre ressources du brief ne sont pas semées, et
-  **`tools.base_url` porte trois adresses provisoires sur `example.com`**.
-  → **sans échéance, ou l'humain fournit les adresses.**
+  **`tools.base_url` porte trois adresses provisoires sur `example.com`**. → **sans échéance, ou
+  l'humain fournit les adresses.**
 - **Les filtres ne survivent pas à un aller-retour par la navigation principale.** `docs/06` §9 les
   veut conservés ; le retour navigateur les restitue, un clic sur « Projets » repart à zéro.
   → **si l'usage le réclame.**
@@ -214,8 +217,8 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   cinquante projets », ce qu'une page rend sans effort. Au-delà, un plafond avant une pagination.
   → **si l'usage le réclame.**
 - **Une activité `in_progress` porte une fin de période à venir.** La fraîcheur retient
-  `max(coalesce(period_end, period_start))` : pour un atelier en cours en août, c'est le 31 août. Au
-  mois, l'affichage reste juste. → **le jour où une période d'activité se dira au jour.**
+  `max(coalesce(period_end, period_start))` : pour un atelier en cours en août, c'est le 31 août ;
+  au mois, l'affichage reste juste. → **le jour où une période se dira au jour.**
 
 ---
 

@@ -4269,3 +4269,106 @@ fraîcheur, trois sur `staleBefore`, quatre sur les décomptes.
 les jours en trop sur le mois suivant : le 31 mars reculé d'un mois donnerait le 3 mars. Le seuil
 avancerait de trois jours quatre fois l'an, sans jamais lever d'erreur. Le premier du mois d'abord,
 le recul ensuite, le jour rabattu sur le dernier du mois visé — et un test le tient.
+
+---
+
+## T7.1 — Le budget : le dernier bloc de la page projet — 28/08/2026
+
+**Ce que le ticket ferme.** D28 — *le budget reste dans le POC, en dernier*. `budgets` était au
+schéma depuis la migration `0000` et **n'avait jamais reçu une ligne** : c'était le seul des cinq
+blocs de référence de `docs/06` §5 qui n'existait pas. T4.1 avait livré « Ressources », T5.4
+« Indicateurs adoptés », T6.3 « Journal », T6.4 et T6.5 « Projets liés » ; il restait celui-ci, seul
+survivant de la rangée des cartes annoncées. **`REFERENCE_BLOCKS` disparaît avec lui** — un tableau
+vide et une boucle dessus sont une annonce que plus personne ne lit.
+
+**Neuf fichiers, dont six neufs.** `lib/forms/budget.ts` et son test, `lib/queries/budgets.ts` et
+son test, `components/projects/budget.tsx` et `components/projects/budget-panel.tsx` ;
+`lib/navigation.ts`, `lib/drawers/types.ts`, `lib/drawers/project.tsx`,
+`app/(app)/projets/[id]/actions.ts` et son test, `app/(app)/projets/[id]/page.tsx`.
+**`app/(app)/projets/[id]/drawers.tsx` était au périmètre et n'a pas bougé** : le point d'entrée
+serveur des panneaux passe déjà par `asProjectRequest` et `resolveProjectDrawer`, et la neuvième
+demande y entre sans qu'une ligne change — c'est la propriété que TD.2 cherchait.
+
+**Un geste, pas trois — et c'est la table qui le décide.** `budgets_project_unique` fait qu'un
+projet porte **au plus un** budget. Il n'y a donc rien à désigner : la clé d'URL `budget` prend une
+**seule valeur d'ouverture**, `saisie` — la forme d'`archiver`, non celle de `ressource` —, la
+demande `{ kind: "budget" }` ne porte pas d'`id`, la branche cherche la ligne **par le projet**, et
+`saveProjectBudget` crée ou corrige la même ligne. Là où la ressource, l'adoption et le lien
+demandaient une porte de plus pour rapprocher la cible de la page, `openProject` suffit — il n'y a
+pas de cible reçue à falsifier.
+
+**Le décompte d'exclusivité passe de huit clés à neuf sans qu'un caractère de sa logique change.**
+Septième fois, et la dernière : la page projet n'a plus de bloc à ouvrir. C'est la propriété pour
+laquelle T4.4 l'avait écrit en décompte plutôt qu'en comparaison.
+
+**Quatre arbitrages, dont deux rendus par la fiche et deux par le ticket.**
+
+- **Le budget ne se retire pas** (arbitrage (c) de `tickets-C7.md`). `budgets` n'a pas d'`archived_at`
+  et n'en reçoit pas — ce serait une seconde migration —, et `unlink` ne s'applique pas, l'exception
+  de C6 étant argumentée sur une **table de liaison**. Le rattrapage d'une saisie erronée est donc
+  la **correction** : les cinq colonnes de valeur sont nullables, et un formulaire soumis vide les
+  remet toutes à `null`. C'est pourquoi rien n'est obligatoire dans ce formulaire — refuser la
+  soumission vide aurait fermé le seul chemin qui défait.
+- **Aucune ligne de journal** (arbitrage (d)). `budget` n'est pas l'un des six `event_target_type`,
+  et l'ouvrir pour un seul objet demanderait une migration d'énuméré quand six autres écrivent déjà
+  sans trace. Le point ouvert d'`ETAT.md` se récrit avec un **septième** nom.
+- **`unit` ne se saisit pas, mais se lit.** `budget_unit` n'a qu'une valeur, `days`, et la colonne
+  la porte par défaut : un `<select>` d'une seule option n'offre aucun choix, il occupe une ligne.
+  Elle se lit en revanche dans le bloc — « 140 » sans unité ne dit rien. Le jour où l'énuméré
+  s'ouvrira, le champ arrivera avec la valeur.
+- **La validation vit dans `lib/forms/`**, hors des sept fichiers de la fiche. Le dossier existe
+  pour que la règle s'éprouve **sans branche Neon** ; l'inliner dans `actions.ts` — 2 394 lignes —
+  l'aurait rendue testable seulement contre une base réelle, et aurait forcé le panneau client à
+  importer ses types depuis un fichier `"use server"`. Écart consigné au journal technique.
+
+**Ce que le bloc n'affiche pas.** Aucun reste à consommer, aucun pourcentage, aucune jauge, aucune
+barre de progression, aucun signe de dépassement. « 44 % consommé » serait exactement l'indice
+**calculé par Vision** que D39 interdit ; « 140 jours » et « 61,5 jours » sont deux valeurs
+**reportées**, juxtaposées avec leur date. Le test `un consommé supérieur à l'alloué est écrit sans
+discuter` fige la règle : un dépassement est un fait que l'outil de gestion connaît avant Vision, et
+le refuser empêcherait de reporter la vérité.
+
+**Ce que la vérification a donné.**
+
+- **Le critère se lit dans le HTML servi, et l'ordre s'y lit aussi.** La colonne du récit rend
+  `Roadmap des activités · Démarrage · Projets liés · **Budget** · Journal` : le `<details>` du
+  journal suit immédiatement `</section>` du budget — la place exacte de `docs/06` §5, *dans sa
+  colonne*, la règle posée le 20/08/2026 pour la page à deux colonnes.
+- **L'état vide est un écran à part entière** (règle 5) : il explique ce que le bloc contiendra et
+  porte « Saisir le budget » en bouton primaire. L'état **renseigné** rend « 140 jours », « 61,5
+  jours » — virgule française et **espace insécable mesurée à l'octet, `c2 a0`** —, « 20 août
+  2026 », et le nom de l'outil portant le lien sortant avec son `↗` et son
+  « (lien externe, nouvel onglet) ». L'état **partiel** rend « Non renseigné » et « Non renseignée »
+  au féminin pour la date. Zéro occurrence de `%`, `reste`, `dépass`, `jauge` ou `progress` dans le
+  balisage du bloc.
+- **Le droit décide du rendu comme de l'ouverture.** Servi à Sofia Marchand, membre du domaine mais
+  **non contributrice** du projet : le bloc est là, le geste n'y est pas, et `?budget=saisie` ne
+  monte **aucun** panneau. Servi à Thomas Lemaire, contributeur : les deux sont là.
+- **Le droit s'éprouve par l'action, et l'étape témoin est ce qui rend le reste lisible.** Le
+  formulaire a été rejoué à la main, en multipart, avec les champs `$ACTION_…` du balisage servi —
+  où l'identifiant du projet se lit **en clair**, comme le rappel de contexte l'annonce. *Témoin* :
+  sous Thomas, `BUDGETS=0` → `BUDGETS=1`, la ligne portant `140.0000 / 61.5000 / 2026-08-20`.
+  *Forge* : la même charge sous Sofia, valeurs `999999`, rend **HTTP 200** — le code ne dit jamais
+  ce qui a été écrit — avec le refus dans la réponse, et la ligne reste **intacte à 140.0000**.
+  Sans le témoin, le 200 du refus et le 200 du succès étaient indiscernables.
+- **Trois mises en défaut, trois comptes exacts.** Retirer `filter(tools)` de la jointure fait
+  tomber **le seul** test de la ligne forgée, avec le message qui nomme la fuite : *expected
+  'Gestion a' to be null* — un budget du domaine `b` affichant le nom d'un outil du domaine `a`.
+  Neutraliser `writeProject` dans `openProject` fait tomber **huit** tests, dont celui du budget :
+  le cas de droit n'est donc pas vide de sens. Poser un `record()` dans `saveProjectBudget` fait
+  tomber **un seul** test, celui de l'absence de journal — sans lui, cette absence ne se
+  distinguerait pas d'un oubli, et elle ne se lit dans aucun écran.
+- **Le contraste ne se mesure pas, et le dire est le constat.** Aucun couple n'est neuf **par la
+  position** : le bloc est une `Section`, donc `bg-surface-neutral-pale`, exactement le fond de la
+  carte d'en-tête d'où `Field` vient et des quatre autres blocs de la page. `Field`, `ACTION_LINK`,
+  `ExternalLink`, `BlockNote` et le bouton primaire y sont tous déjà mesurés. Inventer une mesure
+  pour un couple inchangé aurait été l'affirmer plutôt que la constater.
+- **Le compte.** `tsc`, `npm run lint` (`--max-warnings=0`) et `npm run test` au vert : 41 fichiers,
+  **1 189 tests**, dont **45 neufs** — 22 pour le formulaire, 9 pour la lecture, 14 pour l'action.
+
+**Quatre chiffres faux retirés en chemin, et aucun corrigé.** L'ajout d'une neuvième clé rendait
+faux « les vingt et une constantes » de `lib/navigation.ts`, « les huit panneaux » de
+`lib/drawers/types.ts`, « les six panneaux d'écriture » de `lib/drawers/project.tsx`, « les quatre
+clés » de `page.tsx` — plus « sept écritures » d'`actions.ts`, déjà faux avant ce ticket. Le geste
+du dépôt depuis T6.1 est de **retirer** le nombre, jamais de le mettre à jour : un nombre dans un
+commentaire vieillit à chaque ticket. Cinquième famille du même défaut, et celle-là est refermée.

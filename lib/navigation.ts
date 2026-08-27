@@ -465,6 +465,36 @@ export const LINK_PANEL_PARAM = "lien";
 export const LINK_PANEL_NEW = "nouveau";
 
 /**
+ * Le panneau de saisie du **budget** d'un accompagnement (T7.1), sur la page du
+ * projet — la neuvième et dernière clé d'ouverture de cet écran, et celle qui
+ * tient D28.
+ *
+ * **Une seule valeur d'ouverture**, la forme d'`archiver` et non celle de
+ * `ressource` : il n'y a rien à désigner. L'objet visé est celui de la page, et
+ * c'est une propriété de la table plutôt qu'un choix d'interface — un projet
+ * porte **au plus un** budget, `budgets_project_unique` l'impose. La valeur
+ * n'ouvre donc pas un cas parmi deux : `saveProjectBudget` crée ou corrige la
+ * même ligne, et c'est un seul geste, un seul formulaire, une seule adresse.
+ *
+ * **Une clé distincte des huit autres**, et pour la raison qui les sépare déjà
+ * entre elles : ce sont des gestes différents, pas des formes du même.
+ *
+ * **Le décompte d'exclusivité de la page projet passe de huit clés à neuf sans
+ * qu'un caractère de sa logique change** — la septième fois, et c'est la
+ * propriété pour laquelle T4.4 l'avait écrit en décompte plutôt qu'en
+ * comparaison.
+ *
+ * Ce n'est pas cette route qui protège : l'action redérive le droit
+ * `writeProject` sur le `projectId` **reçu** (arbitrage (e) de
+ * `tickets-C7.md` — le budget est une propriété de l'accompagnement, jamais du
+ * domaine).
+ */
+export const BUDGET_PANEL_PARAM = "budget";
+
+/** La seule valeur qui ouvre le panneau. Toute autre n'ouvre rien. */
+export const BUDGET_PANEL_ENTRY = "saisie";
+
+/**
  * Les clés de **filtre** de la liste transverse des projets (T2.3), montées ici
  * en T6.7 — et c'est la première fois qu'un filtre quitte l'écran qui le lit.
  *
@@ -477,8 +507,10 @@ export const LINK_PANEL_NEW = "nouveau";
  * filtrent plus rien, **sans qu'aucun test ni le compilateur ne le dise**.
  *
  * **Ce sont des clés de filtre, non des clés d'ouverture de panneau.** Les
- * vingt et une constantes ci-dessus décident d'un panneau ; celles-ci
- * restreignent une liste. Elles vivent au même endroit pour la même raison —
+ * constantes ci-dessus décident chacune d'un panneau ; celles-ci restreignent
+ * une liste. **Sans le compte** : il disait « vingt et une » et T7.1 en ajoute
+ * deux — un nombre dans un commentaire vieillit à chaque ticket, et c'est le
+ * geste de T6.1 sur `scoped.ts`, resservi ici plutôt que corrigé. Elles vivent au même endroit pour la même raison —
  * une URL appartient à l'interface, et son vocabulaire se tient en un seul
  * lieu.
  *
@@ -734,6 +766,18 @@ export const ROUTES = {
    */
   projectLinkEdit: (id: string, linkId: string) =>
     `/projets/${id}?${LINK_PANEL_PARAM}=${linkId}`,
+  /**
+   * La page du projet, panneau de **budget** ouvert (T7.1). Même mécanique que
+   * toutes les adresses d'ouverture qui précèdent : un paramètre, pas un écran
+   * de plus, et la fermeture reste `project(id)`.
+   *
+   * **Une seule entrée pour les deux gestes**, là où `projectResourceEdit`,
+   * `projectIndicatorEdit` et `projectLinkEdit` en demandaient une seconde :
+   * un projet porte au plus un budget, il n'y a donc pas de cible à nommer, et
+   * l'action décide seule si elle crée ou si elle corrige.
+   */
+  projectBudget: (id: string) =>
+    `/projets/${id}?${BUDGET_PANEL_PARAM}=${BUDGET_PANEL_ENTRY}`,
   /**
    * Le référentiel des personnes (T5bis.2).
    *

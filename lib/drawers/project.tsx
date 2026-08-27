@@ -28,6 +28,7 @@
 
 import { ActivityPanel } from "@/components/projects/activity-panel";
 import { AdoptionPanel } from "@/components/projects/adoption-panel";
+import { BudgetPanel } from "@/components/projects/budget-panel";
 import { LinkPanel } from "@/components/projects/link-panel";
 import {
   ResourcePanel,
@@ -46,6 +47,7 @@ import {
 } from "@/lib/db/schema";
 import { toActivityFormValues } from "@/lib/forms/activity";
 import { toAdoptionFormValues } from "@/lib/forms/adoption";
+import { toBudgetFormValues } from "@/lib/forms/budget";
 import { toLinkFormValues } from "@/lib/forms/link";
 import { toResourceFormValues } from "@/lib/forms/resource";
 import { toResultFormValues } from "@/lib/forms/result";
@@ -55,6 +57,8 @@ import {
   ACTIVITY_PANEL_PARAM,
   ARCHIVE_PANEL_CONFIRM,
   ARCHIVE_PANEL_PARAM,
+  BUDGET_PANEL_ENTRY,
+  BUDGET_PANEL_PARAM,
   CANCEL_PANEL_PARAM,
   INDICATOR_PANEL_NEW,
   INDICATOR_PANEL_PARAM,
@@ -74,6 +78,7 @@ import {
   listResultToolOptions,
 } from "@/lib/queries/activities";
 import type { RoadmapGroup } from "@/lib/queries/activities";
+import { findProjectBudget } from "@/lib/queries/budgets";
 import { listAdoptableIndicators } from "@/lib/queries/indicators";
 import { listLinkableProjects } from "@/lib/queries/links";
 import type { ProjectDetail } from "@/lib/queries/projects";
@@ -93,6 +98,7 @@ import {
   createProjectLink,
   createResource,
   createResult,
+  saveProjectBudget,
   updateActivity,
   updateAdoption,
   updateProjectLink,
@@ -111,8 +117,12 @@ import {
 export type ProjectDrawerContext = {
   /**
    * Le droit d'écrire sur cet accompagnement, archivage compris : un seul point
-   * de bascule fait tomber ensemble les six panneaux d'écriture (T4bis.3,
-   * arbitrage (a)). Le septième, `starter`, ne le consulte pas : il lit.
+   * de bascule fait tomber ensemble **tous** les panneaux d'écriture (T4bis.3,
+   * arbitrage (a)) — le budget de T7.1 compris, sans qu'une condition se soit
+   * ajoutée. `starter` est le seul à ne pas le consulter : il lit.
+   *
+   * **Sans le compte**, comme l'en-tête de ce module : la phrase disait « les
+   * six », ils sont sept depuis T7.1.
    */
   canWrite: boolean;
   roadmap: readonly RoadmapGroup[];
@@ -574,6 +584,59 @@ export async function resolveProjectDrawer(
     }
 
     /* ------------------------------------------------------------------ */
+    /* Le budget — T7.1, et la dernière promesse de `docs/06` §5.
+
+       **Une seule branche pour les deux gestes**, là où `resource`, `adoption`
+       et `link` en portent deux : un projet a **au plus un** budget
+       (`budgets_project_unique`), si bien qu'il n'y a rien à rapprocher de la
+       page — la ligne se cherche par le projet, jamais par un identifiant reçu.
+       Il n'y a donc pas non plus de demande forgée à écarter ici : ce que la
+       valeur d'URL ne porte pas ne se falsifie pas.
+
+       **`canWrite` et rien d'autre** : le droit est `writeProject`, jamais
+       `manageDomain` (arbitrage (e) de `tickets-C7.md`) — le budget est une
+       propriété de l'**accompagnement**, ce qui le sépare de la vision produit.
+       C'est le même point de bascule que les six panneaux d'écriture qui
+       précèdent, **et aucune condition ne s'ajoute ici**. */
+    case "budget": {
+      if (!context.canWrite) return null;
+
+      /* La ligne est lue ici, et non dans le contexte : la discipline des
+         lectures conditionnelles de T3.3 vaut pour ce panneau comme pour les
+         autres — les huit qui ne l'ouvrent pas ne la paient pas. */
+      const budget = await findProjectBudget(session.db, project.id);
+
+      /* **L'exception nominative de T4bis.6**, transposée au budget : l'outil
+         déjà porté reste dans la liste — donc sélectionné — même archivé
+         depuis. Sans elle, il retomberait sur « Aucun » et la première
+         re-soumission détacherait le budget de son outil **en silence**. Une
+         saisie n'en passe aucune : elle n'a aucune valeur antérieure à
+         préserver. */
+      const tools = await listResultToolOptions(
+        session.db,
+        budget?.toolId ? { keepToolId: budget.toolId } : {},
+      );
+
+      return {
+        titleId: "panneau-budget-titre",
+        title: budget ? "Corriger le budget" : "Saisir le budget",
+        subtitles: [project.name],
+        body: (
+          <BudgetPanel
+            action={saveProjectBudget.bind(null, project.id)}
+            tools={tools}
+            {...(budget
+              ? {
+                  submitLabel: "Enregistrer les modifications",
+                  initial: toBudgetFormValues(budget),
+                }
+              : {})}
+          />
+        ),
+      };
+    }
+
+    /* ------------------------------------------------------------------ */
     /* Le seul panneau en lecture seule (20/08/2026).
 
        **Aucun droit ne le garde**, et c'est exact : une piste de démarrage est
@@ -614,8 +677,14 @@ export function projectRequestFromParams(asked: {
   indicateur?: string | undefined;
   piste?: string | undefined;
   lien?: string | undefined;
+  budget?: string | undefined;
 }): ProjectDrawerRequest | null {
   if (asked.archiver === ARCHIVE_PANEL_CONFIRM) return { kind: "archive" };
+
+  /* La forme d'`archiver`, jusqu'à la comparaison : **une seule valeur
+     ouvre**, toute autre n'ouvre rien. Aucune sentinelle à distinguer d'un
+     identifiant — un projet n'a qu'un budget, il n'y a rien à désigner. */
+  if (asked.budget === BUDGET_PANEL_ENTRY) return { kind: "budget" };
   if (asked.annuler !== undefined) return { kind: "cancel", id: asked.annuler };
   if (asked.resultat !== undefined)
     return { kind: "result", id: asked.resultat };
@@ -661,4 +730,5 @@ export const PROJECT_PANEL_PARAMS = [
   INDICATOR_PANEL_PARAM,
   STARTER_PANEL_PARAM,
   LINK_PANEL_PARAM,
+  BUDGET_PANEL_PARAM,
 ] as const;

@@ -59,6 +59,7 @@ import {
 import {
   activities,
   activityTypes,
+  budgets,
   domains,
   entities,
   events,
@@ -70,6 +71,7 @@ import {
   projects,
   resources,
   results,
+  tools,
 } from "@/lib/db/schema";
 
 /** Qui la requête prétend être. Chaque test la pose avant d'appeler l'action. */
@@ -87,6 +89,7 @@ vi.mock("next/headers", () => ({
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
 const {
+  saveProjectBudget,
   createActivity,
   updateActivity,
   transitionActivity,
@@ -135,6 +138,12 @@ type Fixture = {
   archivedProjectName: string;
   /** Un accompagnement d'un **autre domaine** — la seule ligne d'ailleurs du fichier. */
   foreignProjectId: string;
+  /** L'outil de gestion vivant du domaine — la cible normale d'un budget (T7.1). */
+  toolId: string;
+  /** Le même, archivé : ce que l'action refuse hors exception nominative. */
+  archivedToolId: string;
+  /** Un outil d'un **autre domaine** : ce que l'action refuse par message de champ. */
+  foreignToolId: string;
 };
 
 let f: Fixture;
@@ -249,6 +258,19 @@ beforeAll(async () => {
     isContributor: true,
   });
 
+  /* Les outils de gestion — T7.1. Le vivant est la cible normale d'un budget ;
+     l'archivé éprouve le refus, et l'exception nominative qui le rattrape. */
+  const tool = await scope.insert(tools, {
+    name: `Gestion ${suffix}`,
+    kind: "budget",
+    baseUrl: "https://gestion.example.com",
+  });
+  const retiredTool = await scope.insert(tools, {
+    name: `Ancien portail ${suffix}`,
+    kind: "budget",
+  });
+  await scope.archive(tools, retiredTool.id);
+
   /* Un accompagnement d'un **autre domaine**, créé par sa propre couche
      scopée : rien ici ne contourne la règle 1, pas même pour forger. */
   const otherDomain = await superAdmin.createDomain({
@@ -273,6 +295,14 @@ beforeAll(async () => {
     productId: otherProduct.id,
     statusId: otherStatus.id,
   });
+  /* Un outil d'ailleurs : `budgets.tool_id` est la seconde colonne du fichier à
+     pointer une table scopée, et un identifiant d'un autre domaine y est un cas
+     réel — pas une hypothèse. Il éprouve les deux barrières, celle de l'action
+     et celle de la couche. */
+  const foreignTool = await otherScope.insert(tools, {
+    name: `Gestion ailleurs ${suffix}`,
+    kind: "budget",
+  });
 
   f = {
     domainId: domain.id,
@@ -288,6 +318,9 @@ beforeAll(async () => {
     neighbourName: neighbour.name,
     archivedProjectName: archivedProject.name,
     foreignProjectId: foreignProject.id,
+    toolId: tool.id,
+    archivedToolId: retiredTool.id,
+    foreignToolId: foreignTool.id,
   };
 }, 180_000);
 
@@ -301,11 +334,13 @@ afterAll(async () => {
     resources,
     activities,
     projectLinks,
+    budgets,
     projectMembers,
     projects,
     projectStatuses,
     products,
     activityTypes,
+    tools,
     entities,
     persons,
   ];
@@ -1454,5 +1489,348 @@ describe("removeProjectLink — retirer un lien", () => {
 
     expect(await declaredRows()).toHaveLength(1);
     expect(lines).toHaveLength(0);
+  });
+});
+
+/* ==========================================================================
+   Le budget — T7.1
+
+   **Le droit s'éprouve par l'action, jamais par l'écran.** Le bloc ne rend son
+   geste qu'à qui porte `writeProject` sur cet accompagnement, et cela ne prouve
+   rien : `saveProjectBudget` est un point d'entrée HTTP à part entière, dont
+   l'identifiant lié est sérialisé en clair dans un champ `$ACTION_…`.
+
+   **Ce qui est mesuré est la base, jamais le chemin pris.** Un refus se lit à ce
+   qu'aucune ligne n'a bougé ; une écriture, à ce que la colonne porte la valeur
+   attendue. `ok` et `message` sont des indices, la table est la preuve — le code
+   HTTP ne dit jamais ce qui a été écrit.
+
+   **Une propriété que rien d'autre ne mesure** : l'absence de ligne de journal
+   (arbitrage (d)). Elle ne se lit dans aucun écran — le bloc « Journal » ne
+   montre pas ce qui n'y est pas —, et seul le décompte en base la porte.
+   ========================================================================== */
+
+/** La ligne de budget d'un projet, telle que la base la porte. */
+async function budgetRow(projectId: string): Promise<{
+  id: string;
+  allocated: string | null;
+  consumed: string | null;
+  unit: string;
+  measuredOn: string | null;
+  toolId: string | null;
+  externalUrl: string | null;
+} | null> {
+  const rows = await db
+    .select({
+      id: budgets.id,
+      allocated: budgets.allocated,
+      consumed: budgets.consumed,
+      unit: budgets.unit,
+      measuredOn: budgets.measuredOn,
+      toolId: budgets.toolId,
+      externalUrl: budgets.externalUrl,
+    })
+    .from(budgets)
+    .where(
+      and(eq(budgets.domainId, f.domainId), eq(budgets.projectId, projectId)),
+    );
+  return rows[0] ?? null;
+}
+
+/** Le décompte des budgets du domaine — l'étape témoin de chaque geste. */
+async function budgetCount(): Promise<number> {
+  return (
+    await db.select({ id: budgets.id }).from(budgets).where(eq(budgets.domainId, f.domainId))
+  ).length;
+}
+
+/** Les budgets posés par un test, retirés avant le suivant. */
+async function clearBudgets(): Promise<void> {
+  await db.delete(budgets).where(eq(budgets.domainId, f.domainId));
+}
+
+/** Une saisie de budget valide, dont chaque test ne dérange qu'un champ. */
+function budgetForm(overrides: Record<string, string> = {}): FormData {
+  return form({
+    allocated: "120",
+    consumed: "87,5",
+    measuredOn: "2026-08-31",
+    toolId: f.toolId,
+    externalUrl: "https://gestion.example.com/refonte/budget",
+    ...overrides,
+  });
+}
+
+describe("saveProjectBudget — saisir et corriger la même ligne", () => {
+  test("un contributeur saisit le budget, et la ligne porte ses cinq colonnes", async () => {
+    await clearBudgets();
+    currentPerson = f.contributorId;
+
+    const before = await budgetCount();
+    const state = await saveProjectBudget(f.projectId, EMPTY, budgetForm());
+
+    expect(state.ok).toBe(true);
+    expect(await budgetCount()).toBe(before + 1);
+
+    const row = await budgetRow(f.projectId);
+    expect(row).toMatchObject({
+      // La virgule tapée part en point décimal, comme la colonne l'attend.
+      allocated: "120.0000",
+      consumed: "87.5000",
+      measuredOn: "2026-08-31",
+      toolId: f.toolId,
+      externalUrl: "https://gestion.example.com/refonte/budget",
+      // `not null` avec un défaut : elle ne se saisit pas et n'est jamais absente.
+      unit: "days",
+    });
+  });
+
+  test("la seconde soumission corrige la même ligne, elle n'en crée pas une seconde", async () => {
+    /* C'est la propriété que `budgets_project_unique` impose et que la fiche
+       demande : un seul geste, un seul formulaire, une seule adresse. Sans le
+       décompte, un `insert` de plus rendrait le même `ok` — le code HTTP ne dit
+       jamais ce qui a été écrit. */
+    await clearBudgets();
+    currentPerson = f.contributorId;
+
+    await saveProjectBudget(f.projectId, EMPTY, budgetForm());
+    const first = await budgetRow(f.projectId);
+
+    const state = await saveProjectBudget(
+      f.projectId,
+      EMPTY,
+      budgetForm({ consumed: "95", externalUrl: "" }),
+    );
+
+    expect(state.ok).toBe(true);
+    expect(await budgetCount()).toBe(1);
+
+    const row = await budgetRow(f.projectId);
+    // La même ligne, pas une nouvelle.
+    expect(row?.id).toBe(first?.id);
+    expect(row?.consumed).toBe("95.0000");
+    // Un champ vidé efface la colonne : c'est le rattrapage d'une saisie erronée.
+    expect(row?.externalUrl).toBeNull();
+    expect(row?.allocated).toBe("120.0000");
+  });
+
+  test("une soumission vide remet les cinq colonnes à `null`, et la ligne reste", async () => {
+    /* `budgets` ne porte pas d'`archived_at` et ne se supprime pas
+       (arbitrage (c)) : vider le formulaire est **le seul** chemin qui défait un
+       budget saisi par erreur. Le refuser fermerait ce rattrapage. */
+    await clearBudgets();
+    currentPerson = f.contributorId;
+
+    await saveProjectBudget(f.projectId, EMPTY, budgetForm());
+    const state = await saveProjectBudget(f.projectId, EMPTY, form({}));
+
+    expect(state.ok).toBe(true);
+    expect(await budgetCount()).toBe(1);
+    expect(await budgetRow(f.projectId)).toMatchObject({
+      allocated: null,
+      consumed: null,
+      measuredOn: null,
+      toolId: null,
+      externalUrl: null,
+    });
+  });
+
+  test("le geste n'écrit aucune ligne de journal", async () => {
+    /* Arbitrage (d) : `budget` n'est pas l'un des six `event_target_type`, et
+       l'ouvrir pour un seul objet demanderait une migration d'énuméré. Cette
+       absence ne se lit dans aucun écran — seul le décompte la porte, et sans ce
+       test elle ne se distinguerait pas d'un oubli. */
+    await clearBudgets();
+    currentPerson = f.contributorId;
+
+    const lines = await written(async () => {
+      await saveProjectBudget(f.projectId, EMPTY, budgetForm());
+    });
+
+    expect(await budgetRow(f.projectId)).not.toBeNull();
+    expect(lines).toHaveLength(0);
+  });
+});
+
+describe("saveProjectBudget — le droit s'éprouve par l'action", () => {
+  test("un membre non contributeur n'écrit rien, malgré un projet valide", async () => {
+    await clearBudgets();
+    currentPerson = f.outsiderId;
+
+    const before = await budgetCount();
+    const state = await saveProjectBudget(f.projectId, EMPTY, budgetForm());
+
+    expect(state.ok).toBeUndefined();
+    expect(state.message).toContain("réservée au responsable de domaine");
+    // L'étape témoin : rien n'a bougé en base, et c'est la seule preuve.
+    expect(await budgetCount()).toBe(before);
+    expect(await budgetRow(f.projectId)).toBeNull();
+    // La saisie revient telle quelle : Vision ne jette jamais en silence.
+    expect(state.values.allocated).toBe("120");
+  });
+
+  test("un accompagnement archivé ne reçoit pas de budget, même d'un contributeur", async () => {
+    /* Ce qui tombe ici n'est pas le droit — le contributeur l'est des deux
+       accompagnements — mais l'archivage, seconde porte d'`openProject`. */
+    await clearBudgets();
+    currentPerson = f.contributorId;
+
+    const before = await budgetCount();
+    const state = await saveProjectBudget(
+      f.archivedProjectId,
+      EMPTY,
+      budgetForm(),
+    );
+
+    expect(state.ok).toBeUndefined();
+    expect(state.message).toContain("archivé");
+    expect(await budgetCount()).toBe(before);
+    expect(await budgetRow(f.archivedProjectId)).toBeNull();
+  });
+
+  test("un contributeur n'écrit pas sur un projet d'un autre domaine", async () => {
+    /* `writeProject` porte sur une **désignation**, pas sur une appartenance de
+       domaine : c'est le `find` d'`openProject` qui ferme ce cas. */
+    currentPerson = f.contributorId;
+
+    const state = await saveProjectBudget(
+      f.foreignProjectId,
+      EMPTY,
+      budgetForm(),
+    );
+
+    expect(state.ok).toBeUndefined();
+    expect(state.message).toBeDefined();
+  });
+});
+
+describe("saveProjectBudget — l'outil reçu est confronté au domaine", () => {
+  test("un outil d'un autre domaine rend un message de champ, et n'écrit rien", async () => {
+    /* Un message de champ, pas une exception : `assertPreconditions` reste le
+       second filet, pas le premier — ce qui se refuse doit se lire, pas se
+       planter. */
+    await clearBudgets();
+    currentPerson = f.contributorId;
+
+    const before = await budgetCount();
+    const state = await saveProjectBudget(
+      f.projectId,
+      EMPTY,
+      budgetForm({ toolId: f.foreignToolId }),
+    );
+
+    expect(state.ok).toBeUndefined();
+    expect(state.errors.toolId).toContain("n'existe pas dans ce domaine");
+    expect(await budgetCount()).toBe(before);
+  });
+
+  test("un outil archivé est refusé à la saisie", async () => {
+    // Le panneau ne le propose pas, et rien ne justifie de l'accepter par
+    // requête : la règle de `checkAdoptionIndicator`, resservie.
+    await clearBudgets();
+    currentPerson = f.contributorId;
+
+    const state = await saveProjectBudget(
+      f.projectId,
+      EMPTY,
+      budgetForm({ toolId: f.archivedToolId }),
+    );
+
+    expect(state.errors.toolId).toContain("n'existe pas dans ce domaine");
+    expect(await budgetCount()).toBe(0);
+  });
+
+  test("l'outil déjà porté reste acceptable même archivé depuis — l'exception nominative", async () => {
+    /* Sans elle, un budget dont l'outil a été archivé après coup ne se
+       corrigerait plus sans changer d'outil : le panneau le rend sélectionné,
+       et l'action le refuserait. L'exception est **nominative** — elle
+       n'accepte que la valeur déjà portée par la ligne. */
+    await clearBudgets();
+    // La ligne est posée par la couche, avec l'outil archivé : c'est l'état
+    // qu'un archivage postérieur à la saisie produit.
+    await f.scope.insert(budgets, {
+      projectId: f.projectId,
+      allocated: "10",
+      toolId: f.archivedToolId,
+    });
+    currentPerson = f.contributorId;
+
+    const state = await saveProjectBudget(
+      f.projectId,
+      EMPTY,
+      budgetForm({ toolId: f.archivedToolId, allocated: "42" }),
+    );
+
+    expect(state.ok).toBe(true);
+    const row = await budgetRow(f.projectId);
+    expect(row?.allocated).toBe("42.0000");
+    expect(row?.toolId).toBe(f.archivedToolId);
+  });
+
+  test("une saisie sans outil est acceptée : la colonne est nullable", async () => {
+    await clearBudgets();
+    currentPerson = f.contributorId;
+
+    const state = await saveProjectBudget(
+      f.projectId,
+      EMPTY,
+      budgetForm({ toolId: "" }),
+    );
+
+    expect(state.ok).toBe(true);
+    expect((await budgetRow(f.projectId))?.toolId).toBeNull();
+  });
+});
+
+describe("saveProjectBudget — un refus de forme n'écrit rien", () => {
+  test("un montant qui n'est pas un nombre est refusé avant la base", async () => {
+    /* Sans ce contrôle, la chaîne atteindrait une colonne `numeric` et
+       rendrait une erreur PostgreSQL — un 500 — là où l'on attend un message
+       de champ. */
+    await clearBudgets();
+    currentPerson = f.contributorId;
+
+    const state = await saveProjectBudget(
+      f.projectId,
+      EMPTY,
+      budgetForm({ allocated: "beaucoup" }),
+    );
+
+    expect(state.ok).toBeUndefined();
+    expect(state.errors.allocated).toContain("nombre");
+    expect(await budgetCount()).toBe(0);
+  });
+
+  test("une adresse qui n'est pas un lien web est refusée", async () => {
+    // Le bloc rend ce lien par `ExternalLink`, qui pose le `href` tel quel :
+    // une adresse `javascript:` enregistrée s'exécuterait au clic.
+    await clearBudgets();
+    currentPerson = f.contributorId;
+
+    const state = await saveProjectBudget(
+      f.projectId,
+      EMPTY,
+      budgetForm({ externalUrl: "javascript:alert(1)" }),
+    );
+
+    expect(state.errors.externalUrl).toContain("lien web");
+    expect(await budgetCount()).toBe(0);
+  });
+
+  test("un consommé supérieur à l'alloué est écrit sans discuter", async () => {
+    /* D39 : un dépassement est un fait que l'outil de gestion connaît avant
+       Vision. Le refuser — ou l'annoter — serait l'indice **calculé** que le
+       produit s'interdit. */
+    await clearBudgets();
+    currentPerson = f.contributorId;
+
+    const state = await saveProjectBudget(
+      f.projectId,
+      EMPTY,
+      budgetForm({ allocated: "10", consumed: "9999" }),
+    );
+
+    expect(state.ok).toBe(true);
+    expect((await budgetRow(f.projectId))?.consumed).toBe("9999.0000");
   });
 });
