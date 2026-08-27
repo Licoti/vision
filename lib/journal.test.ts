@@ -13,14 +13,15 @@
  * règle sauterait. D'où les deux assertions jumelles — ce que la chaîne est, et
  * ce qu'elle n'est pas (leçon de `lib/format.test.ts`).
  *
- * Ils couvrent **les trois formes et les six noms**. Les quatre noms de T6.2
- * sont arrivés avec les gestes qui les écrivent, et la troisième forme —
- * `statePhrase` — avec les deux seuls gestes qui font *atteindre un état*.
+ * Ils couvrent **les quatre formes et les six noms**. Les quatre noms de T6.2
+ * sont arrivés avec les gestes qui les écrivent, la troisième forme —
+ * `statePhrase` — avec les deux seuls gestes qui font *atteindre un état*, et
+ * la quatrième — `linkPhrase` — avec les trois gestes du lien déclaré (T6.5).
  */
 
 import { describe, expect, test } from "vitest";
 
-import { objectPhrase, statePhrase, teamPhrase } from "./journal";
+import { linkPhrase, objectPhrase, statePhrase, teamPhrase } from "./journal";
 
 const NBSP = "\u00A0";
 
@@ -261,5 +262,74 @@ describe("teamPhrase — ce qui a bougé dans l'équipe", () => {
    */
   test("rien n'a bougé : aucune phrase", () => {
     expect(teamPhrase(NOTHING)).toBeNull();
+  });
+});
+
+/* ==========================================================================
+   La quatrième forme — le lien déclaré (T6.5)
+   ========================================================================== */
+
+describe("linkPhrase — ce qu'un geste a fait d'un lien déclaré", () => {
+  test("les trois participes, au masculin de « Lien »", () => {
+    expect(linkPhrase("declared", "Refonte du panier")).toBe(
+      `Lien déclaré${NBSP}: Refonte du panier`,
+    );
+    expect(linkPhrase("updated", "Refonte du panier")).toBe(
+      `Lien modifié${NBSP}: Refonte du panier`,
+    );
+    expect(linkPhrase("removed", "Refonte du panier")).toBe(
+      `Lien retiré${NBSP}: Refonte du panier`,
+    );
+  });
+
+  /**
+   * L'insécable se mesure sur son point de code, jamais à l'œil : U+00A0 et
+   * l'espace ordinaire sont indiscernables dans un source comme dans un
+   * navigateur. Les deux assertions jumelles disent ce que la chaîne est, et ce
+   * qu'elle n'est pas.
+   */
+  test("le deux-points porte son insécable", () => {
+    const phrase = linkPhrase("declared", "Refonte du panier");
+    expect(phrase.charCodeAt(phrase.indexOf(":") - 1)).toBe(0xa0);
+    expect(phrase).not.toContain("déclaré :");
+  });
+
+  /**
+   * La raison est **ce que le geste voulait dire**, comme le motif d'annulation
+   * de `statePhrase` : ce n'est pas une « valeur avant » que D22 refuse.
+   */
+  test("la raison s'ajoute en incise, insécable compris", () => {
+    const phrase = linkPhrase(
+      "declared",
+      "Refonte du panier",
+      "réutilise la grille d'entretien",
+    );
+    expect(phrase).toBe(
+      `Lien déclaré${NBSP}: Refonte du panier${NBSP}— réutilise la grille d'entretien`,
+    );
+    expect(phrase.charCodeAt(phrase.indexOf("—") - 1)).toBe(0xa0);
+    expect(phrase).not.toContain("panier —");
+  });
+
+  /**
+   * **Une raison absente ne compose aucune clause vide.** `docs/02` §7 veut la
+   * saisie « parfaitement optionnelle » : la moitié des liens n'en portera pas,
+   * et « Lien déclaré : X — » serait la phrase qu'on relit sans comprendre.
+   */
+  test("sans raison, aucune incise — ni pour `null`, ni pour le vide", () => {
+    expect(linkPhrase("declared", "Refonte du panier", null)).toBe(
+      `Lien déclaré${NBSP}: Refonte du panier`,
+    );
+    expect(linkPhrase("declared", "Refonte du panier", "")).not.toContain("—");
+    expect(linkPhrase("declared", "Refonte du panier")).not.toContain("—");
+  });
+
+  /**
+   * **Le retrait ne redit pas la raison, et c'est la règle d'`archiveResource`**
+   * : « Ressource archivée : <titre> » ne redonne pas l'adresse du document. La
+   * phrase désigne ce qui a été touché, elle ne restitue pas son contenu.
+   */
+  test("le retrait ne porte que la désignation", () => {
+    expect(linkPhrase("removed", "Refonte du panier")).not.toContain("—");
   });
 });

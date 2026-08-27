@@ -3974,3 +3974,86 @@ page projet, avec « Journal », que `canWrite` ne touche pas.
 
 **1048 tests, 37 fichiers, verts.** `lint --max-warnings=0` et `tsc --noEmit` sans une ligne. **+20
 tests**, tous dans `lib/queries/links.test.ts`.
+
+---
+
+## T6.5 — Les liens déclarés : relier, dire pourquoi, retirer — 27/08/2026
+
+**Ce que le ticket ferme.** `project_links` était au schéma depuis T1.2 et **n'avait jamais reçu une
+ligne**. T6.4 avait livré la moitié déduite du bloc « Projets liés » en annonçant que la table
+« reste au modèle sans lecteur jusqu'à T6.5 » ; elle a désormais **un lecteur et trois écrivains**.
+`docs/06` §5 décrivait le bloc en une phrase — *« Liens déduits d'abord, puis liens déclarés avec
+leur raison »* — et le bloc la porte enfin entière.
+
+**Deux lectures, trois écritures, un panneau.** `listDeclaredLinks` lit **dans les deux sens** par
+une seule requête, l'autre projet se désignant par un `case` dans le `on` de la jointure ;
+`listLinkableProjects` propose ce qui reste reliable. `createProjectLink`, `updateProjectLink` et
+`removeProjectLink` écrivent, ce dernier par **`unlink`** — `LinkTable` le dit à la compilation,
+`archive` ne compilerait pas sur cette table. Le panneau est le plus court du produit : **deux
+champs, dont un facultatif**, parce que `docs/02` §7 veut que relier reste *très peu coûteux* et que
+cela se lit d'abord dans le nombre de champs.
+
+**Quatre arbitrages rendus avant écriture.** (1) `?lien=<identifiant>` **rouvre le panneau en
+correction** — la fiche posait la clé « `nouveau` | identifiant » sans nommer la destination du
+second cas, et c'est ce que veut dire toute clé polymorphe du dépôt depuis T3.4 ; le prix est une
+troisième action que la fiche ne nommait pas. (2) Le périmètre s'étend à `lib/forms/link.ts` et
+`lib/journal.ts` **avec leurs tests** : la fiche exigeait une phrase de journal neuve sans inclure
+le module qui porte la règle *une fonction par forme de phrase*. (3) Le retrait n'est permis que
+depuis le projet **source**, lettre de l'arbitrage (g). (4) Le **réciproque** reste proposé : la
+contrainte d'unicité porte sur un couple orienté, et inventer un cinquième refus aurait été une
+règle hors périmètre.
+
+**Le cinquième verbe, et la seule phrase dont le nom ne soit pas celui de son `target_type`.**
+`linked` s'écrit dans les trois gestes ; l'énuméré n'a pas d'`unlinked`, donc le retrait porte le
+même verbe et c'est la **phrase** qui distingue — « Lien retiré : Dématérialisation de la
+déclaration ». `event_target_type` n'a pas de valeur `link` (arbitrage (b), et en ajouter une
+demanderait une migration que le chantier s'interdit) : la colonne dit `project`, `target_id`
+désigne l'accompagnement visé, et la phrase dit « Lien ». Les deux sont vrais ; c'est la phrase qui
+se lit.
+
+**Le décompte d'exclusivité passe de sept clés à huit sans qu'un caractère de sa logique change** —
+la sixième fois, et c'est la propriété pour laquelle T4.4 l'avait écrit en décompte plutôt qu'en
+comparaison.
+
+### Les quatre disciplines
+
+- **Le critère se lit dans le HTML servi, sur les deux projets.** Sur celui d'où le lien part : la
+  ligne, sa raison, **« Modifier » et « Retirer »**. Sur celui qu'il vise : la même ligne, la même
+  raison, **et aucun geste** — alors que le lecteur est responsable de domaine et écrit donc sur les
+  deux. L'asymétrie de (g) se lit là, et nulle part ailleurs. Le réciproque déclaré sans raison rend
+  **« Aucune raison donnée »** ; l'état vide du bloc et son bouton primaire ont été lus sous sonde,
+  la base de développement n'ayant qu'une entité — « même entité » y rapproche tout, et aucun
+  accompagnement n'y est sans voisin. Sans droit : ni entrée de bloc, ni geste, et `?lien=nouveau`
+  **n'ouvre rien** tout en servant la page entière.
+- **Le droit s'éprouve par l'action.** Quatre frappes sur le **vrai point d'entrée HTTP**, en
+  `text/plain` avec charge Flight, chacune encadrée de son étape témoin. `createProjectLink` forgée
+  sous une identité sans droit rend **200 et 300 octets** avec son message ; la même sous le
+  responsable rend **200 et 61 383**. `removeProjectLink` frappée **depuis le projet cible** rend
+  **200 et 78 octets** — refus muet — et depuis la source **200 et 60 801**. **Trois situations, un
+  seul code** : seul le décompte en base les sépare. **Aucune ligne de sonde ne reste** — une
+  liaison, trois événements `linked`, une entité, un produit et un accompagnement de sonde effacés,
+  base ramenée à ses cinq accompagnements vivants et à ses deux événements d'avant.
+- **Les tests se mettent en défaut. Vingt-six neutralisations, et trois ont corrigé le ticket.**
+  (a) Le constat « le projet cible ne corrige pas le lien » tombait sur le **droit** et non sur le
+  sens : le contributeur n'écrivait pas sur la cible, et le test serait passé au vert sans rien
+  prouver de l'asymétrie. Le droit lui a été accordé des deux côtés. (b) `filter(projects)` de la
+  jointure symétrique **ne faisait tomber aucun test** : la ligne forgée visait un projet ordinaire
+  de l'autre domaine, que `filter(products)` écartait déjà — exactement le piège que l'en-tête du
+  module nomme. Elle vise désormais le projet dont **seul `domain_id`** franchit la frontière.
+  (c) Un commentaire affirmait que le nom du projet visé devait se lire **avant** `unlink`, « sans
+  quoi la liaison n'existe plus pour désigner sa cible » : c'est faux — la ligne est déjà en main et
+  `unlink` ne cascade sur rien. Les deux ordres passent les mêmes tests ; le commentaire a été
+  récrit. **Une propriété qu'aucun test ne défend n'est pas une propriété.**
+- **Le contraste se mesure.** Trois couples de texte : `content-neutral-dark` **8,12:1** (l'intertitre
+  « Liens déclarés »), `content-neutral-base` **4,98:1** (« Aucune raison donnée »),
+  `content-primary-dark` **15,72:1** (« Modifier », « Retirer »). Aucun couple neuf **par la
+  position** : la carte à filet est celle de T6.4. Le filet à **1,24:1** est la dette de design
+  system déjà consignée, à une position qui existait.
+
+**1101 tests, 38 fichiers, verts.** `lint --max-warnings=0` et `tsc --noEmit` sans une ligne. **+53
+tests** : 19 pour les deux lectures, 17 pour les trois actions, 11 pour `lib/forms/link.ts`, 6 pour
+`linkPhrase`.
+
+**Le seul module de saisie sans test l'aurait été.** `lib/forms/link.ts` serait entré comme le
+quinzième de `lib/forms/` et le premier sans `.test.ts` voisin — l'absence se voyait à l'`ls`. Il a
+son fichier, et ses cinq neutralisations.

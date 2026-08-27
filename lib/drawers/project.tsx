@@ -1,5 +1,10 @@
 /**
- * La résolution des six panneaux de la page projet — TD.2.
+ * La résolution des panneaux de la page projet — TD.2.
+ *
+ * **Sans le compte**, et c'est le geste de T6.1 sur `scoped.ts` : la phrase
+ * disait « les six » quand ils étaient sept depuis le 20/08/2026, et ils sont
+ * huit depuis T6.5. Un nombre dans un commentaire vieillit à chaque ticket ; ce
+ * qui se relit ici est la **règle**, que le `switch` tient branche par branche.
  *
  * **Jumeau de `lib/drawers/product.tsx`, et pour les mêmes raisons.** Rien
  * n'est inventé ici : tout vient de `app/(app)/projets/[id]/page.tsx`, où la
@@ -23,6 +28,7 @@
 
 import { ActivityPanel } from "@/components/projects/activity-panel";
 import { AdoptionPanel } from "@/components/projects/adoption-panel";
+import { LinkPanel } from "@/components/projects/link-panel";
 import {
   ResourcePanel,
   type ResourceActivityOption,
@@ -32,9 +38,15 @@ import { StarterDetail } from "@/components/projects/starter-detail";
 import { ConfirmPanel } from "@/components/ui/confirm-panel";
 import { borderOf, CONTROL, FormField } from "@/components/ui/form-field";
 import type { Session } from "@/lib/auth/session";
-import { activities, projectIndicators, resources } from "@/lib/db/schema";
+import {
+  activities,
+  projectIndicators,
+  projectLinks,
+  resources,
+} from "@/lib/db/schema";
 import { toActivityFormValues } from "@/lib/forms/activity";
 import { toAdoptionFormValues } from "@/lib/forms/adoption";
+import { toLinkFormValues } from "@/lib/forms/link";
 import { toResourceFormValues } from "@/lib/forms/resource";
 import { toResultFormValues } from "@/lib/forms/result";
 import { formatActivityPeriod } from "@/lib/format";
@@ -46,6 +58,8 @@ import {
   CANCEL_PANEL_PARAM,
   INDICATOR_PANEL_NEW,
   INDICATOR_PANEL_PARAM,
+  LINK_PANEL_NEW,
+  LINK_PANEL_PARAM,
   RESOURCE_PANEL_NEW,
   RESOURCE_PANEL_PARAM,
   RESULT_PANEL_PARAM,
@@ -61,6 +75,7 @@ import {
 } from "@/lib/queries/activities";
 import type { RoadmapGroup } from "@/lib/queries/activities";
 import { listAdoptableIndicators } from "@/lib/queries/indicators";
+import { listLinkableProjects } from "@/lib/queries/links";
 import type { ProjectDetail } from "@/lib/queries/projects";
 import { findResourceActivity } from "@/lib/queries/resources";
 import {
@@ -75,10 +90,12 @@ import {
   cancelActivity,
   createActivity,
   createAdoption,
+  createProjectLink,
   createResource,
   createResult,
   updateActivity,
   updateAdoption,
+  updateProjectLink,
   updateResource,
   updateResult,
 } from "@/app/(app)/projets/[id]/actions";
@@ -506,7 +523,58 @@ export async function resolveProjectDrawer(
     }
 
     /* ------------------------------------------------------------------ */
-    /* Le septième panneau, et le seul en lecture seule (20/08/2026).
+    case "link": {
+      if (!context.canWrite) return null;
+
+      /* Aucune condition d'archivage, comme l'adoption : `project_links` n'a
+         pas de colonne `archived_at` — une liaison ne s'archive pas, elle se
+         défait (arbitrage (f)).
+
+         **`fromProjectId` et non `toProjectId`** : c'est l'asymétrie de
+         l'arbitrage (g). Le lien s'affiche sur les deux pages, il ne se corrige
+         que depuis celle d'où il part — et une demande se forge, donc la
+         condition vit ici comme elle vit dans `openLink`. */
+      const row =
+        request.id && isUuid(request.id)
+          ? await session.db.find(projectLinks, request.id)
+          : undefined;
+      const link = row && row.fromProjectId === project.id ? row : null;
+      if (request.id && !link) return null;
+
+      /* **L'exception nominative vit dans la requête** : `keepProjectId` couvre
+         les deux exclusions d'un seul chemin — la cible du lien édité est déjà
+         reliée, et elle a pu être archivée depuis. */
+      const linkable = await listLinkableProjects(
+        session.db,
+        project.id,
+        link ? { keepProjectId: link.toProjectId } : {},
+      );
+
+      return {
+        titleId: "panneau-lien-titre",
+        title: link ? "Modifier le lien" : "Déclarer un lien",
+        subtitles: [project.name],
+        body: (
+          <LinkPanel
+            action={
+              link
+                ? updateProjectLink.bind(null, project.id, link.id)
+                : createProjectLink.bind(null, project.id)
+            }
+            projects={linkable}
+            {...(link
+              ? {
+                  submitLabel: "Enregistrer les modifications",
+                  initial: toLinkFormValues(link),
+                }
+              : {})}
+          />
+        ),
+      };
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Le seul panneau en lecture seule (20/08/2026).
 
        **Aucun droit ne le garde**, et c'est exact : une piste de démarrage est
        un référentiel du domaine, que D9 ouvre à tout le domaine. Ce qui le
@@ -516,7 +584,7 @@ export async function resolveProjectDrawer(
 
        La forme de l'UUID est vérifiée avant : une valeur fantaisiste ne doit
        pas atteindre la base, où elle rendrait une erreur PostgreSQL plutôt
-       qu'une page nue. La règle tenue par les cinq branches qui précèdent. */
+       qu'une page nue. La règle tenue par toutes les branches qui précèdent. */
     case "starter": {
       if (!isUuid(request.id)) return null;
 
@@ -545,6 +613,7 @@ export function projectRequestFromParams(asked: {
   archiver?: string | undefined;
   indicateur?: string | undefined;
   piste?: string | undefined;
+  lien?: string | undefined;
 }): ProjectDrawerRequest | null {
   if (asked.archiver === ARCHIVE_PANEL_CONFIRM) return { kind: "archive" };
   if (asked.annuler !== undefined) return { kind: "cancel", id: asked.annuler };
@@ -569,6 +638,12 @@ export function projectRequestFromParams(asked: {
       : { kind: "activity", id: asked.activite };
   }
 
+  if (asked.lien !== undefined) {
+    return asked.lien === LINK_PANEL_NEW
+      ? { kind: "link" }
+      : { kind: "link", id: asked.lien };
+  }
+
   /* Aucune sentinelle : la valeur désigne toujours une piste, il n'y a pas de
      cas « nouvelle » à porter. */
   if (asked.piste !== undefined) return { kind: "starter", id: asked.piste };
@@ -585,4 +660,5 @@ export const PROJECT_PANEL_PARAMS = [
   ARCHIVE_PANEL_PARAM,
   INDICATOR_PANEL_PARAM,
   STARTER_PANEL_PARAM,
+  LINK_PANEL_PARAM,
 ] as const;

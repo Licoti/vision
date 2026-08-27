@@ -51,13 +51,18 @@ export type ProductDrawerRequest =
   | { kind: "useCaseDetail"; id: string };
 
 /**
- * Les sept panneaux de la page projet, sur la même forme.
+ * Les huit panneaux de la page projet, sur la même forme.
  *
  * **Le septième est le seul en lecture seule** (20/08/2026) : `starter` ouvre le
- * détail d'une piste de démarrage, que tout le domaine lit (D9), là où les six
+ * détail d'une piste de démarrage, que tout le domaine lit (D9), là où les sept
  * autres ouvrent une écriture ou une confirmation. Il n'a pas de jumeau
  * d'écriture — la paire « une clé pour lire, une clé pour écrire » de la page
  * produit n'a rien à séparer sur un référentiel dont D25 donne l'écran à C7.
+ *
+ * **`link` est le huitième** (T6.5), et la paire n'a rien à y séparer non plus,
+ * pour la raison inverse : un lien déclaré n'a pas de fiche, il se lit dans le
+ * bloc. `id` y est facultatif — la valeur porte le cas dans l'URL, `nouveau`
+ * contre un identifiant de `project_links` —, et son absence dit « déclarer ».
  */
 export type ProjectDrawerRequest =
   | { kind: "archive" }
@@ -66,7 +71,8 @@ export type ProjectDrawerRequest =
   | { kind: "adoption"; id?: string | undefined }
   | { kind: "resource"; id?: string | undefined }
   | { kind: "activity"; id?: string | undefined }
-  | { kind: "starter"; id: string };
+  | { kind: "starter"; id: string }
+  | { kind: "link"; id?: string | undefined };
 
 /**
  * Les quatre panneaux de la page **Équipe** — T5bis.4, puis T5bis.6.
@@ -194,6 +200,7 @@ const PROJECT_KINDS = [
   "resource",
   "activity",
   "starter",
+  "link",
 ] as const;
 
 const TEAM_KINDS = ["personDetail", "person", "skill", "archive"] as const;

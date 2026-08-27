@@ -26,8 +26,17 @@
  * souvent leurs personnes ; les dire trois fois ferait une liste de doublons là
  * où l'on attend une liste de voisins.
  *
- * **Les liens déclarés ne sont pas ici** : `project_links` est la matière de
- * T6.5, et ce module ne la lit pas.
+ * **Les liens déclarés sont ici depuis T6.5**, et c'est le second visage du
+ * module : `listDeclaredLinks` lit `project_links`, la seule table de ce
+ * chantier qui stocke quoi que ce soit. Les deux natures cohabitent sans se
+ * confondre — un lien déduit est un **calcul**, toujours vrai, jamais écrit ;
+ * un lien déclaré est un **fait humain**, écrit une fois, qui dit ce que le
+ * calcul ne peut pas voir. Aucune des deux lectures ne filtre l'autre : un même
+ * voisin peut paraître sous les deux, et ce sont deux informations distinctes.
+ *
+ * **La lecture d'un lien déclaré est symétrique, son écriture ne l'est pas**
+ * (arbitrage (g) de `tickets-C6.md`). `from_project_id` est le projet d'où l'on
+ * a agi ; les deux pages l'affichent, une seule le retire.
  *
  * Ce module n'importe pas `db` : il reçoit un `ScopedDb` déjà lié au domaine
  * courant. Règle 1. Les lectures joignent, donc elles passent par `joinedRead`
@@ -43,7 +52,18 @@
  * aucune mise en défaut ne saurait plus dire lequel des deux protège.
  */
 
-import { and, asc, eq, exists, inArray, isNull, ne, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  exists,
+  inArray,
+  isNull,
+  ne,
+  notExists,
+  or,
+  sql,
+} from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import type { ScopedDb } from "@/lib/db/scoped";
@@ -53,6 +73,7 @@ import {
   persons,
   products,
   projectApproaches,
+  projectLinks,
   projectMembers,
   projectStatuses,
   projects,
@@ -436,4 +457,218 @@ function groupBy(
     grouped.set(row.projectId, values);
   }
   return grouped;
+}
+
+/* ==========================================================================
+   Les liens **déclarés** — T6.5
+
+   Ce que le calcul ne peut pas voir, et notamment la réutilisation.
+   `docs/02` §7 : *« c'est le seul cas où l'on demande une saisie qui ne sert
+   pas directement à celui qui la fait ; elle doit donc rester très peu
+   coûteuse et parfaitement optionnelle. »*
+
+   Ces deux lectures sont la seule part du module qui touche une table stockée.
+   Elles n'inventent aucune raison : ce qui s'affiche est ce qui a été saisi, ou
+   rien.
+   ========================================================================== */
+
+/**
+ * Un lien déclaré, vu **depuis le projet consulté**.
+ *
+ * `direction` n'est pas un ornement : c'est ce qui décide du geste de retrait.
+ * La lecture est symétrique — les deux pages portent la ligne —, l'écriture ne
+ * l'est pas : seul le projet **source** retire (arbitrage (g)). Le rendre ici
+ * plutôt que de laisser l'écran comparer deux identifiants évite qu'une seconde
+ * autorité décide de l'orientation.
+ *
+ * **`reason` reste nullable** : un lien sans raison est un lien valide, et
+ * `docs/02` §7 veut la saisie « parfaitement optionnelle ». L'écran dit
+ * l'absence, il ne l'invente pas.
+ */
+export type DeclaredLink = {
+  /** L'identifiant de la **liaison**, jamais celui d'un projet : c'est la cible du retrait. */
+  id: string;
+  /** `outgoing` : le projet consulté est `from_project_id`. Le seul cas qui se retire. */
+  direction: "outgoing" | "incoming";
+  /** L'**autre** projet — celui que la ligne donne à lire et à atteindre. */
+  projectId: string;
+  name: string;
+  productId: string;
+  productName: string;
+  statusLabel: string;
+  statusNature: ProjectStatusNature;
+  /** Colonnes `date` : chaînes `YYYY-MM-DD`, formatées par `lib/format`. */
+  startedOn: string | null;
+  expectedEndOn: string | null;
+  /** La raison saisie, en texte libre. `null` quand personne n'en a donné. */
+  reason: string | null;
+};
+
+/**
+ * Les liens déclarés d'un accompagnement, **dans les deux sens**.
+ *
+ * **Une seule requête, et c'est ce qui rend son étanchéité mesurable.** L'autre
+ * projet se désigne par un `case` dans le `on` de la jointure plutôt que par
+ * deux lectures unies : un second `filter(projects)` plus bas rattraperait la
+ * fuite que le premier laisserait passer, et aucune mise en défaut ne saurait
+ * plus dire lequel des deux protège. C'est la discipline posée par l'en-tête du
+ * module, tenue pour une lecture de plus.
+ *
+ * **Aucun filtre d'archivage, et c'est un arbitrage.** Les liens *déduits*
+ * écartent les projets archivés — un accompagnement rangé ne se **propose**
+ * plus comme voisin. Un lien déclaré n'est pas une proposition : c'est une
+ * phrase que quelqu'un a écrite. Le masquer parce que sa cible a été archivée
+ * depuis ferait disparaître **avec lui son geste de retrait**, et la ligne
+ * deviendrait irretirable. La règle 4 range, elle ne cache pas. Ce qui reste
+ * interdit est de **relier** un projet archivé, et cela se joue à l'écriture.
+ *
+ * Rend `[]` sur un identifiant inconnu comme sur un projet d'un autre domaine :
+ * la distinction n'appartient pas à l'appelant.
+ *
+ * **Aucune borne, aucune pagination, aucun classement.** Le nom ordonne, `id`
+ * départage — un ordre qui varierait d'un affichage à l'autre serait un défaut.
+ */
+export function listDeclaredLinks(
+  scope: ScopedDb,
+  projectId: string,
+): Promise<DeclaredLink[]> {
+  return scope.joinedRead(async (database, { filter }) => {
+    /* L'**autre** projet de la liaison : celui qui n'est pas le projet
+       consulté. Écrit une fois, dans le `on`, il vaut pour les deux sens. */
+    const otherProjectId = sql`case when ${projectLinks.fromProjectId} = ${projectId} then ${projectLinks.toProjectId} else ${projectLinks.fromProjectId} end`;
+
+    const rows = await database
+      .select({
+        id: projectLinks.id,
+        fromProjectId: projectLinks.fromProjectId,
+        reason: projectLinks.reason,
+        projectId: projects.id,
+        name: projects.name,
+        productId: products.id,
+        productName: products.name,
+        statusLabel: projectStatuses.label,
+        statusNature: projectStatuses.nature,
+        startedOn: projects.startedOn,
+        expectedEndOn: projects.expectedEndOn,
+      })
+      .from(projectLinks)
+      .innerJoin(
+        projects,
+        and(eq(projects.id, otherProjectId), filter(projects)),
+      )
+      .innerJoin(
+        products,
+        and(eq(products.id, projects.productId), filter(products)),
+      )
+      .innerJoin(
+        projectStatuses,
+        and(eq(projectStatuses.id, projects.statusId), filter(projectStatuses)),
+      )
+      .where(
+        and(
+          filter(projectLinks),
+          or(
+            eq(projectLinks.fromProjectId, projectId),
+            eq(projectLinks.toProjectId, projectId),
+          ),
+        ),
+      )
+      .orderBy(asc(projects.name), asc(projectLinks.id));
+
+    return rows.map(({ fromProjectId, ...row }) => ({
+      ...row,
+      direction:
+        fromProjectId === projectId
+          ? ("outgoing" as const)
+          : ("incoming" as const),
+    }));
+  });
+}
+
+/**
+ * Un accompagnement proposé à la déclaration : son identifiant, et de quoi le
+ * reconnaître dans une liste — « Refonte du panier · Espace client web ». Le
+ * libellé se compose ici, comme celui d'une `ResourceActivityOption` se compose
+ * dans la page : un `select` reçoit des options, pas des lignes de base.
+ */
+export type LinkableProject = {
+  id: string;
+  label: string;
+};
+
+/**
+ * Les accompagnements que le panneau propose à la déclaration.
+ *
+ * Quatre exclusions, et **aucune cinquième** : le projet consulté lui-même
+ * (l'auto-lien), les projets archivés et ceux d'un produit archivé (interdit de
+ * la fiche : *ni proposé, ni accepté*), et ceux qu'un lien **sortant** vise
+ * déjà — un doublon ne se propose pas. Le **réciproque**, lui, reste proposé :
+ * `project_links_from_to_unique` porte sur un couple orienté, et deux
+ * déclarations opposées sont deux faits distincts, chacun avec sa raison.
+ *
+ * **`keepProjectId` est l'exception nominative** (T4bis.1, T4bis.5, T4bis.6),
+ * et elle couvre les deux exclusions d'un seul chemin : le projet visé par le
+ * lien que l'on corrige est **déjà relié**, et il a pu être archivé depuis.
+ * Sans elle, le `select` retomberait sur rien et la première re-soumission
+ * serait refusée. Elle n'accepte que la valeur portée par la ligne éditée, et
+ * n'ouvre la porte à aucune autre.
+ *
+ * **Ce n'est pas cet écran qui protège** : `createProjectLink` reprend les
+ * quatre conditions sur ce qu'elle **reçoit**.
+ */
+export function listLinkableProjects(
+  scope: ScopedDb,
+  projectId: string,
+  options: { keepProjectId?: string } = {},
+): Promise<LinkableProject[]> {
+  return scope.joinedRead(async (database, { filter }) => {
+    /* Ce qu'un projet doit être pour se proposer : vivant, sous un produit
+       vivant, et pas déjà relié depuis le projet consulté. */
+    const available = and(
+      isNull(projects.archivedAt),
+      isNull(products.archivedAt),
+      notExists(
+        database
+          .select({ one: sql`1` })
+          .from(projectLinks)
+          .where(
+            and(
+              filter(projectLinks),
+              eq(projectLinks.fromProjectId, projectId),
+              eq(projectLinks.toProjectId, projects.id),
+            ),
+          ),
+      ),
+    )!;
+
+    const kept = options.keepProjectId;
+
+    const rows = await database
+      .select({
+        id: projects.id,
+        name: projects.name,
+        productName: products.name,
+      })
+      .from(projects)
+      .innerJoin(
+        products,
+        and(eq(products.id, projects.productId), filter(products)),
+      )
+      .where(
+        and(
+          filter(projects),
+          /* L'auto-lien ne se propose pas — et le `CHECK`
+             `project_links_no_self_link` reste la **seconde** barrière, jamais
+             la première. */
+          ne(projects.id, projectId),
+          kept ? or(eq(projects.id, kept), available)! : available,
+        ),
+      )
+      .orderBy(asc(products.name), asc(projects.name));
+
+    return rows.map((row) => ({
+      id: row.id,
+      label: `${row.name} · ${row.productName}`,
+    }));
+  });
 }

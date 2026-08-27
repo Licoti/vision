@@ -152,6 +152,7 @@ import {
   approaches,
   indicators,
   projectIndicators,
+  projectLinks,
   projects,
   resources,
   results,
@@ -179,6 +180,12 @@ import {
   type ActivityState,
 } from "@/lib/forms/activity";
 import {
+  parseLinkForm,
+  readLinkForm,
+  type LinkFormErrors,
+  type LinkFormState,
+} from "@/lib/forms/link";
+import {
   parseResourceForm,
   readResourceForm,
   type ResourceFormErrors,
@@ -190,7 +197,7 @@ import {
   readResultForm,
   type ResultFormState,
 } from "@/lib/forms/result";
-import { objectPhrase, statePhrase } from "@/lib/journal";
+import { linkPhrase, objectPhrase, statePhrase } from "@/lib/journal";
 import { ROUTES } from "@/lib/navigation";
 
 /**
@@ -1972,4 +1979,416 @@ export async function removeAdoption(
   await session.db.unlink(projectIndicators, adoptionId);
 
   refreshAdoption(projectId, gate.project.productId);
+}
+
+/* ==========================================================================
+   Les liens déclarés — T6.5
+
+   Ce que le calcul ne peut pas voir. Les liens **déduits** ne s'écrivent nulle
+   part (T6.4) ; ceux-ci s'écrivent, et c'est la seule table de liaison entre
+   deux accompagnements du dépôt.
+
+   **Le lien est orienté, et son droit ne l'est pas** (arbitrage (g) de
+   `tickets-C6.md`) : `from_project_id` est le projet d'où l'on agit, et le
+   droit exigé est `writeProject` sur **ce** projet, jamais sur les deux. Une
+   règle de droit qui traverserait deux projets serait la première du dépôt, et
+   D9 ne la porte pas. Conséquence assumée : un contributeur d'un seul des deux
+   accompagnements pose un lien qui s'affiche sur l'autre.
+
+   **La lecture est symétrique, l'écriture ne l'est pas.** Les deux pages
+   portent la ligne ; seule celle d'où le lien part la retire — c'est
+   `openLink` qui le tient, et lui seul.
+   ========================================================================== */
+
+function linkRefusal(formData: FormData, message: string): LinkFormState {
+  return { values: readLinkForm(formData), errors: {}, message };
+}
+
+/**
+ * Le lien reçu, rapproché de **ce** projet — la cinquième porte du fichier, sur
+ * le modèle exact d'`openAdoption`.
+ *
+ * Deux contrôles, et chacun ferme une porte :
+ *
+ * 1. `openProject` sur le `projectId` **reçu** — le droit `writeProject` (D9),
+ *    l'appartenance au domaine, et la lecture seule d'un accompagnement
+ *    archivé, d'un seul appel ;
+ * 2. le lien reçu **part de ce projet**. `fromProjectId` et non `toProjectId` :
+ *    c'est l'asymétrie de l'arbitrage (g), et c'est ici qu'elle vit. Sans ce
+ *    second contrôle, une soumission forgée corrigerait ou retirerait le lien
+ *    d'un autre accompagnement — les identifiants liés sont sérialisés en clair
+ *    dans un champ `$ACTION_…`, et une soumission peut les réécrire.
+ *
+ * **Aucun contrôle d'archivage sur le lien** : `project_links` n'a pas de
+ * colonne `archived_at`, et c'est le fond de l'arbitrage (f) — une liaison ne
+ * s'archive pas, elle se défait.
+ *
+ * Le message n'est utilisé que par `updateProjectLink` : `removeProjectLink`
+ * refuse en silence, n'ayant aucune saisie à rendre.
+ */
+async function openLink(
+  session: Session,
+  projectId: string,
+  linkId: string,
+  refused: string,
+): Promise<
+  | { project: Row<typeof projects>; link: Row<typeof projectLinks> }
+  | { message: string }
+> {
+  const gate = await openProject(session, projectId, refused);
+  if ("message" in gate) return gate;
+
+  const link = await session.db.find(projectLinks, linkId);
+  if (!link || link.fromProjectId !== projectId) {
+    return {
+      message: "Ce lien n'a pas été déclaré depuis cet accompagnement.",
+    };
+  }
+
+  return { project: gate.project, link };
+}
+
+/**
+ * L'accompagnement visé, **confronté au domaine avant d'écrire**.
+ *
+ * `neon-http` n'a pas de transaction interactive : tout se vérifie avant. Trois
+ * refus, et l'ordre est celui de la fiche — hors domaine, auto-lien, archivé —,
+ * le doublon se traitant plus bas.
+ *
+ * **Les contraintes de base sont les secondes barrières, jamais les
+ * premières.** `project_links_no_self_link` rendrait un 500 sur l'auto-lien, et
+ * `DomainScopeError` une page en erreur sur un projet d'ailleurs : une
+ * contrainte qui rend un 500 là où l'on attend un message n'a rien protégé.
+ * Elles restent, et elles ne sont jamais atteintes.
+ *
+ * **Un projet archivé est refusé, et le forger n'y change rien** : le panneau
+ * ne le propose pas (`listLinkableProjects`), et rien ne justifie de l'accepter
+ * par requête — l'écran n'a jamais protégé le point d'entrée HTTP.
+ *
+ * **`keptProjectId` est l'exception nominative** (T4bis.1, T4bis.5, T4bis.6) :
+ * le projet déjà visé par le lien que l'on corrige reste accepté même archivé
+ * depuis, et lui seul. Sans elle, corriger la raison d'un lien vers un
+ * accompagnement rangé depuis serait impossible sans changer de cible.
+ * `createProjectLink` ne passe rien : une déclaration n'a aucune valeur
+ * antérieure à préserver.
+ *
+ * **Elle rend aussi le nom du projet visé** — celui que le journal fige comme
+ * désignation de ce qui a été relié. La ligne est **déjà lue ici** ; la jeter
+ * puis la relire au point d'appel serait une seconde lecture de la même ligne
+ * dans la même soumission, donc une occasion de divergence. Il est vide quand
+ * le projet est refusé — le cas où l'appelant rend ses erreurs et n'écrit rien.
+ */
+async function checkLinkTarget(
+  session: Session,
+  projectId: string,
+  toProjectId: string,
+  keptProjectId: string | null = null,
+): Promise<{ errors: LinkFormErrors; targetName: string }> {
+  const target = await session.db.find(projects, toProjectId);
+
+  if (!target) {
+    return {
+      errors: {
+        toProjectId: "Cet accompagnement n'existe pas dans ce domaine.",
+      },
+      targetName: "",
+    };
+  }
+
+  if (toProjectId === projectId) {
+    return {
+      errors: { toProjectId: "Un accompagnement ne se relie pas à lui-même." },
+      targetName: "",
+    };
+  }
+
+  if (target.archivedAt !== null && target.id !== keptProjectId) {
+    return {
+      errors: {
+        toProjectId:
+          "Cet accompagnement est archivé : il ne peut pas être relié.",
+      },
+      targetName: "",
+    };
+  }
+
+  return { errors: {}, targetName: target.name };
+}
+
+/**
+ * L'unicité `(from, to)`, **devancée plutôt que subie**.
+ *
+ * `project_links_from_to_unique` est une contrainte **totale** — la table n'a
+ * pas d'`archived_at`, donc rien à rendre partiel. Une seconde déclaration du
+ * même couple lèverait une violation d'unicité PostgreSQL, donc un 500, là où
+ * l'on attend un message : ce qui se refuse doit se lire, pas se planter.
+ *
+ * **Le réciproque n'est pas un doublon.** La contrainte porte sur un couple
+ * **orienté** : `A → B` et `B → A` coexistent, et c'est juste — ce sont deux
+ * déclarations, chacune avec sa raison, faites depuis deux accompagnements. Y
+ * ajouter un cinquième refus serait une règle que la fiche ne porte pas.
+ *
+ * `exceptLinkId` est la correction : un lien qui garde sa propre cible ne se
+ * heurte pas à lui-même.
+ */
+async function checkLinkUnique(
+  session: Session,
+  projectId: string,
+  toProjectId: string,
+  exceptLinkId: string | null = null,
+): Promise<LinkFormErrors> {
+  const held = await session.db.list(projectLinks, {
+    where: and(
+      eq(projectLinks.fromProjectId, projectId),
+      eq(projectLinks.toProjectId, toProjectId),
+    ),
+  });
+
+  const clash = held.some((row) => row.id !== exceptLinkId);
+  if (clash) {
+    return { toProjectId: "Ce lien est déjà déclaré." };
+  }
+
+  return {};
+}
+
+/**
+ * Les pages que cette écriture change — **les deux**, et c'est la conséquence
+ * directe de la lecture symétrique : le lien paraît sur la page d'où il part
+ * comme sur celle qu'il vise.
+ *
+ * Ce n'est **pas** `refresh` : `last_activity_at` n'a pas bougé — déclarer un
+ * lien n'est pas un fait d'accompagnement —, et revalider la liste des projets
+ * ou la page du produit ferait croire le contraire au lecteur de ce fichier (la
+ * leçon de T4.2, reprise par `refreshAdoption`).
+ *
+ * Variadique parce qu'une correction peut changer de cible : l'ancienne page
+ * doit perdre la ligne au même instant que la nouvelle la gagne. Le `Set`
+ * évite de revalider deux fois la même adresse.
+ */
+function refreshLink(...projectIds: readonly string[]): void {
+  for (const id of new Set(projectIds)) revalidatePath(ROUTES.project(id));
+}
+
+/**
+ * Déclarer un lien vers un autre accompagnement.
+ *
+ * `projectId` est lié côté serveur ; `previous` est l'état que `useActionState`
+ * fait circuler, dont l'action n'a pas besoin — la saisie repart du `FormData`
+ * à chaque soumission.
+ *
+ * **Aucun lien créé automatiquement à partir d'une règle déduite** : les deux
+ * natures ne se confondent pas. Un lien déclaré dit ce que le calcul ne voit
+ * pas ; le dériver d'un calcul le viderait de son objet.
+ */
+export async function createProjectLink(
+  projectId: string,
+  _previous: LinkFormState,
+  formData: FormData,
+): Promise<LinkFormState> {
+  const session = await requireSession();
+
+  const gate = await openProject(
+    session,
+    projectId,
+    "La déclaration d'un lien est réservée au responsable de domaine et aux contributeurs désignés de cet accompagnement.",
+  );
+  if ("message" in gate) return linkRefusal(formData, gate.message);
+
+  const { values, errors, input } = parseLinkForm(formData);
+  if (!input) return { values, errors };
+
+  const target = await checkLinkTarget(session, projectId, input.toProjectId);
+  if (Object.keys(target.errors).length > 0) {
+    return { values, errors: target.errors };
+  }
+
+  const held = await checkLinkUnique(session, projectId, input.toProjectId);
+  if (Object.keys(held).length > 0) return { values, errors: held };
+
+  try {
+    await session.db.insert(projectLinks, {
+      fromProjectId: projectId,
+      ...input,
+    });
+  } catch (error) {
+    if (error instanceof DomainScopeError) {
+      return linkRefusal(
+        formData,
+        "Une référence de ce formulaire n'appartient pas au domaine : la saisie n'a pas été enregistrée.",
+      );
+    }
+    throw error;
+  }
+
+  /* **Le cinquième verbe de l'énuméré**, et le seul que T6.1 et T6.2 n'avaient
+     pas posé sur son objet propre. `target_type` dit `project` — les six sont
+     figés par l'arbitrage (b), et `link` n'en est pas — et `target_id` désigne
+     l'accompagnement visé : c'est lui que le geste a touché. */
+  await session.db.record({
+    projectId,
+    verb: "linked",
+    targetType: "project",
+    targetId: input.toProjectId,
+    summary: linkPhrase("declared", target.targetName, input.reason),
+  });
+
+  refreshLink(projectId, input.toProjectId);
+
+  return { values, errors: {}, ok: true };
+}
+
+/**
+ * Corriger un lien déclaré : **le même formulaire, la même validation, les
+ * mêmes refus** qu'à la déclaration — la propriété qui fait qu'un seul panneau
+ * sert les deux gestes.
+ *
+ * `projectId` et `linkId` sont liés côté serveur. **Ce ne sont pas des
+ * secrets** : Next les sérialise en clair dans un champ `$ACTION_…`, et une
+ * soumission peut les réécrire. Ce qui protège est `openLink`, qui interroge le
+ * droit sur le projet **reçu** puis rapproche le lien **reçu** de ce projet.
+ *
+ * **La cible peut changer** : corriger un lien, c'est aussi s'être trompé
+ * d'accompagnement. Les trois contrôles valent alors comme à la déclaration —
+ * domaine, auto-lien, archivage —, plus l'unicité, le lien édité excepté de
+ * lui-même.
+ */
+export async function updateProjectLink(
+  projectId: string,
+  linkId: string,
+  _previous: LinkFormState,
+  formData: FormData,
+): Promise<LinkFormState> {
+  const session = await requireSession();
+
+  const gate = await openLink(
+    session,
+    projectId,
+    linkId,
+    "La modification d'un lien est réservée au responsable de domaine et aux contributeurs désignés de cet accompagnement.",
+  );
+  if ("message" in gate) return linkRefusal(formData, gate.message);
+
+  const { values, errors, input } = parseLinkForm(formData);
+  if (!input) return { values, errors };
+
+  /* L'exception nominative : la cible que le lien porte **déjà** est acceptée
+     même archivée, et elle seule. Le panneau la garde sélectionnée sans la
+     proposer ; sans cette ligne, une re-soumission à l'identique serait
+     refusée. */
+  const target = await checkLinkTarget(
+    session,
+    projectId,
+    input.toProjectId,
+    gate.link.toProjectId,
+  );
+  if (Object.keys(target.errors).length > 0) {
+    return { values, errors: target.errors };
+  }
+
+  const held = await checkLinkUnique(
+    session,
+    projectId,
+    input.toProjectId,
+    linkId,
+  );
+  if (Object.keys(held).length > 0) return { values, errors: held };
+
+  try {
+    const updated = await session.db.update(projectLinks, linkId, input);
+    if (!updated) {
+      return linkRefusal(
+        formData,
+        "Ce lien n'a pas été déclaré depuis cet accompagnement.",
+      );
+    }
+  } catch (error) {
+    if (error instanceof DomainScopeError) {
+      return linkRefusal(
+        formData,
+        "Une référence de ce formulaire n'appartient pas au domaine : la saisie n'a pas été enregistrée.",
+      );
+    }
+    throw error;
+  }
+
+  await session.db.record({
+    projectId,
+    verb: "linked",
+    targetType: "project",
+    targetId: input.toProjectId,
+    summary: linkPhrase("updated", target.targetName, input.reason),
+  });
+
+  /* L'ancienne cible est revalidée avec la nouvelle : elle perd la ligne au
+     même instant que l'autre la gagne. */
+  refreshLink(projectId, input.toProjectId, gate.link.toProjectId);
+
+  return { values, errors: {}, ok: true };
+}
+
+/**
+ * Retirer un lien déclaré : la liaison se **défait**, elle ne s'archive pas
+ * (arbitrage (f)).
+ *
+ * **Ce n'est pas une entorse à la règle 4.** La règle protège la donnée
+ * métier ; un lien déclaré est une liaison, et c'est l'arbitrage de fait de
+ * T1.2 — celui des membres de projet, des participants d'activité et des
+ * adoptions. `LinkTable` le dit à la compilation : `archive` ne compilerait pas
+ * sur cette table, `unlink` seul le peut. Rien de la mémoire du centre ne s'y
+ * perd — les deux accompagnements restent, avec leurs pages.
+ *
+ * **Aucune cascade** : `unlink` retire la ligne de liaison, rien d'autre.
+ *
+ * **Sans confirmation** — arbitrage (c) de `tickets-C4bis.md` : elle se
+ * justifie là où le geste retire de la lecture tout un ensemble, et `docs/06`
+ * §9 la proscrit partout où elle ne protège rien. Retirer un lien posé par
+ * erreur est le geste qu'on veut rapide, et il se refait.
+ *
+ * **Le refus est muet**, comme `removeAdoption` : ce geste n'a aucune saisie à
+ * rendre, et rien ne justifie de lui inventer un message que l'écran n'atteint
+ * jamais en usage normal.
+ */
+export async function removeProjectLink(
+  projectId: string,
+  linkId: string,
+): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openLink(
+    session,
+    projectId,
+    linkId,
+    // Jamais rendu : ce geste n'affiche aucun refus.
+    "Le retrait d'un lien est réservé au responsable de domaine et aux contributeurs désignés de cet accompagnement.",
+  );
+  if ("message" in gate) return;
+
+  /* Le nom du projet visé, que la phrase du journal fige.
+
+     **L'ordre est indifférent, et le dire est une correction** : le premier
+     jet plaçait cette lecture avant `unlink` en affirmant qu'après, « la
+     liaison n'existe plus pour désigner sa cible ». C'est faux — `gate.link`
+     est déjà en main, et `unlink` n'efface que la ligne de liaison, jamais le
+     projet qu'elle vise (aucune cascade). La neutralisation l'a montré : les
+     deux ordres passent les mêmes tests. Ce qui disparaîtrait vraiment, et que
+     l'arbitrage (e) demande de figer, c'est le **nom** du jour où le projet
+     serait renommé — pas la ligne qu'on retire. */
+  const target = await session.db.find(projects, gate.link.toProjectId);
+
+  await session.db.unlink(projectLinks, linkId);
+
+  /* **Le verbe reste `linked`, et la phrase dit le retrait** : l'énuméré
+     n'a pas d'`unlinked`, et en ajouter un demanderait une migration. Aucune
+     raison n'est reprise — « Lien retiré : X » désigne ce qui a été touché,
+     comme « Ressource archivée : X » ne redonne pas l'adresse du document. */
+  await session.db.record({
+    projectId,
+    verb: "linked",
+    targetType: "project",
+    targetId: gate.link.toProjectId,
+    summary: linkPhrase("removed", target?.name ?? ""),
+  });
+
+  refreshLink(projectId, gate.link.toProjectId);
 }

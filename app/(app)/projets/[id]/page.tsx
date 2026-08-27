@@ -57,7 +57,10 @@
  * gestes depuis T4bis.6 sans changer d'un caractère** : la valeur y désigne la
  * cible, jamais le geste, si bien que la même adresse saisit quand l'activité
  * n'a pas de résultat et corrige quand elle en porte un. `?archiver=confirmation`
- * ouvre le panneau de confirmation de T4bis.2, repris tel quel. La page reste rendue derrière eux, et porte alors l'attribut HTML
+ * ouvre le panneau de confirmation de T4bis.2, repris tel quel. `?lien=nouveau`
+ * ouvre celui de T6.5, et `?lien=<identifiant de liaison>` le rouvre sur la
+ * raison à corriger — la forme d'`?ressource=`, jusqu'au nom de la clé. La page
+ * reste rendue derrière eux, et porte alors l'attribut HTML
  * `inert` — c'est l'ordre du DOM qui décide de la tabulation, et `inert` est ce
  * qui empêche d'entrer au clavier dans le contenu masqué par le voile.
  *
@@ -105,6 +108,7 @@ import {
   archiveResource,
   archiveResult,
   removeAdoption,
+  removeProjectLink,
   transitionActivity,
 } from "./actions";
 import { restoreProject } from "../actions";
@@ -138,7 +142,7 @@ import { ROUTES } from "@/lib/navigation";
 import { listProjectRoadmap } from "@/lib/queries/activities";
 import { listProjectAdoptions } from "@/lib/queries/indicators";
 import { listProjectJournal } from "@/lib/queries/journal";
-import { listRelatedProjects } from "@/lib/queries/links";
+import { listDeclaredLinks, listRelatedProjects } from "@/lib/queries/links";
 import {
   findAccompanimentRank,
   findProjectDetail,
@@ -167,7 +171,8 @@ export const metadata = {
  * passait de trois cartes à deux. **La promesse est tenue par T6.4** : le bloc
  * est revenu au rendu avec ses liens déduits, il se rend au-dessus de cette
  * liste-ci, et il n'y entre pas — un bloc qui porte son contenu n'annonce plus
- * rien. `project_links` reste au modèle sans lecteur jusqu'à T6.5.
+ * rien. **T6.5 lui a donné sa seconde moitié** : `project_links` a enfin un
+ * lecteur, et le bloc porte les deux natures que `docs/06` §5 lui promettait.
  *
  * **« Journal » en sort à son tour, et par l'inverse : il est livré** (T6.3).
  * Il portait le seul « geste » dessiné de la rangée — « Voir le journal »,
@@ -209,6 +214,7 @@ export default async function ProjectPage({
     archiver?: string;
     indicateur?: string;
     piste?: string;
+    lien?: string;
   }>;
 }) {
   const { id } = await params;
@@ -241,6 +247,7 @@ export default async function ProjectPage({
     archiver,
     indicateur,
     piste,
+    lien,
   } = await searchParams;
 
   /* **L'URL reste une adresse, elle n'est plus le mécanisme** (TD.2). Coller
@@ -255,10 +262,10 @@ export default async function ProjectPage({
      T4.4). Côté clic, elle est devenue structurelle — l'état ne porte qu'une
      demande à la fois.
 
-     **Le décompte passe de six à sept clés sans qu'un caractère de sa logique
-     change** (20/08/2026, `piste`) : c'est la propriété pour laquelle T4.4
-     l'avait écrit en décompte plutôt qu'en comparaison, vérifiée pour la
-     cinquième fois. */
+     **Le décompte passe de sept à huit clés sans qu'un caractère de sa logique
+     change** (T6.5, `lien`) : c'est la propriété pour laquelle T4.4 l'avait
+     écrit en décompte plutôt qu'en comparaison, vérifiée pour la sixième
+     fois. */
   const keys = {
     activite,
     ressource,
@@ -267,6 +274,7 @@ export default async function ProjectPage({
     archiver,
     indicateur,
     piste,
+    lien,
   };
   const conflict =
     Object.values(keys).filter((value) => value !== undefined).length > 1;
@@ -286,7 +294,9 @@ export default async function ProjectPage({
      le même vol que les cinq autres plutôt que derrière un `canWrite`. Les
      liens déduits sont **quatre requêtes de plus** (T6.4) et rien de stocké :
      c'est ce qui garantit qu'ils sont toujours vrais, et le coût est celui que
-     `docs/04` §5 accepte à quinze projets. */
+     `docs/04` §5 accepte à quinze projets. Les liens **déclarés** (T6.5), eux,
+     se lisent en une requête sur `project_links` — dans les deux sens, la
+     lecture étant symétrique. */
   const [
     rank,
     roadmap,
@@ -295,6 +305,7 @@ export default async function ProjectPage({
     starters,
     journal,
     related,
+    declared,
   ] = await Promise.all([
     findAccompanimentRank(session.db, project),
     listProjectRoadmap(session.db, project.id),
@@ -303,6 +314,7 @@ export default async function ProjectPage({
     listStarters(session.db),
     listProjectJournal(session.db, project.id),
     listRelatedProjects(session.db, project.id),
+    listDeclaredLinks(session.db, project.id),
   ]);
 
   /* La roadmap et les pistes sont **déjà lues** pour l'écran : la résolution
@@ -564,21 +576,35 @@ export default async function ProjectPage({
               }
             />
 
-            {/* **« Projets liés » revient au rendu, avec son contenu**
-                (T6.4). `docs/06` §5 le place entre « Indicateurs » et
-                « Budget » ; il se rend donc juste avant la carte annoncée qui
-                reste, et **il n'entre pas dans la rangée** — un bloc qui porte
-                son contenu n'annonce plus rien.
+            {/* **« Projets liés » porte ses deux natures depuis T6.5** : les
+                liens déduits de T6.4, puis les liens déclarés avec leur raison
+                — l'ordre exact de `docs/06` §5. Le bloc se rend juste avant la
+                carte annoncée qui reste, et **il n'entre pas dans la rangée** —
+                un bloc qui porte son contenu n'annonce plus rien.
 
                 Dans la colonne du récit, et non dans le rail : le rail porte
                 les blocs de **chiffres reportés**, et une raison en toutes
-                lettres — « Camille Roux et Sofia Marchand en commun » — ne se
-                lit pas sur 380 px.
+                lettres — « Camille Roux et Sofia Marchand en commun », ou la
+                phrase qu'un collègue a tapée — ne se lit pas sur 380 px.
 
-                Aucun droit ne lui est passé, et il n'y en a aucun à passer :
-                rien ne s'y saisit, et la saisie d'un lien **déclaré** est la
-                matière de T6.5. */}
-            <RelatedProjects related={related} />
+                **Le droit n'entre que par la moitié déclarée**, et par le
+                **même** `canWrite` que les dix gestes qui précèdent — **aucune
+                condition ne s'ajoute ici**. La lecture des deux moitiés reste
+                ouverte à tout le domaine (D9) : c'est pourquoi `declared` part
+                dans le vol de lectures et non derrière un droit. */}
+            <RelatedProjects
+              related={related}
+              declared={declared}
+              addHref={canWrite ? ROUTES.projectLinkNew(project.id) : null}
+              editHref={
+                canWrite
+                  ? (linkId) => ROUTES.projectLinkEdit(project.id, linkId)
+                  : null
+              }
+              removeProjectLink={
+                canWrite ? removeProjectLink.bind(null, project.id) : null
+              }
+            />
 
             {/* Le bloc annoncé, **au singulier depuis T6.3**. La grille a
                 disparu avec le second : une carte dans une grille de deux

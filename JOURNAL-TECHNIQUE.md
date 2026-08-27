@@ -6533,3 +6533,82 @@ de la page énonce déjà : *l'ordre du document est tenu à l'intérieur du rai
 rail aurait été plus littéral et moins lisible : une raison en toutes lettres — « Camille Roux et
 Sofia Marchand en commun » — ne tient pas sur 380 px.
 
+
+---
+
+## T6.5 — Les liens déclarés — 27/08/2026
+
+**Le périmètre de la fiche était incomplet, et de quatre fichiers.** Elle listait huit chemins ; il
+en fallait douze. Deux manques étaient **mécaniques** — `lib/drawers/types.ts`, sans quoi la demande
+`link` n'existe pas, et `app/(app)/projets/[id]/page.tsx`, sans quoi la clé `lien` n'entre ni dans
+`searchParams` ni dans le décompte d'exclusivité et le bloc ne reçoit rien. Deux étaient des
+**arbitrages** : `lib/forms/link.ts`, parce que les quatorze autres modules de saisie ont chacun le
+leur et que les types du formulaire seraient sinon allés dans le composant client ou dans l'action ;
+et `lib/journal.ts`, parce que la fiche exige une phrase neuve — « le verbe reste `linked`, la
+phrase dit le retrait » — alors que ce module porte la règle *une fonction par forme de phrase,
+jamais une par point d'appel*. La composer dans `actions.ts` aurait rompu la seule discipline que
+T6.1 et T6.2 aient posée sur le vocabulaire du journal. Écart assumé, et le seul du ticket qui
+ajoute des fichiers.
+
+**`?lien=<identifiant>` n'avait pas de destination écrite, et il a fallu la choisir.** La fiche pose
+la clé « `nouveau` | identifiant » puis ne nomme que deux actions, `createProjectLink` et
+`removeProjectLink`. La valeur polymorphe ne désignait donc rien. Trois lectures étaient possibles —
+n'ouvrir que sur `nouveau` (mais la fiche écrit deux valeurs), ouvrir une confirmation de retrait
+(mais l'arbitrage (c) de C4bis réserve la confirmation aux gestes qui retirent tout un ensemble, et
+`removeAdoption`, la liaison la plus proche, n'en a aucune), ou **rouvrir le panneau en correction**.
+C'est la troisième qui a été retenue : c'est ce que veut dire toute clé polymorphe du dépôt depuis
+T3.4 — `ressource`, `activite`, `persona`, `usecase`, `profil`, `entite` —, et le titre du ticket
+énonce trois verbes quand la fiche ne nomme que deux actions. **Le prix est nommé : une troisième
+action, `updateProjectLink`, que la fiche n'annonçait pas.**
+
+**Un lien déclaré s'affiche quel que soit l'archivage de sa cible, et c'est l'inverse des déduits.**
+`listRelatedProjects` écarte les projets archivés et ceux d'un produit archivé — un accompagnement
+rangé ne se **propose** plus comme voisin. `listDeclaredLinks` n'écarte rien, et la raison est un
+enchaînement : masquer la ligne ferait disparaître **avec elle son geste de retrait**, et la liaison
+deviendrait irretirable. La règle 4 range, elle ne cache pas. Ce qui reste interdit est de *relier*
+un accompagnement archivé, et cela se joue à l'écriture — `listLinkableProjects` ne le propose pas,
+`checkLinkTarget` le refuse s'il est forgé.
+
+**Le réciproque n'est pas un doublon, et c'est une décision.** `project_links_from_to_unique` porte
+sur un couple **orienté** : `A → B` et `B → A` coexistent. Le bloc peut donc porter deux lignes pour
+le même couple, avec deux raisons — mesuré dans le HTML servi. Refuser la seconde aurait été un
+cinquième refus là où la fiche en nomme quatre, donc une règle inventée (règle 3) ; et ce sont deux
+faits distincts, écrits depuis deux accompagnements par deux personnes qui n'ont pas dit la même
+chose. Conséquence assumée.
+
+**Un même accompagnement peut figurer dans les deux moitiés du bloc.** Aucune des deux lectures ne
+filtre l'autre : déclarer un lien vers un projet du même produit le fait paraître sous « Liens
+déduits » *et* sous « Liens déclarés ». C'est voulu — « les deux natures ne se confondent pas » —, et
+les deux intertitres sont ce qui l'empêche de se lire comme un doublon. Sans eux, une raison
+composée par Vision et une phrase tapée par un collègue se liraient à l'identique.
+
+**`filter(projects)` d'une jointure ne s'éprouve que si aucun autre filtre ne le double.** La ligne
+forgée de `listDeclaredLinks` visait d'abord un accompagnement ordinaire de l'autre domaine ;
+retirer `filter(projects)` ne faisait **tomber aucun test**, parce que le produit de ce projet était
+lui aussi d'ailleurs et que `filter(products)` l'écartait déjà. La fuite doit viser le projet dont
+**seule** la colonne `domain_id` franchit la frontière — celui que T6.4 avait déjà forgé pour les
+liens déduits. C'est le corollaire, côté cible cette fois, de la leçon que l'en-tête du module
+énonce : deux filtres redondants ne sont ni l'un ni l'autre éprouvables.
+
+**Un test de droit qui prétend mesurer autre chose passe au vert sans rien prouver.** Les deux
+constats de l'asymétrie — le projet cible ne corrige ni ne retire — tombaient d'abord sur
+`writeProject`, le contributeur n'étant pas membre du projet voisin : le message rendu disait
+« réservée au responsable de domaine », et non « déclaré depuis cet accompagnement ». Le droit lui a
+été accordé **des deux côtés**, si bien que la seule chose qui puisse encore refuser est le sens de
+la liaison. **Pour mesurer une règle, il faut d'abord désarmer toutes celles qui passent avant
+elle.**
+
+**Une propriété qu'aucun test ne défend n'est pas une propriété.** Le premier jet lisait le nom du
+projet visé **avant** `unlink`, avec un commentaire affirmant qu'après, « la liaison n'existe plus
+pour désigner sa cible ». La neutralisation a inversé les deux lignes : aucun test n'est tombé. Et
+pour cause — `gate.link` est déjà en main, et `unlink` n'efface que la ligne de liaison, jamais
+l'accompagnement qu'elle vise. Le commentaire a été récrit pour dire ce qui est vrai : ce qui
+disparaîtrait vraiment, et que l'arbitrage (e) demande de figer, c'est le **nom** le jour où le
+projet serait renommé.
+
+**Le cinquième chiffre faux de la même famille, et le geste ne change pas.** `lib/drawers/project.tsx`
+disait « la résolution des **six** panneaux » quand ils étaient sept depuis le 20/08/2026 et huit
+depuis ce ticket. Comme `scoped.ts` en T6.1, le compte a été **retiré** plutôt que corrigé : un
+nombre dans un commentaire vieillit à chaque ticket, et ce qui doit se relire est la règle que le
+`switch` tient branche par branche. Le point ouvert d'`ETAT.md` a été récrit pour porter ce
+cinquième cas.

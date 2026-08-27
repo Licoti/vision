@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 27/08/2026, T6.4. Balayé au découpage de C6, seul moment où il l'est.
+**Dernière mise à jour :** 27/08/2026, T6.5. Balayé au découpage de C6, seul moment où il l'est.
 **Chantier en cours :** **C6 — Liens et journal**, sept tickets dans `tickets-C6.md`.
-**Ticket suivant :** **T6.5 — les liens déclarés : relier, dire pourquoi, retirer.**
+**Ticket suivant :** **T6.6 — le flux d'activité récente en vue d'ensemble.**
 
 ---
 
@@ -20,7 +20,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **terminé** |
 | TD — Dette technique et couche de présentation | TD.1 → TD.6 | **terminé** |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
-| C6 — Liens et journal | T6.1 → T6.7 | **en cours** — T6.1 → T6.4 faits |
+| C6 — Liens et journal | T6.1 → T6.7 | **en cours** — T6.1 → T6.5 faits |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
 ---
@@ -29,6 +29,10 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
 *(une ligne par **chantier clos**, et une par ticket du chantier en cours. Le récit détaillé vit
 dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`.)*
+
+- **T6.5 — les liens déclarés : relier, dire pourquoi, retirer, 27/08/2026.** `project_links` a un
+  lecteur et trois écrivains ; huitième clé d'URL, **cinquième verbe**, quatrième forme de phrase.
+  **Vingt-six neutralisations, trois ont corrigé le ticket.** Lu sur les **deux** projets. +53, 1101.
 
 - **T6.4 — les liens déduits, et le bloc « Projets liés », 27/08/2026.** `listRelatedProjects`, les
   quatre règles de `docs/04` §5 **en SQL**, la préséance seule en TS. **Dix neutralisations, dix
@@ -96,8 +100,8 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   humaine.**
 - **Rétablir un accompagnement sous un produit archivé le laisse invisible.** Aucune liste ne
   l'affiche, les deux jointures écartant les projets d'un produit archivé : le geste paraît ne rien
-  faire. Aucun garde-fou (arbitrage (f) de C4bis) ; rien n'est perdu. **T6.1 a ouvert `restoreProject`
-  sans le poser** — ce serait une règle métier neuve dans un ticket de trace. → **C7 au plus tard.**
+  faire. Aucun garde-fou (arbitrage (f) de C4bis) ; rien n'est perdu, et `restoreProject` a été
+  ouverte sans le poser (T6.1) — ce serait une règle métier neuve. → **C7 au plus tard.**
 - **Le chemin du clic de `/equipe` n'a pas été parcouru au navigateur.** Celui de l'**adresse** est lu
   dans le HTML servi ; celui du **clic** ne l'est pas. Les cinq propriétés en attente sont celles de
   `DrawerHost`, éprouvées par TD.2 sur les deux autres pages hôtes. → **action humaine, un clic.**
@@ -139,16 +143,12 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 - **`lib/format.ts` porte une dette, et non plus deux** — T6.3 a refermé l'insécable.
   `PERSON_KIND_LABEL` vit dans `lib/forms/person.ts` : un déplacement, **plus un vocabulaire à
   trancher depuis T5bis.7**, et c'est lui qui l'a laissé ouvert. → **ce ticket-là.**
-- **L'en-tête de `schema.ts` dit « les 26 tables métier », elles sont 30.** Chiffre faux d'une famille
-  qui en compte quatre — `scoped.ts` disait 22, la fiche de C6 annonçait 25 puis « treize points
-  d'appel » pour quatorze. T6.1 a **retiré** le compte plutôt que de le corriger ; le même geste
-  attend ici. → **au prochain ticket qui l'ouvre.**
+- **L'en-tête de `schema.ts` dit « les 26 tables métier », elles sont 30.** Cinquième chiffre faux
+  d'une même famille — `scoped.ts`, la fiche de C6 deux fois, et `drawers/project.tsx` (« les six
+  panneaux » pour huit, **retiré** par T6.5). Le geste est de retirer. → **au prochain qui l'ouvre.**
 - **Trois fichiers de tests d'action nettoient encore sur `if (!f?.domainId) return`** — un
-  `beforeAll` qui échoue après avoir créé son domaine le laisse en place, et il fait tomber le
-  fichier suivant. **Ils étaient quatre, pas trois, et `projets/actions.test.ts` n'était pas corrigé
-  malgré ce qui était écrit ici** (T6.2, qui a refermé les deux de son périmètre). Restent
-  `projets/actions.test.ts`, `produits/actions.test.ts`, `administration/actions.test.ts`.
-  → **au prochain ticket qui ouvre l'un d'eux.**
+  `beforeAll` qui échoue après avoir créé son domaine le laisse en place, et fait tomber le fichier
+  suivant. Restent `projets/`, `produits/` et `administration/actions.test.ts`. → **au prochain.**
 - **`uiLayerSeal` ne scelle pas `components/shell/`.** Rien n'empêcherait `components/ui/` d'importer
   `breadcrumb.tsx` ou `main-nav.tsx`. La propriété est vraie aujourd'hui : un trou dans le scellement,
   pas une régression, qui se comble en une ligne. → **au prochain ticket qui ouvre `eslint.config.mjs`.**

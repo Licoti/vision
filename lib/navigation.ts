@@ -435,6 +435,36 @@ export const ENTITY_FORM_NEW = "nouvelle";
 export const DELETE_PANEL_PARAM = "supprimer";
 
 /**
+ * Le panneau du **lien déclaré** (T6.5), huitième et dernière clé d'ouverture de
+ * la page projet — la première qui écrive dans une table de liaison entre deux
+ * accompagnements.
+ *
+ * **Une seule clé, pour lire comme pour écrire, parce qu'il n'y a qu'un droit.**
+ * La paire « une clé pour lire, une clé pour écrire » — `persona`/`fiche`,
+ * `usecase`/`scenario` — n'a rien à séparer ici : un lien déclaré **n'a pas de
+ * fiche**, il se lit dans le bloc « Projets liés ». Ce qui justifiait deux clés
+ * là-bas était deux droits ; ici il n'y en a qu'un, `writeProject` sur le projet
+ * courant (arbitrage (g) de `tickets-C6.md`).
+ *
+ * **Deux valeurs d'ouverture**, la forme de `ressource` depuis T4bis.5 :
+ * `nouveau` déclare, l'identifiant d'une **ligne de `project_links`** corrige sa
+ * raison, et toute autre valeur n'ouvre rien — un UUID ne peut pas valoir
+ * `nouveau`. Un seul formulaire pour les deux gestes.
+ *
+ * **Le décompte d'exclusivité de la page projet passe de sept clés à huit sans
+ * qu'un caractère de sa logique change** — la sixième fois, et c'est la
+ * propriété pour laquelle T4.4 l'avait écrit en décompte plutôt qu'en
+ * comparaison.
+ *
+ * Ce n'est pas cette route qui protège : les trois actions redérivent le droit
+ * sur le `projectId` **reçu**.
+ */
+export const LINK_PANEL_PARAM = "lien";
+
+/** La valeur qui ouvre le panneau vide. Un identifiant ouvre la correction. */
+export const LINK_PANEL_NEW = "nouveau";
+
+/**
  * Les adresses des sept écrans, et des formulaires qui les alimentent. Les
  * pages de détail prennent un identifiant : le schéma en pose des UUID, et
  * rien ne promet encore de slug — ce choix revient à C2, avec l'écran qui
@@ -644,6 +674,25 @@ export const ROUTES = {
    */
   projectStarter: (id: string, starterId: string) =>
     `/projets/${id}?${STARTER_PANEL_PARAM}=${starterId}`,
+  /**
+   * La page du projet, panneau de **déclaration d'un lien** ouvert sur le vide
+   * (T6.5). Même mécanique que les quatorze adresses d'ouverture qui précèdent :
+   * un paramètre, pas un écran de plus, et la fermeture reste `project(id)`.
+   */
+  projectLinkNew: (id: string) =>
+    `/projets/${id}?${LINK_PANEL_PARAM}=${LINK_PANEL_NEW}`,
+  /**
+   * Le même panneau, sur un lien déjà déclaré : la valeur porte le cas, et c'est
+   * la seule différence avec l'entrée ci-dessus — la forme de
+   * `projectResourceEdit` jusqu'au nom de la clé.
+   *
+   * **La valeur porte l'identifiant de la liaison, et non celui du projet
+   * visé.** C'est la règle tenue partout depuis T3.4 : la valeur désigne l'objet
+   * que le panneau corrige, et ici c'est la ligne de `project_links` — celle qui
+   * porte la raison.
+   */
+  projectLinkEdit: (id: string, linkId: string) =>
+    `/projets/${id}?${LINK_PANEL_PARAM}=${linkId}`,
   /**
    * Le référentiel des personnes (T5bis.2).
    *

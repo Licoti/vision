@@ -8,11 +8,11 @@
  * **Une fonction par forme de phrase, jamais une par point d'appel.** C'est ce
  * qui empêche deux gestes voisins de dire la même chose de deux manières :
  * `createProject` et `archiveProject` traversent la même fonction, et le seul
- * moyen qu'ils divergent serait de changer la table des participes. **Trois
- * formes depuis T6.2**, et la troisième n'est pas un quatorzième point d'appel
- * déguisé : les onze gestes qui disent « ceci a été créé, corrigé ou archivé »
- * passent tous par `objectPhrase`, et seuls les deux qui font *atteindre un
- * état* passent par `statePhrase`.
+ * moyen qu'ils divergent serait de changer la table des participes. **Quatre
+ * formes depuis T6.5** : les gestes qui disent « ceci a été créé, corrigé ou
+ * archivé » passent tous par `objectPhrase`, ceux qui font *atteindre un état*
+ * par `statePhrase`, ceux qui touchent la composition d'une équipe par
+ * `teamPhrase`, et ceux qui relient deux accompagnements par `linkPhrase`.
  *
  * **`summary` est figé à l'écriture** (D22, arbitrage (e)) : le libellé de
  * l'objet est recopié dans la phrase parce que c'est lui qui disparaîtrait
@@ -248,4 +248,56 @@ export function teamPhrase(moves: TeamMoves): string | null {
 
   if (clauses.length === 0) return null;
   return `${head("member", "updated")}${NBSP}: ${clauses.join(`${NBSP}; `)}`;
+}
+
+/**
+ * Ce qu'un geste a fait d'un lien déclaré — T6.5.
+ *
+ * **Trois, et pas quatre** : un lien se déclare, se corrige et se retire ; rien
+ * ne le rétablit, `project_links` n'ayant pas d'`archived_at` (`LinkTable`). Un
+ * quatrième participe sans appelant est celui que le ticket suivant emploierait
+ * de travers.
+ */
+export type JournalLinkDeed = "declared" | "updated" | "removed";
+
+/** Les trois participes du lien. « Lien » est masculin : aucun accord à porter. */
+const LINK_DEEDS: Record<JournalLinkDeed, string> = {
+  declared: "déclaré",
+  updated: "modifié",
+  removed: "retiré",
+};
+
+/**
+ * La quatrième forme : le lien qu'un accompagnement déclare vers un autre.
+ *
+ * « Lien déclaré : Refonte du panier — réutilise la grille d'entretien » ·
+ * « Lien retiré : Refonte du panier ».
+ *
+ * **C'est la seule phrase du journal dont le nom ne soit pas celui de son
+ * `target_type`**, et ce n'est pas une négligence. `event_target_type` n'a pas
+ * de valeur `link` : les six sont figés par l'arbitrage (b) de
+ * `tickets-C6.md`, et en ajouter une septième demanderait une migration, que le
+ * chantier s'interdit. La colonne dit donc `project` — l'objet touché *est* un
+ * accompagnement, celui que `target_id` désigne — et la phrase dit « Lien »,
+ * qui est ce que le geste a fait. Les deux sont vrais ; c'est la phrase qui se
+ * lit.
+ *
+ * **Le nom du projet visé est figé** (D22, arbitrage (e)) : c'est la
+ * désignation de ce qui a été relié, et elle disparaîtrait autrement — au
+ * retrait, la ligne de liaison n'existe plus pour la redonner.
+ *
+ * **La raison est figée avec elle, et seulement quand le geste en porte une.**
+ * C'est la règle du motif d'annulation dans `statePhrase` : ce n'est pas une
+ * « valeur avant » que D22 refuse, c'est ce que le geste voulait dire. Le
+ * retrait, lui, n'en passe aucune — il ne dit pas *pourquoi* le lien existait,
+ * il dit qu'il n'existe plus, comme « Ressource archivée » ne redonne pas
+ * l'adresse du document.
+ */
+export function linkPhrase(
+  deed: JournalLinkDeed,
+  projectName: string,
+  reason?: string | null,
+): string {
+  const clause = `Lien ${LINK_DEEDS[deed]}${NBSP}: ${projectName}`;
+  return reason ? `${clause}${NBSP}— ${reason}` : clause;
 }

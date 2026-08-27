@@ -13,6 +13,20 @@
  * qui existait déjà. C'est précisément ce que ces tests éprouvent : le champ
  * neuf n'ouvre aucune porte, il passe par `openProject` comme les sept autres.
  *
+ * **T6.5 y ajoute les trois gestes du lien déclaré** — déclarer, corriger,
+ * retirer —, et deux propriétés que rien d'autre ne mesure : le **cinquième
+ * verbe** de l'énuméré, `linked`, écrit dans les deux sens ; et l'**asymétrie
+ * de l'arbitrage (g)**, qui veut que la lecture soit symétrique et l'écriture
+ * non. Cette seconde-là ne se lit dans aucun écran — un geste absent du rendu
+ * n'a jamais protégé le point d'entrée qui l'accompagne —, seul le décompte en
+ * base la porte.
+ *
+ * **Un second domaine arrive avec eux**, et il n'a qu'un usage : `project_links`
+ * est la première table du fichier dont une colonne pointe un projet, si bien
+ * qu'un `to_project_id` d'ailleurs est un cas réel. Il éprouve les deux
+ * barrières — celle de l'action, qui rend un message de champ, et celle de la
+ * couche, qui lève `DomainScopeError` et qu'aucun chemin d'écran n'atteint.
+ *
  * **T6.2 y ajoute les onze gestes du journal** — cinq sur l'activité, trois sur
  * la ressource, trois sur le résultat. Le critère de la fiche **se compte en
  * base**, l'écran ne portant encore rien : après chaque geste, une ligne
@@ -32,11 +46,16 @@
  * Aucun `next/navigation` : ces deux actions ne redirigent pas (TD.2).
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
 import { db } from "@/lib/db/client";
-import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
+import {
+  DomainScopeError,
+  forDomain,
+  superAdmin,
+  type ScopedDb,
+} from "@/lib/db/scoped";
 import {
   activities,
   activityTypes,
@@ -45,6 +64,7 @@ import {
   events,
   persons,
   products,
+  projectLinks,
   projectMembers,
   projectStatuses,
   projects,
@@ -78,6 +98,9 @@ const {
   createResult,
   updateResult,
   archiveResult,
+  createProjectLink,
+  updateProjectLink,
+  removeProjectLink,
 } = await import("./actions");
 
 const suffix = Math.random().toString(36).slice(2, 10);
@@ -105,6 +128,13 @@ type Fixture = {
   typeLabel: string;
   /** Une activité vivante du projet ouvert, pour éprouver la correction. */
   activityId: string;
+  /** Un second accompagnement **ouvert** du même domaine : la cible d'un lien. */
+  neighbourId: string;
+  neighbourName: string;
+  /** Le nom de l'accompagnement archivé, que le journal figerait s'il l'acceptait. */
+  archivedProjectName: string;
+  /** Un accompagnement d'un **autre domaine** — la seule ligne d'ailleurs du fichier. */
+  foreignProjectId: string;
 };
 
 let f: Fixture;
@@ -120,6 +150,17 @@ let f: Fixture;
  * peut échouer.
  */
 let createdDomainId: string | null = null;
+
+/**
+ * Le **second** domaine — T6.5, et il n'a qu'un usage.
+ *
+ * `project_links.to_project_id` est la première colonne de ce fichier qui
+ * pointe un projet : un identifiant d'ailleurs y est un cas réel, pas une
+ * hypothèse. Il est retenu hors de la fixture pour la raison qui vaut au
+ * premier — un `beforeAll` qui échoue après l'avoir créé le laisserait en base,
+ * et un domaine résiduel fait tomber le fichier suivant.
+ */
+let createdOtherDomainId: string | null = null;
 
 beforeAll(async () => {
   const domain = await superAdmin.createDomain({
@@ -187,6 +228,52 @@ beforeAll(async () => {
     periodEnd: "2026-10-31",
   });
 
+  /* Le voisin : un second accompagnement **ouvert**, sur le même produit, et
+     dont le contributeur est **aussi** contributeur.
+
+     **Ce dernier point n'est pas un détail, il est la condition du constat.**
+     L'asymétrie de l'arbitrage (g) veut que le lien ne se corrige et ne se
+     retire que depuis le projet **source**. Si l'acteur n'avait pas le droit
+     d'écrire sur la cible, les deux tests qui l'éprouvent tomberaient sur le
+     droit — mesuré : ils rendaient « réservée au responsable de domaine » — et
+     passeraient au vert sans rien prouver de l'asymétrie. Le droit accordé des
+     deux côtés est ce qui ne laisse tomber que ce qu'on veut mesurer. */
+  const neighbour = await scope.insert(projects, {
+    name: `Voisin ${suffix}`,
+    productId: product.id,
+    statusId: status.id,
+  });
+  await scope.insert(projectMembers, {
+    projectId: neighbour.id,
+    personId: contributor.id,
+    isContributor: true,
+  });
+
+  /* Un accompagnement d'un **autre domaine**, créé par sa propre couche
+     scopée : rien ici ne contourne la règle 1, pas même pour forger. */
+  const otherDomain = await superAdmin.createDomain({
+    name: `__test__projet_actions_ailleurs__${suffix}`,
+    competenceCenterName: `Centre ailleurs ${suffix}`,
+  });
+  createdOtherDomainId = otherDomain.id;
+  const otherScope = forDomain({ domainId: otherDomain.id });
+  const otherEntity = await otherScope.insert(entities, {
+    label: `Entité ailleurs ${suffix}`,
+  });
+  const otherStatus = await otherScope.insert(projectStatuses, {
+    label: `En cours ailleurs ${suffix}`,
+    nature: "active",
+  });
+  const otherProduct = await otherScope.insert(products, {
+    name: `Produit ailleurs ${suffix}`,
+    entityId: otherEntity.id,
+  });
+  const foreignProject = await otherScope.insert(projects, {
+    name: `Ailleurs ${suffix}`,
+    productId: otherProduct.id,
+    statusId: otherStatus.id,
+  });
+
   f = {
     domainId: domain.id,
     scope,
@@ -197,18 +284,23 @@ beforeAll(async () => {
     typeId: type.id,
     typeLabel: type.label,
     activityId: activity.id,
+    neighbourId: neighbour.id,
+    neighbourName: neighbour.name,
+    archivedProjectName: archivedProject.name,
+    foreignProjectId: foreignProject.id,
   };
 }, 180_000);
 
 afterAll(async () => {
-  if (!createdDomainId) return;
-  /* `events` en tête : ses clés étrangères cascadent, mais le nettoyage ne s'en
-     remet pas à une cascade — ce qui est écrit explicitement se relit. */
+  /* `events` en tête, `project_links` avant `projects` : leurs clés étrangères
+     cascadent, mais le nettoyage ne s'en remet pas à une cascade — ce qui est
+     écrit explicitement se relit. */
   const tables = [
     events,
     results,
     resources,
     activities,
+    projectLinks,
     projectMembers,
     projects,
     projectStatuses,
@@ -217,10 +309,21 @@ afterAll(async () => {
     entities,
     persons,
   ];
-  for (const table of tables) {
-    await db.delete(table).where(eq(table.domainId, createdDomainId));
+
+  /* Les deux domaines se nettoient du même geste, et le second **avant** le
+     premier : `project_links` peut porter une ligne de l'un qui vise l'autre,
+     et `projects` refuserait la suppression tant qu'elle tient. */
+  const ids = [createdOtherDomainId, createdDomainId].filter(
+    (id): id is string => id !== null,
+  );
+  if (ids.length === 0) return;
+
+  for (const domainId of ids) {
+    for (const table of tables) {
+      await db.delete(table).where(eq(table.domainId, domainId));
+    }
   }
-  await db.delete(domains).where(eq(domains.id, createdDomainId));
+  await db.delete(domains).where(inArray(domains.id, ids));
 });
 
 /* ==========================================================================
@@ -918,6 +1021,438 @@ describe("un refus n'écrit ni la ligne métier ni l'événement", () => {
     });
 
     expect(state?.message).toContain("archivé");
+    expect(lines).toHaveLength(0);
+  });
+});
+
+/* ==========================================================================
+   Les liens déclarés — T6.5
+
+   **Le cinquième verbe de l'énuméré**, `linked`, et le seul que T6.1 et T6.2
+   n'avaient pas posé sur son objet propre. Il s'écrit dans les deux sens : la
+   phrase distingue ce que la colonne ne distingue pas.
+
+   **L'asymétrie de l'arbitrage (g) se mesure ici, et nulle part ailleurs.** La
+   lecture est symétrique — les deux pages portent la ligne (`listDeclaredLinks`)
+   —, l'écriture ne l'est pas : seul le projet **source** corrige et retire. Un
+   bouton absent du rendu n'a jamais protégé le point d'entrée HTTP, et c'est
+   `openLink` qui le tient.
+   ========================================================================== */
+
+/** Les liaisons déclarées du domaine, telles que la base les porte. */
+async function declaredRows(): Promise<
+  { id: string; fromProjectId: string; toProjectId: string; reason: string | null }[]
+> {
+  return db
+    .select({
+      id: projectLinks.id,
+      fromProjectId: projectLinks.fromProjectId,
+      toProjectId: projectLinks.toProjectId,
+      reason: projectLinks.reason,
+    })
+    .from(projectLinks)
+    .where(eq(projectLinks.domainId, f.domainId));
+}
+
+/** Les liaisons posées par un test, retirées avant le suivant. */
+async function clearLinks(): Promise<void> {
+  await db.delete(projectLinks).where(eq(projectLinks.domainId, f.domainId));
+}
+
+/** Une liaison posée **par la couche**, sans passer par l'action qu'on éprouve. */
+async function declare(
+  fromProjectId: string,
+  toProjectId: string,
+  reason?: string,
+): Promise<string> {
+  const row = await f.scope.insert(projectLinks, {
+    fromProjectId,
+    toProjectId,
+    ...(reason ? { reason } : {}),
+  });
+  return row.id;
+}
+
+describe("createProjectLink — déclarer un lien", () => {
+  test("un contributeur déclare le lien, et le journal le dit", async () => {
+    await clearLinks();
+    currentPerson = f.contributorId;
+
+    const lines = await written(async () => {
+      await createProjectLink(
+        f.projectId,
+        EMPTY,
+        form({
+          toProjectId: f.neighbourId,
+          reason: "Réutilise la grille d'entretien",
+        }),
+      );
+    });
+
+    const rows = await declaredRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.fromProjectId).toBe(f.projectId);
+    expect(rows[0]?.toProjectId).toBe(f.neighbourId);
+    expect(rows[0]?.reason).toBe("Réutilise la grille d'entretien");
+
+    // Une ligne, et une seule. `target_type` dit `project` — les six sont figés
+    // par l'arbitrage (b), et `link` n'en est pas — et `target_id` désigne
+    // l'accompagnement visé : c'est lui que le geste a touché.
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("linked");
+    expect(lines[0]?.targetType).toBe("project");
+    expect(lines[0]?.targetId).toBe(f.neighbourId);
+    expect(lines[0]?.projectId).toBe(f.projectId);
+    expect(lines[0]?.actorId).toBe(f.contributorId);
+    expect(lines[0]?.summary).toBe(
+      `Lien déclaré${NBSP}: ${f.neighbourName}${NBSP}— Réutilise la grille d'entretien`,
+    );
+  });
+
+  test("une raison absente part à `null`, et c'est un cas normal", async () => {
+    await clearLinks();
+    currentPerson = f.contributorId;
+
+    const lines = await written(async () => {
+      await createProjectLink(
+        f.projectId,
+        EMPTY,
+        form({ toProjectId: f.neighbourId, reason: "   " }),
+      );
+    });
+
+    // `docs/02` §7 : la saisie doit rester « parfaitement optionnelle ». Une
+    // raison faite d'espaces n'est pas une raison — et la phrase ne compose
+    // alors aucune incise vide.
+    expect((await declaredRows())[0]?.reason).toBeNull();
+    expect(lines[0]?.summary).toBe(`Lien déclaré${NBSP}: ${f.neighbourName}`);
+    expect(lines[0]?.summary).not.toContain("—");
+  });
+
+  test("l'auto-lien est refusé, et le `CHECK` n'est jamais atteint", async () => {
+    await clearLinks();
+    currentPerson = f.contributorId;
+
+    let state: { errors?: { toProjectId?: string } } | undefined;
+    const lines = await written(async () => {
+      state = await createProjectLink(
+        f.projectId,
+        EMPTY,
+        form({ toProjectId: f.projectId, reason: "Boucle" }),
+      );
+    });
+
+    // Un message de champ, pas une violation de contrainte : ce qui se refuse
+    // doit se lire, pas se planter. `project_links_no_self_link` reste la
+    // seconde barrière — elle n'a rien à rattraper.
+    expect(state?.errors?.toProjectId).toContain("lui-même");
+    expect(await declaredRows()).toHaveLength(0);
+    expect(lines).toHaveLength(0);
+  });
+
+  test("le doublon est refusé, et l'`unique` n'est jamais atteint", async () => {
+    await clearLinks();
+    await declare(f.projectId, f.neighbourId, "Le premier");
+    currentPerson = f.contributorId;
+
+    let state: { errors?: { toProjectId?: string } } | undefined;
+    const lines = await written(async () => {
+      state = await createProjectLink(
+        f.projectId,
+        EMPTY,
+        form({ toProjectId: f.neighbourId, reason: "Le second" }),
+      );
+    });
+
+    expect(state?.errors?.toProjectId).toContain("déjà déclaré");
+    // La première ligne est intacte : un refus ne récrit rien.
+    const rows = await declaredRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.reason).toBe("Le premier");
+    expect(lines).toHaveLength(0);
+  });
+
+  test("le réciproque n'est pas un doublon : les deux sens coexistent", async () => {
+    await clearLinks();
+    await declare(f.neighbourId, f.projectId, "Depuis l'autre côté");
+    currentPerson = f.contributorId;
+
+    await createProjectLink(
+      f.projectId,
+      EMPTY,
+      form({ toProjectId: f.neighbourId, reason: "Depuis celui-ci" }),
+    );
+
+    // `project_links_from_to_unique` porte sur un couple **orienté**. Deux
+    // déclarations opposées sont deux faits distincts, chacun avec sa raison —
+    // et refuser la seconde serait un cinquième refus que la fiche ne porte pas.
+    const rows = await declaredRows();
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.reason).sort()).toEqual([
+      "Depuis celui-ci",
+      "Depuis l'autre côté",
+    ]);
+  });
+
+  test("un accompagnement d'un autre domaine est refusé", async () => {
+    await clearLinks();
+    currentPerson = f.contributorId;
+
+    let state: { errors?: { toProjectId?: string } } | undefined;
+    const lines = await written(async () => {
+      state = await createProjectLink(
+        f.projectId,
+        EMPTY,
+        form({ toProjectId: f.foreignProjectId, reason: "Forgé" }),
+      );
+    });
+
+    // La couche ne distingue pas « inconnu » d'« ailleurs », et l'écran non
+    // plus : c'est le même message, et c'est voulu.
+    expect(state?.errors?.toProjectId).toContain("n'existe pas dans ce domaine");
+    expect(await declaredRows()).toHaveLength(0);
+    expect(lines).toHaveLength(0);
+  });
+
+  test("un accompagnement archivé est refusé, même forgé", async () => {
+    await clearLinks();
+    currentPerson = f.contributorId;
+
+    let state: { errors?: { toProjectId?: string } } | undefined;
+    const lines = await written(async () => {
+      state = await createProjectLink(
+        f.projectId,
+        EMPTY,
+        form({ toProjectId: f.archivedProjectId, reason: "Forgé" }),
+      );
+    });
+
+    // `listLinkableProjects` ne le propose pas ; ce constat-ci dit que
+    // l'absence du `select` n'est pas ce qui protège.
+    expect(state?.errors?.toProjectId).toContain("archivé");
+    expect(await declaredRows()).toHaveLength(0);
+    expect(lines).toHaveLength(0);
+  });
+
+  test("un membre non contributeur ne déclare rien", async () => {
+    await clearLinks();
+    currentPerson = f.outsiderId;
+
+    let state: { message?: string } | undefined;
+    const lines = await written(async () => {
+      state = await createProjectLink(
+        f.projectId,
+        EMPTY,
+        form({ toProjectId: f.neighbourId, reason: "Forgé" }),
+      );
+    });
+
+    // L'étape témoin : sans elle, un refus et une panne seraient indiscernables.
+    expect(state?.message).toContain("réservée au responsable de domaine");
+    expect(await declaredRows()).toHaveLength(0);
+    expect(lines).toHaveLength(0);
+  });
+
+  test("un accompagnement archivé ne déclare pas de lien", async () => {
+    await clearLinks();
+    currentPerson = f.contributorId;
+
+    let state: { message?: string } | undefined;
+    const lines = await written(async () => {
+      state = await createProjectLink(
+        f.archivedProjectId,
+        EMPTY,
+        form({ toProjectId: f.neighbourId, reason: "Forgé" }),
+      );
+    });
+
+    // Le droit est là — le contributeur l'est des deux projets. Ce qui tombe
+    // est l'archivage de la source, et c'est `openProject` qui le tient.
+    expect(state?.message).toContain("archivé");
+    expect(await declaredRows()).toHaveLength(0);
+    expect(lines).toHaveLength(0);
+  });
+});
+
+describe("la seconde barrière : la couche refuse ce que l'action a déjà écarté", () => {
+  /**
+   * `checkLinkTarget` rend un message de champ avant d'écrire, si bien que
+   * `DomainScopeError` n'est **jamais** levée par le chemin de l'écran. Ce
+   * constat mesure la barrière que l'action rend inatteignable : sans lui,
+   * retirer le contrôle de l'action ferait rendre un 500 au lieu d'un message,
+   * et rien ne dirait laquelle des deux protège.
+   */
+  test("`insert` refuse un `to_project_id` d'un autre domaine", async () => {
+    await expect(
+      f.scope.insert(projectLinks, {
+        fromProjectId: f.projectId,
+        toProjectId: f.foreignProjectId,
+      }),
+    ).rejects.toBeInstanceOf(DomainScopeError);
+
+    expect(await declaredRows()).toHaveLength(0);
+  });
+});
+
+describe("updateProjectLink — corriger la raison", () => {
+  test("un contributeur corrige, et le journal fige la phrase d'après", async () => {
+    await clearLinks();
+    const linkId = await declare(f.projectId, f.neighbourId, "Première raison");
+    currentPerson = f.contributorId;
+
+    const lines = await written(async () => {
+      await updateProjectLink(
+        f.projectId,
+        linkId,
+        EMPTY,
+        form({ toProjectId: f.neighbourId, reason: "Raison corrigée" }),
+      );
+    });
+
+    expect((await declaredRows())[0]?.reason).toBe("Raison corrigée");
+
+    // Le libellé figé est celui d'**après** le geste : écrire celui d'avant
+    // serait une « valeur avant », que D22 refuse.
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("linked");
+    expect(lines[0]?.summary).toBe(
+      `Lien modifié${NBSP}: ${f.neighbourName}${NBSP}— Raison corrigée`,
+    );
+  });
+
+  test("le projet **cible** ne corrige pas le lien — l'écriture n'est pas symétrique", async () => {
+    await clearLinks();
+    const linkId = await declare(f.projectId, f.neighbourId, "Intacte");
+    currentPerson = f.contributorId;
+
+    let state: { message?: string } | undefined;
+    const lines = await written(async () => {
+      state = await updateProjectLink(
+        f.neighbourId,
+        linkId,
+        EMPTY,
+        form({ toProjectId: f.projectId, reason: "Depuis l'autre bout" }),
+      );
+    });
+
+    // L'arbitrage (g), mesuré : la ligne s'affiche des deux côtés, elle ne se
+    // corrige que depuis celui d'où elle part. Aucun écran ne dit cette
+    // propriété — seule la base la porte.
+    expect(state?.message).toContain("déclaré depuis cet accompagnement");
+    expect((await declaredRows())[0]?.reason).toBe("Intacte");
+    expect(lines).toHaveLength(0);
+  });
+
+  test("un membre non contributeur ne corrige rien", async () => {
+    await clearLinks();
+    const linkId = await declare(f.projectId, f.neighbourId, "Intacte");
+    currentPerson = f.outsiderId;
+
+    let state: { message?: string } | undefined;
+    const lines = await written(async () => {
+      state = await updateProjectLink(
+        f.projectId,
+        linkId,
+        EMPTY,
+        form({ toProjectId: f.neighbourId, reason: "Forgée" }),
+      );
+    });
+
+    expect(state?.message).toContain("réservée au responsable de domaine");
+    expect((await declaredRows())[0]?.reason).toBe("Intacte");
+    expect(lines).toHaveLength(0);
+  });
+});
+
+describe("removeProjectLink — retirer un lien", () => {
+  test("la liaison disparaît, et le verbe reste `linked`", async () => {
+    await clearLinks();
+    const linkId = await declare(f.projectId, f.neighbourId, "À retirer");
+    currentPerson = f.contributorId;
+
+    const lines = await written(async () => {
+      await removeProjectLink(f.projectId, linkId);
+    });
+
+    // `unlink`, pas `archive` : `project_links` n'a pas d'`archived_at`, et
+    // `LinkTable` le dit à la compilation. Aucune cascade — la ligne de
+    // liaison, rien d'autre.
+    expect(await declaredRows()).toHaveLength(0);
+
+    // L'énuméré n'a pas d'`unlinked` : le verbe reste `linked`, la phrase dit
+    // le retrait. Et elle ne redit pas la raison — « Ressource archivée : X »
+    // ne redonne pas l'adresse du document.
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("linked");
+    expect(lines[0]?.targetId).toBe(f.neighbourId);
+    expect(lines[0]?.summary).toBe(`Lien retiré${NBSP}: ${f.neighbourName}`);
+    expect(lines[0]?.summary).not.toContain("À retirer");
+  });
+
+  test("les deux accompagnements restent — aucune cascade", async () => {
+    await clearLinks();
+    const linkId = await declare(f.projectId, f.neighbourId);
+    currentPerson = f.contributorId;
+
+    await removeProjectLink(f.projectId, linkId);
+
+    const alive = await db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(
+        and(
+          eq(projects.domainId, f.domainId),
+          inArray(projects.id, [f.projectId, f.neighbourId]),
+        ),
+      );
+    expect(alive).toHaveLength(2);
+  });
+
+  test("le projet **cible** ne retire pas le lien — l'écriture n'est pas symétrique", async () => {
+    await clearLinks();
+    const linkId = await declare(f.projectId, f.neighbourId, "Intacte");
+    currentPerson = f.contributorId;
+
+    const lines = await written(async () => {
+      await removeProjectLink(f.neighbourId, linkId);
+    });
+
+    // Le geste n'est pas rendu de ce côté-là, et ce n'est pas ce rendu qui
+    // protège : le point d'entrée refuse le lien **reçu** qui ne part pas de ce
+    // projet. Le refus est muet — ce geste n'a aucune saisie à rendre.
+    //
+    // Le contributeur écrit dans **les deux** accompagnements : ce qui refuse
+    // n'est donc pas le droit, c'est le sens de la liaison.
+    expect(await declaredRows()).toHaveLength(1);
+    expect(lines).toHaveLength(0);
+  });
+
+  test("un membre non contributeur ne retire rien, en silence", async () => {
+    await clearLinks();
+    const linkId = await declare(f.projectId, f.neighbourId, "Intacte");
+    currentPerson = f.outsiderId;
+
+    const lines = await written(async () => {
+      await removeProjectLink(f.projectId, linkId);
+    });
+
+    expect(await declaredRows()).toHaveLength(1);
+    expect(lines).toHaveLength(0);
+  });
+
+  test("un identifiant de liaison inconnu ne retire rien", async () => {
+    await clearLinks();
+    await declare(f.projectId, f.neighbourId, "Intacte");
+    currentPerson = f.contributorId;
+
+    const lines = await written(async () => {
+      await removeProjectLink(
+        f.projectId,
+        "00000000-0000-4000-8000-000000000000",
+      );
+    });
+
+    expect(await declaredRows()).toHaveLength(1);
     expect(lines).toHaveLength(0);
   });
 });
