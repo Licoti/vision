@@ -2,9 +2,11 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 27/08/2026, T6.7. Balayé au découpage de C6, seul moment où il l'est.
-**Chantier en cours :** aucun. **C6 — Liens et journal** est clos, ses sept tickets livrés.
-**Ticket suivant :** **aucun — session de découpage de C7**, finitions, budget, SSO (`docs/05` §5).
+**Dernière mise à jour :** 27/08/2026, session de découpage de C7. Balayé à cette occasion, seul
+moment où il l'est.
+**Chantier en cours :** **C7 — Finitions**, dix tickets, découpés dans `tickets-C7.md`. **Dernier
+chantier du POC** — `docs/05` §5 n'en a pas de huitième.
+**Ticket suivant :** **T7.1 — le budget : le dernier bloc de la page projet** (D28).
 
 ---
 
@@ -21,7 +23,8 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | TD — Dette technique et couche de présentation | TD.1 → TD.6 | **terminé** |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
-| C7 — Finitions, budget, SSO | à découper | à faire |
+| C7 — Finitions | T7.1 → T7.10 | **en cours** |
+| C8 — après le POC | **à découper** | à faire |
 
 ---
 
@@ -29,37 +32,6 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
 *(une ligne par **chantier clos**, et une par ticket du chantier en cours. Le récit détaillé vit
 dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`.)*
-
-- **T6.7 — la vue d'ensemble entière : répartition, fraîcheur, accès direct, 27/08/2026.** Clôt C6.
-  Trois lectures, trois blocs ; les clés de filtre montent dans `lib/navigation.ts`. **Seize
-  neutralisations, deux ont corrigé le ticket.** Onze chiffres suivis, onze concordances. +29, 1144.
-
-- **T6.6 — le flux d'activité récente en vue d'ensemble, 27/08/2026.** `listRecentEvents`, première
-  lecture d'`events` qui traverse le domaine ; la vue d'ensemble perd l'état vide de T1.6. **Huit
-  neutralisations, deux ont corrigé le ticket.** Deux origines, trois états vides, lus servis. +14, 1115.
-
-- **T6.5 — les liens déclarés : relier, dire pourquoi, retirer, 27/08/2026.** `project_links` a un
-  lecteur et trois écrivains ; huitième clé d'URL, **cinquième verbe**, quatrième forme de phrase.
-  **Vingt-six neutralisations, trois ont corrigé le ticket.** Lu sur les **deux** projets. +53, 1101.
-
-- **T6.4 — les liens déduits, et le bloc « Projets liés », 27/08/2026.** `listRelatedProjects`, les
-  quatre règles de `docs/04` §5 **en SQL**, la préséance seule en TS. **Dix neutralisations, dix
-  chutes isolées.** Une seule entité en base : deux règles inatteignables, lues sous sonde. +20, 1048.
-
-- **T6.3 — le bloc « Journal » sur la page projet, 27/08/2026.** `listProjectJournal`, le `<details>`
-  fermé en dernier, « Voir le journal » **devenu le `<summary>`** ; `SectionHeader` apprend `as` et
-  `mark`. **Deux mises en défaut ont corrigé les tests.** Sonde d'archivage. +11, 1028 verts.
-
-- **T6.2 — le journal : activités, ressources, résultats, relevés, 26/08/2026.** Les quatre
-  `target_type` restants, **quatorze** points d'appel là où la fiche en annonçait treize, six noms et
-  une troisième forme de phrase. Les relevés portent `product_id` et **pas** `project_id`, mesuré en
-  base. Quatre gestes frappés sur le **vrai point d'entrée HTTP**, trois états vides lus dans le HTML
-  servi, aucune ligne de sonde laissée. Trois mises en défaut isolées. +31 tests, 1017 verts.
-
-- **T6.1 — le journal : la couche d'écriture, et les gestes du projet, 26/08/2026.** `record()`
-  seizième entrée de `forDomain`, `lib/journal.ts` et ses deux formes de phrase, cinq points d'appel.
-  Les cinq gestes frappés sur le **vrai point d'entrée HTTP**, aucune ligne de sonde laissée. Quatre
-  mises en défaut, dont **une a corrigé le code**. +27 tests, 986 verts.
 
 - **C1 — Socle technique — T1.1 → T1.6, du 11 au 12/08/2026.** Projet, schéma, couche d'accès
   scopée, contexte de session, référentiels, coquille applicative. Rien de visible, tout le reste en
@@ -71,26 +43,28 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
 - **C4 — Ressources et résultats — T4.1 → T4.4, du 13 au 14/08/2026.** Le bloc « Ressources », le
   geste qui relie, le résultat sur l'entrée de roadmap, sa saisie déclarative. Ferme la boucle
   minimale de `docs/05` §2.
-- **C4bis — Archivage et correction — T4bis.1 → T4bis.6, du 14 au 15/08/2026.** Six manques refermés
-  sous six arbitrages : la matrice « corriger / archiver » est pleine, et un seul `canWrite` fait
-  tomber sept gestes ensemble. Porte l'unicité partielle du résultat, qui fait de « retirer puis
-  ressaisir » un chemin réel.
-- **C5 — Indicateurs et lecture dans le temps — T5.1 → T5.6, du 16 au 17/08/2026.** Le bloc en
-  lecture, les gestes de l'indicateur et du relevé, l'adoption, les deux couches de la frise du temps
-  long. **Tout a depuis été refait hors ticket** (17/08), et neuf dérogations documentaires en sont
-  consignées au journal technique.
+- **C4bis — Archivage et correction — T4bis.1 → T4bis.6, du 14 au 15/08/2026.** La matrice
+  « corriger / archiver » est pleine, un seul `canWrite` fait tomber sept gestes ensemble, et
+  l'unicité **partielle** du résultat fait de « retirer puis ressaisir » un chemin réel.
+- **C5 — Indicateurs et lecture dans le temps — T5.1 → T5.6, du 16 au 17/08/2026.** L'indicateur, le
+  relevé, l'adoption, les deux couches de la frise du temps long. **Tout a depuis été refait hors
+  ticket** (17/08), et neuf dérogations documentaires en sont consignées au journal technique.
 - **TD — Dette technique et couche de présentation — TD.1 → TD.6, du 17 au 19/08/2026.** Six tickets
-  **hors chantier** : le socle des panneaux (**−644 lignes nettes**), l'ouverture des panneaux côté
-  client, le bouton et le lien d'action, puis les garde-fous ESLint — `spacingScaleLock`,
-  `socleLock`, `uiLayerSeal`, `--max-warnings=0`.
+  **hors chantier** : le socle des panneaux (**−644 lignes nettes**), leur ouverture côté client, le
+  bouton, puis les garde-fous ESLint — `spacingScaleLock`, `socleLock`, `uiLayerSeal`,
+  `--max-warnings=0`.
 - **C5bis — Équipe — T5bis.1 → T5bis.7, du 17 au 25/08/2026.** Le chantier que `docs/05` §5 n'avait
-  pas prévu, intercalé sans décaler C6 ni C7 : trois tables, l'entrée « Équipe », les cinq filtres
-  d'URL, la fiche en panneau, le radar, les six gestes d'écriture, et la sélection d'équipe du
-  formulaire de projet qui **puise** enfin dans le référentiel. Dérogation bornée par six garde-fous.
+  pas prévu, intercalé sans décaler C6 ni C7 : trois tables, l'entrée « Équipe », cinq filtres d'URL,
+  la fiche en panneau, le radar, six gestes d'écriture, et la sélection d'équipe qui **puise** enfin
+  dans le référentiel.
+- **C6 — Liens et journal — T6.1 → T6.7, du 26 au 27/08/2026.** `events` reçoit sa première ligne
+  après six chantiers au schéma : `record()` seizième entrée de `forDomain`, cinq verbes, six
+  `target_type`, dix-neuf points d'appel. Puis le bloc « Journal », les quatre règles de lien déduit
+  **en SQL**, les liens déclarés, et la vue d'ensemble entière. **Aucune migration**, comme annoncé.
 - **Reprise d'interface hors ticket — seize gestes, du 17 au 21/08/2026.** Menu « … » de la roadmap,
-  « Vision produit » puis sa reprise `northstar-v2`, « Personae », « Use Cases » et « Démarrage »
-  (migrations 0005 à 0008), page projet en `project-v2`, bouton à trois rangs, roadmap reprise,
-  entités en `/administration`, hiérarchie de la page produit.
+  « Vision produit » et sa reprise `northstar-v2`, « Personae », « Use Cases », « Démarrage »
+  (migrations 0005 à 0008), page projet en `project-v2`, bouton à trois rangs, entités en
+  `/administration`, hiérarchie de la page produit.
 
 ---
 
@@ -102,59 +76,71 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 
 ### a. À trancher — sinon les tickets suivants héritent du problème
 
+- **Cinq points ont perdu leur chantier quand C7 s'est découpé, et C8 les reprend** : le **SSO**
+  (D37, sorti de C7), les **sept objets non journalisés** que la fiche de C6 promettait à C7, les
+  **six clés naturelles** de l'amorçage, et deux replis — la **carte qui ne se détache d'aucun
+  fond** et le **filtre de roadmap dans l'URL**. `docs/05` §5 s'arrête à sept chantiers : **C8 est
+  hors POC, et il reste entièrement à découper.** → **session de découpage de C8.**
+
 - **Les secrets Neon n'ont jamais été tournés.** Deux chaînes ont transité en clair le 12/08/2026.
-  Hors dépôt — `.env.local` seul —, mais valides. Reportées une fois, au découpage de C6, qui est
-  passé et n'en dépendait pas. → **action humaine.**
-- **Rétablir un accompagnement sous un produit archivé le laisse invisible.** Les lectures écartent
-  les projets d'un produit archivé — six depuis T6.7 —, donc le geste paraît ne rien faire. Aucun
-  garde-fou (arbitrage (f) de C4bis) ; rien n'est perdu. → **C7 au plus tard.**
-- **Le chemin du clic de `/equipe` n'a pas été parcouru au navigateur.** Celui de l'**adresse** est lu
-  dans le HTML servi ; celui du **clic** ne l'est pas. Les cinq propriétés en attente sont celles de
-  `DrawerHost`, éprouvées par TD.2 sur les deux autres pages hôtes. → **action humaine, un clic.**
+  Hors dépôt — `.env.local` seul —, mais valides. **Reportées deux fois** : au découpage de C6, puis
+  à celui de C7, qui n'en dépendaient ni l'un ni l'autre. → **action humaine.**
+- **Le SSO Entra ID est sorti de C7**, faute d'inscription d'application — décision humaine du
+  27/08/2026, **écart à D37** consigné au journal technique. Le stub reste, `/dev/session` reste, et
+  `lib/auth/provider.ts` attend toujours son seul réécrivain. Ce qui manque n'est pas du code : un
+  tenant, un client, un secret, une URI de redirection. → **action humaine, puis C8.**
 
 ### b. Assignés à un ticket
 
-- **La répartition par entité n'est pas rendue, faute de filtre.** `docs/06` §3 la demande ;
-  `/projets` porte trois clés depuis T2.3 — `recherche`, `approche`, `statut` — et aucune d'entité.
-  La fiche T6.7 tranchait d'avance : *un chiffre dont le filtre n'existe pas n'est pas rendu*.
-  → **ticket de la liste des projets, C7.**
-- **Une piste de démarrage ne mène pas à l'activité qu'elle suggère.** `starters` ne porte
-  **volontairement aucun `activity_type_id`** — une colonne sans lecteur est celle qu'on relit un jour
-  sans savoir pourquoi (T5.2). Le geste coûterait une colonne et trois lignes ; à joindre au point
-  voisin. → **ticket propre, C7 au plus tard.**
-- **L'outil par défaut d'un type d'activité ne présélectionne rien.** Moitié refermée le 21/08/2026 :
-  `default_tool_id` **nomme** le lien sortant. Reste le panneau de résultat (T4.4).
-  → **ticket propre, C7 au plus tard.**
-- **`project_indicators.note` n'a ni écrivain ni lecteur.** Colonne posée en T1.2 ; le panneau
-  d'adoption saisit quatre champs, pas un cinquième (16/08/2026, règle 3). Ce qui manque est **une
-  phrase sur le pourquoi d'une cible**. → **C7 ; ou jamais, si personne ne la réclame.**
+- **La liste transverse n'a que deux filtres sur les quatre de `docs/06` §4** — `approche` et
+  `statut` depuis T2.3, ni entité ni métier. Conséquence en vue d'ensemble : la répartition par
+  entité n'est pas rendue, la fiche T6.7 ayant tranché qu'*un chiffre dont le filtre n'existe pas
+  n'est pas rendu*. → **T7.2.**
+- **Le clic de `/equipe` n'a jamais été parcouru au navigateur.** Celui de l'**adresse** est lu dans
+  le HTML servi ; celui du **clic** ne l'est pas. Les cinq propriétés en attente sont celles de
+  `DrawerHost`, éprouvées par TD.2 sur les deux autres pages hôtes. → **T7.7.**
 - **La coquille de navigation reste focalisable derrière le voile, sans JavaScript.** La page porte
-  `inert`, la barre latérale vit dans le layout ; **l'obstacle a disparu en TD.2**. À joindre au
-  rebranchement de ses deux blocs manquants. → **ticket barre latérale, C7 ou plus tôt.**
-- **La barre d'ancres de la page projet est retirée du rendu.** Point **suspendu, pas refermé** :
-  `subnav.tsx` reste sans appelant, les `id` de section et le `scroll-mt-19` restent posés, inertes.
-  La question de l'entrée active se reposera telle quelle. → **ticket barre latérale.**
+  `inert`, la barre latérale vit dans le layout, et **l'obstacle technique a disparu en TD.2** : ce
+  qui reste est un parcours clavier à faire. → **T7.7.**
+- **La barre d'ancres de la page projet n'est pas rendue.** `subnav.tsx` est sans appelant, ses `id`
+  de section et son `scroll-mt-19` restent posés et inertes depuis le 20/08/2026, et la question de
+  l'entrée active — que seul le défilement désigne — se reposera telle quelle. → **T7.5.**
+- **La carte de la personne courante manque à la barre latérale.** Second bloc écarté par T1.6 ; le
+  premier, l'entrée Administration, a été livré le 21/08/2026. → **T7.5.**
+- **Le contenu rédigé d'`/a-propos` reste à écrire.** La page a son en-tête et son état vide ; son
+  contenu ne demande aucune lecture en base (D36). → **T7.8.**
 - **Deux colonnes saisies ne s'affichent nulle part** : `products.kind` (D10), lu par aucun écran ;
   `persons.kind` sur les deux lectures de projet, qui affichent tous les membres à l'identique.
-  → **ticket propre, C7.**
-- **Le filtre de la roadmap ne se partage plus par son adresse.** Repassé côté client à la demande :
-  il ne se copie plus, ne survit plus au rechargement, n'existe plus sans JavaScript. Une adresse
-  reviendrait par `history.replaceState`, **sans** rendre le clic navigant. → **C7 ; ou jamais.**
-- **Le groupe « Annulé » n'est plus replié par défaut.** La roadmap en liste à plat l'a fait
-  disparaître avec les quatre autres intertitres. `docs/03` §6 demande « en retrait, replié par
-  défaut » : le retrait tient, le repli non. → **ticket propre, C7 au plus tard.**
-- **Le contenu rédigé d'`/a-propos` reste à écrire.** La page a son en-tête et son état vide ; son
-  contenu ne demande aucune lecture en base. → **ticket propre, C7 au plus tard.**
+  → **T7.9.**
+- **`project_indicators.note` n'a ni écrivain ni lecteur.** Colonne posée en T1.2 ; le panneau
+  d'adoption saisit quatre champs, pas un cinquième. Ce qui manque est **une phrase sur le pourquoi
+  d'une cible** (`docs/04` §3). → **T7.9.**
 - **Corriger une personne du centre en intervenant côté entité lui laisse ses compétences.**
   `parsePersonForm` efface la disponibilité — le `CHECK` l'exige — mais rien d'équivalent n'existe
   pour `person_skills` : les liaisons restent affichées et **illisibles en écriture**. Aucune donnée
-  perdue. → **ticket propre, C7 au plus tard.**
-- **`lib/format.ts` porte une dette, et non plus deux** — T6.3 a refermé l'insécable.
-  `PERSON_KIND_LABEL` vit dans `lib/forms/person.ts` : un déplacement, **plus un vocabulaire à
-  trancher depuis T5bis.7**, et c'est lui qui l'a laissé ouvert. → **ce ticket-là.**
+  perdue. → **T7.9.**
+- **`lib/format.ts` porte une dette.** `PERSON_KIND_LABEL` vit dans `lib/forms/person.ts` : un
+  déplacement, **plus un vocabulaire à trancher** — T5bis.7 a refermé la duplication, pas les mots.
+  → **T7.9.**
+- **Une piste de démarrage ne mène pas à l'activité qu'elle suggère.** `starters` ne porte
+  **volontairement aucun `activity_type_id`** — une colonne sans lecteur est celle qu'on relit un jour
+  sans savoir pourquoi (T5.2). Le geste coûte une colonne, une migration et trois lignes. → **T7.10.**
+- **L'outil par défaut d'un type d'activité ne présélectionne rien.** `default_tool_id` **nomme** le
+  lien sortant depuis le 21/08/2026 ; il ne choisit encore rien dans le panneau de résultat (T4.4).
+  → **T7.10.**
+- **Le groupe « Annulé » n'est plus replié par défaut.** La roadmap en liste à plat l'a fait
+  disparaître avec les quatre autres intertitres. `docs/03` §6 demande « en retrait, replié par
+  défaut » : le retrait tient, le repli non. → **T7.10.**
+- **Rétablir un accompagnement sous un produit archivé le laisse invisible.** Les lectures écartent
+  les projets d'un produit archivé — six depuis T6.7 —, donc le geste paraît ne rien faire. Aucun
+  garde-fou (arbitrage (f) de C4bis) ; rien n'est perdu. → **T7.10.**
+- **Sept objets écrivent sans laisser de trace au journal** : persona, use case, indicateur,
+  personne, entité, vision produit, et le **budget** de T7.1. Les six `event_target_type` sont une
+  liste fermée sans migration (arbitrage (b) de C6, (d) de C7) ; les ouvrir à un seul objet serait
+  refermer le point à moitié. → **C8.**
 - **L'en-tête de `schema.ts` dit « les 26 tables métier », elles sont 30.** Cinquième chiffre faux
   d'une même famille — `scoped.ts`, la fiche de C6 deux fois, et `drawers/project.tsx` (« les six
-  panneaux » pour huit, **retiré** par T6.5). Le geste est de retirer. → **au prochain qui l'ouvre.**
+  panneaux » pour huit, **retiré** par T6.5). Le geste est de retirer. → **T7.10, qui l'ouvre.**
 - **Trois fichiers de tests d'action nettoient encore sur `if (!f?.domainId) return`** — un
   `beforeAll` qui échoue après avoir créé son domaine le laisse en place, et fait tomber le fichier
   suivant. Restent `projets/`, `produits/` et `administration/actions.test.ts`. → **au prochain.**
@@ -181,40 +167,46 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 - **Une carte ne se détache d'aucun fond, et c'est le design system qui manque.** Trois positions :
   la North Star (1,04:1, sa bordure la sauve à 1,33:1), les cartes de personae (1,05:1, le filet à
   1,17:1), le panneau de T5bis.4 (1,24:1). Le plus franc des `surface-neutral-*` plafonne à 2,22:1,
-  sous la limite de 3:1. **Tous les couples de texte passent 4,5:1.** → **arbitrage humain, sinon C7.**
-- **Sans JavaScript, les gestes d'une carte de roadmap ne sont plus atteignables.** Le menu « … »
-  décide de son ouverture, seule exception arbitrée à D30 : les **quatre actions serveur** n'ont aucun
-  repli, leurs formulaires vivant dans la charge RSC. Refermer demanderait un `<details>` natif — qui
-  perdrait `Échap`, le clic extérieur et `role="menu"` — ou une URL par geste. → **sans échéance.**
-- **La base de développement a dérivé de la fixture, et c'est acté. Elle est jetable** — la règle 4
-  protège la donnée métier, pas une fixture locale. Un critère passé ne s'y relit donc pas
-  nécessairement, et **une comparaison avant/après n'y vaut que si rien n'a bougé entre les deux
-  mesures**. Pas de `db:reset`. → **sans échéance ; un ticket d'outillage si le besoin devient réel.**
+  sous la limite de 3:1. **Tous les couples de texte passent 4,5:1.** T7.7 le **mesure** et le
+  remonte ; il ne le referme pas, aucun neuvième jeton ne s'inventant. → **design system, sinon C8.**
 - **Le design system a huit manques, et aucun n'a été inventé.** Trois élévations et deux gradients
   nommés sans valeur ; aucun jeton de bordure de contrôle, de bordure d'erreur, d'interlettrage, de
   voile au-delà de 40 %, de séparateur, de mouvement (`--duration-drawer` et `--easing-drawer` sont
   dans `app/tokens.css` faute de mieux) ; **`--number-*` s'arrête à 100 px** quand dix-neuf valeurs
   légitimes vivent au-delà. **Six substituts mesurés** dans `form-field.tsx` et `panel.tsx` —
   `content-neutral-normal` 3,88:1, `content-danger-base` 5,19:1, `content-neutral-dark` 3,05:1,
-  `content-neutral-base` 4,98:1. **Aucun septième ne s'invente.** → **à faire remonter au design
-  system.**
+  `content-neutral-base` 4,98:1. **Aucun neuvième ne s'invente.** → **design system.**
+- **Le filtre de la roadmap ne se partage plus par son adresse.** Repassé côté client à la demande :
+  il ne se copie plus, ne survit plus au rechargement, n'existe plus sans JavaScript. Une adresse
+  reviendrait par `history.replaceState`, **sans** rendre le clic navigant. L'arbitrage du 21/08 est
+  humain ; le rouvrir demanderait la même main. → **arbitrage humain, sinon C8.**
+- **Sans JavaScript, les gestes d'une carte de roadmap ne sont plus atteignables.** Le menu « … »
+  décide de son ouverture, seule exception arbitrée à D30 : les **quatre actions serveur** n'ont aucun
+  repli. Refermer demanderait un `<details>` natif — qui perdrait `Échap`, le clic extérieur et
+  `role="menu"` — ou une URL par geste. → **sans échéance.**
+- **La base de développement a dérivé de la fixture, et c'est acté. Elle est jetable** — la règle 4
+  protège la donnée métier, pas une fixture locale. Un critère passé ne s'y relit pas nécessairement,
+  et **une comparaison avant/après n'y vaut que si rien n'a bougé entre les deux mesures**. Pas de
+  `db:reset`. → **sans échéance ; un ticket d'outillage si le besoin devient réel.**
+- **L'amorçage rapproche par clé naturelle, donc un renommage recrée — et c'est arrivé.** La clé des
+  activités, étendue à `projet · type · période`, atténue sans éliminer : un renommage a laissé deux
+  lignes en base de développement, l'ancienne orpheline — sans conséquence en production, où
+  l'amorçage ne tourne pas. **Refermé pour les entités seules.** Aucun ticket de C7 ne porte les six
+  restants, et la base de développement est jetable. → **C8.**
 - **Deux gabarits de grille portent une dimension en dur, et c'est un arbitrage.**
   `indicators.tsx:495` et `:585` disent à quelle largeur une carte cesse de tenir : un **point d'arrêt
   de mise en page**, pas une valeur de thème (T1.6), hors de la clause 2 de `spacingScaleLock` par
-  construction. → **à reposer si le design system s'enrichit d'une grille.**
+  construction. T7.6 en posera d'autres, de la même famille. → **à reposer si le design system
+  s'enrichit d'une grille.**
 - **La création d'un projet n'est pas atomique, et ne peut pas l'être.** `neon-http` n'a pas de
   transaction interactive — la couche n'a que `batch`. La parade est de tout confronter au domaine
   **avant** d'écrire et d'ordonner les ajouts avant les retraits (T3.6). Reste ouvert : une écriture
-  qui réussirait puis dont la suivante échouerait — **dont la ligne de journal d'un geste**.
-  → **le jour où la couche exposera une transaction.**
+  qui réussit puis dont la suivante échoue — **dont la ligne de journal d'un geste**. → **le jour où
+  la couche exposera une transaction.**
 - **La fixture est incomplète sur les ressources et les résultats.** Les deux résultats factices
   n'ont pas de lien profond, trois des quatre ressources du brief ne sont pas semées, et
   **`tools.base_url` porte trois adresses provisoires sur `example.com`**.
   → **sans échéance, ou l'humain fournit les adresses.**
-- **L'amorçage rapproche par clé naturelle, donc un renommage recrée — et c'est arrivé.** La clé des
-  activités, étendue à `projet · type · période`, atténue sans éliminer : un renommage a laissé deux
-  lignes en base de développement, l'ancienne orpheline — sans conséquence en production, où
-  l'amorçage ne tourne pas. **Refermé pour les entités seules.** → **les six restants, C7.**
 - **Les filtres ne survivent pas à un aller-retour par la navigation principale.** `docs/06` §9 les
   veut conservés ; le retour navigateur les restitue, un clic sur « Projets » repart à zéro.
   → **si l'usage le réclame.**
@@ -241,10 +233,10 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 - **Le domaine courant est le premier domaine actif trouvé en base**, rendu **par nom** : pas de
   variable d'environnement, `docs/05` §3 posant un domaine unique. Le jour où un second existe, le
   choix revient au fournisseur d'identité.
-- **`/dev/session` est une route de développement**, rendue 404 en production, reliée à aucune
-  navigation. Elle disparaîtra avec le stub en C7.
-- **L'authentification est un stub jusqu'en C7**, mais le contexte de session a sa forme finale.
-  `lib/auth/provider.ts` est le seul fichier que C7 réécrit.
+- **L'authentification est un stub sans échéance** depuis que le SSO est sorti de C7 (27/08/2026),
+  mais le contexte de session a sa forme finale. `lib/auth/provider.ts` reste le seul fichier que le
+  SSO réécrira, et **`/dev/session` reste** : c'est le seul endroit où l'on change de personne
+  courante. Elle est rendue 404 en production et reliée à aucune navigation.
 - **Les maquettes `docs/design/maquettes/` sont une référence visuelle**, jamais branchées.
 - **Une fonction serveur se frappe en `text/plain`**, jamais en urlencodé : la charge est le tableau
   d'arguments encodé en Flight. **Le code HTTP ne dit jamais ce qui a été écrit** — T6.1 a mesuré un

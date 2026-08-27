@@ -472,6 +472,44 @@ seule trace, ce qui est la raison de les déplacer plutôt que de les résumer.)
   part où aller. **Mesuré** : POST forgé avec étape témoin, `persons` à 13 avant et après,
   `projects` de 11 à 12.
 
+**C6 — Liens et journal**
+
+*(les sept lignes ci-dessous repliées d'`ETAT.md` le 27/08/2026, geste 1 de la session de découpage
+de C7 — la dernière de ce genre, `docs/05` §5 n'ayant pas de huitième chantier. Elles sont reprises
+**verbatim**, remises dans l'ordre chronologique comme les blocs qui précèdent : `ETAT.md` les
+portait du plus récent au plus ancien. Le récit détaillé des sept vit plus bas dans ce fichier.)*
+
+- **T6.1 — le journal : la couche d'écriture, et les gestes du projet, 26/08/2026.** `record()`
+  seizième entrée de `forDomain`, `lib/journal.ts` et ses deux formes de phrase, cinq points d'appel.
+  Les cinq gestes frappés sur le **vrai point d'entrée HTTP**, aucune ligne de sonde laissée. Quatre
+  mises en défaut, dont **une a corrigé le code**. +27 tests, 986 verts.
+
+- **T6.2 — le journal : activités, ressources, résultats, relevés, 26/08/2026.** Les quatre
+  `target_type` restants, **quatorze** points d'appel là où la fiche en annonçait treize, six noms et
+  une troisième forme de phrase. Les relevés portent `product_id` et **pas** `project_id`, mesuré en
+  base. Quatre gestes frappés sur le **vrai point d'entrée HTTP**, trois états vides lus dans le HTML
+  servi, aucune ligne de sonde laissée. Trois mises en défaut isolées. +31 tests, 1017 verts.
+
+- **T6.3 — le bloc « Journal » sur la page projet, 27/08/2026.** `listProjectJournal`, le `<details>`
+  fermé en dernier, « Voir le journal » **devenu le `<summary>`** ; `SectionHeader` apprend `as` et
+  `mark`. **Deux mises en défaut ont corrigé les tests.** Sonde d'archivage. +11, 1028 verts.
+
+- **T6.4 — les liens déduits, et le bloc « Projets liés », 27/08/2026.** `listRelatedProjects`, les
+  quatre règles de `docs/04` §5 **en SQL**, la préséance seule en TS. **Dix neutralisations, dix
+  chutes isolées.** Une seule entité en base : deux règles inatteignables, lues sous sonde. +20, 1048.
+
+- **T6.5 — les liens déclarés : relier, dire pourquoi, retirer, 27/08/2026.** `project_links` a un
+  lecteur et trois écrivains ; huitième clé d'URL, **cinquième verbe**, quatrième forme de phrase.
+  **Vingt-six neutralisations, trois ont corrigé le ticket.** Lu sur les **deux** projets. +53, 1101.
+
+- **T6.6 — le flux d'activité récente en vue d'ensemble, 27/08/2026.** `listRecentEvents`, première
+  lecture d'`events` qui traverse le domaine ; la vue d'ensemble perd l'état vide de T1.6. **Huit
+  neutralisations, deux ont corrigé le ticket.** Deux origines, trois états vides, lus servis. +14, 1115.
+
+- **T6.7 — la vue d'ensemble entière : répartition, fraîcheur, accès direct, 27/08/2026.** Clôt C6.
+  Trois lectures, trois blocs ; les clés de filtre montent dans `lib/navigation.ts`. **Seize
+  neutralisations, deux ont corrigé le ticket.** Onze chiffres suivis, onze concordances. +29, 1144.
+
 ---
 
 ## Journal des tickets — récit détaillé

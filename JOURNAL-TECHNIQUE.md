@@ -6794,3 +6794,102 @@ qu'elle était, un truquage de la mesure. Il reste cinq lignes de trop. Le geste
 lignes —, et c'est le geste 1 de la session de découpage, qui est le pas suivant. Le faire ici
 serait faire le découpage dans un ticket. T6.6 avait annoncé que le prochain ticket n'aurait pas la
 marge ; il ne l'a pas eue.
+
+---
+
+## C7 (découpage) — 27/08/2026
+
+### L'écart à D37 : le SSO sort de C7, et le stub n'a plus d'échéance
+
+D37 écrit que *le SSO est reporté en C7, mais pas la notion d'utilisateur courant*. La question a été
+posée en ouverture de la session de découpage — le ticket dépend d'une inscription d'application
+Entra ID (tenant, client, secret, URI de redirection) et de la première dépendance runtime hors
+`next`, `react`, `drizzle` et `@neondatabase/serverless` — et **l'humain a tranché de l'en sortir**,
+l'inscription n'existant pas. Règle 6 : la décision se consigne ici et le travail continue.
+
+**Ce que l'écart coûte, nommé.** `lib/auth/provider.ts` n'est pas réécrit et son en-tête ment
+désormais deux fois — « C'est le seul fichier que C7 réécrit », et « Le cookie disparaîtra avec lui
+en C7 » sur `SESSION_COOKIE`. `app/dev/session/page.tsx` ment de même, deux fois. Ces quatre phrases
+sont **nommées dans la fiche T7.5**, seul ticket dont le sujet touche l'identité de la personne
+courante : sans ce rattachement, elles rejoindraient la famille des cinq chiffres faux qu'`ETAT.md`
+traîne depuis T5bis.1, et un commentaire faux vaut une ligne de code fausse.
+
+**Ce que l'écart ne coûte pas.** Rien du contexte de session ne bouge : `lib/auth/session.ts`
+n'importe rien de Next, les droits sont une fonction pure, et un jeton remplacera un cookie sans
+qu'une règle de droit change de place. C'était l'objet même de la séparation posée en T1.4, et elle
+tient — c'est précisément ce qui rend le report sans conséquence structurelle.
+
+**Ce qui reste bloqué sur une main humaine** : un tenant, un client, un secret, une URI de
+redirection. Le point est en tête d'`ETAT.md`, au même rang que les secrets Neon jamais tournés, qui
+en sont à leur second report.
+
+### Un point ouvert promis par C6 n'avait jamais été écrit dans `ETAT.md`
+
+L'arbitrage (b) de `tickets-C6.md` disait, de persona, use case, indicateur, personne, entité et
+vision produit : *leurs écritures existent, elles ne laissent pas de trace, et c'est un point ouvert
+pour C7, pas un manque de ce chantier.* **Ce point n'a jamais atteint `ETAT.md`** — vérifié par
+`grep` avant d'être affirmé —, et il n'aurait donc été retrouvé par personne au moment de découper
+C7 : c'est exactement le défaut que le protocole cherche à empêcher.
+
+Il y est écrit maintenant, avec un **septième** objet : le budget de T7.1, que l'arbitrage (d) laisse
+hors du journal pour la même raison qui a tenu en C6 — ouvrir l'énuméré à un seul objet, par une
+migration, refermerait le point à moitié et laisserait six objets dehors sans plus savoir pourquoi.
+
+**La leçon, et elle est de procédure** : une fiche de chantier qui promet un point ouvert ne l'écrit
+pas ; seul le ticket qui la lit peut le faire, et aucun ticket de C6 n'avait cet arbitrage dans son
+périmètre. Un « point ouvert pour C7 » énoncé dans une fiche est une note, pas une destination.
+
+### `entite` cède la place à `ligne` — un renommage d'URL, assumé dans son ticket
+
+L'écran d'administration porte `?entite=<nouvelle|identifiant>` depuis le 21/08/2026. Le rendre
+multi-référentiel demandait un choix : neuf clés de formulaire — une par table —, ou une clé
+générique plus un sélecteur de table. L'arbitrage (f) retient la seconde forme, `?referentiel=<clé>`
+plus `?ligne=<nouvelle|identifiant>`, pour la raison qui a fait réemployer `indicateur` sur deux
+pages : **ce qui interdit le réemploi d'une clé est deux sens sur un même écran, jamais deux écrans**.
+
+C'est un renommage de l'existant, que la règle 3 proscrit « pendant que j'y suis ». Il n'est pas
+proscrit ici parce qu'il **est** le sujet du ticket : rendre l'écran multi-référentiel, c'est
+précisément défaire l'hypothèse d'un référentiel unique que le nom `entite` encode. La contrepartie
+est nommée dans la fiche T7.3 : `referentiel` absent vaut « entités », si bien qu'aucune adresse
+déjà servie ne casse.
+
+### La suppression reste bornée aux entités, et l'argument aurait pu se généraliser
+
+`DeletableTable = typeof entities` est *une union nominative, jamais un prédicat structurel* : rien
+dans le typage n'empêchait d'y ajouter les huit référentiels de C7. L'arbitrage (g) ne le fait pas.
+
+**La raison est que l'argument du 21/08 ne se généralise pas.** L'exception avait été portée par un
+fait précis : une entité fautive **bloque toute création de produit**, l'entité étant obligatoire sur
+`products` et le référentiel n'ayant alors aucun autre point d'entrée. Un métier ou une approche
+fautifs ne bloquent rien — ils s'archivent, disparaissent des sélecteurs, et la règle 4 retrouve son
+plein effet. Étendre la suppression aurait été transformer une exception argumentée en règle par
+symétrie, ce qui est exactement la manière dont la règle 4 se perd.
+
+Point rouvrable par l'humain — jamais par un ticket, qui n'aurait pas l'autorité de le faire.
+
+### Deux tickets dérogent à la première discipline, et le disent
+
+« Le critère se lit dans le HTML servi » ne couvre pas tout C7. **T7.6** mesure une mise en page sous
+trois largeurs et **T7.7** parcourt un clavier : ni l'un ni l'autre ne se lit dans un `curl`. La
+fiche de chaque ticket le dit, et la section de vérification du fichier le redit une fois pour les
+deux — la part concernée se rapporte **comme une mesure au navigateur**, jamais confondue avec une
+lecture de rendu. C'est le seul endroit du dépôt où la discipline 1 ne s'applique pas telle quelle,
+et l'écrire vaut mieux que de laisser un ticket croire qu'il l'a tenue.
+
+Corollaire pour T7.7 : le point ouvert *« une carte ne se détache d'aucun fond »* — trois positions à
+1,04:1, 1,05:1 et 1,24:1 contre une limite de 3:1 — **s'y mesure sans s'y refermer**. Le plus franc
+des `surface-neutral-*` plafonne à 2,22:1, et l'interdit commun du chantier reprend la formule de
+C6 : aucun neuvième jeton ne s'invente. Le ticket remonte trois mesures au design system ; il ne
+choisit pas une couleur.
+
+### `ETAT.md` repasse sous son plafond, et le geste promis par T6.7 a suffi
+
+Le fichier était à **255 lignes** pour un seuil de 250 — T6.7 avait consigné le dépassement et nommé
+le geste qui le rendrait : le repli de C6. Il a suffi. Les sept entrées de ticket, trois lignes
+chacune, sont devenues **une** ligne de chantier et sont parties verbatim dans
+`HISTORIQUE-TICKETS.md`, remises dans l'ordre chronologique comme les blocs qui les précèdent.
+Résultat : **243 lignes**, six points récrits sans addendum, un point ajouté, dix destinations de
+ticket posées.
+
+C'est le dernier repli de ce genre : `docs/05` §5 n'a pas de huitième chantier, et la section
+« Journal des tickets » restera donc bornée par construction.
