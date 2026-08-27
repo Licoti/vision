@@ -38,7 +38,7 @@ import { StatusPill } from "@/components/ui/status-pill";
 import { requireSession } from "@/lib/auth/provider";
 import { approaches, projectStatuses } from "@/lib/db/schema";
 import { formatMonth, formatProjects } from "@/lib/format";
-import { ROUTES } from "@/lib/navigation";
+import { PROJECT_FILTER_PARAM, ROUTES } from "@/lib/navigation";
 import {
   listProjectFilterOptions,
   listProjects,
@@ -61,11 +61,19 @@ const COLUMN = {
   freshness: "w-28 flex-none text-right",
 } as const;
 
-/** Les noms des paramètres d'URL. En français, comme les segments de route. */
+/**
+ * Les noms des paramètres d'URL. En français, comme les segments de route.
+ *
+ * **Deux des trois viennent désormais de `lib/navigation.ts`** (T6.7) : la
+ * répartition de la vue d'ensemble rend des chiffres cliquables vers cet écran,
+ * donc `approche` et `statut` ont un **second** lecteur — et une clé qui vit à
+ * deux endroits n'en est plus une. `recherche` reste ici : rien hors de cette
+ * page ne l'écrit.
+ */
 const PARAM = {
   search: "recherche",
-  approach: "approche",
-  status: "statut",
+  approach: PROJECT_FILTER_PARAM.approach,
+  status: PROJECT_FILTER_PARAM.status,
 } as const;
 
 type SearchParams = Partial<Record<(typeof PARAM)[keyof typeof PARAM], string>>;

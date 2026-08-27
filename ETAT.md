@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 27/08/2026, T6.6. Balayé au découpage de C6, seul moment où il l'est.
-**Chantier en cours :** **C6 — Liens et journal**, sept tickets dans `tickets-C6.md`.
-**Ticket suivant :** **T6.7 — la vue d'ensemble entière : répartition, fraîcheur, accès direct.**
+**Dernière mise à jour :** 27/08/2026, T6.7. Balayé au découpage de C6, seul moment où il l'est.
+**Chantier en cours :** aucun. **C6 — Liens et journal** est clos, ses sept tickets livrés.
+**Ticket suivant :** **aucun — session de découpage de C7**, finitions, budget, SSO (`docs/05` §5).
 
 ---
 
@@ -20,7 +20,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **terminé** |
 | TD — Dette technique et couche de présentation | TD.1 → TD.6 | **terminé** |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
-| C6 — Liens et journal | T6.1 → T6.7 | **en cours** — T6.1 → T6.6 faits |
+| C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
 ---
@@ -29,6 +29,10 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
 *(une ligne par **chantier clos**, et une par ticket du chantier en cours. Le récit détaillé vit
 dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`.)*
+
+- **T6.7 — la vue d'ensemble entière : répartition, fraîcheur, accès direct, 27/08/2026.** Clôt C6.
+  Trois lectures, trois blocs ; les clés de filtre montent dans `lib/navigation.ts`. **Seize
+  neutralisations, deux ont corrigé le ticket.** Onze chiffres suivis, onze concordances. +29, 1144.
 
 - **T6.6 — le flux d'activité récente en vue d'ensemble, 27/08/2026.** `listRecentEvents`, première
   lecture d'`events` qui traverse le domaine ; la vue d'ensemble perd l'état vide de T1.6. **Huit
@@ -98,34 +102,35 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 
 ### a. À trancher — sinon les tickets suivants héritent du problème
 
-- **Les secrets Neon n'ont jamais été tournés.** Deux chaînes de connexion ont transité en clair dans
-  la conversation le 12/08/2026. Elles ne sont que dans `.env.local`, hors dépôt, mais restent
-  valides. **Reporté au découpage de C6 : rien dans les sept fiches n'en dépend.** → **action
-  humaine.**
-- **Rétablir un accompagnement sous un produit archivé le laisse invisible.** Aucune liste ne
-  l'affiche, les deux jointures écartant les projets d'un produit archivé : le geste paraît ne rien
-  faire. Aucun garde-fou (arbitrage (f) de C4bis) ; rien n'est perdu, et `restoreProject` a été
-  ouverte sans le poser (T6.1) — ce serait une règle métier neuve. → **C7 au plus tard.**
+- **Les secrets Neon n'ont jamais été tournés.** Deux chaînes ont transité en clair le 12/08/2026.
+  Hors dépôt — `.env.local` seul —, mais valides. Reportées une fois, au découpage de C6, qui est
+  passé et n'en dépendait pas. → **action humaine.**
+- **Rétablir un accompagnement sous un produit archivé le laisse invisible.** Les lectures écartent
+  les projets d'un produit archivé — six depuis T6.7 —, donc le geste paraît ne rien faire. Aucun
+  garde-fou (arbitrage (f) de C4bis) ; rien n'est perdu. → **C7 au plus tard.**
 - **Le chemin du clic de `/equipe` n'a pas été parcouru au navigateur.** Celui de l'**adresse** est lu
   dans le HTML servi ; celui du **clic** ne l'est pas. Les cinq propriétés en attente sont celles de
   `DrawerHost`, éprouvées par TD.2 sur les deux autres pages hôtes. → **action humaine, un clic.**
 
 ### b. Assignés à un ticket
 
+- **La répartition par entité n'est pas rendue, faute de filtre.** `docs/06` §3 la demande ;
+  `/projets` porte trois clés depuis T2.3 — `recherche`, `approche`, `statut` — et aucune d'entité.
+  La fiche T6.7 tranchait d'avance : *un chiffre dont le filtre n'existe pas n'est pas rendu*.
+  → **ticket de la liste des projets, C7.**
 - **Une piste de démarrage ne mène pas à l'activité qu'elle suggère.** `starters` ne porte
   **volontairement aucun `activity_type_id`** — une colonne sans lecteur est celle qu'on relit un jour
   sans savoir pourquoi (T5.2). Le geste coûterait une colonne et trois lignes ; à joindre au point
   voisin. → **ticket propre, C7 au plus tard.**
-- **L'outil par défaut d'un type d'activité ne présélectionne rien.** Moitié refermée le
-  21/08/2026 : `default_tool_id` **nomme** désormais le lien sortant d'une activité. Reste que le
-  panneau de résultat (T4.4) ne présélectionne pas cet outil. → **ticket propre, C7 au plus tard.**
-- **`project_indicators.note` n'a ni écrivain ni lecteur.** La colonne existe depuis T1.2 ; le panneau
-  d'adoption saisit quatre champs, pas un cinquième (16/08/2026, règle 3). Le geste manquant est **une
-  phrase sur le pourquoi d'une cible**. → **C7 au plus tard ; ou jamais, si personne ne la réclame.**
+- **L'outil par défaut d'un type d'activité ne présélectionne rien.** Moitié refermée le 21/08/2026 :
+  `default_tool_id` **nomme** le lien sortant. Reste le panneau de résultat (T4.4).
+  → **ticket propre, C7 au plus tard.**
+- **`project_indicators.note` n'a ni écrivain ni lecteur.** Colonne posée en T1.2 ; le panneau
+  d'adoption saisit quatre champs, pas un cinquième (16/08/2026, règle 3). Ce qui manque est **une
+  phrase sur le pourquoi d'une cible**. → **C7 ; ou jamais, si personne ne la réclame.**
 - **La coquille de navigation reste focalisable derrière le voile, sans JavaScript.** La page porte
-  `inert`, la barre latérale vit dans le layout ; **l'obstacle a disparu en TD.2**, l'ouverture étant
-  un état client. À joindre au **rebranchement des deux blocs manquants de la barre latérale** —
-  personne courante et Administration. → **ticket barre latérale, C7 ou plus tôt.**
+  `inert`, la barre latérale vit dans le layout ; **l'obstacle a disparu en TD.2**. À joindre au
+  rebranchement de ses deux blocs manquants. → **ticket barre latérale, C7 ou plus tôt.**
 - **La barre d'ancres de la page projet est retirée du rendu.** Point **suspendu, pas refermé** :
   `subnav.tsx` reste sans appelant, les `id` de section et le `scroll-mt-19` restent posés, inertes.
   La question de l'entrée active se reposera telle quelle. → **ticket barre latérale.**
@@ -154,8 +159,8 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   `beforeAll` qui échoue après avoir créé son domaine le laisse en place, et fait tomber le fichier
   suivant. Restent `projets/`, `produits/` et `administration/actions.test.ts`. → **au prochain.**
 - **`uiLayerSeal` ne scelle ni `components/shell/` ni `components/overview/`.** Il nomme trois
-  dossiers métier ; il y en a **cinq** — T6.6 a creusé le second trou, `eslint.config.mjs` étant hors
-  périmètre. Un trou dans le scellement, pas une régression. → **au prochain qui ouvre ce fichier.**
+  dossiers métier ; il y en a **cinq**, et le second trou compte quatre fichiers (T6.6, T6.7).
+  `eslint.config.mjs` est hors périmètre à chaque fois. → **au prochain qui l'ouvre.**
 - **Les deux use cases de la fixture n'ont aucun persona rattaché.** `scripts/seed.ts` n'en sème
   aucun. Le rattachement est facultatif et le lien a été éprouvé par sonde scopée : ce qui manque est
   un **jeu d'essai**. → **au prochain ticket qui sème des personae.**
@@ -170,9 +175,9 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 ### c. Dettes assumées, sans échéance
 
 - **La page produit porte deux langages d'en-tête.** « Vision produit » a pris le surtitre en
-  capitales et le kebab en absolu de `northstar-v2` ; les blocs voisins gardent `BlockHeader`, sur
-  demande. Au second bloc qui reprend le surtitre, `Eyebrow` quitte `indicators.tsx` pour
-  `components/ui/block.tsx`. → **arbitrage humain, pas un ticket.**
+  capitales et le kebab en absolu de `northstar-v2` ; ses voisins gardent `BlockHeader`, sur demande.
+  Au second bloc à surtitre, `Eyebrow` quitte `indicators.tsx` pour `block.tsx`.
+  → **arbitrage humain.**
 - **Une carte ne se détache d'aucun fond, et c'est le design system qui manque.** Trois positions :
   la North Star (1,04:1, sa bordure la sauve à 1,33:1), les cartes de personae (1,05:1, le filet à
   1,17:1), le panneau de T5bis.4 (1,24:1). Le plus franc des `surface-neutral-*` plafonne à 2,22:1,
@@ -204,15 +209,15 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   → **le jour où la couche exposera une transaction.**
 - **La fixture est incomplète sur les ressources et les résultats.** Les deux résultats factices
   n'ont pas de lien profond, trois des quatre ressources du brief ne sont pas semées, et
-  **`tools.base_url` porte trois adresses provisoires sur `example.com`** pour que « Démarrage »
-  ouvre quelque chose. → **sans échéance, ou l'humain fournit les adresses.**
+  **`tools.base_url` porte trois adresses provisoires sur `example.com`**.
+  → **sans échéance, ou l'humain fournit les adresses.**
 - **L'amorçage rapproche par clé naturelle, donc un renommage recrée — et c'est arrivé.** La clé des
   activités, étendue à `projet · type · période`, atténue sans éliminer : un renommage a laissé deux
   lignes en base de développement, l'ancienne orpheline — sans conséquence en production, où
   l'amorçage ne tourne pas. **Refermé pour les entités seules.** → **les six restants, C7.**
 - **Les filtres ne survivent pas à un aller-retour par la navigation principale.** `docs/06` §9 les
   veut conservés ; le retour navigateur les restitue, un clic sur « Projets » repart à zéro.
-  Mémoriser l'URL de retour demanderait un état de session. → **si l'usage le réclame.**
+  → **si l'usage le réclame.**
 - **La liste transverse n'est ni paginée ni plafonnée.** `docs/06` §4 la projette « à quinze puis
   cinquante projets », ce qu'une page rend sans effort. Au-delà, un plafond avant une pagination.
   → **si l'usage le réclame.**
@@ -246,5 +251,5 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   archivage refusé qui rend **200**, comme celui qui réussit, et une action frappée en urlencodé avec
   le **bon** identifiant qui rend **404**, comme un identifiant inconnu. Trois « 200 muets » avant
   elle, faute d'étape témoin : TD.1, T5bis.4, T5bis.6. **Seul le décompte en base tranche.**
-- **Le levier n'est pas le modèle mais les quatre disciplines de vérification** — le relevé des
-  modèles employés ticket par ticket est dans `HISTORIQUE-TICKETS.md`.
+- **Le levier n'est pas le modèle mais les quatre disciplines de vérification** — le relevé par
+  ticket est dans `HISTORIQUE-TICKETS.md`.

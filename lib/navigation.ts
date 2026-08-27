@@ -465,6 +465,33 @@ export const LINK_PANEL_PARAM = "lien";
 export const LINK_PANEL_NEW = "nouveau";
 
 /**
+ * Les clés de **filtre** de la liste transverse des projets (T2.3), montées ici
+ * en T6.7 — et c'est la première fois qu'un filtre quitte l'écran qui le lit.
+ *
+ * **Elles étaient locales tant qu'un seul écran les écrivait.** C'est la règle
+ * que `/produits` et `/equipe` tiennent encore : un `const PARAM` non exporté,
+ * au plus près de la page qui le relit. Elle vaut aussi longtemps qu'il n'y a
+ * qu'un lecteur — dès qu'il y en a deux, la clé se met à vivre à deux endroits,
+ * et une clé qui vit à deux endroits n'en est plus une : le jour où `statut`
+ * deviendrait `etat`, la vue d'ensemble continuerait de servir des liens qui ne
+ * filtrent plus rien, **sans qu'aucun test ni le compilateur ne le dise**.
+ *
+ * **Ce sont des clés de filtre, non des clés d'ouverture de panneau.** Les
+ * vingt et une constantes ci-dessus décident d'un panneau ; celles-ci
+ * restreignent une liste. Elles vivent au même endroit pour la même raison —
+ * une URL appartient à l'interface, et son vocabulaire se tient en un seul
+ * lieu.
+ *
+ * **`recherche` n'y figure pas**, et c'est délibéré : rien hors de la page ne
+ * l'écrit. On ne monte que ce qui a deux lecteurs (règle 3) — une clé exportée
+ * sans appelant est celle qu'on relit un jour sans savoir pourquoi.
+ */
+export const PROJECT_FILTER_PARAM = {
+  approach: "approche",
+  status: "statut",
+} as const;
+
+/**
  * Les adresses des sept écrans, et des formulaires qui les alimentent. Les
  * pages de détail prennent un identifiant : le schéma en pose des UUID, et
  * rien ne promet encore de slug — ce choix revient à C2, avec l'écran qui
@@ -577,6 +604,20 @@ export const ROUTES = {
   productUseCase: (id: string, useCaseId: string) =>
     `/produits/${id}?${USE_CASE_DETAIL_PARAM}=${useCaseId}`,
   projects: "/projets",
+  /**
+   * La liste transverse, **filtrée sur un statut** (T6.7). Ce n'est pas un
+   * écran de plus : c'est le même, avec un paramètre — la forme des routes de
+   * panneau, appliquée à un filtre.
+   *
+   * Elle existe parce que la répartition de la vue d'ensemble rend des chiffres
+   * cliquables : le chiffre et la liste doivent viser **la même** clé, et c'est
+   * ici qu'elles la partagent.
+   */
+  projectsByStatus: (statusId: string) =>
+    `/projets?${PROJECT_FILTER_PARAM.status}=${statusId}`,
+  /** La même, **filtrée sur une approche** (T6.7). Même forme, même raison. */
+  projectsByApproach: (approachId: string) =>
+    `/projets?${PROJECT_FILTER_PARAM.approach}=${approachId}`,
   project: (id: string) => `/projets/${id}`,
   projectNew: "/projets/nouveau",
   /**

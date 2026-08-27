@@ -4135,3 +4135,99 @@ la préséance, la phrase, l'acteur, l'acteur nul, le plafond, l'état vide, et 
 est le quatrième dossier métier ; `uiLayerSeal` n'en nomme que trois. `eslint.config.mjs` était hors
 du périmètre de la fiche (règle 3), et le point ouvert d'`ETAT.md` a été **récrit** pour le dire
 plutôt que d'être élargi en silence.
+
+---
+
+## T6.7 — La vue d'ensemble entière : répartition, fraîcheur, accès direct — 27/08/2026
+
+**Ce que le ticket ferme.** T6.6 avait livré le premier des quatre blocs de `docs/06` §3 — le seul
+qui **dépende** du journal. T6.7 livre les trois autres et **clôt C6** : la répartition, les projets
+sans activité récente, l'accès direct. L'arbitrage (d) du découpage l'exigeait — *laisser l'écran à
+moitié vide après l'avoir ouvert coûterait plus qu'il ne protège.* Aucun des trois ne demandait de
+table neuve : ils lisent `projects`, `products` et les deux référentiels tels qu'ils existent depuis
+T2.3.
+
+**Trois lectures dans `lib/queries/overview.ts`.** `listProjectDistribution` compte les projets par
+statut et par approche, chacune en `leftJoin` depuis le **référentiel** — c'est ce qui rend un zéro.
+`listStaleProjects` retient `last_activity_at` antérieur au seuil, **et les nuls avec**.
+`countProjects` / `countProducts` donnent les deux nombres de l'accès direct. Les trois rejouent, à
+la lettre, les conditions de la liste qu'elles annoncent.
+
+**Le contrat du ticket tient en une phrase : suivre le lien rend exactement ce nombre de lignes.**
+D'où le choix qui décide de tout — **on compte `products.id`, jamais `projects.id`**. Un projet
+vivant sous un **produit archivé** franchit le premier `leftJoin` et échoue au second : compter la
+colonne du projet l'inclurait, quand `listProjects` l'écarte par son `innerJoin`. Le chiffre dirait
+un de plus que la liste, sans qu'aucune erreur ne se produise.
+
+**Cinq arbitrages, rendus avant d'écrire.**
+
+- **La répartition par entité n'est pas rendue.** `/projets` porte trois clés depuis T2.3 —
+  `recherche`, `approche`, `statut` — et **aucune d'entité**. La fiche tranchait d'avance : *un
+  chiffre dont le filtre n'existe pas n'est pas rendu*. Poser la clé aurait été une fonctionnalité
+  sur un autre écran (règle 3). Point ouvert, destination C7.
+- **Les zéros se rendent**, tout le référentiel non archivé — l'écart assumé avec
+  `listProjectFilterOptions`, qui n'offre que ce qui ramène quelque chose. L'une propose des
+  chemins, l'autre **décrit une distribution**. `formatProjects(0)` écrit « Aucun projet ».
+- **Une valeur de référentiel archivée se rend si et seulement si elle porte encore des projets.**
+  Archivée et vide, c'est du vocabulaire retiré. Archivée et porteuse, ses projets comptent dans la
+  liste : la taire ferait de la répartition une lecture **incomplète en silence**, et comme aucune
+  somme n'est affichée, personne ne verrait l'écart.
+- **L'accès direct porte ses décomptes**, et le plafond des dormants est **dix**, écrit et jamais
+  annoncé — la forme de `RECENT_EVENTS_LIMIT`.
+- **Les clés de filtre montent dans `lib/navigation.ts`.** Elles étaient un `const PARAM` non
+  exporté de `app/(app)/projets/page.tsx` : légitime tant qu'un seul écran les écrivait. Avec un
+  second lecteur, une clé qui vit à deux endroits n'en est plus une — le jour où `statut` devient
+  `etat`, la vue d'ensemble sert des liens qui ne filtrent plus rien, **sans qu'aucun test ni le
+  compilateur ne le dise**. Deux fichiers hors du périmètre de la fiche, sans changement de
+  comportement.
+
+**Ce que la vérification a donné.**
+
+- **Le critère se lit dans le HTML servi, et il se suit.** Les quatre blocs sont dans le document,
+  dans l'ordre de `docs/06` §3. **Onze chiffres rendus, onze suivis, onze concordances** — dont
+  **deux à zéro** (« Cadrage », « Audit d'éco-conception »), lues « Aucun projet » et servant zéro
+  ligne. Le bloc des dormants rend trois projets, la date en toutes lettres, le « jamais » en tête ;
+  aucune occurrence de badge, d'alerte ou de pourcentage. L'accès direct annonce « 3 produits » et
+  « 5 projets », et sert 3 et 5 lignes.
+- **Une valeur hors fixture ne rend pas zéro, et c'est T2.3 qui le décide.** `/projets?statut=`
+  suivi d'un UUID forgé sert **les cinq** projets : `find` est scopé, ne trouve rien, et le filtre
+  est **ignoré** plutôt qu'appliqué à vide — *inventer un libellé à partir d'un paramètre serait
+  donner du crédit à ce qu'on n'a pas lu.* La vue d'ensemble ne rend aucun chiffre pour une telle
+  valeur ; il n'y a donc rien à faire diverger.
+- **Le référentiel archivé a demandé une sonde, la base de développement n'en portant aucun.**
+  « Terminé » archivé reste rendu, à 1 projet, et son lien sert **1** ligne — `find` ne filtrant pas
+  l'archivage, la clé résout encore. « Cadrage » archivé, à zéro, **disparaît**. Les deux moitiés de
+  la règle lues dans le HTML servi, puis les deux statuts rétablis, `archived_at` remis à `null`
+  **mesuré en retour**. La sonde est supprimée, non archivée.
+- **Les tests se mettent en défaut. Seize neutralisations, et deux ont corrigé le ticket.**
+  (a) Trois neutralisations de la fraîcheur faisaient tomber le constat du **plafond** en plus du
+  leur : l'archivé et les deux projets forgés étaient sans activité, donc entraient **en tête** de
+  liste et chassaient les lignes attendues. Datés à soixante jours — dormants, mais après le projet
+  endormi —, chacun ne fait plus tomber que son constat. (b) `filter(entities)` du décompte des
+  produits **n'avait aucune chute** : rien dans la fixture ne portait un produit dont l'entité soit
+  d'ailleurs. Une ligne forgée l'a donné. Les treize autres tombent chacune sur son constat.
+- **Un constat est global par construction, et c'est voulu.** La concordance « le chiffre est le
+  nombre de lignes » tombe à **chaque** divergence — c'est exactement le cas que la fiche désigne
+  pour les filtres d'archivage. L'isolement se mesure donc parmi les constats **ciblés**, et chacun
+  vise un `filter()` sur une valeur de référentiel qui ne sert qu'à lui : deux statuts et une
+  approche n'existent dans la fixture que pour porter une ligne forgée.
+- **Le contraste se mesure, et aucun couple n'est neuf par la position.** Les quatre du ticket, sur
+  `surface-neutral-pale` : `content-neutral-darkest` **17,87:1**, `content-neutral-dark` **8,12:1**,
+  `content-info-base` **6,41:1**, `content-neutral-base` **4,98:1** — les quatre valeurs de T6.6, ce
+  qui valide la méthode. `StatusPill` entre pour la première fois **dans un lien** ; ses quatre
+  couples sont ceux mesurés dans `status-pill.tsx`, la surface d'accueil est celle de `List`.
+- **Le droit s'éprouve par l'action — et il n'y en a aucune.** Rien ne s'écrit sur cet écran, aucun
+  point d'entrée HTTP n'est ajouté, et les quatre lectures sont ouvertes à tout le domaine (D9). Ce
+  qui s'est vérifié est la propriété inverse : le `<main>` servi à Awa Diallo, sans droit de
+  domaine, est **identique à l'octet** à celui servi à Camille Roux, responsable. La seule différence
+  de la page est l'entrée « Administration » de la barre latérale, qui appartient au layout.
+
+**1144 tests, 39 fichiers, verts.** `lint --max-warnings=0` et `tsc --noEmit` sans une ligne. **+29
+tests** : douze sur la répartition — les deux concordances, le zéro, la double approche, les deux
+moitiés de la règle d'archivage, l'ordre du référentiel, les cinq étanchéités —, dix sur la
+fraîcheur, trois sur `staleBefore`, quatre sur les décomptes.
+
+**`staleBefore` est pure, et son rabattement de jour n'est pas décoratif.** `setUTCMonth` reporte
+les jours en trop sur le mois suivant : le 31 mars reculé d'un mois donnerait le 3 mars. Le seuil
+avancerait de trois jours quatre fois l'an, sans jamais lever d'erreur. Le premier du mois d'abord,
+le recul ensuite, le jour rabattu sur le dernier du mois visé — et un test le tient.

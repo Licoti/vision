@@ -29,10 +29,20 @@
  * et il y en a trois.
  */
 
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
 
 import type { ScopedDb } from "@/lib/db/scoped";
-import { events, persons, products, projects } from "@/lib/db/schema";
+import {
+  approaches,
+  entities,
+  events,
+  persons,
+  products,
+  projectApproaches,
+  projectStatuses,
+  projects,
+} from "@/lib/db/schema";
+import type { ProjectStatusNature } from "@/lib/queries/projects";
 
 /**
  * Le plafond du flux — **un nombre écrit, jamais une pagination** (fiche T6.6).
@@ -215,5 +225,399 @@ export function listRecentEvents(
       actorName: row.actorName,
       origin: originOf(row),
     }));
+  });
+}
+
+/* ==========================================================================
+   La répartition — combien de projets par statut, par approche (T6.7)
+   ========================================================================== */
+
+/**
+ * Une valeur de référentiel et le nombre de projets qu'elle porte.
+ *
+ * **Le nombre est un décompte de lignes, jamais un indice.** C'est la frontière
+ * de D39 : Vision n'a rien calculé pour qualifier qui que ce soit — elle a
+ * compté ce que le filtre de `/projets` rendra. D'où le contrat que le ticket
+ * pose et que le test mesure : **suivre le lien rend exactement ce nombre de
+ * lignes**. Un décompte qui ne tiendrait pas cette promesse serait un mensonge
+ * qu'aucun autre constat ne détecte.
+ */
+export type DistributionEntry = {
+  id: string;
+  label: string;
+  count: number;
+};
+
+/** Un statut porte en plus sa `nature` : c'est ce que la pastille rend. */
+export type StatusDistributionEntry = DistributionEntry & {
+  nature: ProjectStatusNature;
+};
+
+/**
+ * Les deux dimensions rendues — **et non les trois de `docs/06` §3.**
+ *
+ * L'entité manque, et c'est la lettre de la fiche : *« un chiffre dont le
+ * filtre n'existe pas n'est pas rendu »*. `/projets` porte trois clés depuis
+ * T2.3 — `recherche`, `approche`, `statut` — et **aucune clé d'entité**. Rendre
+ * le chiffre demanderait de poser ce filtre sur un autre écran, c'est-à-dire
+ * une fonctionnalité hors du ticket (règle 3) ; le rendre sans filtre
+ * donnerait un nombre qui ne mène nulle part. Point ouvert d'`ETAT.md`,
+ * destination C7.
+ */
+export type ProjectDistribution = {
+  statuses: StatusDistributionEntry[];
+  approaches: DistributionEntry[];
+};
+
+/**
+ * La forme brute d'une ligne de répartition : le décompte, plus l'archivage du
+ * référentiel, que la sortie ne porte pas.
+ */
+type DistributionRow = DistributionEntry & { archivedAt: Date | null };
+
+/**
+ * Une valeur de référentiel se rend si elle est vivante, **ou** si elle porte
+ * encore des projets.
+ *
+ * Les deux moitiés ont chacune leur raison. Une valeur archivée sans projet est
+ * du vocabulaire retiré : la montrer rouvrirait un choix que le domaine a
+ * fermé. Une valeur archivée qui porte encore des projets est un fait : ces
+ * projets existent, ils comptent dans la liste, et la taire ferait de la
+ * répartition une lecture **incomplète en silence** — la somme des chiffres
+ * cesserait de rendre compte des lignes.
+ *
+ * Aucune somme n'est affichée, et c'est justement pourquoi la règle compte :
+ * personne ne verrait l'écart.
+ */
+function isRendered(row: DistributionRow): boolean {
+  return row.archivedAt === null || row.count > 0;
+}
+
+/** L'entrée rendue, une fois l'archivage du référentiel consommé. */
+function strip(row: DistributionRow): DistributionEntry {
+  return { id: row.id, label: row.label, count: row.count };
+}
+
+/**
+ * Combien de projets par statut, et par approche.
+ *
+ * **Les trois conditions d'archivage sont celles de `listProjects`, à la
+ * lettre** — `filter(projects)`, `projects.archived_at is null`,
+ * `products.archived_at is null` — et c'est tout ce qui fait tenir le contrat
+ * du ticket. Le décompte et la liste ne sont pas deux lectures qui se
+ * ressemblent : ce sont deux façons d'écrire la même clause, et la seule preuve
+ * qu'elles disent la même chose est de suivre le lien et de compter.
+ *
+ * **On compte `products.id`, jamais `projects.id`.** La différence n'est pas
+ * cosmétique : un projet vivant sous un **produit archivé** franchit le premier
+ * `leftJoin` et échoue au second. Compter la colonne du projet l'inclurait,
+ * quand `listProjects` l'écarte par son `innerJoin products` — le chiffre
+ * dirait un de plus que la liste, sans qu'aucune erreur ne se produise. C'est
+ * exactement la divergence que la mise en défaut de la fiche cherche.
+ *
+ * **Le référentiel entier, zéros compris**, à rebours de
+ * `listProjectFilterOptions` qui n'offre que ce qui ramène quelque chose. Les
+ * deux n'ont pas le même objet : l'une propose des chemins, celle-ci **décrit
+ * une distribution**. Un statut du domaine absent de la répartition se lit
+ * comme un statut qui n'existe pas, et « Aucun projet » est un fait que le
+ * domaine a intérêt à voir.
+ *
+ * **Un projet à deux approches compte dans les deux**, donc la somme des
+ * approches dépasse le nombre de projets. Ce n'est pas un défaut : c'est le
+ * comportement du filtre, qui retient un projet dès qu'il porte l'approche.
+ * Aucune somme n'est d'ailleurs affichée — un total inviterait à en faire un
+ * pourcentage, que la fiche interdit nommément.
+ *
+ * **Deux requêtes, un seul passage.** La forme de `listProjectFilterOptions` :
+ * les référentiels sont courts, et deux allers-retours sur un même `joinedRead`
+ * coûtent moins qu'un `union` dont le type ne se vérifierait plus à la sortie.
+ *
+ * L'ordre est celui du domaine — `position` d'abord, le libellé départageant —,
+ * jamais celui du décompte : trier par nombre ferait de la répartition un
+ * classement, et le rang deviendrait une lecture. `docs/06` §10.
+ */
+export function listProjectDistribution(
+  scope: ScopedDb,
+): Promise<ProjectDistribution> {
+  return scope.joinedRead(async (database, { filter }) => {
+    const statusRows = await database
+      .select({
+        id: projectStatuses.id,
+        label: projectStatuses.label,
+        nature: projectStatuses.nature,
+        archivedAt: projectStatuses.archivedAt,
+        count: sql<number>`count(${products.id})::int`,
+      })
+      .from(projectStatuses)
+      .leftJoin(
+        projects,
+        and(
+          eq(projects.statusId, projectStatuses.id),
+          filter(projects),
+          isNull(projects.archivedAt),
+        ),
+      )
+      .leftJoin(
+        products,
+        and(
+          eq(products.id, projects.productId),
+          filter(products),
+          isNull(products.archivedAt),
+        ),
+      )
+      .where(filter(projectStatuses))
+      .groupBy(projectStatuses.id)
+      .orderBy(asc(projectStatuses.position), asc(projectStatuses.label));
+
+    const approachRows = await database
+      .select({
+        id: approaches.id,
+        label: approaches.label,
+        archivedAt: approaches.archivedAt,
+        count: sql<number>`count(${products.id})::int`,
+      })
+      .from(approaches)
+      /* Trois `leftJoin` en cascade, et **`filter()` sur chacun** : la table de
+         liaison est une table du domaine comme les autres, et l'oublier
+         laisserait un projet d'ailleurs rattacher une approche d'ici. */
+      .leftJoin(
+        projectApproaches,
+        and(
+          eq(projectApproaches.approachId, approaches.id),
+          filter(projectApproaches),
+        ),
+      )
+      .leftJoin(
+        projects,
+        and(
+          eq(projects.id, projectApproaches.projectId),
+          filter(projects),
+          isNull(projects.archivedAt),
+        ),
+      )
+      .leftJoin(
+        products,
+        and(
+          eq(products.id, projects.productId),
+          filter(products),
+          isNull(products.archivedAt),
+        ),
+      )
+      .where(filter(approaches))
+      .groupBy(approaches.id)
+      .orderBy(asc(approaches.position), asc(approaches.label));
+
+    return {
+      statuses: statusRows.filter(isRendered).map((row) => ({
+        ...strip(row),
+        nature: row.nature,
+      })),
+      approaches: approachRows.filter(isRendered).map(strip),
+    };
+  });
+}
+
+/* ==========================================================================
+   Les projets sans activité récente (T6.7)
+   ========================================================================== */
+
+/**
+ * Le seuil de fraîcheur : **un mois**, celui de `docs/05` §7.
+ *
+ * Le document en fait le *thermomètre de la fraîcheur* — *« la proportion de
+ * projets dont la dernière activité date de plus d'un mois »*. Vision en retient
+ * le seuil et **jamais la proportion** : un taux serait l'indice calculé que
+ * D39 interdit, et il qualifierait le centre. La liste dit des projets et une
+ * date ; elle ne dit pas quelle part du tout ils font.
+ */
+export const STALE_AFTER_MONTHS = 1;
+
+/**
+ * Le plafond de la liste — **un nombre écrit, jamais annoncé**, la forme de
+ * `RECENT_EVENTS_LIMIT`.
+ *
+ * Dix : `docs/06` §3 veut *« une liste courte, factuelle »*, et une liste
+ * courte est celle qu'on lit d'un regard. **La conséquence est nommée** :
+ * au-delà de dix projets dormants, les suivants ne sont pas affichés. Le bloc
+ * attire le regard sur ce qui s'endort, il ne tient pas l'inventaire de ce qui
+ * dort — c'est la page `/projets`, triée par activité récente, qui le fait.
+ *
+ * **Rien ne l'affiche**, ni « 10 premiers », ni « voir plus » : un bloc qui
+ * annoncerait sa longueur inviterait à la comparer d'une semaine à l'autre, et
+ * ce serait la mesure d'activité du centre que la fiche interdit.
+ */
+export const STALE_PROJECTS_LIMIT = 10;
+
+/**
+ * L'instant qui sépare le récent du dormant : **un mois avant maintenant**.
+ *
+ * **Une fonction pure, et c'est ce qui rend le seuil mesurable.** Écrit
+ * `now() - interval '1 month'` en SQL, il serait juste et intestable : aucun
+ * test ne pourrait placer le même projet d'un côté puis de l'autre de la
+ * frontière, et un décalage d'un mois passerait au vert.
+ *
+ * **Le jour se rabat sur le dernier du mois quand il n'existe pas.** Sans cela,
+ * `setUTCMonth` fait déborder le 31 mars sur le 3 mars — JavaScript reporte les
+ * jours en trop sur le mois suivant. Un seuil qui avancerait de trois jours
+ * quatre fois l'an rendrait « plus d'un mois » faux sans jamais lever
+ * d'erreur.
+ *
+ * **UTC, comme les quatre formateurs de `lib/format.ts`** : le seuil se compare
+ * à une colonne `timestamptz`, et l'heure locale du serveur n'a pas à décider
+ * de ce qui dort.
+ */
+export function staleBefore(now: Date = new Date()): Date {
+  const day = now.getUTCDate();
+  const before = new Date(now);
+
+  // Le premier du mois d'abord : c'est le seul jour qui existe dans tous les
+  // mois, donc le seul depuis lequel un recul de mois ne peut pas déborder.
+  before.setUTCDate(1);
+  before.setUTCMonth(before.getUTCMonth() - STALE_AFTER_MONTHS);
+
+  // Le zéro du mois suivant est le dernier jour du mois courant.
+  const lastDay = new Date(
+    Date.UTC(before.getUTCFullYear(), before.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  before.setUTCDate(Math.min(day, lastDay));
+
+  return before;
+}
+
+/**
+ * Un accompagnement qui ne bouge plus, tel que le bloc le rend.
+ *
+ * **Ni statut, ni équipe, ni produit** : le bloc dit un nom et une date, et
+ * `docs/06` §3 le veut *« sans alerte ni badge »*. Trois colonnes de plus
+ * feraient une seconde liste des projets sur la vue d'ensemble, quand
+ * `/projets` existe et porte le tri par fraîcheur.
+ */
+export type StaleProject = {
+  id: string;
+  name: string;
+  /**
+   * `null` quand le projet n'a **jamais** eu d'activité — et il figure alors
+   * dans la liste au même titre que les autres. « Aucune activité » est un
+   * fait, pas un retard (arbitrage (h) de `tickets-C6.md`).
+   */
+  lastActivityAt: Date | null;
+};
+
+/**
+ * Les projets dont la dernière activité est antérieure au seuil, et ceux qui
+ * n'en ont jamais eu.
+ *
+ * **Les mêmes conditions d'archivage que `listProjects`**, et pour la même
+ * raison qu'à la répartition : un projet rangé n'est pas un projet qui dort, et
+ * un accompagnement sous produit archivé non plus.
+ *
+ * **Le tri est un tri, jamais un classement.** Du plus ancien au plus récent,
+ * les « jamais » en tête, le nom départageant à égalité — un ordre qui varierait
+ * d'un affichage à l'autre serait un défaut, d'autant qu'ici il décide qui entre
+ * sous le plafond. Aucun rang n'est affiché, aucun badge, aucune couleur
+ * d'alerte : ce qui se lit est une date, et le lecteur juge.
+ *
+ * **Le seuil est un argument**, pas un `now()` en SQL — voir `staleBefore`.
+ *
+ * **La lecture est ouverte à tout le domaine** (D9) : aucun droit ne se lit ici
+ * ni chez l'appelant. Un projet qui dort n'est pas une information réservée.
+ */
+export function listStaleProjects(
+  scope: ScopedDb,
+  before: Date = staleBefore(),
+  limit: number = STALE_PROJECTS_LIMIT,
+): Promise<StaleProject[]> {
+  return scope.joinedRead(async (database, { filter }) => {
+    return database
+      .select({
+        id: projects.id,
+        name: projects.name,
+        lastActivityAt: projects.lastActivityAt,
+      })
+      .from(projects)
+      .innerJoin(
+        products,
+        and(
+          eq(products.id, projects.productId),
+          filter(products),
+          isNull(products.archivedAt),
+        ),
+      )
+      .where(
+        and(
+          filter(projects),
+          isNull(projects.archivedAt),
+          /* `or` ne rend `undefined` que sans condition : il y en a deux. */
+          or(
+            isNull(projects.lastActivityAt),
+            lt(projects.lastActivityAt, before),
+          )!,
+        ),
+      )
+      .orderBy(
+        sql`${projects.lastActivityAt} asc nulls first`,
+        asc(projects.name),
+      )
+      .limit(limit);
+  });
+}
+
+/* ==========================================================================
+   L'accès direct (T6.7)
+   ========================================================================== */
+
+/**
+ * Combien de projets et combien de produits — les deux nombres de l'accès
+ * direct.
+ *
+ * **Ce sont des décomptes de lignes, et le lien le prouve** : chacun mène à la
+ * liste sans filtre, qui rend exactement ce nombre. C'est le contrat de la
+ * répartition, appliqué à l'entrée qui n'en pose aucun — et les deux pages de
+ * destination affichent déjà ces mêmes nombres (`formatProjects`,
+ * `formatProducts`).
+ *
+ * **Ce n'est pas la taille du centre.** Un décompte de lignes ne qualifie
+ * personne : il dit ce que l'écran suivant contient. La frontière de D39 est
+ * ici franche — ce serait un indice si Vision en tirait un rythme, une
+ * moyenne ou un taux, et elle n'en tire rien.
+ *
+ * **Chaque décompte rejoue les jointures de sa liste, et non un `count(*)`
+ * nu.** `listProjects` écarte les projets d'un produit archivé par son
+ * `innerJoin`, `listProductsWithCounts` écarte les produits dont l'entité n'est
+ * pas du domaine : un décompte plus simple que sa liste est un décompte qui
+ * finit par en dire plus qu'elle.
+ */
+export function countProjects(scope: ScopedDb): Promise<number> {
+  return scope.joinedRead(async (database, { filter }) => {
+    const [row] = await database
+      .select({ count: sql<number>`count(*)::int` })
+      .from(projects)
+      .innerJoin(
+        products,
+        and(
+          eq(products.id, projects.productId),
+          filter(products),
+          isNull(products.archivedAt),
+        ),
+      )
+      .where(and(filter(projects), isNull(projects.archivedAt)));
+
+    return row?.count ?? 0;
+  });
+}
+
+/** Le pendant, pour les produits. Voir `countProjects`. */
+export function countProducts(scope: ScopedDb): Promise<number> {
+  return scope.joinedRead(async (database, { filter }) => {
+    const [row] = await database
+      .select({ count: sql<number>`count(*)::int` })
+      .from(products)
+      .innerJoin(
+        entities,
+        and(eq(entities.id, products.entityId), filter(entities)),
+      )
+      .where(and(filter(products), isNull(products.archivedAt)));
+
+    return row?.count ?? 0;
   });
 }

@@ -6718,3 +6718,79 @@ se serait vu là.
 point ouvert, tout en en sortant un refermé ; les deux additions ont été comprimées jusqu'à revenir
 au plafond. Le seuil tient, mais il tient de justesse, et le prochain ticket n'aura pas cette marge :
 le balayage appartient à la session de découpage, pas au ticket.
+
+---
+
+## T6.7 — La vue d'ensemble entière : répartition, fraîcheur, accès direct — 27/08/2026
+
+**Un écart de périmètre assumé : les clés de filtre montent dans `lib/navigation.ts`.** La fiche
+annonçait trois fichiers — `lib/queries/overview.ts` et son test, `components/overview/`,
+`app/(app)/page.tsx`. Il en a fallu deux de plus, `lib/navigation.ts` et
+`app/(app)/projets/page.tsx`, et **sans changement de comportement** : `approche` et `statut`
+étaient un `const PARAM` non exporté de la page projets, et la vue d'ensemble devait les écrire pour
+poser ses liens. Trois voies existaient — monter les clés, exporter le `const` d'un module de route,
+ou écrire `?statut=` en dur. La troisième pose deux sources pour une clé ; la deuxième tire un
+module de page dans le graphe d'un composant. La première est la seule qui laisse **une** source, et
+c'est le domicile où vivent déjà `ACTIVITY_PANEL_PARAM` et `ENTITY_FORM_PARAM`. `recherche` n'est
+**pas** montée : rien hors de la page ne l'écrit, et une clé exportée sans appelant est celle qu'on
+relit un jour sans savoir pourquoi (leçon de T5.2).
+
+**Le piège du décompte : `count(projects.id)` et `count(products.id)` ne comptent pas la même
+chose.** Un projet vivant sous un produit archivé franchit le `leftJoin` des projets et échoue à
+celui des produits. Compter la colonne du projet l'inclut ; `listProjects` l'exclut par son
+`innerJoin`. Le chiffre annoncerait un de plus que la liste servie, **sans erreur, sans exception,
+sans trace** — et aucune somme n'étant affichée, personne ne verrait l'écart. Mesuré : remplacer la
+colonne fait tomber quatre constats.
+
+**Une valeur hors fixture ne rend pas zéro, et ce n'est pas un défaut de T6.7.** `/projets` confronte
+chaque paramètre au domaine avant de le croire (T2.3) : un statut inconnu est **ignoré**, pas
+appliqué à vide, et la page sert alors la liste entière. La vue d'ensemble ne rendant aucun chiffre
+pour une valeur qui n'existe pas, il n'y a rien à faire diverger — mais un lecteur qui forgerait
+l'adresse verrait cinq lignes là où il attendrait zéro. C'est un arbitrage de T2.3, documenté dans
+l'en-tête de sa page, et il ne se rouvre pas ici.
+
+**`find` ne filtre pas l'archivage, et c'est ce qui sauve l'arbitrage sur le référentiel archivé.**
+Rendre un statut archivé qui porte encore des projets n'aurait aucun sens si son lien ne filtrait
+plus rien. Il filtre : `find` n'applique que `filter(table)`. Lu dans le HTML servi par sonde —
+« Terminé » archivé, rendu à 1 projet, lien servant 1 ligne ; « Cadrage » archivé et vide,
+disparu — puis les deux `archived_at` remis à `null` et **mesurés en retour**.
+
+**Deux mises en défaut ont corrigé le ticket, et la première est la leçon de T6.3 resservie.** Trois
+neutralisations de la fraîcheur faisaient tomber le constat du **plafond** en plus du leur : les
+projets à écarter — l'archivé, les deux forgés — étaient sans activité, donc entraient en tête de
+liste, les projets sans activité ouvrant la marche. Une chute non isolée ne désigne plus le filtre
+qu'elle éprouve. Ils sont désormais datés à soixante jours : dormants comme les autres, mais
+**postérieurs** au projet endormi, donc jamais dans les deux premières lignes. La seconde :
+`filter(entities)` du décompte des produits n'avait **aucune** chute, faute d'un produit dont
+l'entité soit d'ailleurs. Une clause qu'aucun test ne défend n'est pas un garde-fou.
+
+**Un constat global assumé, et il faut le dire pour qu'on ne le prenne pas pour un défaut
+d'isolement.** La concordance « le chiffre est le nombre de lignes » tombe à **chaque** divergence,
+par construction — c'est sa valeur, et c'est le cas que la fiche désigne nommément pour les filtres
+d'archivage. L'isolement se mesure donc parmi les constats **ciblés** : deux statuts et une approche
+n'existent dans la fixture que pour porter une ligne forgée, ce qui donne à chaque `filter()` une
+chute à lui.
+
+**`setUTCMonth` reporte les jours en trop, et un seuil s'en trouverait faux quatre fois l'an.** Le 31
+mars reculé d'un mois donne le 3 mars, février n'ayant pas de 31. `staleBefore` pose le premier du
+mois, recule, puis rabat le jour sur le dernier du mois visé. Sans cela, « plus d'un mois »
+avancerait de trois jours sans jamais lever d'erreur — le genre de faute qu'aucun écran ne montre.
+Le seuil est **un argument** et non un `now()` en SQL, faute de quoi aucun test ne pourrait placer
+le même projet d'un côté puis de l'autre de la frontière.
+
+**`StatusPill` entre pour la première fois dans un lien, et son en-tête dit encore le contraire.**
+Le commentaire de `components/ui/status-pill.tsx` justifie le `<span>` par « rien ne filtre par
+statut depuis les cinq écrans qui la rendent ». Depuis T6.7, la vue d'ensemble filtre par statut —
+mais la pastille n'est toujours pas l'affordance : c'est la **ligne** qui est le lien, et la
+pastille reste un `<span>` à l'intérieur. La phrase du composant reste vraie de son propre balisage
+et fausse de son environnement. `status-pill.tsx` était hors périmètre (règle 3).
+
+**`ETAT.md` dépasse le plafond de cinq lignes, et c'est un report délibéré.** Le fichier était à 250
+lignes exactes ; T6.7 y ajoute son entrée de journal et un point ouvert. **Dix points ont été
+récrits plus serré** — des mots en moins, jamais des lignes plus larges : la largeur maximale reste
+celle du fichier committé, 109 caractères, une première tentative à 120 ayant été défaite pour ce
+qu'elle était, un truquage de la mesure. Il reste cinq lignes de trop. Le geste qui les rend est le
+**repli de C6** — six entrées de trois lignes contre une ligne de chantier, soit une vingtaine de
+lignes —, et c'est le geste 1 de la session de découpage, qui est le pas suivant. Le faire ici
+serait faire le découpage dans un ticket. T6.6 avait annoncé que le prochain ticket n'aurait pas la
+marge ; il ne l'a pas eue.

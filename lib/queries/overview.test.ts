@@ -52,24 +52,37 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { db } from "@/lib/db/client";
 import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
 import {
+  approaches,
   domains,
   entities,
   events,
   persons,
   products,
+  projectApproaches,
   projectStatuses,
   projects,
 } from "@/lib/db/schema";
+import { listProductsWithCounts } from "@/lib/queries/products";
+import { listProjects } from "@/lib/queries/projects";
 
-import { listRecentEvents } from "./overview";
+import {
+  countProducts,
+  countProjects,
+  listProjectDistribution,
+  listRecentEvents,
+  listStaleProjects,
+  staleBefore,
+} from "./overview";
 
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
 const teardownOrder = [
   events,
+  projectApproaches,
   projects,
   products,
   entities,
   projectStatuses,
+  approaches,
   persons,
 ];
 
@@ -86,6 +99,10 @@ type Fixture = {
   otherProjectName: string;
   productId: string;
   productName: string;
+  /** Le statut du domaine, cible des lignes forgées de T6.7. */
+  statusId: string;
+  /** Son entité, pour ce que T6.7 sème de produits en plus. */
+  entityId: string;
   aliceId: string;
 };
 
@@ -112,6 +129,75 @@ let leakedDomainEventId: string;
 let leakedActorEventId: string;
 let leakedProjectEventId: string;
 let leakedProductEventId: string;
+
+/* ---------------------------------------------------------------------------
+   Ce que T6.7 sème en plus, **dans `a` seulement**.
+
+   Hors de `seedDomain`, et c'est délibéré : semé là, `c` cesserait d'être le
+   domaine dont on peut affirmer qu'il ne porte rien, et les constats de T6.6 se
+   mettraient à dépendre d'un jeu qui ne les concerne pas. Le jeu de T6.7 est
+   donc posé sur `a`, et `b` ne reçoit que ce qu'une ligne forgée exige.
+   ------------------------------------------------------------------------- */
+
+/* Les statuts — le référentiel et ses cas de bord. */
+let emptyStatusId: string;
+let archivedEmptyStatusId: string;
+let archivedUsedStatusId: string;
+
+/* Les approches — dont une qui n'a que sa ligne de liaison forgée. */
+let usedApproachId: string;
+let sharedApproachId: string;
+let emptyApproachId: string;
+let leakedLinkApproachId: string;
+
+/* Les projets qui ne doivent compter nulle part. */
+let archivedProjectId: string;
+let orphanProjectId: string;
+let archivedProductId: string;
+
+/* Les projets de la fraîcheur. */
+let sleepyProjectId: string;
+let freshProjectId: string;
+let keptProjectId: string;
+
+/* Les lignes forgées de T6.7, nommées par le filtre qu'elles éprouvent. */
+let leakedDomainProjectId: string;
+let leakedProductProjectId: string;
+let leakedEntityProductId: string;
+
+/** L'instant du semis : ce qui est « frais » l'est par rapport à lui. */
+const SEEDED_AT = new Date();
+
+/**
+ * La dernière activité du projet endormi : **quatre-vingt-dix jours avant le
+ * semis**, et non une date écrite.
+ *
+ * Une date fixe ferait dépendre le constat du jour où le test tourne — juste
+ * en août 2026, faux avant juillet 2026. Le seuil se mesure par rapport à un
+ * instant, donc la donnée se pose par rapport au même instant.
+ */
+const SLEEPY_AT = new Date(SEEDED_AT.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+/**
+ * La dernière activité des projets qui **ne doivent jamais figurer** —
+ * l'archivé et les deux forgés. Soixante jours : dormants comme les autres, mais
+ * **postérieurs** au projet endormi.
+ *
+ * **C'est ce qui isole le constat du plafond**, et c'est une chute mesurée le
+ * 27/08/2026 : laissés sans activité, ces trois-là entraient en tête de liste —
+ * les projets sans activité ouvrent la marche — et chassaient du plafond de deux
+ * les lignes attendues. Retirer `filter(projects)` faisait alors tomber le
+ * plafond **en plus** de l'étanchéité qu'il visait. Une chute non isolée ne
+ * désigne plus le filtre qu'elle éprouve (leçon de T6.3).
+ */
+const STALE_TAIL_AT = new Date(SEEDED_AT.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+/** Les deux statuts qui ne portent qu'une ligne forgée, un filtre chacun. */
+let leakedDomainStatusId: string;
+let leakedProductStatusId: string;
+
+/** L'approche de `b`, et son seul emploi : `filter(approaches)`. */
+let otherDomainApproachId: string;
 
 async function seedDomain(label: string): Promise<Fixture> {
   const domain = await superAdmin.createDomain({
@@ -168,6 +254,8 @@ async function seedDomain(label: string): Promise<Fixture> {
     otherProjectName,
     productId: product.id,
     productName,
+    statusId: status.id,
+    entityId: entity.id,
     aliceId: alice.id,
   };
 }
@@ -362,6 +450,255 @@ beforeAll(async () => {
     })
     .returning({ id: events.id });
   leakedProductEventId = leakedProduct[0]!.id;
+
+  /* ======================================================================
+     T6.7 — le jeu de la répartition, de la fraîcheur et des décomptes.
+
+     Il tient en trois familles : les valeurs de référentiel et leurs cas de
+     bord, les projets qui ne doivent compter nulle part, et les projets dont
+     la fraîcheur décide.
+     ====================================================================== */
+
+  /* ----- Les statuts. -------------------------------------------------- */
+
+  /* Le zéro : un statut du référentiel que personne n'emploie. C'est le cas
+     que `listProjectFilterOptions` refuse d'offrir et que la répartition doit
+     rendre — un statut du domaine absent de la lecture se lirait comme un
+     statut qui n'existe pas. */
+  const emptyStatus = await a.scope.insert(projectStatuses, {
+    label: `Idée ${suffix}`,
+    nature: "framing",
+    position: "2",
+  });
+  emptyStatusId = emptyStatus.id;
+
+  /* Le vocabulaire retiré : archivé et sans projet, il ne se rend pas. */
+  const archivedEmptyStatus = await a.scope.insert(projectStatuses, {
+    label: `Statut retiré ${suffix}`,
+    nature: "paused",
+    position: "3",
+  });
+  archivedEmptyStatusId = archivedEmptyStatus.id;
+  await a.scope.archive(projectStatuses, archivedEmptyStatusId);
+
+  /* L'autre moitié de la règle : archivé **mais porteur**, il se rend — sans
+     quoi ses projets compteraient dans la liste et dans aucun chiffre. */
+  const archivedUsedStatus = await a.scope.insert(projectStatuses, {
+    label: `Statut retiré en usage ${suffix}`,
+    nature: "done",
+    position: "4",
+  });
+  archivedUsedStatusId = archivedUsedStatus.id;
+
+  const kept = await a.scope.insert(projects, {
+    name: `Projet au statut retiré ${suffix}`,
+    productId: a.productId,
+    statusId: archivedUsedStatusId,
+    lastActivityAt: SEEDED_AT,
+  });
+  keptProjectId = kept.id;
+  await a.scope.archive(projectStatuses, archivedUsedStatusId);
+
+  /* ----- Les approches. ------------------------------------------------ */
+
+  const usedApproach = await a.scope.insert(approaches, {
+    label: `Research ${suffix}`,
+    position: "1",
+  });
+  usedApproachId = usedApproach.id;
+
+  /* La seconde approche du **même** projet : c'est elle qui montre qu'un projet
+     compte dans deux dimensions à la fois, et donc que la somme des approches
+     n'est pas le nombre de projets. Aucune somme n'est d'ailleurs affichée. */
+  const sharedApproach = await a.scope.insert(approaches, {
+    label: `Lean ${suffix}`,
+    position: "2",
+  });
+  sharedApproachId = sharedApproach.id;
+
+  const emptyApproach = await a.scope.insert(approaches, {
+    label: `Audit UX ${suffix}`,
+    position: "3",
+  });
+  emptyApproachId = emptyApproach.id;
+
+  /* Une approche à elle seule pour la ligne de liaison forgée : posée sur
+     `emptyApproach`, la fuite ferait tomber le constat du zéro **en plus** du
+     sien, et une chute non isolée ne désigne plus le filtre qu'elle éprouve. */
+  const leakedLinkApproach = await a.scope.insert(approaches, {
+    label: `Approche à liaison forgée ${suffix}`,
+    position: "4",
+  });
+  leakedLinkApproachId = leakedLinkApproach.id;
+
+  await a.scope.insert(projectApproaches, {
+    projectId: a.projectId,
+    approachId: usedApproachId,
+  });
+  await a.scope.insert(projectApproaches, {
+    projectId: a.otherProjectId,
+    approachId: usedApproachId,
+  });
+  await a.scope.insert(projectApproaches, {
+    projectId: a.projectId,
+    approachId: sharedApproachId,
+  });
+
+  /* ----- Les projets qui ne comptent nulle part. ------------------------ */
+
+  const archivedProject = await a.scope.insert(projects, {
+    name: `Accompagnement rangé ${suffix}`,
+    productId: a.productId,
+    statusId: a.statusId,
+    lastActivityAt: STALE_TAIL_AT,
+  });
+  archivedProjectId = archivedProject.id;
+  await a.scope.archive(projects, archivedProjectId);
+
+  /* Le projet **vivant sous un produit archivé** : c'est le seul cas que
+     `count(projects.id)` compterait et que `count(products.id)` écarte, et
+     c'est la divergence exacte que la fiche demande de mettre en défaut. */
+  const archivedProduct = await a.scope.insert(products, {
+    name: `Produit rangé ${suffix}`,
+    entityId: a.entityId,
+  });
+  archivedProductId = archivedProduct.id;
+
+  const orphan = await a.scope.insert(projects, {
+    name: `Accompagnement sous produit rangé ${suffix}`,
+    productId: archivedProductId,
+    statusId: a.statusId,
+    lastActivityAt: SLEEPY_AT,
+  });
+  orphanProjectId = orphan.id;
+  await a.scope.insert(projectApproaches, {
+    projectId: orphanProjectId,
+    approachId: usedApproachId,
+  });
+  await a.scope.archive(products, archivedProductId);
+
+  /* ----- La fraîcheur. -------------------------------------------------- */
+
+  /* Le même projet des deux côtés de la frontière : c'est le seul montage où
+     un seuil décalé d'un mois fait tomber un constat. Deux projets, l'un
+     ancien l'autre récent, se laisseraient traverser par un mauvais seuil. */
+  const sleepy = await a.scope.insert(projects, {
+    name: `Accompagnement endormi ${suffix}`,
+    productId: a.productId,
+    statusId: a.statusId,
+    lastActivityAt: SLEEPY_AT,
+  });
+  sleepyProjectId = sleepy.id;
+
+  /* Le témoin du seuil **par défaut** : daté de l'instant du semis, il est
+     hors du mois écoulé quelle que soit la date à laquelle le test tourne. */
+  const fresh = await a.scope.insert(projects, {
+    name: `Accompagnement frais ${suffix}`,
+    productId: a.productId,
+    statusId: a.statusId,
+    lastActivityAt: SEEDED_AT,
+  });
+  freshProjectId = fresh.id;
+
+  /* `c` n'a que ses deux projets d'amorçage, sans activité : datés de
+     l'instant du semis, ils font de lui le domaine dont **aucun** projet ne
+     dort. Sans cela, l'état vide de la fraîcheur n'aurait nulle part où se
+     lire — un projet sans activité en est un qui dort. */
+  await db
+    .update(projects)
+    .set({ lastActivityAt: SEEDED_AT })
+    .where(eq(projects.domainId, c.domainId));
+
+  /* ----- Les lignes forgées de T6.7. -----------------------------------
+
+     Chacune ne franchit la frontière que sur **une** colonne, et aucune autre
+     clause ne l'écarte en amont.
+     ------------------------------------------------------------------- */
+
+  /* **Un statut par ligne forgée**, et c'est la condition de l'isolement : sur
+     le statut commun, les deux fuites produiraient le même écart de décompte,
+     et retirer l'un ou l'autre filtre ferait tomber les deux constats. Une
+     chute non isolée ne désigne plus le filtre qu'elle éprouve (leçon de
+     T6.3). */
+  const leakedDomainStatus = await a.scope.insert(projectStatuses, {
+    label: `Statut à projet forgé par le domaine ${suffix}`,
+    nature: "active",
+    position: "5",
+  });
+  leakedDomainStatusId = leakedDomainStatus.id;
+
+  const leakedProductStatus = await a.scope.insert(projectStatuses, {
+    label: `Statut à projet forgé par le produit ${suffix}`,
+    nature: "active",
+    position: "6",
+  });
+  leakedProductStatusId = leakedProductStatus.id;
+
+  /* L'approche de `b` : sans elle, `filter(approaches)` n'aurait rien à
+     écarter et son retrait passerait au vert. */
+  const otherDomainApproach = await b.scope.insert(approaches, {
+    label: `Approche de b ${suffix}`,
+    position: "1",
+  });
+  otherDomainApproachId = otherDomainApproach.id;
+
+  /* (5) Le projet est d'un **autre domaine** — son produit et son statut sont
+         ceux de `a`, il est vivant, son produit l'est aussi. Seul
+         `filter(projects)` l'écarte, dans la répartition comme dans la
+         fraîcheur comme dans le décompte. */
+  const leakedDomainProject = await db
+    .insert(projects)
+    .values({
+      domainId: b.domainId,
+      name: `Fuite de projet par le domaine ${suffix}`,
+      productId: a.productId,
+      statusId: leakedDomainStatusId,
+      lastActivityAt: STALE_TAIL_AT,
+    })
+    .returning({ id: projects.id });
+  leakedDomainProjectId = leakedDomainProject[0]!.id;
+
+  /* (6) Le projet est de `a`, vivant, sur un statut de `a` — seul son
+         **produit** est d'un autre domaine. Seul `filter(products)` l'écarte.
+         C'est aussi ce qui distingue le décompte de sa liste : `listProjects`
+         l'écarte par son `innerJoin`, le décompte doit faire de même. */
+  const leakedProductProject = await db
+    .insert(projects)
+    .values({
+      domainId: a.domainId,
+      name: `Fuite de projet par le produit ${suffix}`,
+      productId: b.productId,
+      statusId: leakedProductStatusId,
+      lastActivityAt: STALE_TAIL_AT,
+    })
+    .returning({ id: projects.id });
+  leakedProductProjectId = leakedProductProject[0]!.id;
+
+  /* (7) La **liaison** est d'un autre domaine, ses deux extrémités sont de
+         `a` : le projet de `a`, l'approche de `a`. Seul
+         `filter(projectApproaches)` l'écarte — la table de liaison est une
+         table du domaine comme les autres. */
+  await db.insert(projectApproaches).values({
+    domainId: b.domainId,
+    projectId: a.projectId,
+    approachId: leakedLinkApproachId,
+  });
+
+  /* (8) Le produit est de `a` et vivant — seule son **entité** est d'un autre
+         domaine. Seul `filter(entities)` l'écarte, et c'est la jointure que
+         `listProductsWithCounts` porte : un décompte plus simple que sa liste
+         est un décompte qui finit par en dire plus qu'elle. Sans cette ligne,
+         la clause n'aurait rien à écarter et son retrait passerait au vert
+         (mesuré le 27/08/2026). */
+  const leakedEntityProduct = await db
+    .insert(products)
+    .values({
+      domainId: a.domainId,
+      name: `Fuite de produit par l'entité ${suffix}`,
+      entityId: b.entityId,
+    })
+    .returning({ id: products.id });
+  leakedEntityProductId = leakedEntityProduct[0]!.id;
 });
 
 afterAll(async () => {
@@ -529,5 +866,313 @@ describe("listRecentEvents", () => {
 
     expect(row).toBeDefined();
     expect(row?.origin).toBeNull();
+  });
+});
+
+/* ==========================================================================
+   T6.7 — la répartition, la fraîcheur, les décomptes
+
+   **Un constat traverse les trois : le chiffre et la liste disent la même
+   chose.** C'est le seul qui prouve qu'un décompte ne ment pas — un décompte
+   juste sur un filtre qui ne l'est pas est un mensonge que rien d'autre ne
+   détecte (fiche T6.7). Il est **global par construction** : toute divergence
+   le fait tomber, et c'est précisément le cas que la fiche désigne pour les
+   filtres d'archivage. L'isolement se mesure donc parmi les constats **ciblés**,
+   chacun visant un `filter()` et un seul.
+   ========================================================================== */
+
+/** L'entrée d'une dimension, cherchée par identifiant et jamais par position. */
+function entryFor<T extends { id: string }>(
+  entries: T[],
+  id: string,
+): T | undefined {
+  return entries.find((entry) => entry.id === id);
+}
+
+describe("listProjectDistribution", () => {
+  test("le décompte de chaque statut est le nombre de lignes que son filtre rend", async () => {
+    const { statuses } = await listProjectDistribution(a.scope);
+
+    // **Le constat central du ticket.** Il ne compare pas à un nombre écrit
+    // ici — un nombre écrit à la main ne dirait que ce que l'auteur croyait —
+    // mais à ce que `/projets?statut=…` rendra vraiment.
+    for (const entry of statuses) {
+      const rows = await listProjects(a.scope, { statusId: entry.id });
+      expect(entry.count).toBe(rows.length);
+    }
+
+    // Et la lecture n'est pas vide, sans quoi la boucle ci-dessus passerait
+    // sur un tableau sans rien mesurer.
+    expect(statuses.length).toBeGreaterThan(0);
+  });
+
+  test("le décompte de chaque approche est le nombre de lignes que son filtre rend", async () => {
+    const { approaches: rows } = await listProjectDistribution(a.scope);
+
+    for (const entry of rows) {
+      const projectRows = await listProjects(a.scope, { approachId: entry.id });
+      expect(entry.count).toBe(projectRows.length);
+    }
+
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  test("une valeur de référentiel sans projet rend zéro, et elle est rendue", async () => {
+    const { statuses, approaches: rows } = await listProjectDistribution(
+      a.scope,
+    );
+
+    // C'est l'écart assumé avec `listProjectFilterOptions`, qui n'offre que ce
+    // qui ramène quelque chose : la répartition **décrit une distribution**,
+    // elle ne propose pas des chemins. Un statut du domaine absent de la
+    // lecture se lirait comme un statut qui n'existe pas.
+    expect(entryFor(statuses, emptyStatusId)?.count).toBe(0);
+    expect(entryFor(rows, emptyApproachId)?.count).toBe(0);
+  });
+
+  test("un projet à deux approches compte dans les deux", async () => {
+    const { approaches: rows } = await listProjectDistribution(a.scope);
+
+    // La somme des approches dépasse donc le nombre de projets, et c'est le
+    // comportement du filtre. Aucune somme n'est affichée : un total
+    // inviterait à en faire un pourcentage, que la fiche interdit.
+    expect(entryFor(rows, usedApproachId)?.count).toBe(2);
+    expect(entryFor(rows, sharedApproachId)?.count).toBe(1);
+  });
+
+  test("une valeur de référentiel archivée sans projet n'est pas rendue", async () => {
+    const { statuses } = await listProjectDistribution(a.scope);
+
+    // Du vocabulaire retiré : le montrer rouvrirait un choix que le domaine a
+    // fermé.
+    expect(entryFor(statuses, archivedEmptyStatusId)).toBeUndefined();
+  });
+
+  test("une valeur de référentiel archivée qui porte des projets est rendue", async () => {
+    const { statuses } = await listProjectDistribution(a.scope);
+
+    // L'autre moitié de la règle, et la plus importante : ces projets comptent
+    // dans la liste transverse. Taire leur statut ferait de la répartition une
+    // lecture **incomplète en silence** — et comme aucune somme n'est
+    // affichée, personne ne verrait l'écart.
+    expect(entryFor(statuses, archivedUsedStatusId)?.count).toBe(1);
+
+    // Et c'est bien **ce** projet-là que le chiffre compte : un décompte juste
+    // sur les mauvaises lignes ne serait pas un décompte.
+    const rows = await listProjects(a.scope, { statusId: archivedUsedStatusId });
+    expect(rows.map((row) => row.id)).toEqual([keptProjectId]);
+  });
+
+  test("l'ordre est celui du référentiel du domaine, jamais celui du décompte", async () => {
+    const { statuses } = await listProjectDistribution(a.scope);
+    const ranks = statuses.map((entry) => entry.id);
+
+    // `position` d'abord — trier par nombre ferait de la répartition un
+    // classement, et le rang deviendrait une lecture (`docs/06` §10). Le
+    // statut d'amorçage est en position 1, le statut vide en 2 : le second
+    // porte pourtant zéro projet et reste après le premier.
+    expect(ranks.indexOf(a.statusId)).toBeLessThan(ranks.indexOf(emptyStatusId));
+    expect(ranks.indexOf(emptyStatusId)).toBeLessThan(
+      ranks.indexOf(archivedUsedStatusId),
+    );
+  });
+
+  /* ------------------------------------------------------------------------
+     Les quatre étanchéités de la répartition. Chacune vise **un seul**
+     `filter()`, sur une valeur de référentiel qui ne sert qu'à elle.
+     ------------------------------------------------------------------------ */
+
+  test("un statut d'un autre domaine n'entre pas — `filter(projectStatuses)`", async () => {
+    const { statuses } = await listProjectDistribution(a.scope);
+
+    expect(statuses.map((entry) => entry.id)).not.toContain(b.statusId);
+  });
+
+  test("une approche d'un autre domaine n'entre pas — `filter(approaches)`", async () => {
+    const { approaches: rows } = await listProjectDistribution(a.scope);
+
+    expect(rows.map((entry) => entry.id)).not.toContain(otherDomainApproachId);
+  });
+
+  test("un projet d'un autre domaine ne se compte pas — `filter(projects)`", async () => {
+    const { statuses } = await listProjectDistribution(a.scope);
+
+    // Le statut n'existe que pour cette ligne forgée : son décompte est zéro,
+    // et il ne peut le cesser que si `filter(projects)` disparaît.
+    expect(entryFor(statuses, leakedDomainStatusId)?.count).toBe(0);
+  });
+
+  test("un projet sous un produit d'un autre domaine ne se compte pas — `filter(products)`", async () => {
+    const { statuses } = await listProjectDistribution(a.scope);
+
+    expect(entryFor(statuses, leakedProductStatusId)?.count).toBe(0);
+  });
+
+  test("une liaison d'un autre domaine ne rattache rien — `filter(projectApproaches)`", async () => {
+    const { approaches: rows } = await listProjectDistribution(a.scope);
+
+    // Les deux extrémités de la liaison sont de `a` : seule la ligne de
+    // liaison est d'ailleurs. Une table de liaison est une table du domaine
+    // comme les autres, et l'oublier laisserait un projet d'ailleurs rattacher
+    // une approche d'ici.
+    expect(entryFor(rows, leakedLinkApproachId)?.count).toBe(0);
+  });
+});
+
+describe("listStaleProjects", () => {
+  test("le seuil sépare, et le même projet passe d'un côté puis de l'autre", async () => {
+    const day = 24 * 60 * 60 * 1000;
+
+    const before = await listStaleProjects(
+      a.scope,
+      new Date(SLEEPY_AT.getTime() - day),
+    );
+    const after = await listStaleProjects(
+      a.scope,
+      new Date(SLEEPY_AT.getTime() + day),
+    );
+
+    // **Un seul projet des deux côtés**, et c'est le seul montage où un seuil
+    // décalé fait tomber un constat : deux projets, l'un ancien l'autre
+    // récent, se laisseraient traverser par un mauvais seuil.
+    expect(before.map((row) => row.id)).not.toContain(sleepyProjectId);
+    expect(after.map((row) => row.id)).toContain(sleepyProjectId);
+  });
+
+  test("un projet sans aucune activité y figure", async () => {
+    const rows = await listStaleProjects(a.scope);
+    const row = entryFor(rows, a.projectId);
+
+    // « Aucune activité » est un fait, pas un retard (arbitrage (h)). La
+    // requête rend `null` ; la phrase appartient à l'écran.
+    expect(row).toBeDefined();
+    expect(row?.lastActivityAt).toBeNull();
+  });
+
+  test("un projet dont l'activité est récente n'y figure pas", async () => {
+    const rows = await listStaleProjects(a.scope);
+
+    // Le seuil par défaut, celui que la page emploie. Le témoin est daté de
+    // l'instant du semis : il est dans le mois écoulé quel que soit le jour où
+    // le test tourne.
+    expect(rows.map((row) => row.id)).not.toContain(freshProjectId);
+  });
+
+  test("les projets sans activité viennent en tête, puis du plus ancien au plus récent", async () => {
+    const rows = await listStaleProjects(a.scope);
+    const ranks = rows.map((row) => row.id);
+
+    // Un tri, jamais un classement : aucun rang ne se rend, rien ne se compare
+    // d'une ligne à l'autre. L'ordre existe parce qu'un plafond doit décider
+    // qui entre.
+    expect(ranks.indexOf(a.otherProjectId)).toBeLessThan(
+      ranks.indexOf(a.projectId),
+    );
+    expect(ranks.indexOf(a.projectId)).toBeLessThan(
+      ranks.indexOf(sleepyProjectId),
+    );
+  });
+
+  test("le plafond borne la liste, et il retient les plus anciens", async () => {
+    const rows = await listStaleProjects(a.scope, staleBefore(), 2);
+
+    // Deux constats en un, comme au plafond du flux : un plafond qui rendrait
+    // le bon nombre de mauvaises lignes ne serait pas un plafond.
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.id)).toEqual([a.otherProjectId, a.projectId]);
+  });
+
+  test("un projet archivé n'y figure pas", async () => {
+    const rows = await listStaleProjects(a.scope);
+
+    // Un accompagnement rangé n'est pas un accompagnement qui dort.
+    expect(rows.map((row) => row.id)).not.toContain(archivedProjectId);
+  });
+
+  test("un projet sous un produit archivé n'y figure pas", async () => {
+    const rows = await listStaleProjects(a.scope);
+
+    // Il est pourtant vivant, et sa dernière activité est bien ancienne : seul
+    // `isNull(products.archivedAt)` l'écarte. C'est la condition de
+    // `listProjects`, tenue à la lettre.
+    expect(rows.map((row) => row.id)).not.toContain(orphanProjectId);
+  });
+
+  test("un domaine dont rien ne dort rend un tableau vide", async () => {
+    // L'état vide appartient à l'écran. Dans `c`, dont les deux projets ont
+    // reçu l'instant du semis pour dernière activité.
+    const rows = await listStaleProjects(c.scope);
+
+    expect(rows).toEqual([]);
+  });
+
+  test("un projet d'un autre domaine n'y figure pas — `filter(projects)`", async () => {
+    const rows = await listStaleProjects(a.scope);
+
+    expect(rows.map((row) => row.id)).not.toContain(leakedDomainProjectId);
+  });
+
+  test("un projet sous un produit d'un autre domaine n'y figure pas — `filter(products)`", async () => {
+    const rows = await listStaleProjects(a.scope);
+
+    expect(rows.map((row) => row.id)).not.toContain(leakedProductProjectId);
+  });
+});
+
+describe("staleBefore", () => {
+  test("recule d'un mois, à la seconde près", async () => {
+    expect(staleBefore(new Date("2026-08-27T09:30:15Z")).toISOString()).toBe(
+      "2026-07-27T09:30:15.000Z",
+    );
+  });
+
+  test("rabat sur le dernier jour quand le jour n'existe pas dans le mois visé", async () => {
+    // Sans le rabattement, `setUTCMonth` reporte les jours en trop sur le mois
+    // suivant : le 31 mars deviendrait le 3 mars, et « plus d'un mois »
+    // avancerait de trois jours sans jamais lever d'erreur.
+    expect(staleBefore(new Date("2026-03-31T09:00:00Z")).toISOString()).toBe(
+      "2026-02-28T09:00:00.000Z",
+    );
+  });
+
+  test("traverse le changement d'année", async () => {
+    expect(staleBefore(new Date("2026-01-15T00:00:00Z")).toISOString()).toBe(
+      "2025-12-15T00:00:00.000Z",
+    );
+  });
+});
+
+describe("countProjects / countProducts", () => {
+  test("le décompte des projets est le nombre de lignes de la liste transverse", async () => {
+    // Le contrat de la répartition, appliqué à l'entrée qui ne pose aucun
+    // filtre : suivre le lien rend exactement ce nombre.
+    const rows = await listProjects(a.scope);
+
+    expect(await countProjects(a.scope)).toBe(rows.length);
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  test("le décompte des produits est le nombre de lignes de la liste des produits", async () => {
+    const rows = await listProductsWithCounts(a.scope);
+
+    expect(await countProducts(a.scope)).toBe(rows.length);
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  test("un produit dont l'entité est d'un autre domaine ne se compte pas — `filter(entities)`", async () => {
+    // Le produit est de `a` et vivant : seule son entité est d'ailleurs. C'est
+    // la jointure de `listProductsWithCounts`, et le décompte la rejoue —
+    // sans quoi le chiffre dirait un de plus que la liste.
+    const rows = await listProductsWithCounts(a.scope);
+
+    expect(rows.map((row) => row.id)).not.toContain(leakedEntityProductId);
+    expect(await countProducts(a.scope)).toBe(rows.length);
+  });
+
+  test("les décomptes n'ont pas d'autre domaine que le leur", async () => {
+    // `c` porte exactement ce que `seedDomain` sème : deux projets, un produit.
+    // Une fuite de domaine s'y verrait immédiatement.
+    expect(await countProjects(c.scope)).toBe(2);
+    expect(await countProducts(c.scope)).toBe(1);
   });
 });
