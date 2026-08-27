@@ -2,10 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 27/08/2026 — T6.3 terminé. Balayé au découpage de C6 (25/08), seul
-moment où ce fichier se balaie : de 701 lignes à moins de 250.
+**Dernière mise à jour :** 27/08/2026, T6.4. Balayé au découpage de C6, seul moment où il l'est.
 **Chantier en cours :** **C6 — Liens et journal**, sept tickets dans `tickets-C6.md`.
-**Ticket suivant :** **T6.4 — les liens déduits, et le retour du bloc « Projets liés ».**
+**Ticket suivant :** **T6.5 — les liens déclarés : relier, dire pourquoi, retirer.**
 
 ---
 
@@ -21,7 +20,7 @@ moment où ce fichier se balaie : de 701 lignes à moins de 250.
 | C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **terminé** |
 | TD — Dette technique et couche de présentation | TD.1 → TD.6 | **terminé** |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
-| C6 — Liens et journal | T6.1 → T6.7 | **en cours** |
+| C6 — Liens et journal | T6.1 → T6.7 | **en cours** — T6.1 → T6.4 faits |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
 ---
@@ -30,6 +29,10 @@ moment où ce fichier se balaie : de 701 lignes à moins de 250.
 
 *(une ligne par **chantier clos**, et une par ticket du chantier en cours. Le récit détaillé vit
 dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`.)*
+
+- **T6.4 — les liens déduits, et le bloc « Projets liés », 27/08/2026.** `listRelatedProjects`, les
+  quatre règles de `docs/04` §5 **en SQL**, la préséance seule en TS. **Dix neutralisations, dix
+  chutes isolées.** Une seule entité en base : deux règles inatteignables, lues sous sonde. +20, 1048.
 
 - **T6.3 — le bloc « Journal » sur la page projet, 27/08/2026.** `listProjectJournal`, le `<details>`
   fermé en dernier, « Voir le journal » **devenu le `<summary>`** ; `SectionHeader` apprend `as` et
@@ -101,9 +104,6 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 
 ### b. Assignés à un ticket
 
-- **Le bloc « Projets liés » est retiré du rendu.** À la demande, le 21/08/2026 : la rangée des blocs
-  annoncés passe à deux cartes. `project_links` est au modèle depuis T1.2 ; ce qui disparaît est
-  l'annonce, pas la destination. → **T6.4.**
 - **Une piste de démarrage ne mène pas à l'activité qu'elle suggère.** `starters` ne porte
   **volontairement aucun `activity_type_id`** — une colonne sans lecteur est celle qu'on relit un jour
   sans savoir pourquoi (T5.2). Le geste coûterait une colonne et trois lignes ; à joindre au point

@@ -111,6 +111,7 @@ import { restoreProject } from "../actions";
 import { AdoptedIndicators } from "@/components/projects/adopted-indicators";
 import { Resources } from "@/components/projects/resources";
 import { Journal } from "@/components/projects/journal";
+import { RelatedProjects } from "@/components/projects/related";
 import { Starters } from "@/components/projects/starters";
 import { Roadmap } from "@/components/projects/roadmap";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
@@ -137,6 +138,7 @@ import { ROUTES } from "@/lib/navigation";
 import { listProjectRoadmap } from "@/lib/queries/activities";
 import { listProjectAdoptions } from "@/lib/queries/indicators";
 import { listProjectJournal } from "@/lib/queries/journal";
+import { listRelatedProjects } from "@/lib/queries/links";
 import {
   findAccompanimentRank,
   findProjectDetail,
@@ -161,9 +163,11 @@ export const metadata = {
  * la page un tiers d'attente pour un tiers de contenu.
  *
  * **« Projets liés » en est sorti le 21/08/2026**, à la demande — masqué, pas
- * livré : la table `project_links` existe au modèle et le bloc revient avec C6.
- * Ce qui disparaît est l'annonce, pas la destination. La rangée passe de trois
- * cartes à deux.
+ * livré : ce qui disparaissait était l'annonce, pas la destination. La rangée
+ * passait de trois cartes à deux. **La promesse est tenue par T6.4** : le bloc
+ * est revenu au rendu avec ses liens déduits, il se rend au-dessus de cette
+ * liste-ci, et il n'y entre pas — un bloc qui porte son contenu n'annonce plus
+ * rien. `project_links` reste au modèle sans lecteur jusqu'à T6.5.
  *
  * **« Journal » en sort à son tour, et par l'inverse : il est livré** (T6.3).
  * Il portait le seul « geste » dessiné de la rangée — « Voir le journal »,
@@ -277,18 +281,29 @@ export default async function ProjectPage({
      prennent pas d'identifiant : c'est un référentiel du domaine, le même sur
      tous les accompagnements.
 
-     **Le journal n'attend aucun droit** : sa lecture est ouverte à tout le
-     domaine (D9), archivé compris, et il part donc dans le même vol que les
-     cinq autres plutôt que derrière un `canWrite`. */
-  const [rank, roadmap, projectResources, adoptions, starters, journal] =
-    await Promise.all([
-      findAccompanimentRank(session.db, project),
-      listProjectRoadmap(session.db, project.id),
-      listProjectResources(session.db, project.id),
-      listProjectAdoptions(session.db, project.id),
-      listStarters(session.db),
-      listProjectJournal(session.db, project.id),
-    ]);
+     **Ni le journal ni les voisins n'attendent un droit** : leur lecture est
+     ouverte à tout le domaine (D9), archivé compris, et ils partent donc dans
+     le même vol que les cinq autres plutôt que derrière un `canWrite`. Les
+     liens déduits sont **quatre requêtes de plus** (T6.4) et rien de stocké :
+     c'est ce qui garantit qu'ils sont toujours vrais, et le coût est celui que
+     `docs/04` §5 accepte à quinze projets. */
+  const [
+    rank,
+    roadmap,
+    projectResources,
+    adoptions,
+    starters,
+    journal,
+    related,
+  ] = await Promise.all([
+    findAccompanimentRank(session.db, project),
+    listProjectRoadmap(session.db, project.id),
+    listProjectResources(session.db, project.id),
+    listProjectAdoptions(session.db, project.id),
+    listStarters(session.db),
+    listProjectJournal(session.db, project.id),
+    listRelatedProjects(session.db, project.id),
+  ]);
 
   /* La roadmap et les pistes sont **déjà lues** pour l'écran : la résolution
      les reçoit plutôt que de les relire. C'est `loadProjectDrawerContext` qui
@@ -548,6 +563,22 @@ export default async function ProjectPage({
                 ROUTES.projectStarter(project.id, starterId)
               }
             />
+
+            {/* **« Projets liés » revient au rendu, avec son contenu**
+                (T6.4). `docs/06` §5 le place entre « Indicateurs » et
+                « Budget » ; il se rend donc juste avant la carte annoncée qui
+                reste, et **il n'entre pas dans la rangée** — un bloc qui porte
+                son contenu n'annonce plus rien.
+
+                Dans la colonne du récit, et non dans le rail : le rail porte
+                les blocs de **chiffres reportés**, et une raison en toutes
+                lettres — « Camille Roux et Sofia Marchand en commun » — ne se
+                lit pas sur 380 px.
+
+                Aucun droit ne lui est passé, et il n'y en a aucun à passer :
+                rien ne s'y saisit, et la saisie d'un lien **déclaré** est la
+                matière de T6.5. */}
+            <RelatedProjects related={related} />
 
             {/* Le bloc annoncé, **au singulier depuis T6.3**. La grille a
                 disparu avec le second : une carte dans une grille de deux

@@ -2772,6 +2772,15 @@ posés dans un domaine-sonde de T5bis.4, archivés de même ; une liaison `proje
 où ils occupaient encore la place. Conservés tels quels : un point refermé documente comment il
 l%s été.)*
 
+- ~~**Le bloc « Projets liés » est retiré du rendu.**~~ **Refermé le 27/08/2026 par T6.4.** Le point
+  était né d'une demande du 21/08/2026 : la rangée des blocs annoncés passait de trois cartes à
+  deux, et « Projets liés » disparaissait — masqué, pas livré. `project_links` était au modèle
+  depuis T1.2 et **les quatre règles de lien déduit étaient écrites depuis `docs/04` §5** : ce qui
+  disparaissait était l'annonce, pas la destination. Le bloc revient avec son contenu réel, entre
+  « Démarrage » et « Budget », et il n'entre pas dans la rangée — un bloc qui porte son contenu
+  n'annonce plus rien. `project_links` reste au modèle **sans lecteur** jusqu'à T6.5 : ce ticket-ci
+  ne livre que le déduit.
+
 - ~~**« Voir le journal » est dessiné sans être un lien.**~~ **Refermé le 27/08/2026 par T6.3, à
   l'endroit exact où il avait été posé.** Le point disait une dette d'interface arbitrée le
   20/08/2026 : la maquette `project-v2` dessinait trois gestes sans route, deux avaient été retirés,
@@ -3892,3 +3901,76 @@ quatorze — quatrième chiffre de la même famille que « les 22 » de `scoped.
 `schema.ts`. Et le point ouvert sur `if (!f?.domainId) return` annonçait trois fichiers pour quatre,
 en affirmant qu'un cinquième était corrigé alors qu'il ne l'était pas. **Une correction consignée
 n'est pas une correction faite.**
+
+---
+
+## T6.4 — Les liens déduits, et le retour du bloc « Projets liés » — 27/08/2026
+
+**Ce que le ticket ouvre.** Un projet ne disait pas ses voisins, alors que quatre règles de
+rapprochement sont écrites depuis `docs/04` §5 et que le rattachement obligatoire à un produit
+garantit qu'aucun accompagnement n'est isolé. `listRelatedProjects(scope, projectId)` par
+`joinedRead` les branche toutes les quatre : même produit, personnes en commun (≥ 2), même entité,
+approches communes. **Rien n'est stocké** — ce sont des requêtes exécutées à l'affichage, ce qui
+garantit qu'elles sont toujours vraies.
+
+**Un projet n'apparaît qu'une fois, sous sa règle la plus forte.** La force ordonne la liste, elle
+ne se lit nulle part : ni rang, ni pastille de proximité, ni « 3 points communs ». C'est D39
+appliquée à un lien — ce qui se montre est le **fait** qui rapproche, pas l'indice qui le résume.
+Les quatre raisons s'écrivent « Même produit », « Camille Roux et Sofia Marchand en commun », « Même
+entité : Digital Factory », « Approches communes : Audit UX ». **Aucune ne porte de chiffre**, et un
+test l'exige par une expression régulière plutôt que par une relecture.
+
+**Trois arbitrages tranchés avant écriture.** (1) Les quatre prédicats s'écrivent **en SQL**, seuil
+« ≥ 2 » compris — `exists … group by … having count(*) >= 2` —, la préséance seule restant en
+TypeScript : la lecture dit ce qu'elle cherche plutôt que de ramener le domaine entier pour trier
+ensuite. (2) Les formulations sont **différenciées par règle**, la plus forte ne nommant pas le
+produit que la ligne porte déjà. (3) La fixture ne pouvant pas éprouver les quatre règles, le HTML
+servi se lit **sous sonde jetable**, sans toucher à `scripts/seed.ts` (règle 3).
+
+**Le module a une frontière, et c'est ce qui rend ses filtres mesurables.** Les personnes et les
+approches du projet consulté sont lues **une fois**, par des jointures filtrées sur `persons` et sur
+`approaches` ; tout le reste ne compare plus que des identifiants déjà confrontés au domaine. Les
+deux lectures qui suivent ne joignent donc **ni `persons` ni `approaches`**. Sans cette forme, un
+second `filter()` sur les mêmes tables rattraperait la fuite que le premier laisserait passer, et
+aucune mise en défaut ne saurait plus dire lequel des deux protège.
+
+**Dix neutralisations, dix chutes isolées.** Les quatre règles (prédicat SQL **et** branche de
+préséance, le prix nommé de l'arbitrage), le seuil de deux personnes (ses deux écritures), puis les
+cinq `filter()` : `projects` sur la requête des candidats, `persons`, `approaches`,
+`projectMembers` et `projectApproaches` sur les lectures de référence. Chacune fait tomber **un**
+test et rien d'autre. Cela a demandé que **chaque projet du jeu ne coche qu'une règle** — un projet
+rapproché par deux règles survit à la neutralisation de la première, et sa chute ne prouve rien — et
+que **chaque ligne forgée ait sa propre cible** : cinq fuites qui viseraient le même projet feraient
+tomber les cinq tests ensemble.
+
+**Une chute impossible, et elle est nommée.** Neutraliser la règle « même produit » ne fait
+*disparaître* aucune ligne : un produit n'a qu'une entité, donc tout voisin de même produit est
+**aussi** de même entité. Ce qui tombe est sa **raison**, pas sa présence. C'est pourquoi le test de
+préséance constate l'**unicité** — « n'apparaît qu'une fois » — et non le libellé gagnant : sinon
+une seule neutralisation aurait fait tomber deux tests.
+
+**Le HTML servi, mesuré — et la fixture vérifiée avant d'être crue.** La base de développement a
+dérivé : ses cinq produits vivent tous sous **une seule entité**, si bien que « même entité »
+rapproche tout et que « approches communes », plus faible, ne peut jamais surgir. Deux règles sur
+quatre étaient donc inatteignables, et deux autres — dont « personnes en commun », plafonnée à
+**une** personne partagée entre produits différents. Une sonde scopée a posé une seconde entité, un
+produit et trois accompagnements ; les **quatre raisons** ont été lues au point de code sur
+`/projets/8cd98cb8…`, l'insécable compris (`Même entité\xa0: Digital Factory`) ; l'**état vide** a
+été lu sur un accompagnement seul sous son entité ; et l'archivage des deux sondes d'équipe a fait
+**disparaître** la raison « en commun » du HTML servi, les trois autres tenant. **Aucune ligne de
+sonde ne reste** — trois projets, deux produits, deux entités retirés, décompte à zéro vérifié en
+base, script supprimé.
+
+**Le contraste, mesuré.** Trois couples sur `surface-neutral-pale` : `content-info-base` 6,41:1 (le
+lien), `content-neutral-base` 4,98:1 (statut, produit, période), `content-neutral-dark` 8,12:1 (la
+raison). Aucun couple neuf **par la position** : la carte à filet est celle de `resources.tsx`, et
+`StatusPill` porte son propre fond, déjà mesuré dans son en-tête. Le filet à 1,24:1 est la dette de
+design system déjà consignée, à une position qui existait.
+
+**Le droit s'éprouve par l'action — sans objet, et c'est dit plutôt qu'affirmé rempli.** Ce ticket
+n'ajoute **aucun point d'entrée HTTP**, aucune action serveur, aucun panneau : il n'y a rien à
+frapper en `text/plain`. Le bloc ne reçoit aucun droit et n'en attend aucun — c'est le second de la
+page projet, avec « Journal », que `canWrite` ne touche pas.
+
+**1048 tests, 37 fichiers, verts.** `lint --max-warnings=0` et `tsc --noEmit` sans une ligne. **+20
+tests**, tous dans `lib/queries/links.test.ts`.

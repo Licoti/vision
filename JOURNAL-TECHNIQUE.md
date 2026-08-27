@@ -6467,3 +6467,69 @@ archivée ni la ressource retirée dont une ligne peut parler, et un lien qui ne
 qu'une absence (`docs/06` §9). Les rendre aurait posé **trois colonnes sans lecteur**, celles que
 T5.2 a refusées dans `starters`. Le jour où le journal gagnera un écran propre — il n'en a pas et
 n'en demande pas —, la question se reposera entière.
+
+---
+
+## T6.4 — Les liens déduits, et le retour du bloc « Projets liés »
+
+**La fixture n'éprouvait que deux règles sur quatre, et la base de développement encore moins.** La
+fiche demandait de vérifier la fixture avant de la croire ; les deux mesures ne disent pas la même
+chose, et c'est la seconde qui compte pour le HTML servi. Dans `scripts/seed.ts`, deux entités et
+deux produits : « même produit » et « approches communes » sortent, « personnes en commun » plafonne
+à **une** personne partagée entre produits différents, et « même entité » n'a aucun cas qui ne soit
+pas déjà « même produit ». Dans la base de développement, qui a dérivé, c'est pire : **les cinq
+produits vivent sous une seule entité**, si bien que « même entité » rapproche tout et que
+« approches communes », plus faible, ne peut **jamais** surgir. Deux règles sur quatre étaient
+inatteignables au rendu. C'est la leçon de T5bis.3 resservie une fois de plus — *un filtre qu'aucune
+ligne forgée ne vise n'est pas éprouvé* —, et elle vaut pour le HTML autant que pour les tests.
+
+**Une sonde scopée a posé une seconde entité**, un produit et trois accompagnements : deux personnes
+partagées avec « Refonte du parcours de virement », une approche partagée, et un troisième seul sous
+son entité pour l'état vide. Les quatre raisons ont été lues **au point de code**, insécable compris
+— `Même entité\xa0: Digital Factory` —, l'état vide aussi, et l'archivage des deux sondes d'équipe a
+fait **disparaître** la raison « en commun » du HTML servi pendant que les trois autres tenaient.
+**Aucune ligne de sonde ne reste** : trois projets, deux produits, deux entités retirés, décompte à
+zéro vérifié en base, script supprimé. `scripts/seed.ts` n'a pas été touché — étendre la fixture
+aurait ajouté au brief §7 un accompagnement qu'il ne nomme pas (règle 3).
+
+**Le prix de l'arbitrage « les règles en SQL » est nommé : deux règles s'écrivent à deux endroits.**
+Le prédicat décide qui est candidat, la préséance décide sous quelle règle il se lit — et le seuil
+de deux personnes vit dans les deux, une constante partagée les empêchant de diverger d'un chiffre.
+Neutraliser une règle demande donc de toucher **ses deux écritures**. L'alternative — tout décider
+en TypeScript après avoir lu les projets vivants du domaine — n'aurait eu qu'un endroit par règle,
+mais aurait ramené le domaine entier pour le filtrer ensuite, et une lecture qui ne dit pas ce
+qu'elle cherche est celle qu'un ticket futur « optimise » de travers.
+
+**Neutraliser « même produit » ne fait disparaître aucune ligne, et c'est structurel.** Un produit
+n'a qu'une entité : tout voisin de même produit est **aussi** de même entité, donc il survit à la
+neutralisation de la règle forte et se relit sous la faible. Ce qui tombe est sa **raison**, jamais
+sa présence. Conséquence sur les tests : le constat de préséance porte sur l'**unicité** — « un
+projet qui coche les quatre règles n'apparaît qu'une fois » — et non sur le libellé gagnant, faute
+de quoi une seule neutralisation aurait fait tomber deux tests. De même, le constat d'ordre compare
+des **rangs de règle non décroissants** plutôt qu'une liste attendue : une liste attendue tombe dès
+qu'une règle manque, et une chute non isolée ne désigne plus ce qu'elle éprouve.
+
+**Le module s'est donné une frontière pour que ses filtres soient mesurables.** Les personnes et les
+approches du projet consulté sont lues **une fois**, par des jointures filtrées sur `persons` et sur
+`approaches` ; les deux lectures qui suivent ne joignent ni l'une ni l'autre et ne comparent que des
+identifiants déjà confrontés au domaine. Sans cette forme, un second `filter(persons)` dans le
+`exists` rattraperait la fuite que le premier laisserait passer : **deux filtres redondants ne sont
+ni l'un ni l'autre éprouvables**, et la mise en défaut passerait au vert en désignant le mauvais
+coupable. Le corollaire tient aussi côté fixture : **cinq lignes forgées, cinq projets cibles
+distincts** — cinq fuites visant le même projet auraient fait tomber les cinq tests ensemble.
+
+**Trois filtres de la requête des candidats n'ont pas de mise en défaut, et c'est dit.**
+`filter(products)`, `filter(entities)` et `filter(projectStatuses)` y sont posés parce que l'en-tête
+de `joinedRead` l'exige de toute table jointe ; les éprouver demanderait une ligne franchissant la
+frontière sur **deux** colonnes à la fois — un produit d'un autre domaine porté par un projet du
+domaine courant —, ce que la discipline d'une seule colonne interdit. Mesuré : les retirer ne fait
+tomber aucun test. Ce n'est pas une fuite, c'est une propriété que ce jeu-là ne peut pas mesurer.
+
+**Le bloc revient dans la colonne du récit, et l'ordre de `docs/06` §5 s'y lit en deux temps.** Le
+document veut « Ressources, Indicateurs, Projets liés, Budget, Journal » ; la page est à deux
+colonnes depuis le 20/08/2026, et les deux premiers vivent dans le rail droit. « Projets liés » se
+rend donc entre « Démarrage » et « Budget », à sa place **dans sa colonne** — la règle que l'en-tête
+de la page énonce déjà : *l'ordre du document est tenu à l'intérieur du rail.* Le mettre dans le
+rail aurait été plus littéral et moins lisible : une raison en toutes lettres — « Camille Roux et
+Sofia Marchand en commun » — ne tient pas sur 380 px.
+
