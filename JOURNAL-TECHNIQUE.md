@@ -6612,3 +6612,109 @@ depuis ce ticket. Comme `scoped.ts` en T6.1, le compte a été **retiré** plut�
 nombre dans un commentaire vieillit à chaque ticket, et ce qui doit se relire est la règle que le
 `switch` tient branche par branche. Le point ouvert d'`ETAT.md` a été récrit pour porter ce
 cinquième cas.
+
+---
+
+## T6.6 — Le flux d'activité récente en vue d'ensemble
+
+**Deux mises en défaut ont corrigé le ticket, et les deux disaient la même chose sous deux formes :
+une règle qu'aucune ligne ne vise n'est pas éprouvée.**
+
+*La préséance ne trancheait rien.* Inverser `originOf` — le produit avant le projet — laissait les
+**treize** constats au vert. La cause : aucun des quatorze points d'écriture ne pose les deux
+rattachements à la fois — les gestes de projet posent `project_id`, le relevé pose `product_id` —,
+si bien que la branche perdante n'était jamais atteinte. Le code prétendait donc arbitrer un cas que
+la fixture ne produisait pas. `JournalEntry` acceptant les deux colonnes et le schéma les déclarant
+toutes deux nullables, un cinquième événement légitime les porte désormais ensemble, écrit par le
+vrai `record()`. La neutralisation fait alors tomber **un** constat. C'est la leçon de T5bis.3 sous
+une forme neuve : jusqu'ici elle valait des **filtres**, elle vaut aussi des **règles de
+composition** — et celle-ci ne se voyait pas, la couverture étant complète sur les cas *réels*.
+
+*Une ligne forgée volait la chute d'un autre test.* Retirer `filter(events)` faisait tomber
+**trois** cas au lieu d'un : l'étanchéité de domaine, l'état vide, et le plafond. Le plafond parce
+que la ligne forgée était datée du 01/09, après tout le jeu : sans filtre de domaine elle entrait
+dans les deux lignes rendues et faussait le constat « il retient les plus récents ». Redatée au
+milieu du jeu, elle ne perturbe plus rien — et elle ne perd rien, la lecture par défaut plafonnant à
+quinze pour huit lignes, et le constat la cherchant par identifiant et non par position. C'est le
+symétrique de la leçon de T6.3 : là, un filtre **en amont** protégeait la ligne forgée ; ici, la
+ligne forgée **débordait en aval** sur un constat qui ne la visait pas.
+
+**Une chute reste non isolée, et elle ne peut pas l'être.** `filter(events)` retiré fait toujours
+tomber deux cas : l'étanchéité de domaine et « un domaine sans événement rend un tableau vide ».
+C'est structurel, et c'est le prix d'une lecture qui traverse le domaine : dans `journal.test.ts`,
+l'état vide tenait à `eq(events.projectId, …)`, une seconde clause qui survivait à la neutralisation
+du filtre. Ici il n'y a **pas** de seconde clause — ce qui rend un domaine vide *est* le filtre de
+domaine. Les deux constats sont la même propriété vue de deux côtés, et un troisième domaine n'y
+change rien. Noté plutôt que maquillé : une chute double dont on sait dire pourquoi ne se confond
+pas avec une chute double qu'on n'a pas regardée.
+
+**Le tri décide qui passe sous le plafond, donc les deux constats sont liés par construction.**
+Inverser `desc(occurredAt)` fait tomber l'ordre **et** le plafond. Ce n'est pas un défaut de
+fixture : un plafond qui ne dirait pas *quelles* lignes il retient ne serait pas un plafond, et son
+constat porte donc sur l'ordre autant que sur le nombre. Retirer `.limit()`, lui, ne fait tomber que
+le plafond.
+
+**Un commentaire affirmait une protection que la mesure a démentie.** L'en-tête de la requête disait
+que sélectionner `projects.id` plutôt qu'`events.projectId` était ce qui empêchait un identifiant
+d'un autre domaine de sortir. Faux : remplacer l'un par l'autre laisse les quatorze constats au
+vert. Ce qui protège est la conjonction `id && name` d'`originOf` — que TypeScript impose de toute
+façon, `EventOrigin.name` n'étant pas nullable. La forme est **gardée** et le commentaire **récrit** :
+c'est une redondance, nommée comme telle, qui met hors de portée un futur relâchement de la
+conjonction. Une redondance qu'on prend pour un garde-fou est un garde-fou qu'on croit avoir.
+
+**`content-info-base` sur `surface-neutral-pale` n'avait jamais été mesuré, alors qu'il sert depuis
+T4.1.** Le lien interne du flux le reprend, et la discipline 3 ne parlant que des couples **neufs par
+la position**, rien n'obligeait à le mesurer. Il l'a été : `#0557ca` sur `#fdfdfd` donne **6,41:1**,
+au-dessus des 4,5:1 du texte courant, et la taille n'y change rien — `text-xs` et `text-sm` relèvent
+du même seuil. Les trois autres couples du bloc, mesurés au même passage : `content-neutral-darkest`
+**17,87:1**, `content-neutral-base` **4,98:1** — la valeur déjà consignée, ce qui valide la méthode
+—, `content-neutral-dark` **8,12:1**. Quatre valeurs vraies valent mieux que trois valeurs vraies et
+une supposée.
+
+**L'état vide du flux ne s'atteint sur aucune donnée du domaine, et il a fallu un domaine à lui.**
+La base de développement porte les deux événements de sonde de T6.3, que rien ne peut retirer — et
+c'est justement ce que D22 demande. Un domaine `AAA sonde T6.6` a donc été créé : le nom vient
+**avant** « Groupe Meridian » dans l'alphabet, ce qui le rend courant, `resolveDomainId` rendant le
+premier domaine actif **par nom**. C'est la méthode des sondes de T5bis.3 et T5bis.4, à l'ordre
+près — les leurs venaient après, et ne devenaient donc jamais courantes. Deux pièges au passage :
+une personne **avec accès** est indispensable, faute de quoi `requireSession` jette et la page rend
+une coquille de 619 octets au lieu de son état vide ; et `domain_role` ne vaut pas `domain_owner`
+mais `domain_manager` — deux tentatives ratées ont laissé deux domaines sans personne, supprimés
+avec le troisième. **La sonde est supprimée, non archivée** : la règle 4 protège la donnée métier,
+pas un domaine créé deux minutes plus tôt. C'est le geste de T5bis.3, et il ne laisse rien — à la
+différence des domaines suspendus de T5bis.4.
+
+**Ce même domaine a refermé un point ouvert sans qu'on l'ait cherché.** Sa personne unique n'étant
+dans aucune équipe, sa fiche rend « Cette personne n'est encore dans l'équipe d'aucun
+accompagnement. » — l'un des deux états vides qu'`ETAT.md` traînait depuis T6.2. Le second, la cible
+absente d'une North Star, a demandé son propre geste sur le domaine réel : cible retirée par le
+panneau d'indicateur, « Aucune cible de produit » lu dans le HTML servi, cible rétablie à 85. Les
+deux gestes d'indicateur **ne laissent aucune trace** — `indicator` n'est pas l'un des six
+`event_target_type` (arbitrage (b)) —, si bien que le décompte d'`events` n'a pas bougé.
+
+**Deux lignes d'`events` de sonde s'ajoutent aux deux de T6.3, et elles ne se retirent pas non
+plus.** Corriger le relevé de 32 à 33 puis de 33 à 32 était le seul chemin vers l'origine
+« produit » : c'est la forme qu'écrit un relevé d'indicateur, `product_id` porté et `project_id`
+nul, et aucun autre geste ne la produit. La donnée métier est revenue exactement où elle était —
+relevé à 32, mesuré en base. Le journal, lui, garde ses deux lignes : `events` ne porte pas
+d'`archived_at`, la couche n'expose aucun `delete` générique, et C6 s'interdit de lui en ajouter.
+La base de développement est jetable (`ETAT.md`) ; en production, la trace serait juste.
+
+**Le harnais de rejeu a dû apprendre les `<select>`.** Celui de T6.3 ne lisait que les `<input>` :
+sur le formulaire d'indicateur, `direction` sortait vide et l'action aurait refusé la saisie. Un
+`<option selected>` se lit dans les deux ordres d'attributs, et les deux motifs sont nécessaires —
+Next sert `selected` avant ou après `value` selon les cas. À savoir pour le prochain rejeu, qui
+tombera sur un formulaire à `<textarea>`.
+
+**Aucun droit n'entre dans ce ticket, et c'est un fait mesuré, pas une case sautée.** La discipline 4
+n'a rien à éprouver — rien ne s'écrit sur la vue d'ensemble, et la lecture du journal est ouverte à
+tout le domaine (D9). Ce qui s'est vérifié à la place est la propriété **inverse** : le bloc servi à
+Yanis Bertin, membre sans droit de domaine et contributeur d'un seul accompagnement — qui n'est pas
+celui dont les événements paraissent —, est **identique à l'octet** à celui servi à Camille Roux,
+responsable de domaine. 2 263 octets de part et d'autre. Un droit qui aurait fuité dans la lecture
+se serait vu là.
+
+**`ETAT.md` était déjà à 250 lignes exactement.** Le ticket y ajoute sa ligne de journal et récrit un
+point ouvert, tout en en sortant un refermé ; les deux additions ont été comprimées jusqu'à revenir
+au plafond. Le seuil tient, mais il tient de justesse, et le prochain ticket n'aura pas cette marge :
+le balayage appartient à la session de découpage, pas au ticket.

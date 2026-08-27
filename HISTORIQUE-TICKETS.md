@@ -4057,3 +4057,81 @@ tests** : 19 pour les deux lectures, 17 pour les trois actions, 11 pour `lib/for
 **Le seul module de saisie sans test l'aurait été.** `lib/forms/link.ts` serait entré comme le
 quinzième de `lib/forms/` et le premier sans `.test.ts` voisin — l'absence se voyait à l'`ls`. Il a
 son fichier, et ses cinq neutralisations.
+
+---
+
+## T6.6 — Le flux d'activité récente en vue d'ensemble — 27/08/2026
+
+**Ce que le ticket ferme.** La vue d'ensemble était un **état vide depuis T1.6** : point d'entrée de
+l'application, elle annonçait ses quatre blocs au lieu d'en porter un. `docs/06` §3 la veut *« le
+seul endroit du produit qui donne le sentiment que Vision est vivante »* ; T6.6 livre le bloc qui le
+fait, et le seul des quatre qui **dépende** du journal (arbitrage (d)). T6.7 livre les trois autres.
+
+**Une lecture, un composant, une page.** `listRecentEvents(scope, limit)` est la **seconde** lecture
+d'`events` et la première qui traverse le domaine — `listProjectJournal` s'arrête à un
+accompagnement. Elle joint trois tables, chacune avec `filter()` dans le `on` de son `leftJoin` :
+`persons` pour l'acteur, `projects` et `products` pour l'**origine**, que la requête tranche
+elle-même — le projet d'abord, le produit à défaut, cas des relevés d'indicateur que T6.2 a prévu.
+`RecentActivity` rend une `<ol>` de la forme du bloc « Journal », chaque ligne portant sa phrase
+figée, son acteur, son origine **cliquable** et sa date. La page devient `async` et perd son
+`EmptyState` d'annonce.
+
+**Le plafond est un nombre écrit : quinze.** Pas de pagination, pas de « voir plus », **et aucun
+décompte** — compter les événements du domaine serait la mesure d'activité du centre que `docs/06`
+§3 refuse sur l'écran que verra un responsable.
+
+**Le mot « activité » ne descend pas de l'en-tête aux lignes.** Le bloc s'appelle « Activité
+récente » parce que `docs/06` §3 le nomme ainsi ; ses lignes sont des **événements**. C'est ici que
+le piège de `docs/04` §4 coûtait le plus cher, et les trois en-têtes du ticket le disent chacun une
+fois.
+
+**Ce que la vérification a donné.**
+
+- **Le critère se lit dans le HTML servi.** Les **deux** origines y sont, ce qui est le seul moyen de
+  prouver les deux branches de la préséance : `href="/projets/28b79f40…"` sur les deux événements de
+  projet que T6.3 avait laissés en base, et `href="/produits/93d634e9…"` sur un événement de relevé
+  — obtenu en corrigeant un relevé de 32 à 33 par le **vrai point d'entrée HTTP**, multipart rejoué
+  depuis le formulaire servi, sans une ligne de JavaScript. Acteurs, dates et libellés `sr-only`
+  lus au point de code. **Le décompte en base a tranché à chaque geste** : `events` 2 → 3 → 4,
+  relevé 32 → 33 → **32 rétabli**.
+- **Trois états vides lus, dont deux qu'`ETAT.md` traînait depuis T6.2.** Celui du flux a demandé un
+  **domaine à lui**, la base de développement portant des événements qu'on ne peut pas retirer : un
+  domaine nommé pour venir **avant** « Groupe Meridian », `resolveDomainId` rendant le premier
+  domaine actif par nom. Sa personne unique n'étant dans aucune équipe, il a refermé au passage
+  « Cette personne n'est encore dans l'équipe d'aucun accompagnement. » Le troisième, « Aucune cible
+  de produit », a demandé son propre geste sur le domaine réel — cible retirée, lue, rétablie à 85.
+  **La sonde est supprimée, non archivée**, et la base ne porte plus qu'un domaine.
+- **Les tests se mettent en défaut. Huit neutralisations, et deux ont corrigé le ticket.**
+  (a) Inverser la préséance de `originOf` laissait les **treize** constats au vert : aucun point
+  d'écriture ne pose les deux rattachements à la fois, donc la branche perdante n'était jamais
+  atteinte. Un cinquième événement légitime les porte désormais ensemble. (b) La ligne forgée du
+  domaine voisin, datée après tout le jeu, **volait la chute du plafond** : sans filtre de domaine
+  elle entrait dans les deux lignes rendues. Redatée au milieu, elle ne perturbe plus rien. Les
+  quatre `filter()` tombent ensuite chacun sur **un** constat, `.limit()` sur un, et la préséance sur
+  un. Une chute reste double et ne peut pas ne pas l'être : ce qui rend un domaine vide **est** le
+  filtre de domaine, faute d'une seconde clause comme celle qui sauvait `journal.test.ts`.
+- **Un commentaire affirmait une protection que la mesure a démentie.** Sélectionner `projects.id`
+  plutôt qu'`events.projectId` ne protège de rien — la conjonction `id && name` d'`originOf` le fait
+  déjà, et TypeScript l'impose. La forme est gardée comme **redondance nommée**, le commentaire
+  récrit. **Une propriété qu'aucun test ne défend n'est pas une propriété** — la leçon de T6.5,
+  resservie sur un autre commentaire.
+- **Le contraste se mesure, et un couple servi depuis T4.1 ne l'avait jamais été.**
+  `content-info-base` sur `surface-neutral-pale` — le lien d'origine — donne **6,41:1**. Les trois
+  autres du bloc : `content-neutral-darkest` **17,87:1**, `content-neutral-base` **4,98:1** (la
+  valeur déjà consignée, ce qui valide la méthode), `content-neutral-dark` **8,12:1**. Aucun couple
+  neuf par la position ; le quatrième a été mesuré quand même.
+- **Le droit s'éprouve par l'action — et il n'y en a aucun.** Rien ne s'écrit sur cet écran, la
+  lecture du journal est ouverte à tout le domaine (D9). Ce qui s'est vérifié est la propriété
+  inverse : le bloc servi à un **membre** sans droit de domaine, contributeur d'un seul
+  accompagnement qui n'est pas celui dont les événements paraissent, est **identique à l'octet** —
+  2 263 de part et d'autre — à celui servi au responsable de domaine.
+
+**1115 tests, 39 fichiers, verts.** `lint --max-warnings=0` et `tsc --noEmit` sans une ligne. **+14
+tests**, tous sur `listRecentEvents` : l'ordre, la traversée des accompagnements, les deux origines,
+la préséance, la phrase, l'acteur, l'acteur nul, le plafond, l'état vide, et les **quatre**
+étanchéités.
+
+**Un dossier neuf creuse un trou dans le scellement, et ne le comble pas.** `components/overview/`
+est le quatrième dossier métier ; `uiLayerSeal` n'en nomme que trois. `eslint.config.mjs` était hors
+du périmètre de la fiche (règle 3), et le point ouvert d'`ETAT.md` a été **récrit** pour le dire
+plutôt que d'être élargi en silence.

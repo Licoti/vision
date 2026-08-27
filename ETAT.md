@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 27/08/2026, T6.5. Balayé au découpage de C6, seul moment où il l'est.
+**Dernière mise à jour :** 27/08/2026, T6.6. Balayé au découpage de C6, seul moment où il l'est.
 **Chantier en cours :** **C6 — Liens et journal**, sept tickets dans `tickets-C6.md`.
-**Ticket suivant :** **T6.6 — le flux d'activité récente en vue d'ensemble.**
+**Ticket suivant :** **T6.7 — la vue d'ensemble entière : répartition, fraîcheur, accès direct.**
 
 ---
 
@@ -20,7 +20,7 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 | C5 — Indicateurs et lecture dans le temps | T5.1 → T5.6 | **terminé** |
 | TD — Dette technique et couche de présentation | TD.1 → TD.6 | **terminé** |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
-| C6 — Liens et journal | T6.1 → T6.7 | **en cours** — T6.1 → T6.5 faits |
+| C6 — Liens et journal | T6.1 → T6.7 | **en cours** — T6.1 → T6.6 faits |
 | C7 — Finitions, budget, SSO | à découper | à faire |
 
 ---
@@ -29,6 +29,10 @@ Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
 *(une ligne par **chantier clos**, et une par ticket du chantier en cours. Le récit détaillé vit
 dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`.)*
+
+- **T6.6 — le flux d'activité récente en vue d'ensemble, 27/08/2026.** `listRecentEvents`, première
+  lecture d'`events` qui traverse le domaine ; la vue d'ensemble perd l'état vide de T1.6. **Huit
+  neutralisations, deux ont corrigé le ticket.** Deux origines, trois états vides, lus servis. +14, 1115.
 
 - **T6.5 — les liens déclarés : relier, dire pourquoi, retirer, 27/08/2026.** `project_links` a un
   lecteur et trois écrivains ; huitième clé d'URL, **cinquième verbe**, quatrième forme de phrase.
@@ -149,16 +153,12 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 - **Trois fichiers de tests d'action nettoient encore sur `if (!f?.domainId) return`** — un
   `beforeAll` qui échoue après avoir créé son domaine le laisse en place, et fait tomber le fichier
   suivant. Restent `projets/`, `produits/` et `administration/actions.test.ts`. → **au prochain.**
-- **`uiLayerSeal` ne scelle pas `components/shell/`.** Rien n'empêcherait `components/ui/` d'importer
-  `breadcrumb.tsx` ou `main-nav.tsx`. La propriété est vraie aujourd'hui : un trou dans le scellement,
-  pas une régression, qui se comble en une ligne. → **au prochain ticket qui ouvre `eslint.config.mjs`.**
+- **`uiLayerSeal` ne scelle ni `components/shell/` ni `components/overview/`.** Il nomme trois
+  dossiers métier ; il y en a **cinq** — T6.6 a creusé le second trou, `eslint.config.mjs` étant hors
+  périmètre. Un trou dans le scellement, pas une régression. → **au prochain qui ouvre ce fichier.**
 - **Les deux use cases de la fixture n'ont aucun persona rattaché.** `scripts/seed.ts` n'en sème
   aucun. Le rattachement est facultatif et le lien a été éprouvé par sonde scopée : ce qui manque est
   un **jeu d'essai**. → **au prochain ticket qui sème des personae.**
-- **Deux états vides ne se lisent dans aucun HTML servi** : la **cible** absente d'une North Star et
-  la personne dans aucune équipe. **Les trois autres sont refermés par T6.2**, lus après archivage
-  des cinq relevés du domaine puis rétablis. Ces deux-ci ne s'atteignent par aucun geste de relevé —
-  ils tiennent à `project_indicators` et à `project_members`. → **T6.6**, même sonde ; sinon C7.
 - **Deux capacités du bouton n'ont aucun appelant, et c'est une entorse assumée.** Le rang `tertiary`
   et les props d'icône de `Button` enfreignent l'en-tête de `button.tsx` — objet même de la demande,
   **éprouvés par sonde**. Premier appelant naturel : le « Annuler » des quatre pieds de formulaire.
