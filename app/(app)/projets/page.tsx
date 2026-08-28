@@ -8,10 +8,16 @@
  *
  * **Les filtres passent par l'URL** et non par un état client : ils se
  * partagent, ils survivent à un rechargement, et l'écran reste un composant
- * serveur. Deux dimensions plus une recherche font un formulaire `GET` — la
+ * serveur. Quatre dimensions plus une recherche font un formulaire `GET` — la
  * forme en pastilles de la liste des produits tenait à une seule dimension ;
  * ici elle produirait une vingtaine de pastilles. Le formulaire fonctionne
  * sans JavaScript.
+ *
+ * **Les quatre filtres de `docs/06` §4 sont là depuis T7.2 ; les colonnes qu'il
+ * demande, non.** Le document veut sur chaque ligne l'entité et les métiers, en
+ * plus des cinq colonnes rendues. L'« Attendu » de la fiche T7.2 ne les nomme
+ * pas — elle pose des filtres et un chiffre —, et les ajouter aurait été une
+ * fonctionnalité hors du ticket (règle 3). Point ouvert d'`ETAT.md`.
  *
  * Un identifiant qui ne désigne rien dans le domaine est ignoré, jamais
  * affiché : inventer un libellé à partir d'un paramètre serait donner du
@@ -36,7 +42,7 @@ import { List, ListHeader, ListRow } from "@/components/ui/list";
 import { Page, PageHeader } from "@/components/ui/page";
 import { StatusPill } from "@/components/ui/status-pill";
 import { requireSession } from "@/lib/auth/provider";
-import { approaches, projectStatuses } from "@/lib/db/schema";
+import { approaches, entities, jobs, projectStatuses } from "@/lib/db/schema";
 import { formatMonth, formatProjects } from "@/lib/format";
 import { PROJECT_FILTER_PARAM, ROUTES } from "@/lib/navigation";
 import {
@@ -64,14 +70,20 @@ const COLUMN = {
 /**
  * Les noms des paramètres d'URL. En français, comme les segments de route.
  *
- * **Deux des trois viennent désormais de `lib/navigation.ts`** (T6.7) : la
- * répartition de la vue d'ensemble rend des chiffres cliquables vers cet écran,
- * donc `approche` et `statut` ont un **second** lecteur — et une clé qui vit à
- * deux endroits n'en est plus une. `recherche` reste ici : rien hors de cette
- * page ne l'écrit.
+ * **Les quatre filtres viennent de `lib/navigation.ts`** : `approche` et
+ * `statut` y sont montés en T6.7, quand la répartition de la vue d'ensemble
+ * s'est mise à servir des chiffres cliquables vers cet écran — une clé qui vit
+ * à deux endroits n'en est plus une — et `entite` et `metier` les y rejoignent
+ * en T7.2, avec la troisième dimension de cette même répartition.
+ *
+ * `recherche` reste ici, et c'est la frontière de `docs/06` §4 : elle sépare
+ * les **filtres**, chacun le nom d'un référentiel, de la **recherche**, qui
+ * court sur trois colonnes. Rien hors de cette page ne l'écrit.
  */
 const PARAM = {
   search: "recherche",
+  entity: PROJECT_FILTER_PARAM.entity,
+  job: PROJECT_FILTER_PARAM.job,
   approach: PROJECT_FILTER_PARAM.approach,
   status: PROJECT_FILTER_PARAM.status,
 } as const;
@@ -94,23 +106,30 @@ export default async function ProjectsPage({
 
   const search = params[PARAM.search]?.trim() ?? "";
 
+  const requestedEntity = uuidParam(params[PARAM.entity]);
+  const requestedJob = uuidParam(params[PARAM.job]);
   const requestedApproach = uuidParam(params[PARAM.approach]);
   const requestedStatus = uuidParam(params[PARAM.status]);
 
   // Chaque paramètre est confronté au domaine avant d'être cru. `find` est
   // scopé : la valeur d'un autre domaine n'existe pas, elle ne « manque » pas.
-  const [activeApproach, activeStatus] = await Promise.all([
-    requestedApproach
-      ? session.db.find(approaches, requestedApproach)
-      : undefined,
-    requestedStatus
-      ? session.db.find(projectStatuses, requestedStatus)
-      : undefined,
-  ]);
+  const [activeEntity, activeJob, activeApproach, activeStatus] =
+    await Promise.all([
+      requestedEntity ? session.db.find(entities, requestedEntity) : undefined,
+      requestedJob ? session.db.find(jobs, requestedJob) : undefined,
+      requestedApproach
+        ? session.db.find(approaches, requestedApproach)
+        : undefined,
+      requestedStatus
+        ? session.db.find(projectStatuses, requestedStatus)
+        : undefined,
+    ]);
 
   const options = await listProjectFilterOptions(session.db);
 
   const rows = await listProjects(session.db, {
+    entityId: activeEntity?.id,
+    jobId: activeJob?.id,
     approachId: activeApproach?.id,
     statusId: activeStatus?.id,
     search: search || undefined,
@@ -120,6 +139,8 @@ export default async function ProjectsPage({
    *  lue en base, jamais du paramètre. */
   const applied: { field: string; value: string }[] = [
     ...(search ? [{ field: "Recherche", value: `« ${search} »` }] : []),
+    ...(activeEntity ? [{ field: "Entité", value: activeEntity.label }] : []),
+    ...(activeJob ? [{ field: "Métier", value: activeJob.label }] : []),
     ...(activeApproach
       ? [{ field: "Approche", value: activeApproach.label }]
       : []),
@@ -127,7 +148,10 @@ export default async function ProjectsPage({
   ];
 
   const hasOptions =
-    options.approaches.length > 0 || options.statuses.length > 0;
+    options.entities.length > 0 ||
+    options.jobs.length > 0 ||
+    options.approaches.length > 0 ||
+    options.statuses.length > 0;
 
   return (
     <Page>
@@ -141,6 +165,8 @@ export default async function ProjectsPage({
         <ProjectFilters
           options={options}
           search={search}
+          entityId={activeEntity?.id}
+          jobId={activeJob?.id}
           approachId={activeApproach?.id}
           statusId={activeStatus?.id}
         />
@@ -286,11 +312,15 @@ function NewProjectLink() {
 function ProjectFilters({
   options,
   search,
+  entityId,
+  jobId,
   approachId,
   statusId,
 }: {
   options: ProjectFilterOptions;
   search: string;
+  entityId: string | undefined;
+  jobId: string | undefined;
   approachId: string | undefined;
   statusId: string | undefined;
 }) {
@@ -312,6 +342,24 @@ function ProjectFilters({
         />
       </Field>
 
+      {/* L'ordre des quatre est celui de `docs/06` §4 : entité, métier,
+          approche, statut. Chacun se masque seul quand sa liste est vide. */}
+      <Select
+        id="filtre-entite"
+        label="Entité"
+        name={PARAM.entity}
+        all="Toutes"
+        options={options.entities}
+        value={entityId}
+      />
+      <Select
+        id="filtre-metier"
+        label="Métier"
+        name={PARAM.job}
+        all="Tous"
+        options={options.jobs}
+        value={jobId}
+      />
       <Select
         id="filtre-approche"
         label="Approche"

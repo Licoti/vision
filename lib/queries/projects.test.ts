@@ -58,9 +58,15 @@ type Fixture = {
   domainId: string;
   scope: ScopedDb;
   entityId: string;
+  /** La seconde entité : sans elle, le filtre d'entité n'écarterait rien. */
+  secondEntityId: string;
   doneStatusId: string;
   activeStatusId: string;
   researchJobId: string;
+  /** Le métier du projet `Ancien` — il donne sa seconde option au filtre. */
+  contentJobId: string;
+  /** Déclaré par le seul projet archivé : jamais proposé au filtrage. */
+  orphanJobId: string;
   approachId: string;
   orphanApproachId: string;
 };
@@ -70,9 +76,16 @@ let a: Fixture;
 let b: Fixture;
 
 /**
- * Un domaine complet : une entité, deux statuts, un métier, deux approches dont
- * une orpheline, un produit vivant et un produit archivé, et cinq projets — un
- * frais, un ancien, un sans activité, un archivé, un rattaché au produit archivé.
+ * Un domaine complet : **deux entités**, deux statuts, **trois métiers dont un
+ * orphelin**, deux approches dont une orpheline, un produit vivant par entité
+ * et un produit archivé, et six projets — un frais, un ancien, un sans
+ * activité, un archivé, un rattaché au produit archivé, et le voisin de la
+ * seconde entité.
+ *
+ * **Les deux référentiels de T7.2 ont leur `position` à contre-alphabet**, la
+ * règle déjà tenue par les approches du domaine `c` : sans cela, l'ordre du
+ * domaine et celui du dictionnaire coïncideraient, et le tri se validerait sur
+ * rien.
  */
 async function seedDomain(label: string): Promise<Fixture> {
   const domain = await superAdmin.createDomain({
@@ -81,7 +94,17 @@ async function seedDomain(label: string): Promise<Fixture> {
   });
   const scope = forDomain({ domainId: domain.id });
 
-  const entity = await scope.insert(entities, { label: `Entité ${label}` });
+  const entity = await scope.insert(entities, {
+    label: `Entité ${label}`,
+    position: "2",
+  });
+  /* La seconde entité, en position **1** alors qu'elle passe **après** la
+     première dans l'alphabet : l'ordre du domaine prime sur celui du
+     dictionnaire, et c'est ce désaccord qui rend le tri mesurable. */
+  const secondEntity = await scope.insert(entities, {
+    label: `Zone voisine ${label}`,
+    position: "1",
+  });
 
   const active = await scope.insert(projectStatuses, {
     label: "En cours",
@@ -94,11 +117,25 @@ async function seedDomain(label: string): Promise<Fixture> {
     position: "1",
   });
 
-  // Le référentiel des métiers du domaine : la liste transverse ne les affiche
-  // ni ne les filtre plus, mais le formulaire de projet les propose toujours.
+  /* Le référentiel des métiers du domaine. Le formulaire de projet les propose
+     depuis T2.6 ; **la liste transverse les filtre depuis T7.2** — les métiers
+     **déclarés du projet**, jamais ceux que son équipe porte (D44).
+
+     `position` à contre-alphabet ici aussi : « UX Research » ferme le
+     dictionnaire et ouvre le référentiel. */
   const research = await scope.insert(jobs, {
     label: `UX Research ${label}`,
+    position: "1",
+  });
+  const content = await scope.insert(jobs, {
+    label: `Content Design ${label}`,
     position: "2",
+  });
+  /* Le métier que seul le projet **archivé** déclare : il ne doit pas être
+     proposé au filtrage. Le pendant exact de l'approche orpheline. */
+  const orphanJob = await scope.insert(jobs, {
+    label: `Métier orphelin ${label}`,
+    position: "3",
   });
 
   const approach = await scope.insert(approaches, { label: `Research ${label}` });
@@ -113,6 +150,13 @@ async function seedDomain(label: string): Promise<Fixture> {
   const archivedProduct = await scope.insert(products, {
     name: `Produit archivé ${label}`,
     entityId: entity.id,
+  });
+  /* Le produit de la seconde entité : c'est lui qui donne au filtre d'entité
+     quelque chose à écarter. Un projet n'a pas d'entité à lui — il la tient de
+     son produit —, donc le filtre ne se mesure que par un second produit. */
+  const secondProduct = await scope.insert(products, {
+    name: `Produit voisin ${label}`,
+    entityId: secondEntity.id,
   });
 
   const fresh = await scope.insert(projects, {
@@ -140,6 +184,14 @@ async function seedDomain(label: string): Promise<Fixture> {
     name: `Muet ${label}`,
     productId: product.id,
     statusId: active.id,
+  });
+  /* Le voisin, sous la seconde entité. Sa fraîcheur est la plus ancienne du
+     domaine : il se range juste avant « Muet », qui n'en a aucune. */
+  await scope.insert(projects, {
+    name: `Voisin ${label}`,
+    productId: secondProduct.id,
+    statusId: active.id,
+    lastActivityAt: new Date("2022-01-31T00:00:00Z"),
   });
 
   const archivedProject = await scope.insert(projects, {
@@ -193,13 +245,25 @@ async function seedDomain(label: string): Promise<Fixture> {
     approachId: orphanApproach.id,
   });
 
+  await scope.insert(projectJobs, { projectId: fresh.id, jobId: research.id });
+  await scope.insert(projectJobs, { projectId: old.id, jobId: content.id });
+
+  // Et le métier orphelin sur le seul projet archivé, comme l'approche.
+  await scope.insert(projectJobs, {
+    projectId: archivedProject.id,
+    jobId: orphanJob.id,
+  });
+
   return {
     domainId: domain.id,
     scope,
     entityId: entity.id,
+    secondEntityId: secondEntity.id,
     activeStatusId: active.id,
     doneStatusId: done.id,
     researchJobId: research.id,
+    contentJobId: content.id,
+    orphanJobId: orphanJob.id,
     approachId: approach.id,
     orphanApproachId: orphanApproach.id,
   };
@@ -582,6 +646,7 @@ describe("listProjects — ordre et périmètre", () => {
       "Frais a",
       "Ancien a",
       "Taux 100 % a",
+      "Voisin a",
       "Muet a",
     ]);
   });
@@ -646,7 +711,7 @@ describe("listProjects — filtres", () => {
 
   test("les filtres se combinent, chacun restreignant le précédent", async () => {
     const active = await listProjects(a.scope, { statusId: a.activeStatusId });
-    expect(active).toHaveLength(3);
+    expect(active).toHaveLength(4);
 
     const andApproach = await listProjects(a.scope, {
       statusId: a.activeStatusId,
@@ -663,9 +728,79 @@ describe("listProjects — filtres", () => {
     expect(andSearch).toEqual([]);
   });
 
+  test("le filtre d'entité retient les projets de son entité, et elle seule", async () => {
+    // Un projet n'a pas d'entité à lui : il la tient de son produit, et c'est
+    // `products.entity_id` que le filtre traverse.
+    expect(names(await listProjects(a.scope, { entityId: a.secondEntityId })))
+      .toEqual(["Voisin a"]);
+
+    // L'autre entité rend tout le reste — et pas le voisin.
+    const first = await listProjects(a.scope, { entityId: a.entityId });
+    expect(names(first)).toEqual([
+      "Frais a",
+      "Ancien a",
+      "Taux 100 % a",
+      "Muet a",
+    ]);
+  });
+
+  test("le filtre de métier retient le projet qui le déclare", async () => {
+    // D44 : les métiers **déclarés du projet** font foi. `Frais a` déclare
+    // « UX Research » ; son équipe, elle, n'a jamais été consultée pour cela.
+    expect(names(await listProjects(a.scope, { jobId: a.researchJobId })))
+      .toEqual(["Frais a"]);
+    expect(names(await listProjects(a.scope, { jobId: a.contentJobId })))
+      .toEqual(["Ancien a"]);
+  });
+
+  test("le métier du seul projet archivé ne ramène rien", async () => {
+    // La liaison existe, mais son projet est rangé : le filtre ne le
+    // ressuscite pas.
+    expect(await listProjects(a.scope, { jobId: a.orphanJobId })).toEqual([]);
+  });
+
+  test("les quatre filtres se combinent", async () => {
+    // `Frais a` est le seul à porter les quatre à la fois.
+    const all = await listProjects(a.scope, {
+      entityId: a.entityId,
+      jobId: a.researchJobId,
+      approachId: a.approachId,
+      statusId: a.activeStatusId,
+    });
+    expect(names(all)).toEqual(["Frais a"]);
+
+    // Une seule dimension qui ne recoupe pas suffit à vider la combinaison —
+    // le voisin est bien de la seconde entité, mais il ne déclare aucun métier.
+    const crossed = await listProjects(a.scope, {
+      entityId: a.secondEntityId,
+      jobId: a.researchJobId,
+    });
+    expect(crossed).toEqual([]);
+  });
+
   test("un filtre ne laisse pas passer une valeur d'un autre domaine", async () => {
     const rows = await listProjects(a.scope, { approachId: b.approachId });
     expect(rows).toEqual([]);
+  });
+
+  /* Les deux frontières de T7.2, **une par test** : un constat partagé
+     tomberait sous l'une comme sous l'autre neutralisation, et une chute non
+     isolée ne désigne plus le filtre qu'elle éprouve. */
+
+  test("le filtre d'entité ne laisse pas passer une entité d'un autre domaine", async () => {
+    // L'entité de `b` ne désigne aucun produit d'ici — `products` porte son
+    // `filter()` dans le `on` de sa jointure.
+    expect(await listProjects(a.scope, { entityId: b.entityId })).toEqual([]);
+    expect(await listProjects(a.scope, { entityId: b.secondEntityId })).toEqual(
+      [],
+    );
+  });
+
+  test("le filtre de métier ne laisse pas passer un métier d'un autre domaine", async () => {
+    // Le métier de `b` ne trouve aucune liaison d'ici — `filter(projectJobs)`
+    // est dans le `where` de l'`exists`.
+    expect(await listProjects(a.scope, { jobId: b.researchJobId })).toEqual([]);
+    expect(await listProjects(a.scope, { jobId: b.contentJobId })).toEqual([]);
   });
 });
 
@@ -742,12 +877,68 @@ describe("listProjectFilterOptions", () => {
     );
   });
 
+  test("les deux entités qui portent un projet vivant sont proposées", async () => {
+    const options = await listProjectFilterOptions(a.scope);
+
+    // L'ordre est celui du domaine — `position` d'abord —, et il contredit ici
+    // le dictionnaire : « Zone voisine » est en position 1.
+    expect(options.entities.map((option) => option.label)).toEqual([
+      "Zone voisine a",
+      "Entité a",
+    ]);
+  });
+
+  test("les deux métiers déclarés par un projet vivant sont proposés", async () => {
+    const options = await listProjectFilterOptions(a.scope);
+
+    // `position` de nouveau contre l'alphabet : « UX Research » est en 1.
+    expect(options.jobs.map((option) => option.label)).toEqual([
+      "UX Research a",
+      "Content Design a",
+    ]);
+  });
+
+  test("le métier du seul projet archivé n'est pas proposé", async () => {
+    const options = await listProjectFilterOptions(a.scope);
+
+    // Le pendant exact de l'approche orpheline : offrir ce filtre serait
+    // offrir un chemin vers le vide.
+    expect(options.jobs.map((option) => option.id)).not.toContain(a.orphanJobId);
+  });
+
+  test("aucune option ne mène à une liste vide", async () => {
+    // Le contrat des quatre listes, et le seul qui les couvre toutes : ce qui
+    // est proposé ramène au moins une ligne.
+    const options = await listProjectFilterOptions(a.scope);
+
+    for (const option of options.entities) {
+      expect(
+        (await listProjects(a.scope, { entityId: option.id })).length,
+      ).toBeGreaterThan(0);
+    }
+    for (const option of options.jobs) {
+      expect(
+        (await listProjects(a.scope, { jobId: option.id })).length,
+      ).toBeGreaterThan(0);
+    }
+
+    expect(options.entities.length).toBeGreaterThan(0);
+    expect(options.jobs.length).toBeGreaterThan(0);
+  });
+
   test("aucune option ne vient d'un autre domaine", async () => {
     const options = await listProjectFilterOptions(a.scope);
-    const all = [...options.approaches, ...options.statuses];
+    const all = [
+      ...options.entities,
+      ...options.jobs,
+      ...options.approaches,
+      ...options.statuses,
+    ];
 
     expect(all.some((option) => option.label.endsWith(" b"))).toBe(false);
     expect(all.map((option) => option.id)).not.toContain(b.approachId);
+    expect(all.map((option) => option.id)).not.toContain(b.entityId);
+    expect(all.map((option) => option.id)).not.toContain(b.researchJobId);
   });
 });
 

@@ -7043,3 +7043,91 @@ C'est la seconde fois que le seuil mord, après T6.7. La différence est qu'il n
 chantier disponible : `docs/05` §5 n'a pas de huitième chantier, C7 en compte neuf après celui-ci,
 et chaque ticket ajoutera sa ligne. **Le prochain qui dépassera n'aura que le resserrement**, et il
 s'épuisera. → à nommer au découpage de C8.
+
+---
+
+## T7.2 — Entité et métier : les deux filtres manquants, et la répartition par entité — 28/08/2026
+
+### `metier` monte dans `lib/navigation.ts` avec **un seul** lecteur, contre la règle écrite là
+
+La fiche demande que `PROJECT_FILTER_PARAM` gagne `entity: "entite"` **et** `job: "metier"`, et
+motive les deux par la même raison : *« elles ont deux lecteurs, et une clé qui vit à deux endroits
+n'en est plus une »*. C'est vrai d'`entite` — la répartition de la vue d'ensemble sert désormais
+`/projets?entite=…`, donc le chiffre et la liste doivent partager la clé. **Ce n'est pas vrai de
+`metier`** : la fiche interdit nommément la répartition par métier (*« `docs/06` §3 en nomme trois,
+et la quatrième ne s'invente pas »*), donc rien hors de la page ne l'écrit, ni ne l'écrira.
+
+La règle inscrite dans ce bloc en T6.7 était pourtant explicite : *« on ne monte que ce qui a deux
+lecteurs (règle 3) — une clé exportée sans appelant est celle qu'on relit un jour sans savoir
+pourquoi »*, et c'est elle qui a laissé `recherche` dans la page.
+
+**La fiche l'emporte, et le commentaire est récrit pour dire la vraie raison** plutôt que d'invoquer
+un second lecteur qui n'existe pas : les quatre filtres de `docs/06` §4 forment un **jeu** que
+l'écran lit d'un bloc, et scinder ce jeu entre deux fichiers aurait fait de l'appartenance à ce
+module une question de *nombre de lecteurs* plutôt que de *nature*. `recherche` reste dehors sur ce
+critère-là, et non plus sur le décompte : `docs/06` §4 sépare les filtres — chacun le nom d'un
+référentiel — de la recherche, qui court sur trois colonnes.
+
+C'est un écart à une règle de commentaire, pas à une décision de `docs/07`. Il se consigne, et le
+travail continue.
+
+### Le décompte de l'entité compte `projects.id` là où celui du statut compte `products.id`
+
+Les deux lectures se ressemblent et **ne comptent pas la même colonne**, ce qui a l'air d'une
+incohérence et n'en est pas une. La chaîne du statut va `project_statuses → projects → products` ;
+celle de l'entité va `entities → products → projects`. Dans les deux cas on compte **la table la
+plus lointaine**, celle dont la nullité emporte celle des autres.
+
+Compter la mauvaise extrémité ne lève aucune erreur et ne se voit nulle part : le chiffre dirait un
+de plus que la liste pour un projet vivant sous un produit archivé, et aucune somme n'est affichée
+pour que quiconque s'en aperçoive. L'en-tête de `listProjectDistribution` porte désormais la règle
+sous cette forme générale, plutôt que la formule *« on compte `products.id`, jamais `projects.id` »*
+de T6.7, qui devenait fausse à la troisième dimension.
+
+### La répartition rend cinq entités quand le filtre n'en propose qu'une
+
+Sur la base de développement, le bloc « Par entité » sert cinq lignes dont quatre à zéro, et le
+`<select>` de `/projets` n'offre que « Digital Factory ». **Les deux lectures ont raison**, et leur
+divergence est celle que T6.7 avait déjà posée entre `listProjectDistribution` et
+`listProjectFilterOptions` : l'une **décrit une distribution** — un référentiel absent de la
+répartition se lirait comme un référentiel qui n'existe pas —, l'autre **propose des chemins**, et
+un chemin vers une liste vide n'en est pas un.
+
+Le contrat tient dans les deux cas, et c'est ce qui a été mesuré : les quatre entités à zéro portent
+un lien, et suivre ce lien rend zéro ligne et l'état vide de l'écran (règle 5).
+
+### Les deux `filter()` de la chaîne de l'entité demandent chacun leur montage
+
+`entities → products → projects` porte deux jointures, donc deux étanchéités, et une ligne forgée
+ordinaire n'en éprouve qu'une : si le produit est d'ailleurs, retirer `filter(projects)` ne change
+rien, la chaîne étant déjà coupée en amont. Il a donc fallu **deux entités et deux montages
+inverses** — l'une dont le seul produit est de `b` mais dont le projet est de `a`, l'autre dont le
+produit est de `a` et le projet de `b`. Mesuré : chaque `filter()` retiré fait tomber son seul
+constat ciblé, et jamais celui de l'autre.
+
+Les deux projets forgés sont datés `STALE_TAIL_AT`, comme leurs aînés de T6.7, et le projet
+**légitime** ajouté sous l'entité archivée est daté `SEEDED_AT`. Sans cela il serait entré en tête
+de `listStaleProjects` — les projets sans activité ouvrent la marche — et aurait chassé du plafond
+les deux lignes attendues, faisant tomber un constat de fraîcheur qui n'a rien à voir avec ce
+ticket. C'est la chute mesurée le 27/08/2026, évitée en la connaissant.
+
+### Une sonde fausse a accusé le code avant de s'accuser elle-même
+
+La première mesure du contrat en HTML servi a rendu « Digital Factory : annoncé 5, servi 0 », donc
+une divergence. Le compteur de la page, lui, disait bien « 5 projets ». **C'était la sonde** : son
+motif attendait `href` avant `class`, quand Next sert `class` d'abord.
+
+Le fait mérite d'être noté parce qu'il illustre la discipline en sens inverse : une mesure qui
+contredit le code doit être mise en défaut **elle aussi** avant d'être crue. Une sonde qui compte
+zéro compte aussi zéro quand tout va bien.
+
+### Les colonnes de `docs/06` §4 restent absentes, et le ticket n'était pas celui-là
+
+Le document veut sur chaque ligne *nom, produit, entité, statut, métiers, équipe, date* — sept
+colonnes ; l'écran en rend cinq. T7.2 a posé les deux **filtres** manquants sans poser les deux
+**colonnes** : son « Attendu » ne les nomme pas, et les ajouter aurait été une fonctionnalité hors
+du ticket (règle 3).
+
+Aucun ticket de C7 n'ouvre le périmètre de cet écran pour du contenu : T7.9, le seul qui traite des
+colonnes qu'aucun écran ne lit, **s'interdit nommément** de rouvrir T7.2, et T7.6 comme T7.7 sont
+des tickets de forme. Le point part donc en C8, avec sa raison.

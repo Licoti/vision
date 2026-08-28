@@ -229,7 +229,8 @@ export function listRecentEvents(
 }
 
 /* ==========================================================================
-   La répartition — combien de projets par statut, par approche (T6.7)
+   La répartition — combien de projets par statut, par entité, par approche
+   (T6.7, complétée par T7.2)
    ========================================================================== */
 
 /**
@@ -254,18 +255,22 @@ export type StatusDistributionEntry = DistributionEntry & {
 };
 
 /**
- * Les deux dimensions rendues — **et non les trois de `docs/06` §3.**
+ * **Les trois dimensions de `docs/06` §3**, enfin au complet (T7.2) : par
+ * statut, par entité, par approche.
  *
- * L'entité manque, et c'est la lettre de la fiche : *« un chiffre dont le
- * filtre n'existe pas n'est pas rendu »*. `/projets` porte trois clés depuis
- * T2.3 — `recherche`, `approche`, `statut` — et **aucune clé d'entité**. Rendre
- * le chiffre demanderait de poser ce filtre sur un autre écran, c'est-à-dire
- * une fonctionnalité hors du ticket (règle 3) ; le rendre sans filtre
- * donnerait un nombre qui ne mène nulle part. Point ouvert d'`ETAT.md`,
- * destination C7.
+ * L'entité a manqué d'un chantier, et c'était la lettre de la fiche T6.7 :
+ * *« un chiffre dont le filtre n'existe pas n'est pas rendu »*. `/projets` ne
+ * portait aucune clé d'entité, et rendre le chiffre aurait donné un nombre qui
+ * ne mène nulle part. T7.2 pose le filtre d'abord, le chiffre ensuite — dans
+ * cet ordre, et c'est le seul qui tienne le contrat.
+ *
+ * **Il n'y en aura pas de quatrième.** Le métier a gagné son filtre par le même
+ * ticket et n'a pas de répartition : `docs/06` §3 en nomme trois, et une
+ * quatrième dimension ne s'invente pas depuis la seule existence d'un filtre.
  */
 export type ProjectDistribution = {
   statuses: StatusDistributionEntry[];
+  entities: DistributionEntry[];
   approaches: DistributionEntry[];
 };
 
@@ -299,7 +304,7 @@ function strip(row: DistributionRow): DistributionEntry {
 }
 
 /**
- * Combien de projets par statut, et par approche.
+ * Combien de projets par statut, par entité, et par approche.
  *
  * **Les trois conditions d'archivage sont celles de `listProjects`, à la
  * lettre** — `filter(projects)`, `projects.archived_at is null`,
@@ -308,12 +313,19 @@ function strip(row: DistributionRow): DistributionEntry {
  * ressemblent : ce sont deux façons d'écrire la même clause, et la seule preuve
  * qu'elles disent la même chose est de suivre le lien et de compter.
  *
- * **On compte `products.id`, jamais `projects.id`.** La différence n'est pas
- * cosmétique : un projet vivant sous un **produit archivé** franchit le premier
- * `leftJoin` et échoue au second. Compter la colonne du projet l'inclurait,
- * quand `listProjects` l'écarte par son `innerJoin products` — le chiffre
- * dirait un de plus que la liste, sans qu'aucune erreur ne se produise. C'est
- * exactement la divergence que la mise en défaut de la fiche cherche.
+ * **On compte toujours la colonne de la table la plus lointaine de la
+ * chaîne**, et c'est la seule règle qui tienne le contrat. Pour le statut et
+ * l'approche, la chaîne va `référentiel → projects → products` : on compte
+ * `products.id`. Pour l'entité, elle va `entities → products → projects`, en
+ * sens inverse : on compte `projects.id`.
+ *
+ * La différence n'est pas cosmétique. Sur la chaîne des statuts, un projet
+ * vivant sous un **produit archivé** franchit le premier `leftJoin` et échoue
+ * au second : compter la colonne du projet l'inclurait, quand `listProjects`
+ * l'écarte par son `innerJoin products` — le chiffre dirait un de plus que la
+ * liste, sans qu'aucune erreur ne se produise. C'est exactement la divergence
+ * que la mise en défaut de la fiche cherche, et compter le bout de la chaîne
+ * est ce qui l'empêche des deux côtés.
  *
  * **Le référentiel entier, zéros compris**, à rebours de
  * `listProjectFilterOptions` qui n'offre que ce qui ramène quelque chose. Les
@@ -328,9 +340,10 @@ function strip(row: DistributionRow): DistributionEntry {
  * Aucune somme n'est d'ailleurs affichée — un total inviterait à en faire un
  * pourcentage, que la fiche interdit nommément.
  *
- * **Deux requêtes, un seul passage.** La forme de `listProjectFilterOptions` :
- * les référentiels sont courts, et deux allers-retours sur un même `joinedRead`
- * coûtent moins qu'un `union` dont le type ne se vérifierait plus à la sortie.
+ * **Trois requêtes, un seul passage.** La forme de `listProjectFilterOptions` :
+ * les référentiels sont courts, et trois allers-retours sur un même
+ * `joinedRead` coûtent moins qu'un `union` dont le type ne se vérifierait plus
+ * à la sortie.
  *
  * L'ordre est celui du domaine — `position` d'abord, le libellé départageant —,
  * jamais celui du décompte : trier par nombre ferait de la répartition un
@@ -368,6 +381,38 @@ export function listProjectDistribution(
       .where(filter(projectStatuses))
       .groupBy(projectStatuses.id)
       .orderBy(asc(projectStatuses.position), asc(projectStatuses.label));
+
+    /* L'entité : la seule chaîne qui parte du référentiel **vers** le projet en
+       passant par le produit. Un projet a exactement un produit, donc aucune
+       ligne ne se compte deux fois — ce qui n'est pas vrai de l'approche, et la
+       différence est dite plus bas. */
+    const entityRows = await database
+      .select({
+        id: entities.id,
+        label: entities.label,
+        archivedAt: entities.archivedAt,
+        count: sql<number>`count(${projects.id})::int`,
+      })
+      .from(entities)
+      .leftJoin(
+        products,
+        and(
+          eq(products.entityId, entities.id),
+          filter(products),
+          isNull(products.archivedAt),
+        ),
+      )
+      .leftJoin(
+        projects,
+        and(
+          eq(projects.productId, products.id),
+          filter(projects),
+          isNull(projects.archivedAt),
+        ),
+      )
+      .where(filter(entities))
+      .groupBy(entities.id)
+      .orderBy(asc(entities.position), asc(entities.label));
 
     const approachRows = await database
       .select({
@@ -412,6 +457,7 @@ export function listProjectDistribution(
         ...strip(row),
         nature: row.nature,
       })),
+      entities: entityRows.filter(isRendered).map(strip),
       approaches: approachRows.filter(isRendered).map(strip),
     };
   });

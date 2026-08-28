@@ -144,6 +144,12 @@ let emptyStatusId: string;
 let archivedEmptyStatusId: string;
 let archivedUsedStatusId: string;
 
+/* Les entités — la troisième dimension, ouverte par T7.2. */
+let emptyEntityId: string;
+let archivedEmptyEntityId: string;
+let archivedUsedEntityId: string;
+let keptEntityProjectId: string;
+
 /* Les approches — dont une qui n'a que sa ligne de liaison forgée. */
 let usedApproachId: string;
 let sharedApproachId: string;
@@ -198,6 +204,17 @@ let leakedProductStatusId: string;
 
 /** L'approche de `b`, et son seul emploi : `filter(approaches)`. */
 let otherDomainApproachId: string;
+
+/**
+ * Les deux entités qui ne portent qu'une ligne forgée, **un filtre chacune**.
+ *
+ * C'est la condition de l'isolement, celle qu'un statut par fuite tient déjà
+ * plus haut : sur une entité commune, les deux fuites produiraient le même
+ * écart de décompte et retirer l'un ou l'autre `filter()` ferait tomber les
+ * deux constats.
+ */
+let leakedProductEntityId: string;
+let leakedProjectEntityId: string;
 
 async function seedDomain(label: string): Promise<Fixture> {
   const domain = await superAdmin.createDomain({
@@ -499,6 +516,56 @@ beforeAll(async () => {
   keptProjectId = kept.id;
   await a.scope.archive(projectStatuses, archivedUsedStatusId);
 
+  /* ----- Les entités (T7.2). --------------------------------------------
+
+     Les trois mêmes cas de bord que les statuts, et pour la même raison : la
+     règle `isRendered` ne se prouve que sur une valeur archivée **vide** et une
+     valeur archivée **porteuse**. L'entité d'amorçage, elle, est en position 0
+     et porte déjà les produits du domaine.
+     -------------------------------------------------------------------- */
+
+  /* Le zéro : une entité du référentiel qui ne porte aucun produit. */
+  const emptyEntity = await a.scope.insert(entities, {
+    label: `Entité sans produit ${suffix}`,
+    position: "1",
+  });
+  emptyEntityId = emptyEntity.id;
+
+  /* Le vocabulaire retiré : archivée et vide, elle ne se rend pas. */
+  const archivedEmptyEntity = await a.scope.insert(entities, {
+    label: `Entité retirée ${suffix}`,
+    position: "2",
+  });
+  archivedEmptyEntityId = archivedEmptyEntity.id;
+  await a.scope.archive(entities, archivedEmptyEntityId);
+
+  /* L'autre moitié de la règle : archivée **mais porteuse**. Ses projets
+     comptent dans la liste transverse ; la taire ferait de la répartition une
+     lecture incomplète en silence, et aucune somme n'est affichée pour que
+     quiconque s'en aperçoive. */
+  const archivedUsedEntity = await a.scope.insert(entities, {
+    label: `Entité retirée en usage ${suffix}`,
+    position: "3",
+  });
+  archivedUsedEntityId = archivedUsedEntity.id;
+
+  const keptEntityProduct = await a.scope.insert(products, {
+    name: `Produit sous entité retirée ${suffix}`,
+    entityId: archivedUsedEntityId,
+  });
+  /* **Daté de l'instant du semis**, jamais laissé nul : une activité nulle le
+     ferait entrer en **tête** de `listStaleProjects` — les projets sans
+     activité ouvrent la marche — et il chasserait du plafond les deux lignes
+     que le constat attend. C'est la chute mesurée le 27/08/2026, évitée. */
+  const keptEntityProject = await a.scope.insert(projects, {
+    name: `Projet sous entité retirée ${suffix}`,
+    productId: keptEntityProduct.id,
+    statusId: a.statusId,
+    lastActivityAt: SEEDED_AT,
+  });
+  keptEntityProjectId = keptEntityProject.id;
+  await a.scope.archive(entities, archivedUsedEntityId);
+
   /* ----- Les approches. ------------------------------------------------ */
 
   const usedApproach = await a.scope.insert(approaches, {
@@ -699,6 +766,62 @@ beforeAll(async () => {
     })
     .returning({ id: products.id });
   leakedEntityProductId = leakedEntityProduct[0]!.id;
+
+  /* (9) La chaîne de l'entité est `entities → products → projects`, donc elle
+         porte **deux** `filter()` à éprouver, et chacun demande son montage.
+
+         Ici, le **produit** est d'un autre domaine et le projet qu'il porte est
+         de `a` : seul `filter(products)` écarte la ligne. Retirer
+         `filter(projects)` ne change rien — le produit reste dehors, et la
+         chaîne est coupée en amont. La chute est donc isolée. */
+  const leakedProductEntity = await a.scope.insert(entities, {
+    label: `Entité à produit forgé ${suffix}`,
+    position: "4",
+  });
+  leakedProductEntityId = leakedProductEntity.id;
+
+  const forgedProduct = await db
+    .insert(products)
+    .values({
+      domainId: b.domainId,
+      name: `Produit forgé sous entité de a ${suffix}`,
+      entityId: leakedProductEntityId,
+    })
+    .returning({ id: products.id });
+
+  await db.insert(projects).values({
+    domainId: a.domainId,
+    name: `Projet de a sous produit forgé ${suffix}`,
+    productId: forgedProduct[0]!.id,
+    statusId: leakedProductStatusId,
+    lastActivityAt: STALE_TAIL_AT,
+  });
+
+  /* (10) L'inverse : le **produit** est de `a` et vivant, seul le **projet**
+          est d'ailleurs. Seul `filter(projects)` écarte la ligne, et retirer
+          `filter(products)` ne change rien.
+
+          Les deux forgés sont datés `STALE_TAIL_AT`, comme leurs aînés : si un
+          filtre tombait, ils entreraient dans la fraîcheur **après** les
+          projets sans activité, sans déplacer le plafond. */
+  const leakedProjectEntity = await a.scope.insert(entities, {
+    label: `Entité à projet forgé ${suffix}`,
+    position: "5",
+  });
+  leakedProjectEntityId = leakedProjectEntity.id;
+
+  const cleanProduct = await a.scope.insert(products, {
+    name: `Produit de a sous entité à projet forgé ${suffix}`,
+    entityId: leakedProjectEntityId,
+  });
+
+  await db.insert(projects).values({
+    domainId: b.domainId,
+    name: `Projet forgé sous produit de a ${suffix}`,
+    productId: cleanProduct.id,
+    statusId: leakedDomainStatusId,
+    lastActivityAt: STALE_TAIL_AT,
+  });
 });
 
 afterAll(async () => {
@@ -940,6 +1063,91 @@ describe("listProjectDistribution", () => {
     expect(entryFor(rows, sharedApproachId)?.count).toBe(1);
   });
 
+  /* ------------------------------------------------------------------------
+     L'entité — la dimension que T7.2 ouvre, et le seul constat qui prouve
+     quoi que ce soit : **suivre le lien rend exactement ce nombre de lignes.**
+     ------------------------------------------------------------------------ */
+
+  test("le décompte de chaque entité est le nombre de lignes que son filtre rend", async () => {
+    const { entities: rows } = await listProjectDistribution(a.scope);
+
+    // Le contrat du ticket. Il ne compare à aucun nombre écrit ici — un nombre
+    // écrit à la main ne dirait que ce que l'auteur croyait — mais à ce que
+    // `/projets?entite=…` rendra vraiment. Un décompte juste sur un filtre qui
+    // ne l'est pas est un mensonge que rien d'autre ne détecte.
+    for (const entry of rows) {
+      const projectRows = await listProjects(a.scope, { entityId: entry.id });
+      expect(entry.count).toBe(projectRows.length);
+    }
+
+    // La fiche demande **trois** valeurs au moins, dont une à zéro : la boucle
+    // ci-dessus ne dirait rien sur un tableau court.
+    expect(rows.length).toBeGreaterThanOrEqual(3);
+    expect(rows.some((entry) => entry.count === 0)).toBe(true);
+    expect(rows.some((entry) => entry.count > 0)).toBe(true);
+  });
+
+  test("une entité sans aucun produit rend zéro, et elle est rendue", async () => {
+    const { entities: rows } = await listProjectDistribution(a.scope);
+
+    // Le `leftJoin` de la chaîne, et non un `innerJoin` : une entité qui ne
+    // porte rien reste une entité du domaine.
+    expect(entryFor(rows, emptyEntityId)?.count).toBe(0);
+  });
+
+  test("une entité archivée sans projet n'est pas rendue", async () => {
+    const { entities: rows } = await listProjectDistribution(a.scope);
+
+    expect(entryFor(rows, archivedEmptyEntityId)).toBeUndefined();
+  });
+
+  test("une entité archivée qui porte des projets est rendue", async () => {
+    const { entities: rows } = await listProjectDistribution(a.scope);
+
+    expect(entryFor(rows, archivedUsedEntityId)?.count).toBe(1);
+
+    // Et c'est bien **ce** projet-là que le chiffre compte.
+    const projectRows = await listProjects(a.scope, {
+      entityId: archivedUsedEntityId,
+    });
+    expect(projectRows.map((row) => row.id)).toEqual([keptEntityProjectId]);
+  });
+
+  test("l'ordre des entités est celui du référentiel, jamais celui du décompte", async () => {
+    const { entities: rows } = await listProjectDistribution(a.scope);
+    const ranks = rows.map((entry) => entry.id);
+
+    // L'entité d'amorçage est en position 0 et porte des projets ; celle sans
+    // produit est en 1 et n'en porte aucun. Trier par nombre les inverserait.
+    expect(ranks.indexOf(a.entityId)).toBeLessThan(ranks.indexOf(emptyEntityId));
+    expect(ranks.indexOf(emptyEntityId)).toBeLessThan(
+      ranks.indexOf(archivedUsedEntityId),
+    );
+  });
+
+  test("une entité d'un autre domaine n'entre pas — `filter(entities)`", async () => {
+    const { entities: rows } = await listProjectDistribution(a.scope);
+
+    expect(rows.map((entry) => entry.id)).not.toContain(b.entityId);
+  });
+
+  test("un produit d'un autre domaine ne rattache rien — `filter(products)`", async () => {
+    const { entities: rows } = await listProjectDistribution(a.scope);
+
+    // Le projet qu'il porte est pourtant de `a` : c'est le produit, et lui
+    // seul, qui coupe la chaîne. Retirer `filter(projects)` ne rend pas ce
+    // décompte non nul.
+    expect(entryFor(rows, leakedProductEntityId)?.count).toBe(0);
+  });
+
+  test("un projet d'un autre domaine ne se compte pas — `filter(projects)`", async () => {
+    const { entities: rows } = await listProjectDistribution(a.scope);
+
+    // L'inverse du précédent : le produit est de `a` et vivant, seul le projet
+    // est d'ailleurs.
+    expect(entryFor(rows, leakedProjectEntityId)?.count).toBe(0);
+  });
+
   test("une valeur de référentiel archivée sans projet n'est pas rendue", async () => {
     const { statuses } = await listProjectDistribution(a.scope);
 
@@ -978,8 +1186,12 @@ describe("listProjectDistribution", () => {
   });
 
   /* ------------------------------------------------------------------------
-     Les quatre étanchéités de la répartition. Chacune vise **un seul**
-     `filter()`, sur une valeur de référentiel qui ne sert qu'à elle.
+     Les étanchéités de la répartition. Chacune vise **un seul** `filter()`,
+     sur une valeur de référentiel qui ne sert qu'à elle.
+
+     **Sans le compte** : il disait « quatre » pour cinq, et T7.2 en ajoute
+     trois — un nombre dans un commentaire vieillit à chaque ticket, et c'est
+     le geste de T6.1 sur `scoped.ts`, resservi ici.
      ------------------------------------------------------------------------ */
 
   test("un statut d'un autre domaine n'entre pas — `filter(projectStatuses)`", async () => {

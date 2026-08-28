@@ -65,8 +65,25 @@ export type ProjectRow = {
   lastActivityAt: Date | null;
 };
 
-/** Les filtres combinables de l'écran. Tous facultatifs, tous cumulatifs. */
+/**
+ * Les filtres combinables de l'écran. Tous facultatifs, tous cumulatifs.
+ *
+ * **Les quatre de `docs/06` §4 depuis T7.2** — entité, métier, approche,
+ * statut —, plus la recherche, que le document tient à part.
+ */
 export type ProjectFilters = {
+  /**
+   * L'entité, **tenue du produit** : un projet n'en porte pas.
+   * `products.entity_id` est le seul chemin, et c'est déjà celui que la ligne
+   * affiche quand elle rend son produit de rattachement.
+   */
+  entityId?: string | undefined;
+  /**
+   * Le métier **déclaré du projet** (D44), jamais celui de l'équipe. Les deux
+   * peuvent diverger — un projet peut mobiliser un métier que personne de son
+   * équipe ne porte —, et c'est le déclaré qui fait foi pour le filtrage.
+   */
+  jobId?: string | undefined;
   approachId?: string | undefined;
   statusId?: string | undefined;
   /** Le texte saisi, déjà coupé. Vide vaut absent. */
@@ -101,7 +118,14 @@ function likePattern(search: string): string {
  * ferait le même résultat — la vérification a été faite, elle ne duplique rien.
  * `exists` est retenu parce qu'il ne touche pas à la forme du jeu de résultats :
  * le jour où le filtre acceptera plusieurs valeurs, la jointure se mettrait à
- * doubler les lignes et celui-ci non.
+ * doubler les lignes et celui-ci non. **Le métier reprend cette forme à la
+ * lettre** (T7.2) : c'est la même liaison n-à-n, et elle appelle la même
+ * précaution.
+ *
+ * **L'entité, elle, ne joint rien de neuf** : `products` est déjà en
+ * `innerJoin`, avec son `filter()`, et l'entité se lit sur sa colonne. Il n'y a
+ * donc aucun `filter()` de plus à ne pas oublier — la meilleure façon de ne pas
+ * manquer une jointure est de ne pas en ajouter.
  *
  * L'équipe est lue en une requête supplémentaire plutôt qu'agrégée en SQL : un
  * `json_agg` ferait tenir le tout en un aller-retour, au prix d'un type que rien
@@ -121,6 +145,31 @@ export function listProjects(
     ];
 
     if (filters.statusId) conditions.push(eq(projects.statusId, filters.statusId));
+
+    /* L'entité se lit sur le produit, déjà joint et déjà filtré. La valeur est
+       confrontée au domaine par l'écran avant d'arriver ici — et une entité
+       d'ailleurs ne désignerait de toute façon aucun produit d'ici, `products`
+       portant son `filter()` dans le `on` de sa jointure. */
+    if (filters.entityId) {
+      conditions.push(eq(products.entityId, filters.entityId));
+    }
+
+    if (filters.jobId) {
+      conditions.push(
+        exists(
+          database
+            .select({ one: sql`1` })
+            .from(projectJobs)
+            .where(
+              and(
+                filter(projectJobs),
+                eq(projectJobs.projectId, projects.id),
+                eq(projectJobs.jobId, filters.jobId),
+              ),
+            ),
+        ),
+      );
+    }
 
     if (filters.approachId) {
       conditions.push(
@@ -225,8 +274,13 @@ export function listProjects(
 /** Une valeur proposée au filtrage. */
 export type FilterOption = { id: string; label: string };
 
-/** Les deux listes de la barre de filtres. */
+/**
+ * Les **quatre** listes de la barre de filtres depuis T7.2 — l'ordre de
+ * `docs/06` §4 : entité, métier, approche, statut.
+ */
 export type ProjectFilterOptions = {
+  entities: FilterOption[];
+  jobs: FilterOption[];
   approaches: FilterOption[];
   statuses: FilterOption[];
 };
@@ -293,10 +347,59 @@ export function listProjectFilterOptions(
       .where(and(filter(approaches), liveProject))
       .orderBy(asc(approaches.position), asc(approaches.label));
 
+    /* L'entité passe par le produit : c'est le seul chemin d'un projet vers
+       elle, et il traverse donc deux jointures là où le statut n'en traverse
+       qu'une. */
+    const entityRows = await database
+      .selectDistinct({
+        id: entities.id,
+        label: entities.label,
+        position: entities.position,
+      })
+      .from(entities)
+      .innerJoin(
+        products,
+        and(eq(products.entityId, entities.id), filter(products)),
+      )
+      .innerJoin(
+        projects,
+        and(eq(projects.productId, products.id), filter(projects)),
+      )
+      .where(and(filter(entities), liveProject))
+      .orderBy(asc(entities.position), asc(entities.label));
+
+    /* Le métier passe par sa table de liaison, la forme exacte de l'approche —
+       **`filter()` sur chacune des trois jointures**, la table de liaison étant
+       une table du domaine comme les autres. D44 : ce sont les métiers
+       **déclarés du projet**, jamais ceux que son équipe porte. */
+    const jobRows = await database
+      .selectDistinct({
+        id: jobs.id,
+        label: jobs.label,
+        position: jobs.position,
+      })
+      .from(jobs)
+      .innerJoin(
+        projectJobs,
+        and(eq(projectJobs.jobId, jobs.id), filter(projectJobs)),
+      )
+      .innerJoin(
+        projects,
+        and(eq(projects.id, projectJobs.projectId), filter(projects)),
+      )
+      .innerJoin(
+        products,
+        and(eq(products.id, projects.productId), filter(products)),
+      )
+      .where(and(filter(jobs), liveProject))
+      .orderBy(asc(jobs.position), asc(jobs.label));
+
     const strip = (rows: { id: string; label: string }[]): FilterOption[] =>
       rows.map((row) => ({ id: row.id, label: row.label }));
 
     return {
+      entities: strip(entityRows),
+      jobs: strip(jobRows),
       approaches: strip(approachRows),
       statuses: strip(statusRows),
     };

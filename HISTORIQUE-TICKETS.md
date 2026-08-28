@@ -4372,3 +4372,89 @@ faux « les vingt et une constantes » de `lib/navigation.ts`, « les huit panne
 clés » de `page.tsx` — plus « sept écritures » d'`actions.ts`, déjà faux avant ce ticket. Le geste
 du dépôt depuis T6.1 est de **retirer** le nombre, jamais de le mettre à jour : un nombre dans un
 commentaire vieillit à chaque ticket. Cinquième famille du même défaut, et celle-là est refermée.
+
+---
+
+## T7.2 — Entité et métier : les deux filtres manquants, et la répartition par entité — 28/08/2026
+
+**Le ticket qui referme une dette de deux chantiers, et dans le seul ordre qui la refermait.**
+`docs/06` §4 demande quatre filtres sur la liste transverse depuis toujours ; il y en avait deux
+depuis T2.3. La conséquence n'était pas dans cet écran mais dans le suivant : `docs/06` §3 demande
+trois dimensions de répartition, T6.7 n'en a livré que deux, et son refus était argumenté —
+*« un chiffre dont le filtre n'existe pas n'est pas rendu »*. Poser le chiffre sans le filtre aurait
+donné un nombre qui ne mène nulle part ; poser le filtre depuis T6.7 aurait été une fonctionnalité
+hors ticket. **Il fallait deux tickets, dans cet ordre**, et c'est le second.
+
+### Ce qui a été écrit
+
+- **`lib/navigation.ts`** — `PROJECT_FILTER_PARAM` passe de deux clés à quatre : `entity: "entite"`
+  et `job: "metier"` rejoignent `approche` et `statut`, **dixième et onzième clés d'URL** du produit.
+  `ROUTES.projectsByEntity` prend la forme exacte de `projectsByStatus`. Aucune `projectsByJob` en
+  regard : rien hors de la liste n'écrit ce filtre, et une route sans appelant est celle qu'on relit
+  un jour sans savoir pourquoi.
+- **`lib/queries/projects.ts`** — `ProjectFilters` gagne `entityId` et `jobId`. **L'entité ne joint
+  rien de neuf** : `products` est déjà en `innerJoin` avec son `filter()`, et l'entité se lit sur sa
+  colonne — la meilleure façon de ne pas oublier un `filter()` est de ne pas ajouter de jointure. Le
+  métier passe par un `exists` sur `projectJobs`, **copie conforme** de celui des approches, pour la
+  raison qui l'avait fait choisir en T2.3 : le jour où le filtre acceptera plusieurs valeurs, une
+  jointure doublerait les lignes et celui-ci non. `ProjectFilterOptions` passe à quatre listes, les
+  deux neuves bâties comme les deux anciennes — `selectDistinct` sur les seules valeurs portées par
+  un projet vivant d'un produit vivant.
+- **`app/(app)/projets/page.tsx`** — deux paramètres de plus, confrontés au domaine par
+  `session.db.find` dans le `Promise.all` existant, deux `<select>` de plus **dans l'ordre du
+  document** (entité, métier, approche, statut), deux lignes de plus aux filtres appliqués. Le
+  composant `Select` s'est réemployé sans une ligne de changement : il se masque seul quand sa liste
+  est vide.
+- **`lib/queries/overview.ts`** — `ProjectDistribution` gagne `entities`, et une troisième requête
+  sur la chaîne `entities → products → projects`. `isRendered` et `strip` se sont réemployés tels
+  quels : une entité archivée sans projet ne se rend pas, une entité archivée **porteuse** se rend.
+- **`components/overview/distribution.tsx`** — la dimension « Par entité », entre statut et
+  approche, l'ordre de `docs/06` §3.
+
+### Ce qui a été vérifié, et comment
+
+- **Le contrat, mesuré dans le HTML servi, sur les trois dimensions.** Chaque chiffre du bloc a été
+  suivi jusqu'à `/projets`, et les lignes de la liste comptées dans la réponse — jamais le compteur
+  que la page affiche pour elle-même, qui est la même affirmation dite deux fois. **Seize valeurs,
+  dont sept à zéro** : statut 4 valeurs (2 à zéro), **entité 5 valeurs (4 à zéro)**, approche 7
+  valeurs (1 à zéro). Aucune divergence. La fiche en demandait trois dont une à zéro.
+- **Sept neutralisations, sept chutes, et l'isolement mesuré.** Retirer `isNull(products.archivedAt)`
+  puis `isNull(projects.archivedAt)` du décompte par entité fait tomber **le seul** constat de
+  contrat — la divergence exacte que la fiche cherchait. Retirer `filter(entities)` fait tomber son
+  seul constat ciblé. Retirer `filter(products)` ou `filter(projects)` de la chaîne fait tomber le
+  sien **et** le contrat, qui est global par construction — jamais celui de l'autre. Neutraliser le
+  filtre d'entité puis celui de métier fait tomber deux jeux **disjoints**, hors du constat de
+  combinaison, qui les assert tous les quatre par définition.
+- **Un constat partagé a été scindé pour cela.** La première rédaction mettait entité et métier dans
+  le même test d'étanchéité : il tombait sous l'une comme sous l'autre neutralisation, et une chute
+  non isolée ne désigne plus le filtre qu'elle éprouve. Deux tests, une frontière chacun.
+- **Le contraste se mesure, même quand la réponse est « rien de neuf ».** Aucun couple n'est neuf
+  **par la position** — le libellé d'entité reprend celui d'approche, dans le même bloc et sur le
+  même fond. Mesuré tout de même, sur `surface-neutral-pale` `#fdfdfd` : `content-neutral-darkest`
+  **17,87:1**, `content-info-base` **6,41:1**, `content-neutral-dark` **8,12:1**. Les trois passent
+  4,5:1.
+- **Le droit ne s'éprouve pas, et le dire est le constat.** Le ticket n'ouvre **aucun point d'entrée
+  d'écriture** : deux filtres de lecture et un décompte, tous ouverts à tout le domaine (D9). Il n'y
+  a pas d'action à forger. Inventer une sonde de droit ici aurait été mimer la discipline, pas
+  l'appliquer.
+- **Un identifiant qui ne désigne rien reste ignoré, jamais affiché.** Mesuré sur
+  `?entite=00000000-…` : la liste complète est servie, « Entité » n'apparaît pas dans les filtres
+  appliqués, et les trois occurrences de l'UUID dans la réponse sont toutes dans la charge Flight du
+  routeur — aucune dans un `<option>`, aucune dans le corps de liste.
+- **Le compte.** `tsc`, `npm run lint` (`--max-warnings=0`), `npm run build` et `npm run test` au
+  vert : 41 fichiers, **1 207 tests**, dont **18 neufs** — 10 pour les filtres et leurs options, 8
+  pour la répartition par entité.
+
+### Le point ouvert que ce ticket referme
+
+- **La liste transverse n'avait que deux filtres sur les quatre de `docs/06` §4** — `approche` et
+  `statut` depuis T2.3, ni entité ni métier ; et la répartition par entité n'était pas rendue en
+  conséquence. **Refermé aux deux bouts** : les quatre filtres existent, la troisième dimension est
+  rendue, et le contrat entre le chiffre et la liste est mesuré.
+
+### Le point ouvert qu'il laisse
+
+- **Deux colonnes de `docs/06` §4 manquent encore aux lignes** — l'entité et les métiers, sur les
+  sept que le document énumère. T7.2 a posé leurs **filtres**, pas leurs **colonnes** : son
+  « Attendu » ne les nommait pas, et la règle 3 tranche. Aucun ticket de C7 n'ouvre cet écran pour du
+  contenu — T7.9 s'interdit nommément de rouvrir T7.2. → **C8.**

@@ -514,11 +514,28 @@ export const BUDGET_PANEL_ENTRY = "saisie";
  * une URL appartient à l'interface, et son vocabulaire se tient en un seul
  * lieu.
  *
- * **`recherche` n'y figure pas**, et c'est délibéré : rien hors de la page ne
- * l'écrit. On ne monte que ce qui a deux lecteurs (règle 3) — une clé exportée
- * sans appelant est celle qu'on relit un jour sans savoir pourquoi.
+ * **Les quatre de `docs/06` §4 depuis T7.2**, et elles y sont ensemble parce
+ * qu'elles forment un **jeu** : entité, métier, approche, statut. `entite` a
+ * gagné le second lecteur qui avait fait monter les deux premières — la
+ * répartition de la vue d'ensemble rend désormais un chiffre par entité, et le
+ * chiffre et la liste doivent viser **la même** clé.
+ *
+ * **`metier` n'a qu'un lecteur, et c'est un écart assumé.** La règle écrite
+ * ici en T6.7 était « on ne monte que ce qui a deux lecteurs » ; la répartition
+ * par métier n'existe pas et n'existera pas — `docs/06` §3 n'en nomme que
+ * trois, et la fiche T7.2 l'interdit nommément. La laisser dans la page aurait
+ * scindé en deux endroits un jeu que l'écran lit d'un bloc, et fait de
+ * l'appartenance à ce module une question de **nombre de lecteurs** plutôt que
+ * de **nature**. Écart consigné dans `JOURNAL-TECHNIQUE.md`.
+ *
+ * **`recherche` n'y figure toujours pas**, et c'est la même frontière lue par
+ * l'autre bout : `docs/06` §4 sépare les **filtres** — chacun le nom d'un
+ * référentiel — de la **recherche**, qui court sur trois colonnes et n'est le
+ * nom de rien.
  */
 export const PROJECT_FILTER_PARAM = {
+  entity: "entite",
+  job: "metier",
   approach: "approche",
   status: "statut",
 } as const;
@@ -650,6 +667,22 @@ export const ROUTES = {
   /** La même, **filtrée sur une approche** (T6.7). Même forme, même raison. */
   projectsByApproach: (approachId: string) =>
     `/projets?${PROJECT_FILTER_PARAM.approach}=${approachId}`,
+  /**
+   * La même, **filtrée sur une entité** (T7.2) — la troisième dimension de la
+   * répartition, celle que `docs/06` §3 demandait et que T6.7 n'a pas rendue
+   * faute de ce filtre.
+   *
+   * **Un projet n'a pas d'entité à lui** : il la tient de son produit, et la
+   * liste résout le rattachement par `products.entity_id`. L'adresse, elle, ne
+   * dit que l'entité — c'est à l'écran de savoir par où passer.
+   *
+   * Aucune entrée `projectsByJob` en regard, et ce n'est pas un oubli : rien
+   * hors de la liste n'écrit ce filtre, la répartition par métier étant
+   * interdite (fiche T7.2). Une route sans appelant est celle qu'on relit un
+   * jour sans savoir pourquoi.
+   */
+  projectsByEntity: (entityId: string) =>
+    `/projets?${PROJECT_FILTER_PARAM.entity}=${entityId}`,
   project: (id: string) => `/projets/${id}`,
   projectNew: "/projets/nouveau",
   /**

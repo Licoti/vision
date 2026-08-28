@@ -17,13 +17,15 @@
  * partagent une **seule** source, faute de quoi un renommage de clé laisserait
  * le bloc servir des liens qui ne filtrent plus rien.
  *
- * **Deux dimensions, quand `docs/06` §3 en demande trois.** L'entité manque, et
- * son absence est la lettre de la fiche T6.7 : *« un chiffre dont le filtre
- * n'existe pas n'est pas rendu »*. `/projets` porte trois clés depuis T2.3 —
- * `recherche`, `approche`, `statut` — et aucune ne désigne l'entité. Rendre le
- * chiffre sans son lien serait rendre un nombre qui ne se vérifie pas ; poser
- * le filtre manquant serait une fonctionnalité hors du ticket (règle 3). Point
- * ouvert d'`ETAT.md`, destination C7.
+ * **Les trois dimensions du document depuis T7.2** — statut, entité, approche —
+ * et dans son ordre. L'entité a manqué le temps d'un chantier, parce que la
+ * fiche T6.7 avait tranché qu'*« un chiffre dont le filtre n'existe pas n'est
+ * pas rendu »* : `/projets` n'avait aucune clé d'entité, et un chiffre sans son
+ * lien est un nombre qui ne se vérifie pas. T7.2 a posé le filtre d'abord.
+ *
+ * **Il n'y a pas de quatrième dimension, et le métier n'en fera pas une.** Il a
+ * gagné son filtre par le même ticket ; `docs/06` §3 nomme trois répartitions,
+ * et une quatrième ne s'invente pas depuis la seule existence d'un filtre.
  *
  * **Un zéro se rend, et il s'écrit en toutes lettres.** « Aucun projet » est un
  * fait du domaine — un statut de son référentiel que personne n'emploie — et le
@@ -58,14 +60,15 @@ export function Distribution({
 }: {
   distribution: ProjectDistribution;
 }) {
-  const { statuses, approaches } = distribution;
-  const hasAny = statuses.length > 0 || approaches.length > 0;
+  const { statuses, entities, approaches } = distribution;
+  const hasAny =
+    statuses.length > 0 || entities.length > 0 || approaches.length > 0;
 
   return (
     <Section>
       <SectionHeader
         title="Répartition"
-        note="Combien d'accompagnements par statut et par approche. Chaque nombre ouvre la liste correspondante."
+        note="Combien d'accompagnements par statut, par entité et par approche. Chaque nombre ouvre la liste correspondante."
       />
 
       {hasAny ? (
@@ -89,6 +92,26 @@ export function Distribution({
             </Dimension>
           ) : null}
 
+          {entities.length > 0 ? (
+            <Dimension title="Par entité">
+              {entities.map((entry) => (
+                <Entry
+                  key={entry.id}
+                  href={ROUTES.projectsByEntity(entry.id)}
+                  count={entry.count}
+                >
+                  {/* Le libellé d'une entité se rend comme celui d'une
+                      approche, dans le même bloc et sur le même fond : aucun
+                      couple de couleurs neuf par la position, donc aucune
+                      mesure de contraste à refaire. */}
+                  <span className="text-sm font-semibold text-content-neutral-darkest">
+                    {entry.label}
+                  </span>
+                </Entry>
+              ))}
+            </Dimension>
+          ) : null}
+
           {approaches.length > 0 ? (
             <Dimension title="Par approche">
               {approaches.map((entry) => (
@@ -107,15 +130,17 @@ export function Distribution({
         </div>
       ) : (
         /* **Le référentiel vide, et non la liste vide** : ce bloc ne dépend pas
-           des projets mais des statuts et des approches du domaine. Un domaine
-           qui n'en porte aucun n'a rien à répartir — et T1.5 en sème.
+           des projets mais des statuts, des entités et des approches du
+           domaine. Un domaine qui n'en porte aucun n'a rien à répartir — et
+           T1.5 en sème.
 
            C'est un `BlockNote` et non un `EmptyState`, la règle du bloc voisin :
            le bloc a son en-tête, et il n'a **aucun geste** à proposer — un
            référentiel se tient en Administration, pas ici. */
         <BlockNote>
-          Les statuts et les approches du domaine s&apos;afficheront ici, avec
-          le nombre d&apos;accompagnements que chacun porte.
+          Les statuts, les entités et les approches du domaine
+          s&apos;afficheront ici, avec le nombre d&apos;accompagnements que
+          chacun porte.
         </BlockNote>
       )}
     </Section>
@@ -123,7 +148,8 @@ export function Distribution({
 }
 
 /**
- * Une dimension de la répartition — « Par statut », « Par approche ».
+ * Une dimension de la répartition — « Par statut », « Par entité », « Par
+ * approche ».
  *
  * Le titre est un `h3` : il vient **sous** le `h2` de `SectionHeader`, et un
  * `h2` de plus en ferait un frère de ce qui le contient. La hiérarchie des
