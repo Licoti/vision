@@ -48,7 +48,6 @@ import {
   indicatorReadings,
   indicators,
   jobs,
-  personAvailability,
   personSkills,
   persons,
   projectApproaches,
@@ -342,8 +341,10 @@ const STARTERS: {
  *   — les **trois** valeurs de disponibilité sont représentées, sans quoi la
  *     pastille n'aurait que deux de ses trois couleurs à montrer.
  *
- * Arbitrage (d) — Marc Tellier, côté entité, n'a ni présentation, ni
- * disponibilité, ni compétence : elles sont propriété du centre.
+ * Arbitrage (d) — Marc Tellier, côté entité, n'a ni présentation ni compétence :
+ * elles sont propriété du centre. **La disponibilité ne se sème plus** : elle se
+ * déduit du nombre d'accompagnements vivants depuis le 28/08/2026, et c'est donc
+ * l'équipe des projets ci-dessous qui la produit.
  */
 const PERSONS: {
   fullName: string;
@@ -351,7 +352,6 @@ const PERSONS: {
   job?: string;
   role?: DomainRole;
   bio?: string;
-  availability?: Availability;
   skills?: { skill: string; level: string }[];
 }[] = [
   {
@@ -360,7 +360,6 @@ const PERSONS: {
     job: "Product Design",
     role: "domain_manager",
     bio: "Product designer, accompagne les équipes du cadrage à la mise en service.",
-    availability: "partial",
     skills: [
       { skill: "Design Strategy", level: "Expert" },
       { skill: "UX Design", level: "Avancé" },
@@ -374,7 +373,6 @@ const PERSONS: {
     job: "UX Research",
     role: "member",
     bio: "Chercheuse, mène les entretiens et les campagnes de tests utilisateurs.",
-    availability: "available",
     skills: [
       { skill: "User Research", level: "Expert" },
       { skill: "Facilitation", level: "Avancé" },
@@ -387,7 +385,6 @@ const PERSONS: {
     job: "UI Design",
     role: "member",
     bio: "Designer d'interface, tient le design system et les parcours à l'écran.",
-    availability: "available",
     skills: [
       { skill: "UI Design", level: "Expert" },
       { skill: "Design System", level: "Avancé" },
@@ -402,7 +399,6 @@ const PERSONS: {
     job: "Accessibilité",
     role: "member",
     bio: "Référente accessibilité, conduit les audits de conformité et les mises en conformité.",
-    availability: "partial",
     skills: [
       { skill: "Accessibilité", level: "Expert" },
       { skill: "UX Audit", level: "Avancé" },
@@ -414,7 +410,6 @@ const PERSONS: {
     job: "UX Research",
     role: "member",
     bio: "Chercheuse, travaille l'observation terrain et la structure de l'information.",
-    availability: "available",
     skills: [
       { skill: "User Research", level: "Avancé" },
       { skill: "Architecture de l'information", level: "Avancé" },
@@ -427,7 +422,6 @@ const PERSONS: {
     job: "Product Design",
     role: "member",
     bio: "Product designer, intervient sur le cadrage et la conception de services.",
-    availability: "unavailable",
     skills: [
       { skill: "UX Design", level: "Avancé" },
       { skill: "Facilitation", level: "Avancé" },
@@ -441,7 +435,6 @@ const PERSONS: {
     job: "UX Research",
     role: "member",
     bio: "Chercheuse, relie les usages mesurés aux constats d'audit.",
-    availability: "partial",
     skills: [
       { skill: "User Research", level: "Avancé" },
       { skill: "UX Audit", level: "Avancé" },
@@ -790,7 +783,6 @@ type StarterKind = (typeof starterKind.enumValues)[number];
 type Family = (typeof activityFamily.enumValues)[number];
 type ActivityState = (typeof activityState.enumValues)[number];
 type DomainRole = (typeof domainRole.enumValues)[number];
-type Availability = (typeof personAvailability.enumValues)[number];
 
 /* ==========================================================================
    Le rapprochement
@@ -1093,7 +1085,6 @@ async function seed(): Promise<void> {
         kind: person.kind,
         jobId: person.job ? idOf(jobIndex, person.job, "Métier") : null,
         bio: person.bio ?? null,
-        availability: person.availability ?? null,
         hasAccess: person.role !== undefined,
         domainRole: person.role ?? null,
         isActive: true,

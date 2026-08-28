@@ -738,6 +738,69 @@ export async function archiveProject(
 }
 
 /**
+ * Supprimer un accompagnement — **définitivement**, et sans que la base s'y
+ * oppose (28/08/2026).
+ *
+ * **C'est `F1-D3` renversé** — *« un projet s'archive, ne se supprime jamais »* —
+ * et la règle 4 avec lui. L'arbitrage est humain, il est daté, et il est
+ * consigné dans `JOURNAL-TECHNIQUE.md` ; `CLAUDE.md` ne s'écrit pas d'ici
+ * (règle 7).
+ *
+ * **Ce que le geste emporte, aucune clé étrangère ne le retiendra.** Les dix qui
+ * pointent `projects.id` sont `on delete cascade` : métiers, approches, équipe,
+ * activités — donc participants et résultats —, ressources, adoptions
+ * d'indicateurs, budget, liens déclarés et **journal**. C'est l'écart franc avec
+ * `deleteEntity`, que `products.entity_id` protège en `restrict` : là-bas, la
+ * base refuse ce que l'écran a manqué de refuser ; **ici, le panneau de
+ * confirmation est le seul garde-fou**, et il annonce ce décompte
+ * (`countProjectContents`).
+ *
+ * **Aucune condition d'archivage** : le geste est offert sur un accompagnement
+ * vivant comme sur un accompagnement rangé — choix de l'humain. Ranger reste le
+ * chemin par défaut, et c'est le panneau qui le dit.
+ *
+ * **Aucune ligne de journal**, et ce n'est pas un oubli : `events.project_id` est
+ * `cascade`, si bien qu'une trace écrite juste avant serait effacée par
+ * l'instruction suivante. Le geste rejoint donc la famille des objets qui
+ * écrivent sans laisser de trace — arbitrage (b) de C6, (d) de C7 — et le point
+ * ouvert d'`ETAT.md` se récrit avec ce nom.
+ *
+ * **Le droit est `manageDomain`**, celui d'`archiveProject`, redérivé sur
+ * l'identifiant **reçu** : `bind(null, project.id)` fait sortir l'identifiant de
+ * la saisie, mais Next le sérialise dans un champ `$ACTION_…`, réécrivable.
+ */
+export async function deleteProject(
+  projectId: string,
+  _previous: ConfirmState,
+  _formData: FormData,
+): Promise<ConfirmState> {
+  const gate = await openProjectAsManager(projectId);
+  if ("message" in gate) return gate;
+  const { session, project } = gate;
+
+  const removed = await session.db.deleteRow(projects, projectId);
+  if (removed === 0) {
+    return { message: "Cet accompagnement n'existe plus dans ce domaine." };
+  }
+
+  /* Les trois quarts de `refreshAround`, **moins la page du projet** : elle
+     n'existe plus, et la revalider ne ferait que la re-rendre en 404 derrière
+     le panneau. */
+  revalidatePath(ROUTES.projects);
+  revalidatePath(ROUTES.products);
+  revalidatePath(ROUTES.product(project.productId));
+
+  /* **La seule action de panneau qui redirige encore**, et pour une raison
+     qu'aucune autre n'a : `ConfirmPanel` se referme sur `ok: true` en laissant
+     la page derrière lui (TD.2), or il n'y a plus de page derrière lui. La
+     fermeture *est* la navigation.
+
+     `redirect` lève : elle est appelée **hors de tout `try`**, la règle de
+     `goToProject` ci-dessus. */
+  redirect(ROUTES.projects);
+}
+
+/**
  * Rétablir un accompagnement archivé — le retour que sa page porte
  * (arbitrage (b)).
  *

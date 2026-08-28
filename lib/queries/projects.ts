@@ -25,16 +25,22 @@ import {
   inArray,
   isNotNull,
   isNull,
+  ne,
   or,
   sql,
 } from "drizzle-orm";
 
+import {
+  availabilityFromProjects,
+  type PersonAvailability,
+} from "@/lib/availability";
 import type { ScopedDb } from "@/lib/db/scoped";
 import {
+  activities,
   approaches,
   entities,
+  events,
   jobs,
-  personAvailability,
   personKind,
   persons,
   products,
@@ -44,6 +50,8 @@ import {
   projectStatusNature,
   projectStatuses,
   projects,
+  resources,
+  results,
 } from "@/lib/db/schema";
 
 /** Les quatre natures de statut, telles que le schéma les énumère. */
@@ -612,8 +620,16 @@ export type ProjectFormPerson = {
   kind: (typeof personKind.enumValues)[number];
   /** Nul : une personne hors centre n'a pas de métier design (`docs/04` §2). */
   jobLabel: string | null;
-  /** Nulle pour un intervenant côté entité — arbitrage (d) de C5bis. */
-  availability: (typeof personAvailability.enumValues)[number] | null;
+  /**
+   * Nulle pour un intervenant côté entité — arbitrage (d) de C5bis.
+   *
+   * **Déduite depuis le 28/08/2026** (`lib/availability.ts`) : elle ne se lit
+   * plus dans une colonne, elle se compte — les accompagnements ni archivés ni
+   * terminés. C'est la même règle que sur la page Équipe, et c'est ce qui compte
+   * ici : deux écrans qui diraient deux disponibilités de la même personne
+   * seraient un défaut.
+   */
+  availability: PersonAvailability | null;
 };
 
 /** Tout ce que les deux écrans de saisie proposent au choix. */
@@ -695,6 +711,7 @@ export async function listProjectFormOptions(
     jobLabelRows,
     approachRows,
     personRows,
+    loadRows,
   ] = await Promise.all([
     scope.list(products, {
       ...(keep.productId
@@ -761,10 +778,60 @@ export async function listProjectFormOptions(
         : { where: eq(persons.isActive, true) }),
       orderBy: [asc(persons.fullName)],
     }),
+    /* **La huitième lecture, et elle est fixe** (28/08/2026) : le nombre
+       d'accompagnements **en cours** par personne, en un seul regroupement pour
+       tout le domaine. Jamais une requête par personne — la discipline de
+       `listTeam` et de `findProjectActivities`.
+
+       Elle ne se restreint pas aux personnes retenues ci-dessus : les deux
+       lectures partent ensemble, donc leurs identifiants ne sont pas encore
+       connus, et un domaine a moins de membres que d'accompagnements. Ce qui
+       n'est pas retenu ne sera simplement pas lu dans la carte.
+
+       **Les deux exclusions sont celles de `listTeam`** — ni archivé, ni
+       terminé —, et c'est la seule chose que les deux lectures doivent dire à
+       l'identique. Elles ne partagent pas leur SQL : ce sont deux formes
+       (sous-requête corrélée là-bas, regroupement ici), et c'est un témoin de
+       test qui tient l'accord, pas le compilateur.
+
+       `filter()` est posé sur les trois tables jointes, comme partout dans
+       `joinedRead` : un membre, un accompagnement ou un statut d'un autre
+       domaine ne prouve aucune charge. */
+    scope.joinedRead((database, { filter }) =>
+      database
+        .select({
+          personId: projectMembers.personId,
+          total: sql<number>`count(*)::int`,
+        })
+        .from(projectMembers)
+        .innerJoin(
+          projects,
+          and(eq(projects.id, projectMembers.projectId), filter(projects)),
+        )
+        .innerJoin(
+          projectStatuses,
+          and(
+            eq(projectStatuses.id, projects.statusId),
+            filter(projectStatuses),
+          ),
+        )
+        .where(
+          and(
+            filter(projectMembers),
+            isNull(projects.archivedAt),
+            ne(projectStatuses.nature, "done"),
+          ),
+        )
+        .groupBy(projectMembers.personId),
+    ),
   ]);
 
   const entityLabels = new Map(entityRows.map((row) => [row.id, row.label]));
   const jobLabels = new Map(jobLabelRows.map((row) => [row.id, row.label]));
+  /* Absente de la carte : zéro accompagnement en cours. `groupBy` ne rend pas
+     de ligne pour qui n'en a aucun — ni pour qui n'en a que des terminés —, et
+     c'est justement le cas « Disponible ». */
+  const projectLoad = new Map(loadRows.map((row) => [row.personId, row.total]));
 
   return {
     products: productRows.map((product) => ({
@@ -780,7 +847,13 @@ export async function listProjectFormOptions(
       fullName: row.fullName,
       kind: row.kind,
       jobLabel: row.jobId ? (jobLabels.get(row.jobId) ?? null) : null,
-      availability: row.availability,
+      /* Arbitrage (d) de C5bis, tenu par la lecture depuis que le `CHECK` est
+         tombé avec la colonne : un intervenant côté entité ne porte pas de
+         disponibilité. */
+      availability:
+        row.kind === "center"
+          ? availabilityFromProjects(projectLoad.get(row.id) ?? 0)
+          : null,
     })),
   };
 }
@@ -817,4 +890,86 @@ export async function findProjectLinks(
       isContributor: row.isContributor,
     })),
   };
+}
+
+/* ==========================================================================
+   Ce qu'une suppression emporte — 28/08/2026
+   ========================================================================== */
+
+/**
+ * Ce que la suppression d'un accompagnement effacerait avec lui.
+ *
+ * **Quatre nombres, et ils ne décident de rien.** Ils sont lus pour être
+ * **dits** — c'est la règle de `liveProductCount` sur les entités —, à ceci près
+ * qu'ici, à la différence des entités, **rien d'autre ne décide non plus** : les
+ * dix clés étrangères qui pointent `projects.id` sont `on delete cascade`, et
+ * aucune n'opposera de refus. Le panneau de confirmation est le seul garde-fou
+ * de ce geste, et ce décompte est ce qu'il annonce. Voir `DeletableTable`
+ * (`lib/db/scoped.ts`).
+ *
+ * **Quatre, et pas dix.** Les six autres cascades — métiers, approches, équipe,
+ * adoptions d'indicateurs, budget, liens déclarés — se nomment dans la phrase
+ * du panneau sans se compter : « trois approches » n'aide personne à décider,
+ * quand « douze activités » le fait. On compte ce qui pèse.
+ *
+ * **Les archivés comptent** (`includeArchived`) : c'est la totalité qui part, et
+ * annoncer un nombre plus petit que la réalité serait le contraire d'une mise en
+ * garde. Les résultats se comptent par leur activité — `results` n'a pas de
+ * `project_id` —, et `events` n'a pas d'`archived_at` : sa ligne est une trace,
+ * elle ne se range pas.
+ *
+ * Quatre lectures qui partent ensemble : le nombre d'allers-retours ne dépend
+ * pas du nombre de lignes comptées, et ce panneau ne s'ouvre qu'une fois.
+ */
+export type ProjectContents = {
+  activities: number;
+  resources: number;
+  results: number;
+  events: number;
+};
+
+export function countProjectContents(
+  scope: ScopedDb,
+  projectId: string,
+): Promise<ProjectContents> {
+  return scope.joinedRead(async (database, { filter }) => {
+    /* **Quatre lectures et non une**, et c'est une correction du 28/08/2026 :
+       la version d'origine tenait les quatre décomptes en sous-requêtes
+       scalaires écrites à la main, et PostgreSQL l'a refusée — un `sql` brut ne
+       qualifie pas ses colonnes comme le fait le constructeur de requêtes, si
+       bien que le `id` de la jointure des résultats devenait ambigu. Le défaut
+       s'est lu dans le HTML servi, en 500 sur le panneau.
+
+       La forme d'ici ne s'écrit plus en SQL : trois `count` de la couche, plus
+       une jointure pour les résultats — `results` n'ayant pas de `project_id`.
+       Elles partent ensemble, donc un seul temps d'attente, et ce panneau ne
+       s'ouvre qu'une fois, sur une confirmation. */
+    const [activityRows, resourceRows, resultRows, eventRows] =
+      await Promise.all([
+        scope.count(activities, {
+          where: eq(activities.projectId, projectId),
+          includeArchived: true,
+        }),
+        scope.count(resources, {
+          where: eq(resources.projectId, projectId),
+          includeArchived: true,
+        }),
+        database
+          .select({ id: results.id })
+          .from(results)
+          .innerJoin(
+            activities,
+            and(eq(activities.id, results.activityId), filter(activities)),
+          )
+          .where(and(filter(results), eq(activities.projectId, projectId))),
+        scope.count(events, { where: eq(events.projectId, projectId) }),
+      ]);
+
+    return {
+      activities: activityRows,
+      resources: resourceRows,
+      results: resultRows.length,
+      events: eventRows,
+    };
+  });
 }

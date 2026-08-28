@@ -317,6 +317,54 @@ export function formatPersons(count: number): string {
 }
 
 /**
+ * « 12 activités » · « 1 activité » · « Aucune activité ».
+ *
+ * **Les quatre décomptes qui suivent servent une seule phrase** : celle du
+ * panneau qui annonce ce que la suppression d'un accompagnement emporte
+ * (28/08/2026). Ils disent ce qu'un geste **efface**, là où `formatProducts` dit
+ * ce qui s'y oppose — et c'est la seule chose qui aide à décider.
+ *
+ * **Ils ne s'affichent nulle part ailleurs, et surtout pas sur un écran de
+ * lecture.** Un nombre d'activités posé à côté d'un accompagnement serait la
+ * mesure d'activité que D39 interdit ; ici, il est le contenu d'une mise en
+ * garde, lue une fois, avant un geste irréversible.
+ *
+ * Zéro s'écrit en toutes lettres, la règle des cinq fonctions voisines — et pour
+ * une raison de plus ici : « 0 activité » se lirait comme un manque, quand la
+ * phrase veut dire « rien de ce genre ne sera perdu ».
+ */
+export function formatActivities(count: number): string {
+  if (count === 0) return "aucune activité";
+  return `${count} activité${count > 1 ? "s" : ""}`;
+}
+
+/** « 3 ressources » · « 1 ressource » · « aucune ressource ». Même emploi. */
+export function formatResources(count: number): string {
+  if (count === 0) return "aucune ressource";
+  return `${count} ressource${count > 1 ? "s" : ""}`;
+}
+
+/** « 3 résultats » · « 1 résultat » · « aucun résultat ». Même emploi. */
+export function formatResults(count: number): string {
+  if (count === 0) return "aucun résultat";
+  return `${count} résultat${count > 1 ? "s" : ""}`;
+}
+
+/**
+ * « 48 lignes de journal » · « 1 ligne de journal » · « aucune ligne de
+ * journal ». Même emploi.
+ *
+ * **« Journal », jamais « activité »** : la règle de C6 ne s'éteint pas avec lui.
+ * Une ligne de journal est une trace technique ; une activité est un fait
+ * d'accompagnement. Les confondre dans une mise en garde ferait croire qu'on
+ * efface deux fois la même chose.
+ */
+export function formatEvents(count: number): string {
+  if (count === 0) return "aucune ligne de journal";
+  return `${count} ligne${count > 1 ? "s" : ""} de journal`;
+}
+
+/**
  * « 3 relevés » · « 1 relevé » · « Aucun relevé ».
  *
  * Le compteur d'un indicateur, sur la page produit. Zéro s'écrit en toutes

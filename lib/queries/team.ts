@@ -23,13 +23,19 @@ import {
   ilike,
   inArray,
   isNull,
+  lte,
   sql,
+  type SQL,
 } from "drizzle-orm";
 
+import {
+  AVAILABILITY_BOUNDS,
+  availabilityFromProjects,
+  type PersonAvailability,
+} from "@/lib/availability";
 import type { ScopedDb } from "@/lib/db/scoped";
 import {
   jobs,
-  personAvailability,
   personKind,
   personSkills,
   persons,
@@ -45,13 +51,16 @@ import type { ProjectStatusNature } from "@/lib/queries/projects";
 export type PersonKind = (typeof personKind.enumValues)[number];
 
 /**
- * Les trois disponibilités, telles que le schéma les énumère.
+ * **Réexporté**, et c'est le seul de ce module.
  *
- * Exportée d'ici et non du schéma, comme `ProjectStatusNature` l'est de
- * `lib/queries/projects.ts` : la pastille lit le type de la requête qui la
- * nourrit, et non de la table. C'est ce précédent qu'`AvailabilityDot` suit.
+ * `PersonAvailability` sortait d'ici depuis T5bis.2, sur le précédent de
+ * `ProjectStatusNature` : la pastille lit le type de la requête qui la nourrit.
+ * La règle a déménagé dans `lib/availability.ts` le 28/08/2026 — deux modules de
+ * lecture en ont besoin —, mais la raison de l'exporter d'ici n'a pas bougé, et
+ * réécrire les appelants pour une valeur qui n'a pas changé de sens n'aurait
+ * rien réparé.
  */
-export type PersonAvailability = (typeof personAvailability.enumValues)[number];
+export type { PersonAvailability };
 
 /**
  * Une compétence portée, avec son niveau.
@@ -192,6 +201,42 @@ export function listTeam(
           ),
       );
 
+    /**
+     * Le nombre d'accompagnements **en cours** dont la personne est membre, en
+     * une sous-requête corrélée.
+     *
+     * Elle sert deux fois — au filtre ci-dessous et à la colonne de la lecture
+     * — et c'est pourquoi elle est nommée : deux écritures du même décompte
+     * finiraient par diverger. `filter()` est posé sur **les trois** tables
+     * jointes, comme partout dans `joinedRead` : un membre, un accompagnement ou
+     * un statut d'un autre domaine ne prouve aucune charge.
+     *
+     * **Deux exclusions, et chacune a sa raison** (arbitrage humain du
+     * 28/08/2026) : l'accompagnement **archivé** est sorti de la lecture, et
+     * l'accompagnement **terminé** a cessé d'occuper qui l'a mené. La seconde a
+     * corrigé une première version qui ne posait que la première — quelqu'un
+     * dont le seul accompagnement venait de se terminer y restait indisponible.
+     *
+     * `projectStatuses` est jointe en **`join`** et non en `left join` :
+     * `projects.status_id` est `not null`, un accompagnement sans statut
+     * n'existe pas, et une jointure externe ferait croire le contraire à qui
+     * relit.
+     */
+    const livingProjectCount = sql<number>`(
+      select count(*)::int
+      from ${projectMembers}
+      join ${projects}
+        on ${projects.id} = ${projectMembers.projectId}
+       and ${filter(projects)}
+       and ${projects.archivedAt} is null
+      join ${projectStatuses}
+        on ${projectStatuses.id} = ${projects.statusId}
+       and ${filter(projectStatuses)}
+       and ${projectStatuses.nature} <> 'done'
+      where ${filter(projectMembers)}
+        and ${projectMembers.personId} = ${persons.id}
+    )`;
+
     const conditions = [filter(persons), isNull(persons.archivedAt)];
 
     if (filters.search) {
@@ -199,7 +244,24 @@ export function listTeam(
     }
     if (filters.jobId) conditions.push(eq(persons.jobId, filters.jobId));
     if (filters.availability) {
-      conditions.push(eq(persons.availability, filters.availability));
+      /* **Le filtre ne porte plus sur une colonne** : la disponibilité est
+         déduite depuis le 28/08/2026. Il compare donc la même sous-requête que
+         la lecture, aux mêmes bornes — `AVAILABILITY_BOUNDS` est lu ici et par
+         `availabilityFromProjects`, sans quoi la liste et son filtre finiraient
+         par dire deux vérités.
+
+         `kind = 'center'` est conjoint : un intervenant côté entité ne porte
+         aucune disponibilité (arbitrage (d) de C5bis), il ne doit donc ressortir
+         d'aucune des trois valeurs — pas même de « Disponible », où son zéro
+         accompagnement l'aurait mis. */
+      const { min, max } = AVAILABILITY_BOUNDS[filters.availability];
+      conditions.push(
+        and(
+          eq(persons.kind, "center"),
+          gte(livingProjectCount, min),
+          ...(max === null ? [] : [lte(livingProjectCount, max)]),
+        ) as SQL,
+      );
     }
 
     if (filters.skillIds?.length) {
@@ -216,7 +278,11 @@ export function listTeam(
         fullName: persons.fullName,
         jobLabel: jobs.label,
         kind: persons.kind,
-        availability: persons.availability,
+        /* La **troisième valeur fixe** de cette lecture, et non une requête par
+           personne : la sous-requête corrélée est évaluée par PostgreSQL dans
+           le même aller-retour. Le nombre de requêtes ne dépend toujours ni du
+           nombre de personnes, ni du nombre de compétences cochées. */
+        projectCount: livingProjectCount,
       })
       .from(persons)
       .leftJoin(jobs, and(eq(jobs.id, persons.jobId), filter(jobs)))
@@ -261,8 +327,17 @@ export function listTeam(
       byPerson.set(row.personId, carried);
     }
 
-    return rows.map((row) => ({
+    /* **Le décompte ne sort pas de cette fonction** : `projectCount` est
+       consommé ici et n'entre pas dans `TeamMemberRow`. C'est ce qui sépare la
+       disponibilité déduite du « nombre d'accompagnements » que D39 interdit
+       d'afficher — l'écran reçoit trois mots, jamais un chiffre.
+
+       Arbitrage (d) de C5bis, tenu par la lecture depuis que le `CHECK` est
+       tombé : un intervenant côté entité ne porte pas de disponibilité. */
+    return rows.map(({ projectCount, ...row }) => ({
       ...row,
+      availability:
+        row.kind === "center" ? availabilityFromProjects(projectCount) : null,
       skills: byPerson.get(row.id) ?? [],
     }));
   });
@@ -460,7 +535,9 @@ export type PersonDetail = {
  *
  * **Aucun décompte n'est rendu** : ni nombre d'accompagnements, ni nombre de
  * compétences, ni moyenne de niveau. La liste se lit, elle ne se totalise pas
- * (garde-fou 2).
+ * (garde-fou 2). Le décompte des accompagnements est bien **calculé** depuis le
+ * 28/08/2026 — mais il est consommé ici, par `availabilityFromProjects`, et ce
+ * qui ressort est un mot, jamais un nombre.
  */
 export function findPersonDetail(
   scope: ScopedDb,
@@ -476,7 +553,6 @@ export function findPersonDetail(
         jobLabel: jobs.label,
         kind: persons.kind,
         bio: persons.bio,
-        availability: persons.availability,
       })
       .from(persons)
       .leftJoin(jobs, and(eq(jobs.id, persons.jobId), filter(jobs)))
@@ -568,6 +644,25 @@ export function findPersonDetail(
 
     return {
       ...person,
+      /* **Aucune lecture neuve pour la disponibilité** (28/08/2026) : elle se
+         déduit de `projectRows`, que cette fonction lisait déjà — et qui porte
+         `statusNature`, ce qui suffit à en retirer les terminés.
+
+         Arbitrage (d) de C5bis, tenu par la lecture depuis que le `CHECK` est
+         tombé : un intervenant côté entité ne porte pas de disponibilité. */
+      /* **Le décompte n'est pas `projectRows.length`**, et c'est la moitié du
+         sujet : la fiche **liste** les accompagnements non archivés, terminés
+         compris — c'est un parcours —, alors que la charge ne compte que ceux
+         qui sont en cours. Une personne dont le seul accompagnement est terminé
+         voit donc une ligne sous « Accompagnements » et la pastille
+         « Disponible », et les deux disent vrai : chaque ligne de cette liste
+         porte sa pastille de statut, où « Terminé » se lit. */
+      availability:
+        person.kind === "center"
+          ? availabilityFromProjects(
+              projectRows.filter((row) => row.statusNature !== "done").length,
+            )
+          : null,
       skills: skillRows,
       projects: projectRows,
       /* Aucun niveau dans le domaine : `0`, et le dessin n'a rien à situer. */

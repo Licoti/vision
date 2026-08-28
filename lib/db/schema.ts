@@ -51,22 +51,14 @@ export const personSource = pgEnum("person_source", ["directory", "manual"]);
 
 export const personKind = pgEnum("person_kind", ["center", "stakeholder"]);
 
-/**
- * La disponibilité d'une personne du centre.
- *
- * Arbitrage (b) de C5bis — l'échelle de maîtrise doit pouvoir évoluer, elle est
- * donc un référentiel (`skill_levels`) ; la disponibilité est une liste fermée
- * de trois valeurs dont la logique dépendra directement le jour où elle se
- * dérivera des accompagnements. C'est le cas de D43 : un énuméré.
- *
- * Arbitrage (d) — elle est une propriété du centre : la colonne est nullable, et
- * un `CHECK` la refuse à un intervenant côté entité.
- */
-export const personAvailability = pgEnum("person_availability", [
-  "available",
-  "partial",
-  "unavailable",
-]);
+/* La disponibilité n'est plus un énuméré de base, et c'est le sens de la
+   migration `0010` (28/08/2026) : le jour annoncé par l'arbitrage (b) de C5bis
+   — « une liste fermée de trois valeurs dont la logique dépendra directement le
+   jour où elle **se dérivera des accompagnements** » — est arrivé. La colonne,
+   son `CHECK` et le type `person_availability` sont tombés ensemble ; les trois
+   valeurs vivent désormais dans `lib/queries/team.ts`, avec la règle qui les
+   produit. Une valeur déduite n'a pas de colonne : la stocker serait se donner
+   deux autorités sur un même mot. */
 
 export const domainRole = pgEnum("domain_role", ["domain_manager", "member"]);
 
@@ -473,17 +465,12 @@ export const persons = pgTable(
     kind: personKind("kind").notNull(),
     /** Courte présentation, saisie. Lue par la fiche de personne (C5bis). */
     bio: text("bio"),
-    /**
-     * Arbitrage (d) de C5bis — nulle pour un intervenant côté entité, et le
-     * `CHECK` ci-dessous le tient : ce n'est pas une convention d'écran.
-     *
-     * Stockée, quand D40 posait un précédent de calcul pour le statut
-     * d'accompagnement d'un produit. La dérivation depuis les accompagnements
-     * en cours exigerait de trancher ce qui rend une personne partiellement
-     * disponible — un nombre ? une charge ? une période ? — et aucune de ces
-     * réponses n'existe dans le modèle. Dette nommée au journal.
-     */
-    availability: personAvailability("availability"),
+    /* `availability` a été retirée le 28/08/2026 (migration `0010`) : la
+       question que son commentaire laissait ouverte — « un nombre ? une charge ?
+       une période ? » — a été tranchée par l'humain, et c'est **un nombre**,
+       celui des accompagnements vivants. La valeur se déduit à la lecture
+       (`lib/queries/team.ts`), sur le précédent de D40, qui calcule déjà le
+       statut d'accompagnement d'un produit plutôt que de le stocker. */
     hasAccess: boolean("has_access").notNull().default(false),
     /** Nul si `has_access` est faux. */
     domainRole: domainRole("domain_role"),
@@ -503,13 +490,11 @@ export const persons = pgTable(
       "persons_role_requires_access",
       sql`(${t.hasAccess} and ${t.domainRole} is not null) or (not ${t.hasAccess} and ${t.domainRole} is null)`,
     ),
-    /* Arbitrage (d) de C5bis, sur la forme du `CHECK` ci-dessus : la
-       disponibilité est une propriété du centre. Un intervenant côté entité
-       n'en porte pas, et le refus est en base — pas seulement dans l'action. */
-    check(
-      "persons_availability_requires_center",
-      sql`${t.availability} is null or ${t.kind} = 'center'`,
-    ),
+    /* `persons_availability_requires_center` est tombé avec la colonne
+       (28/08/2026). L'arbitrage (d) de C5bis tient toujours — la disponibilité
+       est une propriété du centre —, mais **il n'a plus de gardien en base** :
+       c'est la dérivation de `lib/queries/team.ts` qui rend `null` pour un
+       intervenant côté entité. Perte de garantie nommée au journal technique. */
   ],
 );
 

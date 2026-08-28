@@ -7192,3 +7192,185 @@ développement Next exclus (ils portent un identifiant de rendu par requête).
 **Une dette de forme reste, et elle a sa destination.** La barre d'ancres que T7.5 doit rendre a
 maintenant **deux cibles de moins**, dont une conditionnelle. Elle devra se construire à partir de ce
 que la page rend, jamais d'une liste figée — sans quoi elle pointera vers des sections absentes.
+
+---
+
+## Suppression définitive et disponibilité déduite — hors ticket, 28/08/2026
+
+Trois demandes de l'humain, faites et livrées le même jour, **hors ticket et à sa demande** :
+supprimer définitivement un accompagnement, supprimer une personne, et déduire la disponibilité du
+nombre d'accompagnements. Elles ouvrent **quatre écarts documentaires**, et aucun ne se discute — ils
+se consignent (règle 6), `CLAUDE.md` restant fermé à Claude (règle 7).
+
+### Les quatre écarts, et qui les a rendus
+
+**(1) `F1-D3` est renversé** — *« un projet s'archive, ne se supprime jamais »*. Avec lui la règle 4
+sur `projects`. Arbitrage humain du 28/08/2026, périmètre choisi explicitement : **n'importe quel
+accompagnement**, vivant ou archivé, et non le seul archivé ni le seul vide.
+
+**(2) La règle 4 est écartée sur `persons`.** `archivePerson` écrivait « rien n'est supprimé
+(règle 4) » ; la phrase reste vraie de l'archivage, elle ne l'est plus du référentiel.
+
+**(3) L'arbitrage (g) de C7 est rouvert** — *« la suppression reste bornée aux entités… point
+rouvrable par l'humain, jamais par un ticket »*. C'est exactement ce qui s'est produit : par
+l'humain, jamais par un ticket. `DeletableTable` passe d'une table à trois.
+
+**(4) D39 est enfreint par la disponibilité déduite** : c'est un indice **calculé par Vision pour
+qualifier une personne**. L'arbitrage (b) de C5bis l'annonçait pourtant en toutes lettres — *« une
+liste fermée de trois valeurs dont la logique dépendra directement le jour où elle se dérivera des
+accompagnements »* —, et le commentaire de `persons.availability` nommait la dette en attente d'un
+seuil. **Le seuil est arrivé, et c'est un nombre** : `0` → disponible, `1`–`2` → partiellement,
+`3` et plus → indisponible, sur les accompagnements **en cours**.
+
+**La base a été corrigée le jour même, et l'écart mérite d'être lu.** La première version comptait
+les accompagnements **vivants** — tout ce qui n'est pas archivé —, arbitrage rendu au découpage.
+L'humain l'a repris quelques heures plus tard : *« lorsqu'une personne était positionnée sur un
+accompagnement et que cet accompagnement est indiqué Terminé et que la personne n'a pas d'autre
+accompagnement, alors cette personne devrait être disponible »*. La nature `done` sort donc du
+décompte. **Les autres natures restent, `paused` comprise** — une pause n'est pas une fin :
+l'accompagnement reprendra, et la personne y est encore attendue. Si un jour une pause devait cesser
+de peser, ce serait une seconde condition au même endroit, et trois lectures à changer ensemble.
+
+**La correction rend visible ce que la première version cachait** : la fiche **liste** les
+accompagnements non archivés, terminés compris — c'est un parcours —, alors que la pastille ne compte
+que ceux en cours. Une personne peut donc afficher une ligne sous « Accompagnements » et la pastille
+« Disponible ». Ce n'est pas une contradiction, et rien n'a eu à changer pour cela : chaque ligne de
+cette liste **porte déjà sa pastille de statut**, où « Terminé » se lit. La liste raconte, la
+pastille mesure.
+
+### Le fait technique qui commande tout : les trois tables n'ont pas la même barrière
+
+C'est le point à ne pas perdre, et il est écrit dans `DeletableTable` :
+
+| Table | Ce qui retient l'effacement | Ce qui part avec la ligne |
+|---|---|---|
+| `entities` (21/08) | `products.entity_id` en `restrict` | rien |
+| `persons` (28/08) | `project_members.person_id` **et** `activity_participants.person_id`, `restrict` | `person_skills` (`cascade`) ; `created_by` et `events.actor_id` passent à `null` |
+| `projects` (28/08) | **rien** | tout : les dix clés étrangères sont `cascade` |
+
+L'argument du 21/08 — *« `deleteRow` n'efface qu'une ligne que rien ne référence,
+si bien qu'aucune donnée métier ne disparaît jamais avec elle »* — **est faux pour `projects`**, et
+son commentaire a été récrit plutôt qu'augmenté. Supprimer un accompagnement efface ses métiers, ses
+approches, son équipe, ses activités (donc leurs participants et leurs résultats), ses ressources,
+ses adoptions d'indicateurs, son budget, ses liens déclarés **et son journal**. Le panneau de
+confirmation est le **seul** garde-fou de ce geste ; c'est pourquoi il compte ce qu'il emporte.
+
+### Ce qui a été perdu en chemin, et qu'il faut savoir
+
+**Trois lectures doivent poser les mêmes exclusions, et rien ne les y oblige.** `listTeam` compte par
+sous-requête corrélée, `listProjectFormOptions` par regroupement, `findPersonDetail` en filtrant en
+mémoire une liste qu'elle avait déjà. **Trois formes, une seule règle**, et le compilateur ne voit
+rien : ce sont trois témoins de test qui tiennent l'accord, un par lecture, chacun tombant seul quand
+sa lecture diverge. `availabilityFromProjects` ne reçoit qu'un nombre — elle ne sait pas ce qu'elle
+compte, et c'est délibéré : le seuil se lit à un endroit, la base à trois.
+
+**Le `CHECK` `persons_availability_requires_center` est tombé avec la colonne.** L'arbitrage (d) de
+C5bis tient toujours — un intervenant côté entité ne porte pas de disponibilité — mais **il n'a plus
+de gardien en base** : trois lectures le tiennent désormais seules (`listTeam`, `findPersonDetail`,
+`listProjectFormOptions`), chacune par un `kind === "center"`. Une quatrième lecture qui l'oublierait
+inventerait une disponibilité à qui n'en porte pas, et rien ne l'arrêterait. Deux tests le couvrent,
+dont un **côté filtre** : sans `kind = 'center'` dans le `where`, Zoé — zéro accompagnement —
+ressortirait sous « Disponible ».
+
+**`deleteProject` n'écrit aucune ligne de journal, et ce n'est pas un oubli.** `events.project_id`
+est `cascade` : une trace écrite juste avant serait effacée par l'instruction suivante. Le geste
+rejoint donc la famille des objets qui écrivent sans laisser de trace — **huitième nom**, après
+persona, use case, indicateur, personne, entité, vision produit et budget.
+
+**`deleteProject` est la seule action de panneau qui redirige encore** depuis TD.2, et pour une
+raison qu'aucune autre n'a : `ConfirmPanel` se referme sur `ok: true` en laissant la page derrière
+lui, or il n'y a plus de page derrière lui. `redirect` lève, elle est donc appelée hors de tout
+`try` — la règle de `goToProject`.
+
+**Migration `0010`, première destructive depuis `0001`** : `DROP CONSTRAINT`, `DROP COLUMN`,
+`DROP TYPE`. Appliquée à la branche de test ; **la base de développement reste à migrer par
+l'humain** (`npm run db:migrate`), la commande ayant été refusée à l'agent. Sans conséquence
+d'exécution — plus rien n'écrit la colonne, et le `CHECK` survivant accepte le `null` —, mais schéma
+et base divergent tant que ce n'est pas fait.
+
+### Deux pièges rencontrés, tous deux trouvés par la vérification
+
+**(a) Un `sql` brut ne qualifie pas ses colonnes comme le constructeur de requêtes.**
+`countProjectContents` tenait d'abord ses quatre décomptes en sous-requêtes scalaires écrites à la
+main. Drizzle a rendu `"activities"."domain_id" = $1 and "project_id" = $2` — le premier terme
+qualifié (il vient de `filter()`), le second nu — et la jointure des résultats est sortie en
+`join "activities" on "id" = "activity_id"` : **`id` ambigu**. PostgreSQL a refusé, et le panneau a
+rendu **500**. Le défaut n'est apparu ni à `tsc`, ni à ESLint, ni aux tests — **il s'est lu dans le
+HTML servi**, ce qui est exactement ce que la discipline 1 existe pour attraper. Refait avec la
+couche : trois `scope.count` et une jointure du constructeur, qui partent ensemble. Règle à
+retenir : **dans un `sql` brut, ne jamais compter sur la qualification implicite d'une colonne.**
+
+**(b) Un test peut passer pour la mauvaise raison, et seule la neutralisation le dit.** Le test « une
+personne dans une équipe n'est pas effacée » attendait `message` contenant « accompagnement ». En
+neutralisant le décompte de `deletePerson`, il **passait encore** : la clé `restrict` refusait à sa
+place et rendait « rattachée à un accompagnement entre-temps ». Deux refus distincts, un seul mot
+commun. L'assertion porte désormais sur « équipe », qui n'appartient qu'au décompte — et le test
+tombe.
+
+### Ce que la vérification a mesuré
+
+**Le critère lu dans le HTML servi**, jamais affirmé :
+
+- les pastilles de `/equipe` **coïncident, personne par personne**, avec le décompte calculé
+  séparément en SQL — mesuré deux fois, avant et après la correction de la base. Après : les huit
+  lignes servies rendent exactement ce que rend la requête témoin, et **quatre d'entre elles ont
+  changé de mot** — un seul accompagnement, terminé, donc « Disponible » là où la première version
+  disait « Partiellement ». Un intervenant côté entité **n'affiche aucune pastille** ;
+- **le cas nommé par l'humain se lit entier sur une fiche** : Camille Roux porte « Disponible », et
+  la liste « Accompagnements » de la même fiche montre « Refonte du parcours de virement » avec sa
+  pastille **Terminé**. Les deux moitiés sont dans le même balisage servi ;
+- le panneau de suppression d'un accompagnement annonce **3 activités, 3 ressources, 2 résultats et
+  aucune ligne de journal** ; les quatre nombres sont ceux que la base rend ;
+- ceux des personnes annoncent **1 accompagnement, 4 activités, 3 compétences** pour Sofia et
+  **1 / 3 / 4** pour Thomas : exacts tous les six ;
+- « Supprimer définitivement » est servi dans le menu d'un accompagnement **vivant** comme
+  **archivé** — la phrase de la page qui disait « c'est le seul geste qu'un accompagnement archivé
+  offre encore » a été récrite ;
+- le panneau de profil ne sert plus que **quatre champs** — `fullName`, `jobId`, `kind`, `bio` —, et
+  le `select` de filtre `dispo` est toujours là.
+
+**Les tests mis en défaut, quatre fois**, chacune faisant tomber exactement ce qu'elle devait :
+
+| Neutralisation | Ce qui tombe |
+|---|---|
+| Seuil `partial` de `1–2` à `1–1` | les 3 tests du seuil (la règle pure, les bornes, le filtre) |
+| `isNull(projects.archivedAt)` retiré de `listTeam` | les 2 tests de l'exclusion des archivés |
+| `nature <> 'done'` retiré des **deux** lectures de `team.ts` | 3 tests |
+| `nature <> 'done'` retiré de `findPersonDetail` **seule** | 1 seul — celui qui lit la liste **et** la pastille ensemble |
+| `nature <> 'done'` retiré de `listProjectFormOptions` **seule** | 1 seul — son témoin propre |
+| Refus du décompte de `deletePerson` | les 2 refus de suppression — après resserrage, voir (b) |
+| Porte `manageDomain` de `deleteProject` | le seul test du droit |
+
+Les trois neutralisations de `done` sont ce qui vérifie que **chaque lecture a son témoin** : une
+divergence entre deux d'entre elles ne se rattrape nulle part ailleurs.
+
+**Le contraste vérifié plutôt que mesuré, et c'est légitime ici** : le diff n'ajoute que deux chaînes
+de classes — `flex flex-col gap-3 text-sm text-content-neutral-dark` et `font-semibold` —, toutes
+deux **déjà servies dans le panneau de suppression d'entité**, dont les nouveaux panneaux sont les
+jumeaux. `MENU_ITEM_DANGER` était déjà dans ce menu-là, `ACTION_LINK` déjà cinq fois dans cette
+carte-là. **Aucun couple de couleurs n'est neuf par la position**, donc rien à mesurer, et aucun
+neuvième manque du design system n'est inventé.
+
+**Le droit éprouvé par l'action, au niveau de l'action.** Le contributeur **désigné** de
+l'accompagnement — celui qui y écrit des activités — se voit refuser la suppression, et **le
+décompte en base tranche** : sept tables inchangées après le refus. C'est la méthode du fichier de
+T6.1, et c'est celle qui a été suivie. **Ce qui n'a pas été fait** : forger une requête Flight en
+`text/plain` contre le point d'entrée HTTP. Le fichier d'actions de `/equipe`, qui n'existait pas,
+est créé à cette occasion — l'écran portait six actions d'écriture depuis C5bis sans qu'aucune soit
+interrogée par son point d'entrée.
+
+### Une dette refermée au passage
+
+Le point ouvert « trois fichiers de tests d'action nettoient sur `if (!f?.domainId) return` » ne
+gagne pas un quatrième nom : `app/(app)/equipe/actions.test.ts` retient `domainId` **dès la création
+du domaine**, hors de la fixture, si bien qu'un `beforeAll` qui échoue à mi-course laisse malgré tout
+un domaine que l'`afterAll` efface.
+
+### Un test volontairement absent, et pourquoi
+
+Le cas « aucune personne courante » n'est pas éprouvé sur `deletePerson` : sans cookie, le stub
+d'authentification replie sur la première personne éligible du premier domaine actif
+(`lib/auth/provider.ts`) et **la suppression réussit**. C'est une propriété du stub — documentée,
+sans échéance depuis que le SSO est sorti de C7 —, pas de cette action. L'éprouver ici ferait croire
+que ce fichier la couvre. Le cas qui prouve quelque chose est celui d'une personne réelle **sans**
+`manageDomain`.

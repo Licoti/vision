@@ -81,7 +81,8 @@ import { Page, PageHeader } from "@/components/ui/page";
 import { Tag } from "@/components/ui/tag";
 import { loadTeamDrawer } from "./drawers";
 import { requireSession } from "@/lib/auth/provider";
-import { jobs, personAvailability, skillLevels, skills } from "@/lib/db/schema";
+import { PERSON_AVAILABILITY_VALUES } from "@/lib/availability";
+import { jobs, skillLevels, skills } from "@/lib/db/schema";
 import {
   resolveTeamDrawer,
   TEAM_PANEL_PARAMS,
@@ -90,6 +91,7 @@ import {
 import { formatPersons } from "@/lib/format";
 import {
   ARCHIVE_PANEL_PARAM,
+  DELETE_PANEL_PARAM,
   PERSON_FORM_NEW,
   PERSON_FORM_PARAM,
   PERSON_PANEL_PARAM,
@@ -138,15 +140,17 @@ const PARAM = {
  * rend un tableau dès la seconde occurrence. Le typer en `string` seul ferait
  * mentir le compilateur sur le cas qui est justement l'objet de T5bis.3.
  *
- * Les **quatre** clés de panneau s'y ajoutent — `personne` en T5bis.4, puis
- * `profil`, `maitrise` et `archiver` en T5bis.6. Ce ne sont pas des filtres, ce
- * que le décompte d'exclusivité et `TEAM_PANEL_PARAMS` tiennent séparément.
+ * Les clés de panneau s'y ajoutent — `personne` en T5bis.4, puis `profil`,
+ * `maitrise` et `archiver` en T5bis.6, et `supprimer` le 28/08/2026. Ce ne sont
+ * pas des filtres, ce que le décompte d'exclusivité et `TEAM_PANEL_PARAMS`
+ * tiennent séparément.
  */
 type PanelParam =
   | typeof PERSON_PANEL_PARAM
   | typeof PERSON_FORM_PARAM
   | typeof SKILL_PANEL_PARAM
-  | typeof ARCHIVE_PANEL_PARAM;
+  | typeof ARCHIVE_PANEL_PARAM
+  | typeof DELETE_PANEL_PARAM;
 
 type SearchParams = Partial<
   Record<(typeof PARAM)[keyof typeof PARAM] | PanelParam, string | string[]>
@@ -169,18 +173,20 @@ function uuidParam(value: string | undefined): string | undefined {
   return value && isUuid(value) ? value : undefined;
 }
 
-/** La disponibilité n'est pas un identifiant : elle se vérifie contre
- *  l'énuméré, sans aller en base. */
+/** La disponibilité n'est pas un identifiant : elle se vérifie contre la liste
+ *  fermée, sans aller en base. **Celle-ci ne vient plus du schéma** — la colonne
+ *  est tombée le 28/08/2026 —, mais de `lib/availability.ts`, qui porte aussi la
+ *  règle qui la produit. */
 function availabilityParam(
   value: string | undefined,
 ): PersonAvailability | undefined {
-  return personAvailability.enumValues.find((option) => option === value);
+  return PERSON_AVAILABILITY_VALUES.find((option) => option === value);
 }
 
 /** Les trois disponibilités, telles que le `select` les propose. Le libellé
  *  vient de la pastille : un seul endroit dit ces trois mots. */
 const AVAILABILITY_OPTIONS: TeamFilterOption[] =
-  personAvailability.enumValues.map((value) => ({
+  PERSON_AVAILABILITY_VALUES.map((value) => ({
     id: value,
     label: AVAILABILITY_LABEL[value],
   }));
@@ -330,6 +336,7 @@ export default async function TeamPage({
     [PERSON_FORM_PARAM]: one(params[PERSON_FORM_PARAM]),
     [SKILL_PANEL_PARAM]: one(params[SKILL_PANEL_PARAM]),
     [ARCHIVE_PANEL_PARAM]: one(params[ARCHIVE_PANEL_PARAM]),
+    [DELETE_PANEL_PARAM]: one(params[DELETE_PANEL_PARAM]),
   };
   const conflict =
     Object.values(panelKeys).filter((value) => value !== undefined).length > 1;

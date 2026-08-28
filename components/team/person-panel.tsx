@@ -30,21 +30,21 @@
  * action qui ne connaît pas l'identifiant de la personne. **C'est le serveur qui
  * décide ce que ce formulaire écrit, jamais un champ caché.**
  *
- * **Cinq champs, et pas un de plus** : ni compte, ni rôle de domaine, ni accès.
+ * **Quatre champs, et pas un de plus** : ni compte, ni rôle de domaine, ni accès.
  * Être référencé et pouvoir se connecter restent deux choses distinctes (D19), et
  * l'authentification est reprise par C7. Ni score, ni date de validation, ni
  * historique de progression : Vision ne mesure pas une personne (garde-fous 1
  * et 2).
  *
- * **La disponibilité est proposée à tous, et refusée aux uns** : sans
- * JavaScript, un `select` ne peut pas disparaître quand le genre change. La note
- * dit donc la règle, et la validation la tient — arbitrage (d), doublé du `CHECK`
- * `persons_availability_requires_center`.
+ * **Le `select` de disponibilité est parti le 28/08/2026**, avec la colonne qui
+ * le recevait : la valeur se déduit désormais du nombre d'accompagnements
+ * vivants (`lib/availability.ts`). Ce panneau n'a donc plus la difficulté qu'il
+ * décrivait — un `select` proposé à tous et refusé aux uns, faute de pouvoir
+ * disparaître sans JavaScript quand le genre change.
  */
 
 import { useActionState } from "react";
 
-import { AVAILABILITY_LABEL } from "@/components/team/availability-dot";
 import {
   borderOf,
   CONTROL,
@@ -54,7 +54,6 @@ import {
 import { Panel } from "@/components/ui/panel";
 import {
   EMPTY_PERSON_VALUES,
-  PERSON_AVAILABILITY_VALUES,
   PERSON_KIND_LABEL,
   PERSON_KIND_VALUES,
   type PersonFormState,
@@ -206,36 +205,6 @@ export function PersonPanel({
           }
           className={`${CONTROL_TEXT} ${borderOf(errors.bio)}`}
         />
-      </FormField>
-
-      {/* **Les libellés viennent de la pastille** (`availability-dot.tsx`), comme
-          pour le `select` de la barre de filtres depuis T5bis.3 : un seul endroit
-          dit ces trois mots, faute de quoi l'écran en dirait un jour deux
-          versions. */}
-      <FormField
-        label="Disponibilité"
-        htmlFor="personne-dispo"
-        note="Facultative, et réservée aux membres du centre : elle est déclarée, jamais dérivée des accompagnements."
-        error={errors.availability}
-        errorId="personne-dispo-erreur"
-      >
-        <select
-          id="personne-dispo"
-          name="availability"
-          defaultValue={values.availability}
-          aria-invalid={errors.availability ? true : undefined}
-          aria-describedby={
-            errors.availability ? "personne-dispo-erreur" : undefined
-          }
-          className={`${CONTROL} ${borderOf(errors.availability)}`}
-        >
-          <option value="">Non renseignée</option>
-          {PERSON_AVAILABILITY_VALUES.map((availability) => (
-            <option key={availability} value={availability}>
-              {AVAILABILITY_LABEL[availability]}
-            </option>
-          ))}
-        </select>
       </FormField>
     </Panel>
   );

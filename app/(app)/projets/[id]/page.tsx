@@ -193,6 +193,7 @@ export default async function ProjectPage({
     piste?: string;
     lien?: string;
     budget?: string;
+    supprimer?: string;
   }>;
 }) {
   const { id } = await params;
@@ -227,6 +228,7 @@ export default async function ProjectPage({
     piste,
     lien,
     budget: budgetParam,
+    supprimer,
   } = await searchParams;
 
   /* **L'URL reste une adresse, elle n'est plus le mécanisme** (TD.2). Coller
@@ -241,10 +243,12 @@ export default async function ProjectPage({
      T4.4). Côté clic, elle est devenue structurelle — l'état ne porte qu'une
      demande à la fois.
 
-     **Le décompte passe de huit à neuf clés sans qu'un caractère de sa logique
-     change** (T7.1, `budget`) : c'est la propriété pour laquelle T4.4 l'avait
-     écrit en décompte plutôt qu'en comparaison, vérifiée pour la septième
-     fois — et c'est la dernière, la page projet n'ayant plus de bloc à ouvrir. */
+     **Le décompte passe de neuf à dix clés sans qu'un caractère de sa logique
+     change** (28/08/2026, `supprimer`) : c'est la propriété pour laquelle T4.4
+     l'avait écrit en décompte plutôt qu'en comparaison, vérifiée pour la
+     **huitième** fois. T7.1 l'annonçait dernière — « la page projet n'ayant plus
+     de bloc à ouvrir » —, et elle l'était pour les blocs : `supprimer` n'en
+     ouvre aucun, c'est une confirmation. */
   const keys = {
     activite,
     ressource,
@@ -255,6 +259,7 @@ export default async function ProjectPage({
     piste,
     lien,
     budget: budgetParam,
+    supprimer,
   };
   const conflict =
     Object.values(keys).filter((value) => value !== undefined).length > 1;
@@ -407,13 +412,32 @@ export default async function ProjectPage({
                     /* Un formulaire nu : le rétablissement n'a rien à saisir
                        et rien à confirmer — c'est le geste qui **défait**, et
                        `docs/06` §9 proscrit la confirmation là où elle ne
-                       protège rien. Aucun menu à côté : c'est le seul geste
-                       qu'un accompagnement archivé offre encore. */
-                    <form action={restoreProject.bind(null, project.id)}>
-                      <Button type="submit">
-                        Rétablir cet accompagnement
-                      </Button>
-                    </form>
+                       protège rien.
+
+                       **Un menu à côté depuis le 28/08/2026** : la phrase disait
+                       « c'est le seul geste qu'un accompagnement archivé offre
+                       encore », et elle est devenue fausse. Ranger puis effacer
+                       est le chemin naturel, et l'interdire ici obligerait à
+                       rétablir avant de supprimer. */
+                    <>
+                      <form action={restoreProject.bind(null, project.id)}>
+                        <Button type="submit">
+                          Rétablir cet accompagnement
+                        </Button>
+                      </form>
+                      <ActionMenu
+                        label={`Options de l'accompagnement ${project.name}`}
+                      >
+                        <DrawerLink
+                          href={ROUTES.projectDelete(project.id)}
+                          request={{ kind: "delete" }}
+                          role="menuitem"
+                          className={MENU_ITEM_DANGER}
+                        >
+                          Supprimer définitivement
+                        </DrawerLink>
+                      </ActionMenu>
+                    </>
                   ) : (
                     <>
                       {/* **Le geste principal passe au bouton primaire**, et
@@ -442,6 +466,23 @@ export default async function ProjectPage({
                           className={MENU_ITEM_DANGER}
                         >
                           Archiver cet accompagnement
+                        </DrawerLink>
+                        {/* **Sous « Archiver », et non à sa place** : les deux
+                            gestes ont des conséquences opposées — l'un range et
+                            se défait, l'autre efface et ne se défait pas —, et
+                            l'ordre dit lequel est le chemin par défaut. Le
+                            panneau compte ce que la suppression emporte avant de
+                            la proposer.
+
+                            Aucun jeton neuf : `MENU_ITEM_DANGER` est servi juste
+                            au-dessus, dans le même menu et sur le même fond. */}
+                        <DrawerLink
+                          href={ROUTES.projectDelete(project.id)}
+                          request={{ kind: "delete" }}
+                          role="menuitem"
+                          className={MENU_ITEM_DANGER}
+                        >
+                          Supprimer définitivement
                         </DrawerLink>
                       </ActionMenu>
                     </>

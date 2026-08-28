@@ -77,6 +77,8 @@ type Fixture = {
   aliceId: string;
   /** Sans métier, sans compétence : le `leftJoin` et l'état vide. */
   brunoId: string;
+  /** Un seul accompagnement, **terminé** : le cas nommé par l'humain. */
+  evaId: string;
   /** Une seule des deux compétences d'Alice, et à un rang plus bas. */
   carlaId: string;
   /** Côté entité : la mention, et pas de disponibilité (arbitrage (d)). */
@@ -188,7 +190,6 @@ async function seedDomain(label: string): Promise<Fixture> {
     source: "manual",
     kind: "center",
     jobId: forgottenJob.id,
-    availability: "available",
   });
   /* Le métier et la compétence d'Yves ne sont portés que par lui, et il est
      archivé : ni l'un ni l'autre ne doit paraître dans les options. C'est le
@@ -205,27 +206,31 @@ async function seedDomain(label: string): Promise<Fixture> {
     source: "manual",
     kind: "center",
     jobId: job.id,
-    availability: "partial",
   });
   const carla = await scope.insert(persons, {
     fullName: `Carla Dubois ${label}`,
     source: "manual",
     kind: "center",
     jobId: research.id,
-    availability: "partial",
   });
   const bruno = await scope.insert(persons, {
     fullName: `Bruno Klein ${label}`,
     source: "manual",
     kind: "center",
-    availability: "unavailable",
+  });
+  /* **Le cas nommé par l'humain le 28/08/2026** : positionnée sur un
+     accompagnement, cet accompagnement est terminé, elle n'en a pas d'autre —
+     donc disponible. Sa fiche listera pourtant une ligne. */
+  const eva = await scope.insert(persons, {
+    fullName: `Eva Terminé ${label}`,
+    source: "manual",
+    kind: "center",
   });
   const alice = await scope.insert(persons, {
     fullName: `Alice Martin ${label}`,
     source: "manual",
     kind: "center",
     jobId: job.id,
-    availability: "available",
     // La présentation : lue par la fiche seule, jamais par la liste.
     bio: `Conçoit les parcours de bout en bout ${label}.`,
   });
@@ -322,10 +327,13 @@ async function seedDomain(label: string): Promise<Fixture> {
     productId: product.id,
     statusId: active.id,
   });
+  /* **Son statut est `active` et non `done`**, et c'est ce qui en fait un
+     témoin : depuis que la nature `done` est exclue elle aussi, un projet
+     archivé *et* terminé ne prouverait plus lequel des deux filtres joue. */
   const archivedProject = await scope.insert(projects, {
     name: `Rangé ${label}`,
     productId: product.id,
-    statusId: done.id,
+    statusId: active.id,
     startedOn: "2023-01-01",
   });
   const probeLinkProject = await scope.insert(projects, {
@@ -344,6 +352,50 @@ async function seedDomain(label: string): Promise<Fixture> {
   ]) {
     await scope.insert(projectMembers, { projectId, personId: alice.id });
   }
+
+  /* ------------------------------------------------------------------
+     **Les équipes qui produisent la disponibilité** (28/08/2026).
+
+     Elle ne se sème plus : elle se compte. Ces trois appartenances placent
+     chacune une personne sur une borne du seuil, et c'est **ce placement qui
+     est le test** — changer le seuil de `lib/availability.ts` doit faire tomber
+     ces lignes-là, et elles seules.
+
+     **Deux exclusions à éprouver, donc deux témoins distincts** : un
+     accompagnement **archivé** ne compte pas, un accompagnement **terminé** non
+     plus (28/08/2026). Chacun a la personne dont il change la réponse.
+
+       — Bruno : membre du **seul projet archivé**, dont le statut est `active`.
+         Zéro compté : « disponible ». **Témoin de l'archivage** — si l'exclusion
+         tombait, il passerait à « partiellement ». Sa fiche continue de rendre
+         `projects: []`, `findPersonDetail` écartant les archivés : la personne
+         « sans rien » de ce fichier reste sans rien.
+       — Eva : membre du **seul projet terminé**. Zéro compté : « disponible ».
+         **Témoin de la nature `done`**, et c'est le cas que l'humain a nommé —
+         sa fiche liste pourtant une ligne, avec sa pastille « Terminé ».
+       — Carla : `fresh` et `old` — un seul compté, `old` étant terminé. La borne
+         **basse** de « partiellement ».
+       — Damien : `fresh`, `old` et `undated` — deux comptés. La borne **haute**
+         de « partiellement », et **le second témoin de `done`** : si la nature
+         comptait, il basculerait à « indisponible ».
+       — Alice : cinq appartenances, trois comptées — l'archivé et le terminé
+         sortent. La borne **basse** d'« indisponible ».
+
+     L'insertion précède l'archivage du projet, l'ordre de T3.6 : on ajoute
+     avant de retirer.
+     ------------------------------------------------------------------ */
+  await scope.insert(projectMembers, {
+    projectId: archivedProject.id,
+    personId: bruno.id,
+  });
+  await scope.insert(projectMembers, { projectId: old.id, personId: eva.id });
+  for (const projectId of [fresh.id, old.id]) {
+    await scope.insert(projectMembers, { projectId, personId: carla.id });
+  }
+  for (const projectId of [fresh.id, old.id, undated.id]) {
+    await scope.insert(projectMembers, { projectId, personId: damien.id });
+  }
+
   await scope.archive(projects, archivedProject.id);
 
   return {
@@ -351,6 +403,7 @@ async function seedDomain(label: string): Promise<Fixture> {
     scope,
     aliceId: alice.id,
     brunoId: bruno.id,
+    evaId: eva.id,
     carlaId: carla.id,
     zoeId: zoe.id,
     yvesId: yves.id,
@@ -556,19 +609,48 @@ describe("listTeam", () => {
     expect(rows.find((row) => row.id === a.brunoId)?.jobLabel).toBeNull();
   });
 
-  test("le genre et la disponibilité remontent", async () => {
+  /* **La disponibilité se déduit, elle ne se lit plus** (28/08/2026). Les quatre
+     assertions ci-dessous sont les bornes du seuil, et rien n'a été semé pour
+     les produire : c'est l'appartenance aux équipes qui les décide. */
+  test("le genre remonte, et la disponibilité se déduit des accompagnements", async () => {
     const rows = await listTeam(a.scope);
+    const of = (id: string) => rows.find((row) => row.id === id)?.availability;
 
     const alice = rows.find((row) => row.id === a.aliceId);
     expect(alice?.kind).toBe("center");
-    expect(alice?.availability).toBe("available");
 
-    expect(rows.find((row) => row.id === a.brunoId)?.availability).toBe(
-      "unavailable",
+    // Cinq appartenances, trois comptées : la borne basse d'« indisponible ».
+    expect(alice?.availability).toBe("unavailable");
+    // Trois appartenances dont une terminée : deux comptées, la borne haute.
+    expect(of(a.damienId)).toBe("partial");
+    // Deux dont une terminée : une comptée, la borne basse de « partiellement ».
+    expect(of(a.carlaId)).toBe("partial");
+    // Une appartenance, sur un projet **archivé** : zéro compté.
+    expect(of(a.brunoId)).toBe("available");
+    // Une appartenance, sur un projet **terminé** : zéro compté.
+    expect(of(a.evaId)).toBe("available");
+  });
+
+  /**
+   * **Le cas que l'humain a nommé**, dit en une phrase : positionnée sur un
+   * accompagnement, cet accompagnement est terminé, elle n'en a pas d'autre —
+   * donc disponible.
+   *
+   * Les deux moitiés sont éprouvées ensemble, et c'est le sujet : la fiche
+   * **liste** l'accompagnement, la pastille dit « Disponible », et les deux
+   * disent vrai. Un test qui ne regarderait que la pastille laisserait passer
+   * une fiche qui aurait cessé de raconter le parcours.
+   */
+  test("un seul accompagnement, terminé : disponible, et la fiche le liste", async () => {
+    const rows = await listTeam(a.scope);
+    expect(rows.find((row) => row.id === a.evaId)?.availability).toBe(
+      "available",
     );
-    expect(rows.find((row) => row.id === a.damienId)?.availability).toBe(
-      "partial",
-    );
+
+    const person = await findPersonDetail(a.scope, a.evaId);
+    expect(person?.availability).toBe("available");
+    expect(person?.projects).toHaveLength(1);
+    expect(person?.projects[0]?.statusNature).toBe("done");
   });
 
   test("un intervenant côté entité n'a pas de disponibilité", async () => {
@@ -663,17 +745,43 @@ describe("listTeam — les filtres", () => {
     expect(ids).toEqual([a.aliceId]);
   });
 
-  test("la disponibilité restreint aux trois valeurs de l'énuméré", async () => {
-    const ids = await idsOf({ availability: "partial" });
-    expect(ids).toContain(a.carlaId);
-    expect(ids).toContain(a.damienId);
-    expect(ids).not.toContain(a.aliceId);
+  /* **Le filtre porte sur la valeur déduite**, plus sur une colonne. Les trois
+     plages y passent ; avec le test des bornes ci-dessus, elles font que la
+     liste et son filtre ne peuvent pas dire deux vérités — ce que
+     `AVAILABILITY_BOUNDS`, lu par les deux, garantit par construction. */
+  test("la disponibilité restreint aux trois valeurs, sur le décompte", async () => {
+    // L'ordre reste le nom : Carla avant Damien, quelle que soit la charge.
+    expect(await idsOf({ availability: "partial" })).toEqual([
+      a.carlaId,
+      a.damienId,
+    ]);
+
+    const libres = await idsOf({ availability: "available" });
+    expect(libres).toContain(a.brunoId);
+    expect(libres).toContain(a.evaId);
+    expect(libres).not.toContain(a.aliceId);
+
+    const pris = await idsOf({ availability: "unavailable" });
+    expect(pris).toEqual([a.aliceId]);
   });
 
+  /* Le témoin de l'arbitrage (d), **côté filtre** : Zoé n'a aucun
+     accompagnement, et un filtre qui oublierait `kind = 'center'` la ferait
+     ressortir sous « Disponible » — une disponibilité inventée à quelqu'un qui
+     n'en porte pas. */
+  test("un intervenant côté entité ne ressort d'aucune des trois valeurs", async () => {
+    for (const value of ["available", "partial", "unavailable"] as const) {
+      expect(await idsOf({ availability: value })).not.toContain(a.zoeId);
+    }
+  });
+
+  /* La cumulation **restreint pour de bon** : deux personnes portent l'UX
+     Design — Alice et Carla —, une seule est indisponible. Un filtre de
+     disponibilité inopérant rendrait les deux. */
   test("les filtres se cumulent", async () => {
     const ids = await idsOf({
       skillIds: [a.uxSkillId],
-      availability: "available",
+      availability: "unavailable",
     });
     expect(ids).toEqual([a.aliceId]);
   });
@@ -853,7 +961,11 @@ describe("findPersonDetail", () => {
     expect(person?.jobLabel).toBe("Product Design a");
     expect(person?.kind).toBe("center");
     expect(person?.bio).toBe("Conçoit les parcours de bout en bout a.");
-    expect(person?.availability).toBe("available");
+    /* **Déduite de la liste que la fiche affiche elle-même**, moins les
+       terminés : quatre accompagnements listés plus bas, dont `Audit a` qui est
+       terminé — trois comptés, donc « indisponible ». La liste raconte un
+       parcours, la pastille dit une charge, et chaque ligne porte son statut. */
+    expect(person?.availability).toBe("unavailable");
   });
 
   test("les compétences sortent par rang décroissant puis libellé", async () => {

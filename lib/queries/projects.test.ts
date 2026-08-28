@@ -492,6 +492,13 @@ async function seedFormDomain(): Promise<FormFixture> {
     nature: "active",
     position: "2",
   });
+  /* Un statut **terminé** : c'est lui qui fait de `livePerson` le témoin de la
+     seconde exclusion du décompte de disponibilité (28/08/2026). */
+  const doneStatus = await scope.insert(projectStatuses, {
+    label: "Statut terminé d",
+    nature: "done",
+    position: "3",
+  });
 
   const liveJob = await scope.insert(jobs, { label: "Métier vivant d" });
   const archivedJob = await scope.insert(jobs, { label: "Métier archivé d" });
@@ -506,16 +513,19 @@ async function seedFormDomain(): Promise<FormFixture> {
     label: "Approche archivée d",
   });
 
-  /* Le métier et la disponibilité entrent dans la fixture en T5bis.7 : le
-     formulaire les affiche désormais à côté de chaque nom, et une colonne qui
-     n'est jamais peuplée par la fixture est une colonne dont le test ne dit
-     rien. */
+  /* Le métier entre dans la fixture en T5bis.7 : le formulaire l'affiche à côté
+     de chaque nom, et une colonne qui n'est jamais peuplée par la fixture est
+     une colonne dont le test ne dit rien.
+
+     **La disponibilité, elle, ne s'y sème plus** (28/08/2026) : elle se déduit
+     du nombre d'accompagnements **en cours** — ni archivés, ni terminés. Ce sont
+     donc les équipes des projets `edited` et `finished`, plus bas, qui la
+     produisent. */
   const livePerson = await scope.insert(persons, {
     fullName: "Personne vivante d",
     source: "manual",
     kind: "center",
     jobId: liveJob.id,
-    availability: "partial",
   });
   /* Sur le métier **qui sera archivé** : c'est cette ligne qui éprouve la
      septième lecture de `listProjectFormOptions`. Rappelée par `keep`, elle
@@ -526,11 +536,11 @@ async function seedFormDomain(): Promise<FormFixture> {
     source: "manual",
     kind: "center",
     jobId: archivedJob.id,
-    availability: "available",
   });
-  /* Un intervenant côté entité : le `CHECK` `persons_availability_requires_center`
-     lui refuse une disponibilité, et `docs/04` §2 ne lui donne pas de métier
-     design. Les deux colonnes rendues nulles sont sa propriété, pas un oubli. */
+  /* Un intervenant côté entité : la dérivation ne lui donne pas de
+     disponibilité (arbitrage (d) de C5bis, tenu par la lecture depuis que le
+     `CHECK` est tombé), et `docs/04` §2 ne lui donne pas de métier design. Les
+     deux valeurs nulles sont sa propriété, pas un oubli. */
   const stakeholderPerson = await scope.insert(persons, {
     fullName: "Personne côté entité d",
     source: "manual",
@@ -574,6 +584,23 @@ async function seedFormDomain(): Promise<FormFixture> {
   await scope.insert(projectMembers, {
     projectId: edited.id,
     personId: inactivePerson.id,
+    isContributor: false,
+  });
+
+  /* **Le témoin de la nature `done`, sur cette lecture-ci.** Le décompte de
+     `listProjectFormOptions` est une **autre requête** que celui de `listTeam` —
+     un regroupement contre une sous-requête corrélée —, et rien dans le
+     compilateur ne les oblige à poser les mêmes exclusions. `livePerson` est
+     membre d'un seul accompagnement, terminé : elle doit rester « disponible »,
+     et elle basculerait à « partiellement » si l'exclusion tombait ici seule. */
+  const finished = await scope.insert(projects, {
+    name: "Terminé d",
+    productId: liveProduct.id,
+    statusId: doneStatus.id,
+  });
+  await scope.insert(projectMembers, {
+    projectId: finished.id,
+    personId: livePerson.id,
     isContributor: false,
   });
 
@@ -1224,18 +1251,35 @@ describe("listProjectFormOptions — le métier et la disponibilité", () => {
     return options.people.find((person) => person.id === id);
   }
 
-  test("une personne du centre porte son métier et sa disponibilité", async () => {
+  test("un accompagnement terminé ne pèse pas : la personne reste disponible", async () => {
     const person = await personIn(undefined, d.livePersonId);
 
     expect(person?.jobLabel).toBe("Métier vivant d");
+    /* **Une appartenance, sur un accompagnement terminé, donc disponible** — et
+       rien n'a été semé pour le dire : c'est la dérivation du 28/08/2026,
+       éprouvée ici sur le formulaire qui la sert au moment de choisir une
+       équipe. Sans l'exclusion de la nature `done`, elle rendrait
+       « partiellement disponible ». */
+    expect(person?.availability).toBe("available");
+  });
+
+  /* Le témoin de la précédente : sans lui, une dérivation qui rendrait
+     « disponible » à tout le monde passerait pour juste. `inactivePerson` est
+     membre du projet `edited`, qui est vivant — un seul, donc partiellement
+     disponible. */
+  test("un accompagnement vivant fait passer à partiellement disponible", async () => {
+    const person = await personIn(d.keep, d.inactivePersonId);
+
     expect(person?.availability).toBe("partial");
   });
 
   test("un intervenant côté entité n'a ni l'un ni l'autre", async () => {
     const person = await personIn(undefined, d.stakeholderPersonId);
 
-    // Deux nuls qui sont une propriété, pas une donnée manquante : `docs/04` §2
-    // pour le métier, l'arbitrage (d) de C5bis pour la disponibilité.
+    /* Deux nuls qui sont une propriété, pas une donnée manquante : `docs/04` §2
+       pour le métier, l'arbitrage (d) de C5bis pour la disponibilité — que la
+       **lecture** tient désormais seule, le `CHECK` étant tombé avec la
+       colonne. */
     expect(person?.jobLabel).toBeNull();
     expect(person?.availability).toBeNull();
   });

@@ -6,12 +6,17 @@
  * entier : la présentation, la disponibilité, et les compétences avec leur
  * niveau, une par ligne.
  *
+ * **La disponibilité est déduite depuis le 28/08/2026** — du nombre
+ * d'accompagnements vivants, ceux-là mêmes que la fiche liste plus bas. Elle
+ * n'est plus une saisie du profil : la ligne « Disponibilité » et la liste
+ * « Accompagnements » disent donc la même chose, de deux façons.
+ *
  * **Composant serveur**, comme `PersonaDetail` : aucun état, aucun droit, aucun
  * `<form>` de saisie. Il est rendu par la fonction serveur du panneau, ce qui lui
  * laisse la frontière du bundle du bon côté — c'est ce qui a permis à T5bis.5 d'y
  * poser un radar sans embarquer une ligne de JavaScript.
  *
- * **Il ne connaît aucun droit** (T5bis.6) : il reçoit six points d'entrée, et
+ * **Il ne connaît aucun droit** (T5bis.6) : il reçoit ses points d'entrée, et
  * `null` retire le geste. C'est `lib/drawers/team.tsx` qui les dérive de
  * `manageDomain` et du genre de la personne, et ce sont les **actions** qui
  * protègent — un geste absent du rendu n'a jamais protégé le point d'entrée HTTP
@@ -46,6 +51,7 @@ export function PersonCard({
   person,
   editHref,
   archiveHref,
+  deleteHref,
   addSkillHref,
   editSkillHref,
   removeSkill,
@@ -54,6 +60,7 @@ export function PersonCard({
   /** `null` retire le geste — le composant ne connaît aucun droit. */
   editHref: string | null;
   archiveHref: string | null;
+  deleteHref: string | null;
   /** Nul pour un intervenant côté entité : arbitrage (d) de C5bis. */
   addSkillHref: string | null;
   editSkillHref: ((personSkillId: string) => string) | null;
@@ -138,7 +145,7 @@ export function PersonCard({
       {/* Un `div` et non un `span` : `<form>` est du contenu de flux, et un
           élément de phrasé ne l'accepte pas — le balisage servi serait réécrit
           par le navigateur. La règle de `readings-panel.tsx`. */}
-      {editHref || archiveHref ? (
+      {editHref || archiveHref || deleteHref ? (
         <div className="flex flex-wrap items-center gap-4 border-t border-surface-neutral-lighter pt-4">
           {editHref ? (
             <DrawerLink
@@ -166,6 +173,26 @@ export function PersonCard({
               className={ACTION_LINK}
             >
               Archiver cette personne
+            </DrawerLink>
+          ) : null}
+          {deleteHref ? (
+            /* **Le troisième geste, et il ne range pas** (28/08/2026) : il
+               efface, et il ne se défait pas. C'est pourquoi il a sa propre
+               entrée à côté d'« Archiver » plutôt qu'une variante de celle-ci —
+               deux gestes aux conséquences opposées ne se proposent pas sous un
+               même mot. Le panneau dit ce qui part avec la personne et ce qui
+               reste sans son nom.
+
+               Aucun jeton neuf : `ACTION_LINK` est déjà servi deux fois dans
+               cette même carte, donc aucun couple de couleurs n'est neuf par la
+               position, et aucune mesure de contraste n'est à refaire. */
+            <DrawerLink
+              href={deleteHref}
+              request={{ kind: "delete", id: person.id }}
+              aria-label={`Supprimer définitivement ${person.fullName}`}
+              className={ACTION_LINK}
+            >
+              Supprimer définitivement
             </DrawerLink>
           ) : null}
         </div>

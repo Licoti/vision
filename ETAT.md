@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 28/08/2026, après le masquage hors ticket de deux blocs de la page
-projet. Dernier balayage : découpage de C7. **Le fichier dépasse les 250 lignes de la règle 5** — le
-balayage appartient à la session de découpage de C8.
+**Dernière mise à jour :** 28/08/2026, après la suppression définitive et la disponibilité déduite,
+livrées hors ticket. Dernier balayage : découpage de C7. **Le fichier dépasse les 250 lignes de la
+règle 5** — le balayage appartient à la session de découpage de C8.
 **Chantier en cours :** **C7 — Finitions**, dix tickets, découpés dans `tickets-C7.md`. **Dernier
 chantier du POC** — `docs/05` §5 n'en a pas de huitième.
 **Ticket suivant :** **T7.3 — Administration : l'écran devient multi-référentiel, et les quatre
@@ -71,6 +71,13 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   dimensions de sa répartition : le filtre d'abord, le chiffre ensuite — l'ordre qu'imposait T6.7.
   **Contrat mesuré sur seize valeurs, dont sept à zéro** — suivre le lien rend le nombre annoncé.
   Ni migration ni journal ; 18 tests neufs, sept neutralisations.
+- **Suppression définitive et disponibilité déduite — hors ticket, 28/08/2026.** Quatre écarts
+  rendus par l'humain : `F1-D3` et la règle 4 sur `projects`, la règle 4 sur `persons`, l'arbitrage
+  (g) de C7, et D39. `DeletableTable` passe d'une table à trois, **et les trois n'ont pas la même
+  barrière** — `projects` n'en a aucune. La disponibilité quitte la base pour `lib/availability.ts`
+  (migration `0010`, première destructive depuis `0001`), et sa base est **corrigée le jour même** :
+  un accompagnement **terminé** ne pèse plus. 23 tests neufs, sept neutralisations, et un **500
+  trouvé par le HTML servi** que ni `tsc`, ni ESLint, ni 1 226 tests n'avaient vu.
 - **Reprise d'interface hors ticket — dix-sept gestes, du 17 au 28/08/2026.** Menu « … » de la
   roadmap, « Vision produit » et sa reprise `northstar-v2`, « Personae », « Use Cases »,
   « Démarrage » (migrations 0005 à 0008), page projet en `project-v2`, bouton à trois rangs, entités
@@ -93,6 +100,10 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   dans l'URL**. `docs/05` §5 s'arrête à sept chantiers : **C8 est hors POC et reste entièrement à
   découper.** → **session de découpage de C8.**
 
+- **La base de développement n'a pas reçu la migration `0010`.** Elle est appliquée à la branche de
+  test ; la commande a été refusée à l'agent sur la base de développement. Sans conséquence
+  d'exécution — plus rien n'écrit `persons.availability`, et le `CHECK` survivant accepte le `null` —,
+  mais schéma et base divergent tant que `npm run db:migrate` n'a pas tourné. → **action humaine.**
 - **Les secrets Neon n'ont jamais été tournés.** Deux chaînes ont transité en clair le 12/08/2026.
   Hors dépôt — `.env.local` seul —, mais valides. **Reportées deux fois** : au découpage de C6, puis
   à celui de C7, qui n'en dépendaient ni l'un ni l'autre. → **action humaine.**
@@ -141,7 +152,9 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   perdue. → **T7.9.**
 - **Deux libellés vivent hors de `lib/format.ts`** : `PERSON_KIND_LABEL` (`lib/forms/person.ts`) —
   un déplacement **plus un vocabulaire à trancher**, T5bis.7 ayant refermé la duplication et pas les
-  mots — et `BUDGET_UNIT_LABEL` (`components/projects/budget.tsx`), hors périmètre de T7.1. → **T7.9.**
+  mots — et `BUDGET_UNIT_LABEL` (`components/projects/budget.tsx`), hors périmètre de T7.1.
+  `AVAILABILITY_LABEL` reste dans `components/team/availability-dot.tsx` par la même raison, et il en
+  est le troisième cas. → **T7.9.**
 - **Une piste de démarrage ne mène pas à l'activité qu'elle suggère.** `starters` ne porte
   **volontairement aucun `activity_type_id`** — une colonne sans lecteur est celle qu'on relit un jour
   sans savoir pourquoi (T5.2). Le geste coûte une colonne, une migration et trois lignes. → **T7.10.**
@@ -154,16 +167,20 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 - **Rétablir un accompagnement sous un produit archivé le laisse invisible.** Les lectures écartent
   les projets d'un produit archivé — six depuis T6.7 —, donc le geste paraît ne rien faire. Aucun
   garde-fou (arbitrage (f) de C4bis) ; rien n'est perdu. → **T7.10.**
-- **Sept objets écrivent sans laisser de trace au journal** : persona, use case, indicateur,
-  personne, entité, vision produit, et le **budget** de T7.1. Les six `event_target_type` sont une
-  liste fermée sans migration (arbitrage (b) de C6, (d) de C7) ; les ouvrir à un seul objet serait
-  refermer le point à moitié. → **C8.**
+- **Huit objets écrivent sans laisser de trace au journal** : persona, use case, indicateur,
+  personne, entité, vision produit, le budget de T7.1, et la **suppression d'un accompagnement**
+  (28/08). Ce dernier est d'une autre nature : `events.project_id` étant `cascade`, une trace écrite
+  juste avant serait effacée par l'instruction suivante — il n'y a pas de ligne à écrire, il y a une
+  disparition à admettre. Les six `event_target_type` restent une liste fermée sans migration
+  (arbitrage (b) de C6, (d) de C7). → **C8.**
 - **L'en-tête de `schema.ts` dit « les 26 tables métier », elles sont 30.** Cinquième chiffre faux
   d'une même famille — `scoped.ts`, la fiche de C6 deux fois, et `drawers/project.tsx` (« les six
   panneaux » pour huit, **retiré** par T6.5). Le geste est de retirer. → **T7.10, qui l'ouvre.**
 - **Trois fichiers de tests d'action nettoient encore sur `if (!f?.domainId) return`** — un
   `beforeAll` qui échoue après avoir créé son domaine le laisse en place, et fait tomber le fichier
-  suivant. Restent `projets/`, `produits/` et `administration/actions.test.ts`. → **au prochain.**
+  suivant. Restent `projets/`, `produits/` et `administration/actions.test.ts` ; le quatrième,
+  `equipe/actions.test.ts` (28/08), retient son `domainId` **dès la création du domaine**, hors de la
+  fixture — c'est la forme à reprendre. → **au prochain.**
 - **`uiLayerSeal` ne scelle ni `components/shell/` ni `components/overview/`.** Il nomme trois
   dossiers métier ; il y en a **cinq**, et le second trou compte quatre fichiers (T6.6, T6.7).
   `eslint.config.mjs` est hors périmètre à chaque fois. → **au prochain qui l'ouvre.**
@@ -245,6 +262,21 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   fonction `"use server"` renvoie un `ReactNode` : droits, actions et lectures conditionnelles y
   restent. Les URL d'ouverture passent par la **même** résolution que le clic — aucune règle de droit
   ne vit à deux endroits.
+- **La disponibilité est déduite, et sa base vit à trois endroits.** `0` accompagnement **en
+  cours** → disponible, `1`–`2` → partiellement, `3` et plus → indisponible (`lib/availability.ts`,
+  28/08/2026). « En cours » veut dire **ni archivé, ni terminé** ; `paused` compte encore. Le seuil
+  est écrit une fois, mais **les exclusions sont réécrites par chacune des trois lectures**, sous
+  trois formes différentes — sous-requête corrélée, regroupement, filtrage en mémoire —, et le
+  compilateur ne les oblige à rien. Trois témoins de test tiennent l'accord, un par lecture.
+- **L'arbitrage (d) de C5bis n'a plus de gardien en base.** Le `CHECK`
+  `persons_availability_requires_center` est tombé avec la colonne : « un intervenant côté entité ne
+  porte pas de disponibilité » n'est plus tenu que par les trois mêmes lectures, chacune par un
+  `kind === "center"`. Une quatrième qui l'oublierait inventerait une disponibilité, et rien ne
+  l'arrêterait.
+- **Trois tables se suppriment, et elles n'ont pas la même barrière.** `entities` et `persons` sont
+  retenues par des clés `restrict` ; **`projects` n'est retenue par rien** — ses dix clés étrangères
+  sont `cascade`, et son panneau de confirmation est le seul garde-fou du geste. Ajouter une
+  quatrième table à `DeletableTable` est un arbitrage humain, jamais une décision de ticket.
 - **Le domaine courant est le premier domaine actif trouvé en base**, rendu **par nom** : pas de
   variable d'environnement, `docs/05` §3 posant un domaine unique. Le jour où un second existe, le
   choix revient au fournisseur d'identité.

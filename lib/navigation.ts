@@ -417,22 +417,32 @@ export const ENTITY_FORM_PARAM = "entite";
 export const ENTITY_FORM_NEW = "nouvelle";
 
 /**
- * Le panneau de **confirmation de suppression** d'une entité (21/08/2026).
+ * Le panneau de **confirmation de suppression** (21/08/2026), sur trois pages
+ * depuis le 28/08/2026 : `/administration` pour une entité, `/equipe` pour une
+ * personne, la page du projet pour un accompagnement.
  *
  * **Une clé à elle, et non une valeur de plus sur `archiver`** : ce sont deux
  * gestes aux conséquences opposées — l'un range et se défait, l'autre efface et
  * ne se défait pas. C'est la distinction qu'`annuler` tient déjà face à
- * `archiver` sur la page du projet, et elle est ici plus tranchée encore.
+ * `archiver` sur la page du projet, et elle est ici plus tranchée encore. Le
+ * réemploi d'une même clé sur trois pages est celui d'`archiver`, qui en occupe
+ * quatre : ce qui l'interdirait serait deux sens sur un **même** écran.
  *
- * La valeur porte l'identifiant de l'entité : cet écran n'a pas d'objet de
- * page, il faut donc dire *laquelle*. La forme de `teamPersonArchive`.
+ * **La valeur porte l'identifiant là où la page n'a pas d'objet** — une entité
+ * sur `/administration`, une personne sur `/equipe` — et vaut
+ * `DELETE_PANEL_CONFIRM` sur la page du projet, qui en a un. C'est exactement le
+ * partage qu'`archiver` fait déjà entre `teamPersonArchive` et `projectArchive`.
  *
- * **La suppression est l'écart à la règle 4**, arbitré le 21/08/2026 et borné à
- * une ligne de référentiel que rien ne référence — voir `DeletableTable` dans
- * `lib/db/scoped.ts`. Ce n'est pas cette route qui protège : `deleteEntity`
- * redérive le droit et la condition sur l'identifiant **reçu**.
+ * **La suppression est l'écart à la règle 4** : arbitré le 21/08/2026 sur les
+ * entités, élargi le 28/08/2026 aux personnes et aux accompagnements — voir
+ * `DeletableTable` dans `lib/db/scoped.ts`, qui dit ce que chacune des trois
+ * emporte. Ce n'est pas cette route qui protège : les trois actions redérivent
+ * le droit et la condition sur l'identifiant **reçu**.
  */
 export const DELETE_PANEL_PARAM = "supprimer";
+
+/** La valeur qui ouvre la confirmation sur une page qui a un objet. */
+export const DELETE_PANEL_CONFIRM = "confirmation";
 
 /**
  * Le panneau du **lien déclaré** (T6.5), huitième et dernière clé d'ouverture de
@@ -703,6 +713,20 @@ export const ROUTES = {
   projectArchive: (id: string) =>
     `/projets/${id}?${ARCHIVE_PANEL_PARAM}=${ARCHIVE_PANEL_CONFIRM}`,
   /**
+   * La page du projet, panneau de **confirmation de suppression** ouvert
+   * (28/08/2026) — dixième et dernière clé d'ouverture de cette page.
+   *
+   * **Une clé distincte d'`archiver`, et c'est tout le sujet** : ranger et
+   * effacer ne sont pas deux formes du même geste. La valeur est fixe, l'objet
+   * visé étant le projet de la page — la forme de `projectArchive`, à la
+   * différence de `teamPersonDelete`, dont la page n'a pas d'objet.
+   *
+   * **Ce que ce geste efface, la base ne le retiendra pas** : les dix clés
+   * étrangères qui pointent `projects.id` sont `cascade`. Voir `DeletableTable`.
+   */
+  projectDelete: (id: string) =>
+    `/projets/${id}?${DELETE_PANEL_PARAM}=${DELETE_PANEL_CONFIRM}`,
+  /**
    * La page du projet, panneau de saisie ouvert. **Ce n'est pas un écran de
    * plus** : c'est le même, avec un paramètre — et la fermeture est donc
    * `project(id)`, qui n'a pas besoin d'entrée à elle.
@@ -864,6 +888,21 @@ export const ROUTES = {
    */
   teamPersonArchive: (personId: string) =>
     `/equipe?${ARCHIVE_PANEL_PARAM}=${personId}`,
+  /**
+   * La page Équipe, panneau de **confirmation de suppression** ouvert sur une
+   * personne (28/08/2026).
+   *
+   * **La valeur porte l'identifiant**, comme `teamPersonArchive` et pour la
+   * même raison : `/equipe` n'a pas d'objet de page.
+   *
+   * Ce que le geste emporte — les compétences déclarées — et ce qu'il laisse
+   * sans nom — les lignes qu'elle a créées — sont dits par le panneau, jamais
+   * par cette route. Ce sont `project_members.person_id` et
+   * `activity_participants.person_id`, déclarées `restrict`, qui refusent
+   * d'effacer qui a accompagné.
+   */
+  teamPersonDelete: (personId: string) =>
+    `/equipe?${DELETE_PANEL_PARAM}=${personId}`,
   /**
    * La page Équipe, panneau de **compétence** ouvert sur une personne : y poser
    * une compétence avec son niveau. La fermeture reste `team`.

@@ -5,15 +5,17 @@
  * contrepartie d'avoir isolé la validation dans un module pur. Ils énoncent la
  * règle plutôt que de l'observer sur une fixture.
  *
- * Trois blocs portent le poids du fichier :
+ * Deux blocs portent le poids du fichier :
  *   — l'obligation du **nom**, la seule colonne `not null` que ce formulaire
  *     remplisse librement ;
- *   — les deux **énumérés**, vérifiés parce qu'une soumission forgée porte ce
- *     qu'elle veut et qu'une valeur hors énuméré rendrait un 500 ;
- *   — le **refus de la disponibilité sur un intervenant côté entité**
- *     (arbitrage (d) de C5bis), qui est la règle propre à ce formulaire : le
- *     `CHECK` `persons_availability_requires_center` la tient en base, et
- *     l'y laisser seul rendrait un 500 là où l'on attend un message de champ.
+ *   — le **genre**, vérifié parce qu'une soumission forgée porte ce qu'elle veut
+ *     et qu'une valeur hors énuméré rendrait un 500.
+ *
+ * **Le troisième bloc est parti le 28/08/2026** : il éprouvait le refus de la
+ * disponibilité sur un intervenant côté entité, et la disponibilité ne se saisit
+ * plus — elle se déduit du nombre d'accompagnements vivants
+ * (`lib/availability.ts`). Ce que ce bloc protégeait est éprouvé par
+ * `lib/queries/team.test.ts`, sur la lecture.
  *
  * Ce qui n'est pas testé ici, et ne doit pas l'être : l'existence du métier dans
  * le domaine — c'est `assertPreconditions` qui la tranche —, le droit d'écrire
@@ -42,7 +44,6 @@ function values(overrides: Partial<PersonFormValues> = {}): PersonFormValues {
     jobId: JOB,
     kind: "center",
     bio: "Product designer, accompagne les équipes du cadrage à la mise en service.",
-    availability: "partial",
     ...overrides,
   };
 }
@@ -57,14 +58,13 @@ function form(fields: Record<string, string>): FormData {
 }
 
 describe("readPersonForm", () => {
-  test("lit les cinq champs, et rogne les blancs", () => {
+  test("lit les quatre champs, et rogne les blancs", () => {
     const read = readPersonForm(
       form({
         fullName: "  Sofia Marchand  ",
         jobId: `  ${JOB}  `,
         kind: "  center  ",
         bio: "  Chercheuse.  ",
-        availability: "  available  ",
       }),
     );
 
@@ -73,7 +73,6 @@ describe("readPersonForm", () => {
       jobId: JOB,
       kind: "center",
       bio: "Chercheuse.",
-      availability: "available",
     });
   });
 
@@ -96,7 +95,6 @@ describe("readPersonForm", () => {
     );
 
     expect(Object.keys(read).sort()).toEqual([
-      "availability",
       "bio",
       "fullName",
       "jobId",
@@ -106,21 +104,19 @@ describe("readPersonForm", () => {
 });
 
 describe("toPersonFormValues", () => {
-  test("ramène la ligne aux cinq chaînes, `null` devenant vide", () => {
+  test("ramène la ligne aux quatre chaînes, `null` devenant vide", () => {
     expect(
       toPersonFormValues({
         fullName: "Marc Tellier",
         jobId: null,
         kind: "stakeholder",
         bio: null,
-        availability: null,
       }),
     ).toEqual({
       fullName: "Marc Tellier",
       jobId: "",
       kind: "stakeholder",
       bio: "",
-      availability: "",
     });
   });
 });
@@ -157,33 +153,9 @@ describe("validatePersonForm", () => {
     expect(validatePersonForm(values({ bio: "x" })).bio).toBeUndefined();
   });
 
-  test("la disponibilité est facultative", () => {
+  test("un intervenant côté entité sans métier passe", () => {
     expect(
-      validatePersonForm(values({ availability: "" })).availability,
-    ).toBeUndefined();
-  });
-
-  test("une disponibilité hors énuméré est refusée", () => {
-    expect(
-      validatePersonForm(values({ availability: "peut-etre" })).availability,
-    ).toBeDefined();
-  });
-
-  /* Arbitrage (d) de C5bis : la disponibilité est une propriété du centre. Le
-     `CHECK` la tient en base ; ce cas est ce qui la rend lisible à l'écran. */
-  test("un intervenant côté entité ne porte pas de disponibilité", () => {
-    expect(
-      validatePersonForm(
-        values({ kind: "stakeholder", availability: "available" }),
-      ).availability,
-    ).toBeDefined();
-  });
-
-  test("un intervenant côté entité sans disponibilité passe", () => {
-    expect(
-      validatePersonForm(
-        values({ kind: "stakeholder", availability: "", jobId: "" }),
-      ),
+      validatePersonForm(values({ kind: "stakeholder", jobId: "" })),
     ).toEqual({});
   });
 });
@@ -196,7 +168,6 @@ describe("parsePersonForm", () => {
         jobId: JOB,
         kind: "center",
         bio: "Product designer.",
-        availability: "partial",
       }),
     );
 
@@ -206,7 +177,6 @@ describe("parsePersonForm", () => {
       jobId: JOB,
       kind: "center",
       bio: "Product designer.",
-      availability: "partial",
     });
   });
 
@@ -220,22 +190,17 @@ describe("parsePersonForm", () => {
       jobId: null,
       kind: "stakeholder",
       bio: null,
-      availability: null,
     });
   });
 
-  /* La disponibilité tombe avec le genre, et c'est ce `null` explicite qui
-     **efface** celle d'une personne passant du centre à l'entité : sans lui, la
-     correction laisserait la colonne en place et le `CHECK` refuserait
-     l'écriture. La validation ayant déjà refusé une disponibilité saisie sur un
-     `stakeholder`, ce cas ne s'atteint qu'en corrigeant le genre seul. */
-  test("le genre `stakeholder` efface la disponibilité", () => {
+  test("un intervenant côté entité passe sans métier ni présentation", () => {
     const parsed = parsePersonForm(
-      form({ fullName: "Marc Tellier", kind: "stakeholder", availability: "" }),
+      form({ fullName: "Marc Tellier", kind: "stakeholder" }),
     );
 
     expect(parsed.errors).toEqual({});
-    expect(parsed.input?.availability).toBeNull();
+    expect(parsed.input?.jobId).toBeNull();
+    expect(parsed.input?.bio).toBeNull();
   });
 
   test("`input` est nul dès qu'une erreur est levée", () => {

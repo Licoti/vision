@@ -6,29 +6,28 @@
  * branche Neon ni fixture.
  *
  * Ce module ne valide **que la forme** : un nom non vide, un genre qui
- * appartient à son énuméré, une disponibilité qui appartient au sien, un métier
- * qui ressemble à un identifiant. Il ne dit rien de l'existence du métier dans
+ * appartient à son énuméré, un métier qui ressemble à un identifiant. Il ne dit
+ * rien de l'existence du métier dans
  * le domaine, ni du droit d'écrire un profil : ces questions appartiennent au
  * domaine, donc à l'action et à `lib/db/scoped.ts`. Revérifier ici poserait une
  * seconde autorité, qui divergerait un jour de la première.
  *
- * **Cinq champs, et pas un de plus.** `source`, `has_access`, `domain_role` et
+ * **Quatre champs, et pas un de plus.** `source`, `has_access`, `domain_role` et
  * `is_active` ne se saisissent pas : la première est posée à la création
  * (`manual`, D19), les trois autres appartiennent à l'authentification, que C7
  * reprendra. Les écrire ici ferait de cet écran une console de comptes, ce
  * qu'il n'est pas.
  *
- * **La disponibilité est refusée à un intervenant côté entité** — arbitrage (d)
- * de C5bis. Ce n'est pas une redondance avec le `CHECK`
- * `persons_availability_requires_center` : sans ce contrôle, la contrainte
- * rendrait une erreur PostgreSQL — un 500 — là où l'on attend un message de
- * champ. La base tient la règle, ce module la rend lisible.
+ * **La disponibilité n'en est plus un** (28/08/2026) : elle se **déduit** du
+ * nombre d'accompagnements vivants (`lib/availability.ts`), et une valeur déduite
+ * ne se saisit pas. Le champ, sa validation, son effacement au passage du centre
+ * à l'entité et le `CHECK` qui les doublait sont tombés ensemble.
  *
  * **Aucun champ de score, de date de validation ni d'historique** : Vision ne
  * mesure pas une personne (garde-fous 1 et 2, D39).
  */
 
-import { personAvailability, personKind } from "@/lib/db/schema";
+import { personKind } from "@/lib/db/schema";
 import { valueOrNull } from "@/lib/forms/project";
 
 /**
@@ -42,17 +41,9 @@ import { valueOrNull } from "@/lib/forms/project";
  */
 export type PersonKindValue = (typeof personKind.enumValues)[number];
 
-/** `available` · `partial` · `unavailable`. Même règle, même jumelage. */
-export type PersonAvailabilityValue =
-  (typeof personAvailability.enumValues)[number];
-
 /** Les deux genres, dans l'ordre du schéma — celui que le `select` propose. */
 export const PERSON_KIND_VALUES: readonly PersonKindValue[] =
   personKind.enumValues;
-
-/** Les trois disponibilités, dans l'ordre du schéma. */
-export const PERSON_AVAILABILITY_VALUES: readonly PersonAvailabilityValue[] =
-  personAvailability.enumValues;
 
 /**
  * Les deux mots du genre, tels que l'écran les propose.
@@ -70,12 +61,6 @@ export function isPersonKind(value: string): value is PersonKindValue {
   return (personKind.enumValues as readonly string[]).includes(value);
 }
 
-export function isPersonAvailability(
-  value: string,
-): value is PersonAvailabilityValue {
-  return (personAvailability.enumValues as readonly string[]).includes(value);
-}
-
 /* ==========================================================================
    Ce que la personne a saisi
    ========================================================================== */
@@ -90,8 +75,6 @@ export type PersonFormValues = {
   kind: string;
   /** La courte présentation. Facultative — la colonne est nullable. */
   bio: string;
-  /** Facultative, et refusée à un intervenant côté entité (arbitrage (d)). */
-  availability: string;
 };
 
 export type PersonFormErrors = Partial<Record<keyof PersonFormValues, string>>;
@@ -115,11 +98,10 @@ export const EMPTY_PERSON_VALUES: PersonFormValues = {
   jobId: "",
   kind: "",
   bio: "",
-  availability: "",
 };
 
 /**
- * La ligne déjà enregistrée, ramenée aux cinq chaînes du formulaire — le
+ * La ligne déjà enregistrée, ramenée aux quatre chaînes du formulaire — le
  * pré-remplissage du panneau en correction.
  *
  * `null` devient `""` : le formulaire ne connaît que des chaînes, et l'absence
@@ -130,14 +112,12 @@ export function toPersonFormValues(row: {
   jobId: string | null;
   kind: PersonKindValue;
   bio: string | null;
-  availability: PersonAvailabilityValue | null;
 }): PersonFormValues {
   return {
     fullName: row.fullName,
     jobId: row.jobId ?? "",
     kind: row.kind,
     bio: row.bio ?? "",
-    availability: row.availability ?? "",
   };
 }
 
@@ -159,7 +139,6 @@ export function readPersonForm(formData: FormData): PersonFormValues {
     jobId: field(formData, "jobId"),
     kind: field(formData, "kind"),
     bio: field(formData, "bio"),
-    availability: field(formData, "availability"),
   };
 }
 
@@ -204,19 +183,6 @@ export function validatePersonForm(values: PersonFormValues): PersonFormErrors {
       "Ce métier n'est pas désigné correctement : la saisie n'a pas été enregistrée.";
   }
 
-  /* La disponibilité est facultative, et **elle appartient au centre**
-     (arbitrage (d) de C5bis). Le `CHECK` `persons_availability_requires_center`
-     dit la même chose en base ; l'y laisser seul rendrait un 500 là où l'on
-     attend un message de champ. */
-  if (values.availability) {
-    if (!isPersonAvailability(values.availability)) {
-      errors.availability = "Cette disponibilité n'existe pas.";
-    } else if (values.kind !== "center") {
-      errors.availability =
-        "La disponibilité est une propriété du centre de compétence : un intervenant côté entité n'en porte pas.";
-    }
-  }
-
   // `bio` n'est pas validée : un texte libre, nullable en base. Lui imposer une
   // forme serait décider à la place de qui écrit.
 
@@ -241,8 +207,6 @@ export type PersonRowInput = {
   kind: PersonKindValue;
   /** `null` quand rien n'est saisi : la présentation est facultative. */
   bio: string | null;
-  /** `null` pour un intervenant côté entité, toujours (arbitrage (d)). */
-  availability: PersonAvailabilityValue | null;
 };
 
 /**
@@ -253,11 +217,14 @@ export type PersonRowInput = {
  * venait de prouver. Un `as` tiendrait aujourd'hui et mentirait le jour où une
  * troisième valeur entrerait dans l'un des deux énumérés.
  *
- * Les deux énumérés sont donc **renarrowés** ici plutôt qu'affirmés — la forme
- * exacte de `parseIndicatorForm`. Les rattrapages qui suivent sont
- * inatteignables, `validatePersonForm` ayant déjà posé l'erreur, et ils coûtent
- * quatre lignes : c'est ce qui garantit la propriété ci-dessus **par
- * construction**, plutôt que par la lecture croisée de deux fonctions.
+ * Le genre est donc **renarrowé** ici plutôt qu'affirmé — la forme exacte de
+ * `parseIndicatorForm`. Le rattrapage qui suit est inatteignable,
+ * `validatePersonForm` ayant déjà posé l'erreur, et il coûte deux lignes :
+ * c'est ce qui garantit la propriété ci-dessus **par construction**, plutôt que
+ * par la lecture croisée de deux fonctions.
+ *
+ * **Ils étaient deux énumérés** jusqu'au 28/08/2026 : la disponibilité est
+ * partie avec le champ qui la saisissait.
  */
 export function parsePersonForm(formData: FormData): {
   values: PersonFormValues;
@@ -269,13 +236,6 @@ export function parsePersonForm(formData: FormData): {
 
   const kind = isPersonKind(values.kind) ? values.kind : null;
   if (!kind && !errors.kind) errors.kind = "Ce genre de personne n'existe pas.";
-
-  const availability = isPersonAvailability(values.availability)
-    ? values.availability
-    : null;
-  if (values.availability && !availability && !errors.availability) {
-    errors.availability = "Cette disponibilité n'existe pas.";
-  }
 
   if (!kind || Object.keys(errors).length > 0) {
     return { values, errors, input: null };
@@ -289,12 +249,6 @@ export function parsePersonForm(formData: FormData): {
       jobId: valueOrNull(values.jobId),
       kind,
       bio: valueOrNull(values.bio),
-      /* La disponibilité tombe avec le genre : un intervenant côté entité n'en
-         porte pas, et la validation a déjà refusé qu'on en saisisse une. Le
-         `null` explicite est ce qui **efface** celle d'une personne qui passe du
-         centre à l'entité — sans lui, la correction laisserait la colonne en
-         place et le `CHECK` refuserait l'écriture. */
-      availability: kind === "center" ? availability : null,
     },
   };
 }

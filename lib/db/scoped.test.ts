@@ -665,49 +665,29 @@ describe("les compétences portées", () => {
     await a.scope.unlink(personSkills, held.id);
   });
 
-  /* Arbitrage (d) — la disponibilité est une propriété du centre, et le refus
-     est en base. Deux témoins l'encadrent : sans eux, un `CHECK` qui refuserait
-     *tout* passerait pour un `CHECK` juste. */
+  /* **Les deux témoins de l'arbitrage (d) sont partis le 28/08/2026**, avec la
+     colonne qu'ils encadraient : `persons_availability_requires_center` n'existe
+     plus, la disponibilité étant déduite du nombre d'accompagnements vivants
+     (`lib/availability.ts`). L'arbitrage tient toujours — un intervenant côté
+     entité n'en porte pas —, mais **il n'a plus de gardien en base** : c'est la
+     dérivation qui rend `null`, et ce sont les tests de `lib/queries/team.ts`
+     qui l'éprouvent. Perte de garantie consignée au journal technique. */
 
-  test("un intervenant côté entité ne porte pas de disponibilité", async () => {
-    await expect(
-      a.scope.insert(persons, {
-        fullName: "Intervenant disponible",
-        source: "manual",
-        kind: "stakeholder",
-        availability: "available",
-      }),
-    ).rejects.toThrow();
-
-    const rows = await db
-      .select()
-      .from(persons)
-      .where(
-        and(
-          eq(persons.domainId, a.domainId),
-          eq(persons.fullName, "Intervenant disponible"),
-        ),
-      );
-    expect(rows).toHaveLength(0);
-  });
-
-  test("une personne du centre la porte, un intervenant sans elle passe", async () => {
+  test("la présentation se saisit, et elle est facultative", async () => {
     const member = await a.scope.insert(persons, {
-      fullName: "Membre partiellement disponible",
+      fullName: "Membre présenté",
       source: "manual",
       kind: "center",
-      availability: "partial",
       bio: "Une phrase de présentation.",
     });
-    expect(member.availability).toBe("partial");
     expect(member.bio).toBe("Une phrase de présentation.");
 
     const stakeholder = await a.scope.insert(persons, {
-      fullName: "Intervenant sans disponibilité",
+      fullName: "Intervenant sans présentation",
       source: "manual",
       kind: "stakeholder",
     });
-    expect(stakeholder.availability).toBeNull();
+    expect(stakeholder.bio).toBeNull();
   });
 });
 
@@ -907,6 +887,81 @@ describe("`deleteRow`", () => {
       await a.scope.deleteRow(entities, "00000000-0000-4000-8000-000000000000"),
     ).toBe(0);
   });
+
+  /* ------------------------------------------------------------------
+     Les deux tables entrées dans `DeletableTable` le 28/08/2026. Elles n'ont
+     **pas la même barrière**, et c'est tout ce qu'il y a à retenir d'elles.
+     ------------------------------------------------------------------ */
+
+  test("`persons` est retenue par une clé `restrict`, comme `entities`", async () => {
+    /* `project_members.person_id` est `restrict` : dès qu'une personne est dans
+       une équipe, la base refuse de l'effacer. C'est ce qui fait que la règle 4
+       garde ses droits sur tout ce qui a servi.
+
+       **La liaison est créée ici et non prise à la fixture** : celle-ci n'en
+       porte pas, et un test qui s'appuierait dessus passerait en effaçant la
+       personne que les autres partagent. `activity_participants.person_id` est
+       la seconde clé de la paire ; elle est éprouvée par son geste, dans
+       `app/(app)/equipe/actions.test.ts`. */
+    const held = await a.scope.insert(persons, {
+      fullName: `Dans une équipe ${suffix}`,
+      source: "manual",
+      kind: "center",
+    });
+    await a.scope.insert(projectMembers, {
+      projectId: a.projectId,
+      personId: held.id,
+    });
+
+    await expect(a.scope.deleteRow(persons, held.id)).rejects.toThrow(
+      IntegrityError,
+    );
+    expect(await a.scope.find(persons, held.id)).toBeDefined();
+  });
+
+  test("une personne que rien ne référence s'efface, ses compétences avec elle", async () => {
+    const doomed = await a.scope.insert(persons, {
+      fullName: `Doublon ${suffix}`,
+      source: "manual",
+      kind: "center",
+    });
+    const held = await a.scope.insert(personSkills, {
+      personId: doomed.id,
+      skillId: a.skillId,
+      levelId: a.levelId,
+    });
+
+    expect(await a.scope.deleteRow(persons, doomed.id)).toBe(1);
+    expect(await a.scope.find(persons, doomed.id)).toBeUndefined();
+    // `person_skills.person_id` est `cascade` : la liaison part avec elle.
+    expect(await a.scope.find(personSkills, held.id)).toBeUndefined();
+  });
+
+  /**
+   * **`projects` n'a aucune barrière, et c'est le fait qu'il faut voir.**
+   *
+   * Les dix clés étrangères qui le pointent sont `cascade` : rien ne s'oppose,
+   * et l'activité part avec l'accompagnement. Ce test n'éprouve pas un
+   * garde-fou — il éprouve **son absence**, qui est ce que `DeletableTable`
+   * annonce et ce que le panneau de confirmation doit compenser.
+   */
+  test("`projects` n'oppose rien : la cascade emporte son contenu", async () => {
+    const project = await a.scope.insert(projects, {
+      name: `À effacer ${suffix}`,
+      productId: a.productId,
+      statusId: a.statusId,
+    });
+    const activity = await a.scope.insert(activities, {
+      projectId: project.id,
+      activityTypeId: a.activityTypeId,
+      state: "planned",
+      periodStart: "2026-04-01",
+    });
+
+    expect(await a.scope.deleteRow(projects, project.id)).toBe(1);
+    expect(await a.scope.find(projects, project.id)).toBeUndefined();
+    expect(await a.scope.find(activities, activity.id)).toBeUndefined();
+  });
 });
 
 describe("les garde-fous de typage", () => {
@@ -926,9 +981,11 @@ describe("les garde-fous de typage", () => {
       await scope.insert(entities, { label: "x", domainId: "…" });
       // @ts-expect-error `products` n'est pas dans `DeletableTable` : une donnée métier ne s'efface pas.
       await scope.deleteRow(products, "…");
-      // @ts-expect-error `persons` non plus, et pour la même raison.
+      /* **`persons` et `projects` y sont entrés le 28/08/2026**, sur arbitrage
+         humain — l'union reste nominative, et c'est elle qu'on relit ici. */
       await scope.deleteRow(persons, "…");
-      // `entities` y est : `deleteRow` y est disponible, sans cast.
+      await scope.deleteRow(projects, "…");
+      // `entities` y est depuis le 21/08/2026 : sans cast, comme les deux ci-dessus.
       await scope.deleteRow(entities, "…");
     };
     expect(typeof jamaisAppele).toBe("function");

@@ -31,6 +31,9 @@ import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { db } from "@/lib/db/client";
 import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
 import {
+  activities,
+  activityTypes,
+  budgets,
   domains,
   entities,
   events,
@@ -39,6 +42,8 @@ import {
   projectMembers,
   projectStatuses,
   projects,
+  resources,
+  results,
 } from "@/lib/db/schema";
 import { TEAM_FIELD_PREFIX } from "@/lib/forms/project";
 
@@ -64,8 +69,13 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-const { createProject, updateProject, archiveProject, restoreProject } =
-  await import("./actions");
+const {
+  createProject,
+  updateProject,
+  archiveProject,
+  restoreProject,
+  deleteProject,
+} = await import("./actions");
 
 const suffix = Math.random().toString(36).slice(2, 10);
 
@@ -88,6 +98,7 @@ type Fixture = {
   productId: string;
   /** L'accompagnement que les corrections visent. */
   projectId: string;
+  activityTypeId: string;
   /** Trois personnes à faire entrer et sortir de l'équipe. */
   camilleId: string;
   leaId: string;
@@ -130,6 +141,13 @@ beforeAll(async () => {
     name: `Produit ${suffix}`,
     entityId: entity.id,
   });
+  /* Un type d'activité, pour peupler l'accompagnement que la suppression
+     effacera : sans contenu, une cascade ne prouve rien. */
+  const activityType = await scope.insert(activityTypes, {
+    label: `Audit ${suffix}`,
+    family: "evaluation",
+    producesResult: true,
+  });
   const project = await scope.insert(projects, {
     name: `Ouvert ${suffix}`,
     productId: product.id,
@@ -154,6 +172,7 @@ beforeAll(async () => {
     statusId: status.id,
     productId: product.id,
     projectId: project.id,
+    activityTypeId: activityType.id,
     camilleId: camille.id,
     leaId: lea.id,
     rudyId: rudy.id,
@@ -164,6 +183,11 @@ afterAll(async () => {
   if (!f?.domainId) return;
   const tables = [
     events,
+    results,
+    resources,
+    budgets,
+    activities,
+    activityTypes,
     projectMembers,
     projects,
     projectStatuses,
@@ -462,6 +486,247 @@ describe("archiveProject et restoreProject", () => {
     // Rétablir un accompagnement vivant.
     await restoreProject(project.id);
     expect(await written(() => restoreProject(project.id))).toHaveLength(0);
+  });
+});
+
+/* ==========================================================================
+   La suppression définitive — 28/08/2026
+
+   **Le geste n'écrit aucune ligne de journal, il en efface.** C'est ce qui le
+   sort du sujet de ce fichier tout en le laissant à sa place : la seule façon
+   de l'éprouver est de **compter en base**, avant et après — et le journal du
+   projet est l'une des tables comptées.
+
+   `F1-D3` et la règle 4 sont écartées par arbitrage humain daté ; ce qui se
+   vérifie ici est que l'écart fait exactement ce qu'il annonce, et rien de plus
+   — l'accompagnement voisin ne bouge pas.
+   ========================================================================== */
+
+describe("deleteProject", () => {
+  /**
+   * Un accompagnement **plein** : équipe, activité terminée, ressource,
+   * résultat, budget, et deux lignes de journal.
+   *
+   * Sans contenu, une cascade ne prouve rien — elle passerait aussi bien sur
+   * une table vide.
+   */
+  async function seedFullProject(name: string) {
+    const project = await f.scope.insert(projects, {
+      name: `${name} ${suffix}`,
+      productId: f.productId,
+      statusId: f.statusId,
+    });
+
+    await f.scope.insert(projectMembers, {
+      projectId: project.id,
+      personId: f.camilleId,
+      isContributor: false,
+    });
+
+    /* `activities_done_requires_period_end` exige la fin de période sur une
+       activité terminée — et `done` est ce qu'exige la couche pour y rattacher
+       un résultat. */
+    const activity = await f.scope.insert(activities, {
+      projectId: project.id,
+      activityTypeId: f.activityTypeId,
+      state: "done",
+      periodStart: "2026-01-01",
+      periodEnd: "2026-01-31",
+    });
+
+    await f.scope.insert(resources, {
+      projectId: project.id,
+      activityId: activity.id,
+      title: `Rapport ${name} ${suffix}`,
+      url: "https://example.com/rapport",
+      resourceType: "pdf",
+    });
+
+    await f.scope.insert(results, {
+      activityId: activity.id,
+      label: `Conformité ${name}`,
+      value: "72.0000",
+      unit: "%",
+      measuredOn: "2026-01-31",
+    });
+
+    await f.scope.insert(budgets, {
+      projectId: project.id,
+      allocated: "40.0000",
+      consumed: "12.0000",
+    });
+
+    // Deux lignes de journal, écrites par les gestes ordinaires du projet.
+    await f.scope.record({
+      projectId: project.id,
+      verb: "created",
+      targetType: "project",
+      targetId: project.id,
+      summary: `Accompagnement créé${NBSP}: ${name} ${suffix}`,
+    });
+    await f.scope.record({
+      projectId: project.id,
+      verb: "updated",
+      targetType: "project",
+      targetId: project.id,
+      summary: `Accompagnement modifié${NBSP}: ${name} ${suffix}`,
+    });
+
+    return { projectId: project.id, activityId: activity.id };
+  }
+
+  /** Ce que la base porte encore de cet accompagnement, table par table. */
+  async function contentsOf(projectId: string, activityId: string) {
+    const count = async (rows: Promise<{ id: string }[]>) =>
+      (await rows).length;
+
+    return {
+      projects: await count(
+        db.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)),
+      ),
+      members: await count(
+        db
+          .select({ id: projectMembers.id })
+          .from(projectMembers)
+          .where(eq(projectMembers.projectId, projectId)),
+      ),
+      activities: await count(
+        db
+          .select({ id: activities.id })
+          .from(activities)
+          .where(eq(activities.projectId, projectId)),
+      ),
+      resources: await count(
+        db
+          .select({ id: resources.id })
+          .from(resources)
+          .where(eq(resources.projectId, projectId)),
+      ),
+      results: await count(
+        db.select({ id: results.id }).from(results).where(eq(results.activityId, activityId)),
+      ),
+      budgets: await count(
+        db.select({ id: budgets.id }).from(budgets).where(eq(budgets.projectId, projectId)),
+      ),
+      events: await count(
+        db.select({ id: events.id }).from(events).where(eq(events.projectId, projectId)),
+      ),
+    };
+  }
+
+  /**
+   * Le geste réussit en **levant** : `deleteProject` finit par `redirect`, la
+   * page qu'elle laissait derrière elle n'existant plus. Un appel qui rendrait
+   * un état sans lever serait un refus, et le test doit pouvoir les distinguer.
+   */
+  async function deleted(projectId: string): Promise<"redirected" | unknown> {
+    try {
+      return await deleteProject(projectId, {}, new FormData());
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith(REDIRECT)) {
+        return "redirected";
+      }
+      throw error;
+    }
+  }
+
+  test("efface l'accompagnement et tout ce qui pend à lui", async () => {
+    currentPerson = f.managerId;
+    const { projectId, activityId } = await seedFullProject("À effacer");
+
+    // Le témoin : sans lui, un décompte à zéro après coup ne dirait pas si le
+    // contenu a jamais existé.
+    expect(await contentsOf(projectId, activityId)).toEqual({
+      projects: 1,
+      members: 1,
+      activities: 1,
+      resources: 1,
+      results: 1,
+      budgets: 1,
+      events: 2,
+    });
+
+    expect(await deleted(projectId)).toBe("redirected");
+
+    expect(await contentsOf(projectId, activityId)).toEqual({
+      projects: 0,
+      members: 0,
+      activities: 0,
+      resources: 0,
+      results: 0,
+      budgets: 0,
+      events: 0,
+    });
+  });
+
+  test("l'accompagnement voisin ne bouge pas", async () => {
+    currentPerson = f.managerId;
+    const neighbour = await seedFullProject("Voisin épargné");
+    const doomed = await seedFullProject("Effacé à côté");
+
+    await deleted(doomed.projectId);
+
+    expect(
+      await contentsOf(neighbour.projectId, neighbour.activityId),
+    ).toEqual({
+      projects: 1,
+      members: 1,
+      activities: 1,
+      resources: 1,
+      results: 1,
+      budgets: 1,
+      events: 2,
+    });
+  });
+
+  /* Le geste est offert sur les deux états — choix de l'humain du 28/08/2026 :
+     ranger puis effacer est le chemin naturel, et l'interdire obligerait à
+     rétablir avant de supprimer. */
+  test("un accompagnement archivé se supprime aussi", async () => {
+    currentPerson = f.managerId;
+    const { projectId, activityId } = await seedFullProject("Rangé puis effacé");
+    await archiveProject(projectId, {}, new FormData());
+
+    expect(await deleted(projectId)).toBe("redirected");
+    expect((await contentsOf(projectId, activityId)).projects).toBe(0);
+  });
+
+  /**
+   * **Le droit s'éprouve par l'action, et le décompte en base tranche.** Le
+   * contributeur **écrit** dans cet accompagnement (T3.x) : son refus ici ne
+   * peut donc pas être un droit qui manque partout. Et il n'y a pas de code
+   * HTTP à lire — l'action rend un état, la base dit la vérité.
+   */
+  test("un contributeur désigné ne peut pas supprimer", async () => {
+    currentPerson = f.managerId;
+    const { projectId, activityId } = await seedFullProject("Défendu");
+
+    currentPerson = f.contributorId;
+    const state = await deleted(projectId);
+
+    expect(state).not.toBe("redirected");
+    expect((state as { message?: string }).message).toBeDefined();
+    expect(await contentsOf(projectId, activityId)).toEqual({
+      projects: 1,
+      members: 1,
+      activities: 1,
+      resources: 1,
+      results: 1,
+      budgets: 1,
+      events: 2,
+    });
+  });
+
+  /* La couche est scopée : un accompagnement d'un autre domaine n'existe pas,
+     il ne « manque » pas. C'est `openProjectAsManager` qui le dit, et rien ne
+     doit être effacé. */
+  test("un identifiant inconnu n'efface rien", async () => {
+    currentPerson = f.managerId;
+    const { projectId, activityId } = await seedFullProject("Hors de portée");
+
+    const state = await deleted("00000000-0000-4000-8000-000000000000");
+    expect(state).not.toBe("redirected");
+    expect((await contentsOf(projectId, activityId)).projects).toBe(1);
   });
 });
 

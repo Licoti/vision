@@ -72,9 +72,15 @@ export type ProductDrawerRequest =
  * table — `budgets_project_unique` fait qu'un projet porte **au plus un**
  * budget, si bien qu'il n'y a rien à désigner et qu'une seule action crée ou
  * corrige la même ligne.
+ *
+ * **`delete` n'est pas une variante d'`archive`** (28/08/2026), et le type le dit
+ * comme l'URL : l'un range et se défait, l'autre efface et ne se défait pas —
+ * c'est la distinction que la page Administration porte déjà. Les confondre en
+ * une clé aurait mis l'écart à `F1-D3` derrière un booléen.
  */
 export type ProjectDrawerRequest =
   | { kind: "archive" }
+  | { kind: "delete" }
   | { kind: "cancel"; id: string }
   | { kind: "result"; id: string }
   | { kind: "adoption"; id?: string | undefined }
@@ -106,12 +112,18 @@ export type ProjectDrawerRequest =
  * piège de nom est celui du schéma : `persons` porte les membres du centre,
  * `personas` les profils pour lesquels on conçoit. Deux tables sans rapport,
  * deux panneaux sans rapport.
+ *
+ * **`delete` est le cinquième** (28/08/2026), et il porte un identifiant comme
+ * `archive` : `/equipe` n'a pas d'objet de page. Il n'en est pas une variante —
+ * ranger et effacer ne sont pas deux formes du même geste, et c'est la
+ * distinction que la page Administration tient déjà en deux clés.
  */
 export type TeamDrawerRequest =
   | { kind: "personDetail"; id: string }
   | { kind: "person"; id?: string | undefined }
   | { kind: "skill"; id: string }
-  | { kind: "archive"; id: string };
+  | { kind: "archive"; id: string }
+  | { kind: "delete"; id: string };
 
 /**
  * Les trois panneaux de la page **Administration** (21/08/2026).
@@ -204,6 +216,7 @@ const PRODUCT_KINDS = [
 
 const PROJECT_KINDS = [
   "archive",
+  "delete",
   "cancel",
   "result",
   "adoption",
@@ -214,7 +227,13 @@ const PROJECT_KINDS = [
   "budget",
 ] as const;
 
-const TEAM_KINDS = ["personDetail", "person", "skill", "archive"] as const;
+const TEAM_KINDS = [
+  "personDetail",
+  "person",
+  "skill",
+  "archive",
+  "delete",
+] as const;
 
 const ADMIN_KINDS = ["entity", "archive", "delete"] as const;
 
@@ -226,7 +245,11 @@ export function asProductRequest(
     : null;
 }
 
-/** Le jumeau, pour la page projet. `archive` est la seule clé commune. */
+/**
+ * Le jumeau, pour la page projet. `archive` et `delete` sont les deux clés
+ * communes — la seconde depuis le 28/08/2026 —, et ce rétrécissement ne les
+ * distingue donc pas : c'est la résolution qui refuse ce qui ne la concerne pas.
+ */
 export function asProjectRequest(
   request: DrawerRequest,
 ): ProjectDrawerRequest | null {
@@ -238,12 +261,12 @@ export function asProjectRequest(
 /**
  * Le troisième jumeau, pour la page Équipe (T5bis.4, complété en T5bis.6).
  *
- * **`archive` est désormais la seule clé commune aux trois pages**, et ce
- * rétrécissement ne la distingue donc pas : une demande `{ kind: "archive" }`
- * forgée depuis la page produit — qui n'y porte aucun identifiant — passe ce
- * filtre. C'est `resolveTeamDrawer` qui la refuse, en vérifiant la forme de
- * l'UUID avant toute lecture. Le rétrécissement écarte le reste : une demande
- * `personaDetail`, dont le nom ne diffère que d'une lettre, n'ouvre rien ici.
+ * **`archive` et `delete` sont communes aux autres pages**, et ce rétrécissement
+ * ne les distingue donc pas : une demande `{ kind: "delete" }` forgée depuis la
+ * page projet — qui n'y porte aucun identifiant — passe ce filtre. C'est
+ * `resolveTeamDrawer` qui la refuse, en vérifiant la forme de l'UUID avant toute
+ * lecture. Le rétrécissement écarte le reste : une demande `personaDetail`, dont
+ * le nom ne diffère que d'une lettre, n'ouvre rien ici.
  */
 export function asTeamRequest(
   request: DrawerRequest,

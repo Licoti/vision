@@ -4515,3 +4515,106 @@ c'est le point d'entrée que la suite réemploiera.
 
 **Le résultat.** `npm run lint` (`--max-warnings=0`), `npx tsc --noEmit`, `npm run build` et les
 **1 207 tests** passent. Aucune migration, aucune suppression, aucun test touché.
+
+---
+
+## Hors ticket — suppression définitive et disponibilité déduite, 28/08/2026
+
+**La demande.** Trois gestes, demandés et livrés le même jour, **hors ticket et à la demande de
+l'humain** : supprimer définitivement un accompagnement (avec mise en garde), supprimer une personne
+de la page Équipe, et **déduire** la disponibilité du nombre d'accompagnements — `0` → disponible,
+`1` ou `2` → partiellement, `3` et plus → indisponible.
+
+**La base a été corrigée le jour même.** La première version comptait les accompagnements *vivants* —
+tout ce qui n'est pas archivé. L'humain l'a repris : *« un accompagnement indiqué Terminé, et pas
+d'autre accompagnement → disponible »*. La nature `done` sort du décompte ; les autres restent,
+`paused` comprise — une pause n'est pas une fin.
+
+**Ce qu'elle coûte en décisions.** Quatre écarts documentaires, tous rendus par l'humain, tous
+consignés au journal technique : `F1-D3` (« un projet s'archive, ne se supprime jamais ») et la
+règle 4 sur `projects` ; la règle 4 sur `persons` ; l'arbitrage (g) de C7, qui bornait la suppression
+aux entités et se disait *rouvrable par l'humain, jamais par un ticket* — c'est exactement ce qui
+s'est passé ; et D39, la disponibilité déduite étant un indice calculé pour qualifier une personne.
+Ce dernier écart était **annoncé** : l'arbitrage (b) de C5bis posait la disponibilité comme *« une
+liste fermée de trois valeurs dont la logique dépendra directement le jour où elle se dérivera des
+accompagnements »*, et le commentaire de la colonne nommait la dette en attente d'un seuil. Le seuil
+est humain, et c'est un nombre.
+
+### Ce qui a été fait
+
+**`DeletableTable` passe d'une table à trois**, et son commentaire est **récrit** plutôt
+qu'augmenté : l'argument du 21/08 — *« `deleteRow` n'efface qu'une ligne que rien ne référence »* —
+est faux pour `projects`. Les trois n'ont pas la même barrière : `entities` et `persons` sont tenues
+par des clés `restrict`, `projects` n'est tenue par rien. Ses dix clés étrangères sont `cascade`.
+
+**Supprimer un accompagnement** — `deleteProject`, sur la porte `manageDomain` d'`archiveProject`,
+offerte sur un projet vivant **comme** archivé. Le panneau compte ce qu'il emporte
+(`countProjectContents` : activités, ressources, résultats, lignes de journal), nomme les six
+cascades qu'il ne compte pas, et propose la sortie : « Archiver conserve tout cela, et se défait. »
+**Seule action de panneau qui redirige encore** depuis TD.2, faute de page derrière elle. **Aucune
+ligne de journal** : `events.project_id` est `cascade`, une trace écrite juste avant serait effacée
+par l'instruction suivante — huitième objet de la famille.
+
+**Supprimer une personne** — `deletePerson`, sur `openPersonForDelete`, qui laisse passer une
+personne **archivée** (ranger puis effacer est le chemin naturel) là où `openPerson` la refuse. Le
+décompte parle — appartenances d'équipe et participations d'activité —, les deux clés `restrict`
+décident. Le panneau dit les trois choses qui comptent : le geste ne se défait pas, ses compétences
+partent avec elle, et **ce qu'elle a créé reste sans son nom** (`created_by` et `events.actor_id`
+sont `set null`).
+
+**La disponibilité déduite** — `lib/availability.ts`, module neuf, une seule autorité pour le
+**seuil** : les trois valeurs, les bornes, et la règle. Ce qui entre dans le décompte — ni archivé,
+ni terminé — est en revanche posé par **trois lectures de formes différentes** : sous-requête
+corrélée dans `listTeam`, regroupement dans `listProjectFormOptions`, filtrage en mémoire dans
+`findPersonDetail`. Le compilateur ne les oblige à rien ; ce sont trois témoins de test qui tiennent
+l'accord, un par lecture. Il existe parce que **deux** modules de lecture en ont
+besoin — `lib/queries/team.ts` et `lib/queries/projects.ts`, qui sert la sélection d'équipe d'un
+formulaire — et que le second dépendrait du premier, lequel type-importe déjà le second. `listTeam`
+gagne une **troisième lecture fixe** (une sous-requête corrélée, jamais une requête par personne) ;
+son filtre `dispo` compare la même sous-requête aux mêmes bornes ; `findPersonDetail` **ne gagne
+aucune requête** — elle lit déjà les accompagnements, et `statusNature` suffit à en retirer les
+terminés. Migration `0010` : la colonne, son `CHECK` et l'énuméré tombent ensemble.
+
+**La fiche peut lister un accompagnement et dire « Disponible »**, et rien n'a eu à changer pour
+cela : chaque ligne de cette liste porte déjà sa pastille de statut. La liste raconte un parcours, la
+pastille mesure une charge.
+
+### Ce que la vérification a donné
+
+**Le critère lu dans le HTML servi.** Les pastilles de `/equipe` coïncident personne par personne
+avec un décompte calculé séparément en SQL — mesuré avant et après la correction de la base, et
+**quatre lignes changent de mot**. Le cas nommé par l'humain se lit entier sur une fiche : Camille
+Roux porte « Disponible », et la même fiche liste « Refonte du parcours de virement » avec sa
+pastille **Terminé**. Un intervenant côté entité n'en porte aucune. Le panneau de suppression d'un accompagnement annonce **3 activités,
+3 ressources, 2 résultats, aucune ligne de journal** : les quatre sont exacts. Ceux des personnes
+annoncent **1 / 4 / 3** et **1 / 3 / 4** : exacts tous les six. « Supprimer définitivement » est
+servi sur un projet vivant **et** archivé. Le panneau de profil ne sert plus que quatre champs.
+
+**Le HTML servi a trouvé un défaut que rien d'autre n'a vu.** `countProjectContents` tenait d'abord
+ses décomptes en `sql` brut : Drizzle n'y qualifie pas les colonnes comme le fait le constructeur de
+requêtes, la jointure des résultats est sortie avec un `id` **ambigu**, et le panneau a rendu
+**500** — après un `tsc`, un ESLint et 1 226 tests verts. Refait avec la couche.
+
+**Les tests mis en défaut, sept fois.** Seuil `1–2` → `1–1` : trois tests tombent, ceux du seuil.
+`isNull(projects.archivedAt)` retiré : deux tombent. `nature <> 'done'` retiré des deux lectures de
+`team.ts` : trois tombent ; retiré de `findPersonDetail` **seule** : un seul — celui qui lit la liste
+et la pastille ensemble ; retiré de `listProjectFormOptions` **seule** : son témoin propre, et lui
+seul. Refus du décompte de `deletePerson` neutralisé : **un seul** tombait d'abord — le second
+passait parce que la clé `restrict` refusait à sa place avec un message contenant le même mot.
+L'assertion a été resserrée sur « équipe », qui n'appartient qu'au décompte, et les deux tombent.
+Porte `manageDomain` de `deleteProject` neutralisée : le test du droit tombe.
+
+**Le contraste vérifié plutôt que mesuré**, et le diff le montre : deux chaînes de classes ajoutées,
+toutes deux déjà servies dans le panneau de suppression d'entité dont les nouveaux sont les jumeaux ;
+`MENU_ITEM_DANGER` déjà dans ce menu, `ACTION_LINK` déjà cinq fois dans cette carte. Aucun couple
+neuf par la position.
+
+**Le droit éprouvé par l'action.** Le contributeur **désigné** — celui qui écrit des activités dans
+cet accompagnement — se voit refuser la suppression, et sept tables inchangées le prouvent.
+`app/(app)/equipe/actions.test.ts` est **créé** : l'écran portait six actions d'écriture depuis
+C5bis sans qu'aucune soit interrogée par son point d'entrée. Son `afterAll` ne dépend pas de la
+réussite du `beforeAll` — le point ouvert des trois fichiers fautifs ne gagne pas un quatrième nom.
+
+**Le résultat.** `npx tsc --noEmit`, `npm run lint` (`--max-warnings=0`), `npm run build` et les
+**1 227 tests** passent. Une migration (`0010`, première destructive depuis `0001`), appliquée à la branche de test ;
+**la base de développement reste à migrer par l'humain**.

@@ -1,5 +1,10 @@
 /**
- * La résolution des quatre panneaux de la page Équipe — T5bis.4, puis T5bis.6.
+ * La résolution des panneaux de la page Équipe — T5bis.4, T5bis.6, puis la
+ * suppression du 28/08/2026.
+ *
+ * **Sans le compte**, et c'est le geste de T6.1 sur `scoped.ts` : la phrase
+ * disait « les quatre », ils sont cinq. Un nombre dans un commentaire vieillit à
+ * chaque ticket ; ce qui se relit ici est la règle.
  *
  * **Deux chemins, une seule résolution.** L'URL reste une adresse valide —
  * coller `?personne=<identifiant>` ouvre encore la fiche, au rendu serveur — et
@@ -14,10 +19,10 @@
  * elle-même : une personne d'un autre domaine n'existe pas, elle ne « manque »
  * pas.
  *
- * **Une lecture, trois écritures.** `personDetail` ne passe par aucun droit
+ * **Une lecture, le reste en écriture.** `personDetail` ne passe par aucun droit
  * (D9) : la fiche se lit par tout le domaine, comme la liste qui la porte, et ce
- * sont ses **six gestes** qui tombent avec `manageDomain`, chacun à `null`. Les
- * trois autres panneaux, eux, ne s'ouvrent qu'à qui peut écrire (arbitrage (c)).
+ * sont ses gestes qui tombent avec `manageDomain`, chacun à `null`. Les autres
+ * panneaux ne s'ouvrent qu'à qui peut écrire (arbitrage (c)).
  * Ce n'est pas ce rendu qui protège : les six actions redérivent le droit sur
  * l'identifiant **reçu** (`app/(app)/equipe/actions.ts`).
  *
@@ -41,12 +46,22 @@ import {
 import { SkillPanel } from "@/components/team/skill-panel";
 import { ConfirmPanel } from "@/components/ui/confirm-panel";
 import type { Session } from "@/lib/auth/session";
-import { jobs, personSkills, persons, skillLevels, skills } from "@/lib/db/schema";
+import {
+  activityParticipants,
+  jobs,
+  personSkills,
+  persons,
+  projectMembers,
+  skillLevels,
+  skills,
+} from "@/lib/db/schema";
 import type { DrawerContent, TeamDrawerRequest } from "@/lib/drawers/types";
+import { formatAccompaniments, formatActivities } from "@/lib/format";
 import { toPersonFormValues } from "@/lib/forms/person";
 import { toPersonSkillFormValues } from "@/lib/forms/person-skill";
 import {
   ARCHIVE_PANEL_PARAM,
+  DELETE_PANEL_PARAM,
   PERSON_FORM_NEW,
   PERSON_FORM_PARAM,
   PERSON_PANEL_PARAM,
@@ -60,12 +75,46 @@ import {
   archivePerson,
   createPerson,
   createPersonSkill,
+  deletePerson,
   removePersonSkill,
   updatePerson,
   updatePersonSkill,
 } from "@/app/(app)/equipe/actions";
 
 import { asc, eq, isNull, or } from "drizzle-orm";
+
+/**
+ * Ce qui s'oppose à la suppression d'une personne, dit avant le geste — ou
+ * `null` quand rien ne s'y oppose.
+ *
+ * **Sa jumelle vit dans l'action** (`refusalOfAnyTrace`), et les deux phrases
+ * sont **délibérément distinctes** : celle-ci prévient — « le geste sera
+ * refusé » —, l'autre refuse — « une personne qui a accompagné ne s'efface
+ * pas ». C'est le partage que `deleteEntity` et son panneau tiennent déjà
+ * depuis le 21/08/2026 : le décompte se formate au même endroit
+ * (`lib/format.ts`), la phrase appartient à qui la dit.
+ *
+ * Ce panneau ne décide de rien : l'action recompte, et les deux clés étrangères
+ * `restrict` tranchent en dernier.
+ */
+function opposingTrace(
+  members: number,
+  participations: number,
+): string | null {
+  const parts: string[] = [];
+  if (members > 0) {
+    parts.push(
+      `${formatAccompaniments(members)} ${members > 1 ? "la comptent dans leur équipe" : "la compte dans son équipe"}`,
+    );
+  }
+  if (participations > 0) {
+    parts.push(
+      `${formatActivities(participations)} ${participations > 1 ? "la comptent" : "la compte"} parmi ses participants`,
+    );
+  }
+  if (parts.length === 0) return null;
+  return `${parts.join(" et ")} : le geste sera refusé.`;
+}
 
 export async function resolveTeamDrawer(
   session: Session,
@@ -105,6 +154,7 @@ export async function resolveTeamDrawer(
             person={person}
             editHref={canWrite ? ROUTES.teamPersonEdit(person.id) : null}
             archiveHref={canWrite ? ROUTES.teamPersonArchive(person.id) : null}
+            deleteHref={canWrite ? ROUTES.teamPersonDelete(person.id) : null}
             addSkillHref={canCarry ? ROUTES.teamSkillNew(person.id) : null}
             editSkillHref={canCarry ? ROUTES.teamSkillEdit : null}
             removeSkill={canCarry ? removePersonSkill : null}
@@ -303,6 +353,86 @@ export async function resolveTeamDrawer(
         ),
       };
     }
+
+    /* ------------------------------------------------------------------ */
+    case "delete": {
+      /* **L'archivage n'est pas regardé**, à la différence du cas ci-dessus :
+         ranger puis effacer est le chemin naturel, et exiger un rétablissement
+         avant la suppression serait un détour sans raison. C'est la règle
+         d'`openPersonForDelete`, dans l'action — et c'est l'action qui protège.
+
+         Qui n'a pas le droit obtient la page nue : la liste reste lisible par
+         tout le domaine (D9), seul le panneau disparaît. */
+      if (!session.can.manageDomain || !isUuid(request.id)) return null;
+
+      const row = await session.db.find(persons, request.id);
+      if (!row) return null;
+
+      /* Les deux décomptes sont **lus ici pour être dits** : le panneau annonce
+         ce qui s'oppose au geste avant qu'on l'exerce, plutôt que de le refuser
+         après coup. Ils ne décident de rien — `deletePerson` recompte sur ce
+         qu'elle reçoit, et les deux clés `restrict` tranchent en dernier. */
+      const [members, participations, carried] = await Promise.all([
+        session.db.count(projectMembers, {
+          where: eq(projectMembers.personId, row.id),
+        }),
+        session.db.count(activityParticipants, {
+          where: eq(activityParticipants.personId, row.id),
+        }),
+        session.db.count(personSkills, {
+          where: eq(personSkills.personId, row.id),
+        }),
+      ]);
+
+      const opposition = opposingTrace(members, participations);
+
+      return {
+        titleId: "panneau-confirmation-titre",
+        title: "Supprimer cette personne",
+        subtitles: [row.fullName],
+        body: (
+          <ConfirmPanel
+            action={deletePerson.bind(null, row.id)}
+            submitLabel="Supprimer définitivement"
+            pendingLabel="Suppression…"
+          >
+            <div className="flex flex-col gap-3 text-sm text-content-neutral-dark">
+              <p className="font-semibold">
+                Ce geste ne se défait pas. La ligne est effacée de la base, elle
+                n&apos;est pas rangée.
+              </p>
+              <p>
+                Il n&apos;existe que pour une personne créée par erreur — un
+                doublon, une faute de frappe corrigée en créant une seconde
+                ligne. Une personne qui a accompagné s&apos;archive.
+              </p>
+
+              {/* La conséquence la moins visible, et la plus surprenante : elle
+                  s'écrit. Ce que la personne a créé ne disparaît pas — son nom
+                  s'en retire. */}
+              <p>
+                Ce qu&apos;elle a créé reste, sans son nom : les lignes du
+                journal gardent leur phrase et perdent leur auteur.
+              </p>
+
+              {carried > 0 ? (
+                <p>
+                  {carried > 1
+                    ? `Ses ${carried} compétences déclarées sont effacées avec elle.`
+                    : "Sa compétence déclarée est effacée avec elle."}
+                </p>
+              ) : null}
+
+              {opposition ? (
+                <p className="font-semibold">{opposition}</p>
+              ) : (
+                <p>Rien ne la référence : le geste passera.</p>
+              )}
+            </div>
+          </ConfirmPanel>
+        ),
+      };
+    }
   }
 }
 
@@ -327,6 +457,7 @@ export function teamRequestFromParams(asked: {
   profil?: string | undefined;
   maitrise?: string | undefined;
   archiver?: string | undefined;
+  supprimer?: string | undefined;
 }): TeamDrawerRequest | null {
   if (asked.personne !== undefined) {
     return { kind: "personDetail", id: asked.personne };
@@ -346,6 +477,13 @@ export function teamRequestFromParams(asked: {
     return { kind: "archive", id: asked.archiver };
   }
 
+  /* `supprimer` désigne la personne à effacer, comme `archiver` désigne celle à
+     ranger : `/equipe` n'a pas d'objet de page. Sur la page projet, la même clé
+     porte une valeur fixe — la page y a un objet. */
+  if (asked.supprimer !== undefined) {
+    return { kind: "delete", id: asked.supprimer };
+  }
+
   return null;
 }
 
@@ -363,4 +501,5 @@ export const TEAM_PANEL_PARAMS = [
   PERSON_FORM_PARAM,
   SKILL_PANEL_PARAM,
   ARCHIVE_PANEL_PARAM,
+  DELETE_PANEL_PARAM,
 ] as const;

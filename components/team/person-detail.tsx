@@ -81,19 +81,24 @@ export function PersonDetail({
   person,
   editHref,
   archiveHref,
+  deleteHref,
   addSkillHref,
   editSkillHref,
   removeSkill,
 }: {
   person: PersonDetailRow;
   /**
-   * Les six points d'entrée de T5bis.6, dérivés du droit par
-   * `lib/drawers/team.tsx` — `null` retire le geste. Ils traversent cette fiche
-   * sans qu'elle les lise : c'est la carte qui les porte, et ce sont les actions
-   * qui protègent.
+   * Les points d'entrée de T5bis.6, plus la suppression du 28/08/2026, dérivés
+   * du droit par `lib/drawers/team.tsx` — `null` retire le geste. Ils traversent
+   * cette fiche sans qu'elle les lise : c'est la carte qui les porte, et ce sont
+   * les actions qui protègent.
+   *
+   * **Sans le compte** : la phrase disait « les six », ils sont sept. Un nombre
+   * dans un commentaire vieillit à chaque ticket.
    */
   editHref: string | null;
   archiveHref: string | null;
+  deleteHref: string | null;
   addSkillHref: string | null;
   editSkillHref: ((personSkillId: string) => string) | null;
   removeSkill: ((personSkillId: string) => Promise<void>) | null;
@@ -104,16 +109,24 @@ export function PersonDetail({
         person={person}
         editHref={editHref}
         archiveHref={archiveHref}
+        deleteHref={deleteHref}
         addSkillHref={addSkillHref}
         editSkillHref={editSkillHref}
         removeSkill={removeSkill}
       />
 
       <section className="flex flex-col gap-2">
-        {/* **Aucun décompte dans l'intitulé** : la liste se lit, elle ne se
-            totalise pas, et un nombre d'accompagnements présenté comme une
-            mesure d'activité de la personne serait l'indice calculé que D39
-            interdit. */}
+        {/* **Aucun décompte dans l'intitulé**, et cette règle tient encore —
+            mais elle a changé de raison le 28/08/2026. Elle disait : « un nombre
+            d'accompagnements présenté comme une mesure d'activité de la personne
+            serait l'indice calculé que D39 interdit. » Ce nombre est désormais
+            **calculé**, et il produit la disponibilité que la carte ci-dessus
+            affiche — l'écart à D39 est arbitré par l'humain et consigné.
+
+            Ce qui reste tenu : la valeur se dit en **trois mots**, jamais en un
+            chiffre, et rien ne trie ni ne classe les personnes par elle
+            (garde-fous 2 et 3). Un nombre nu au-dessus de cette liste
+            franchirait la ligne que la pastille ne franchit pas. */}
         <h3 className="text-2xs font-semibold text-content-neutral-dark uppercase">
           Accompagnements
         </h3>

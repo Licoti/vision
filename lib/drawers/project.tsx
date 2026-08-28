@@ -51,7 +51,13 @@ import { toBudgetFormValues } from "@/lib/forms/budget";
 import { toLinkFormValues } from "@/lib/forms/link";
 import { toResourceFormValues } from "@/lib/forms/resource";
 import { toResultFormValues } from "@/lib/forms/result";
-import { formatActivityPeriod } from "@/lib/format";
+import {
+  formatActivities,
+  formatActivityPeriod,
+  formatEvents,
+  formatResources,
+  formatResults,
+} from "@/lib/format";
 import {
   ACTIVITY_PANEL_NEW,
   ACTIVITY_PANEL_PARAM,
@@ -60,6 +66,8 @@ import {
   BUDGET_PANEL_ENTRY,
   BUDGET_PANEL_PARAM,
   CANCEL_PANEL_PARAM,
+  DELETE_PANEL_CONFIRM,
+  DELETE_PANEL_PARAM,
   INDICATOR_PANEL_NEW,
   INDICATOR_PANEL_PARAM,
   LINK_PANEL_NEW,
@@ -81,7 +89,10 @@ import type { RoadmapGroup } from "@/lib/queries/activities";
 import { findProjectBudget } from "@/lib/queries/budgets";
 import { listAdoptableIndicators } from "@/lib/queries/indicators";
 import { listLinkableProjects } from "@/lib/queries/links";
-import type { ProjectDetail } from "@/lib/queries/projects";
+import {
+  countProjectContents,
+  type ProjectDetail,
+} from "@/lib/queries/projects";
 import { findResourceActivity } from "@/lib/queries/resources";
 import {
   findStarter,
@@ -90,7 +101,7 @@ import {
 } from "@/lib/queries/starters";
 import { isUuid } from "@/lib/uuid";
 
-import { archiveProject } from "@/app/(app)/projets/actions";
+import { archiveProject, deleteProject } from "@/app/(app)/projets/actions";
 import {
   cancelActivity,
   createActivity,
@@ -197,6 +208,69 @@ export async function resolveProjectDrawer(
               </p>
               <p>
                 Le geste se défait : « Rétablir » ramène l&apos;accompagnement.
+              </p>
+            </div>
+          </ConfirmPanel>
+        ),
+      };
+    }
+
+    /* ------------------------------------------------------------------ */
+    case "delete": {
+      /* **`manageDomain` seul, et non `context.canWrite`** : celui-ci tombe sur
+         un accompagnement archivé (`loadProjectDrawerContext`), or ranger puis
+         effacer est le chemin naturel. Le geste est donc offert sur les deux
+         états — choix de l'humain du 28/08/2026.
+
+         Ce n'est pas ce rendu qui protège : `deleteProject` redérive le droit
+         sur l'identifiant **reçu**. */
+      if (!session.can.manageDomain) return null;
+
+      /* Le décompte est **lu ici pour être dit** : le panneau annonce ce que le
+         geste emporte avant qu'on l'exerce. Il ne décide de rien — et à la
+         différence des entités, **rien d'autre ne décide non plus** : les dix
+         clés étrangères du projet sont `cascade`. Ce panneau est le garde-fou. */
+      const contents = await countProjectContents(session.db, project.id);
+
+      return {
+        titleId: "panneau-confirmation-titre",
+        title: "Supprimer cet accompagnement",
+        subtitles: [project.name],
+        body: (
+          <ConfirmPanel
+            action={deleteProject.bind(null, project.id)}
+            submitLabel="Supprimer définitivement"
+            pendingLabel="Suppression…"
+          >
+            <div className="flex flex-col gap-3 text-sm text-content-neutral-dark">
+              {/* Le panneau dit ce que le geste a d'exceptionnel **avant** de
+                  le proposer : la ligne est effacée de la base, elle n'est pas
+                  rangée, et rien ne la ramènera. */}
+              <p className="font-semibold">
+                Ce geste ne se défait pas. L&apos;accompagnement est effacé de la
+                base, il n&apos;est pas rangé.
+              </p>
+
+              {/* Ce qui part avec lui, chiffré. C'est la seule information qui
+                  aide à décider, et c'est pourquoi elle est comptée plutôt que
+                  nommée. */}
+              <p>
+                Sont effacés avec lui : {formatActivities(contents.activities)},{" "}
+                {formatResources(contents.resources)},{" "}
+                {formatResults(contents.results)} et{" "}
+                {formatEvents(contents.events)}.
+              </p>
+
+              {/* Les six autres cascades se nomment sans se compter : « trois
+                  approches » n'aide personne à décider, « douze activités » si. */}
+              <p>
+                Disparaissent aussi son budget, ses adoptions
+                d&apos;indicateurs, son équipe, ses métiers, ses approches et
+                ses liens déclarés.
+              </p>
+
+              <p className="font-semibold">
+                Archiver conserve tout cela, et se défait.
               </p>
             </div>
           </ConfirmPanel>
@@ -678,8 +752,14 @@ export function projectRequestFromParams(asked: {
   piste?: string | undefined;
   lien?: string | undefined;
   budget?: string | undefined;
+  supprimer?: string | undefined;
 }): ProjectDrawerRequest | null {
   if (asked.archiver === ARCHIVE_PANEL_CONFIRM) return { kind: "archive" };
+
+  /* La forme d'`archiver`, jusqu'à la comparaison : **une seule valeur ouvre**.
+     La page a un objet — le projet —, il n'y a donc rien à désigner, à la
+     différence de `/equipe`, où la même clé porte un identifiant. */
+  if (asked.supprimer === DELETE_PANEL_CONFIRM) return { kind: "delete" };
 
   /* La forme d'`archiver`, jusqu'à la comparaison : **une seule valeur
      ouvre**, toute autre n'ouvre rien. Aucune sentinelle à distinguer d'un
@@ -723,6 +803,7 @@ export function projectRequestFromParams(asked: {
 /** Les clés d'URL qui ouvrent un panneau **sur la page projet**. */
 export const PROJECT_PANEL_PARAMS = [
   ACTIVITY_PANEL_PARAM,
+  DELETE_PANEL_PARAM,
   RESOURCE_PANEL_PARAM,
   RESULT_PANEL_PARAM,
   CANCEL_PANEL_PARAM,

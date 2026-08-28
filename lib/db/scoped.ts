@@ -19,7 +19,13 @@
  * aucune donnée métier ne se supprime, elle s'archive. Deux fonctions font
  * exception, et toutes deux portent leur exception **dans leur type** plutôt
  * que dans un commentaire : `unlink`, réservée aux tables de liaison, et
- * `deleteRow`, réservée aux référentiels que `DeletableTable` énumère.
+ * `deleteRow`, réservée aux tables que `DeletableTable` énumère.
+ *
+ * **`DeletableTable` a cessé d'être une exception de référentiel le
+ * 28/08/2026**, à la demande de l'humain : elle nomme désormais `projects` et
+ * `persons` à côté d'`entities`. La règle 4 est donc écartée sur trois tables
+ * nommées, et l'écart est consigné dans `JOURNAL-TECHNIQUE.md` — `CLAUDE.md`
+ * ne s'écrit pas d'ici (règle 7).
  *
  * `archive` et `restore` sont les **deux seuls chemins** vers `archived_at` :
  * `update` refuse la colonne, et `UpdateValues` l'exclut du typage. Un
@@ -40,7 +46,15 @@ import {
 import { getTableConfig, type PgColumn, type PgTable } from "drizzle-orm/pg-core";
 
 import { db, type Database } from "./client";
-import { activities, domains, entities, events, projects, results } from "./schema";
+import {
+  activities,
+  domains,
+  entities,
+  events,
+  persons,
+  projects,
+  results,
+} from "./schema";
 
 /* ==========================================================================
    Erreurs
@@ -124,28 +138,51 @@ export type ArchivableTable = ScopedTable & { archivedAt: PgColumn };
 export type LinkTable = ScopedTable & { archivedAt?: undefined };
 
 /**
- * Les tables dont une ligne peut être **supprimée** — l'exception à la règle 4,
- * portée par le typage plutôt que par une convention (21/08/2026).
+ * Les tables dont une ligne peut être **supprimée** — l'écart à la règle 4,
+ * porté par le typage plutôt que par une convention (21/08/2026, élargi le
+ * 28/08/2026).
  *
  * **Une union nominative, jamais un prédicat structurel.** `LinkTable` se
  * définit par une forme — l'absence d'`archived_at` — parce que la forme
  * *est* la règle : une liaison n'a rien à archiver. Ici, aucune forme ne
- * distingue `entities` de `products` : les deux portent `archived_at`, les deux
- * sont scopées. Ce qui les sépare est ce qu'elles **sont** — un référentiel qui
- * qualifie, contre une donnée métier qui existe. Cette distinction ne se
- * dérive pas d'un type, elle se décide, et une union nommée est le seul endroit
- * où une décision se relit.
+ * distingue les trois tables nommées de `products` ou d'`activities` : toutes
+ * portent `archived_at`, toutes sont scopées. Ce qui les sépare est une
+ * **décision**, et une union nommée est le seul endroit où une décision se
+ * relit. Un prédicat rendrait supprimable la prochaine table qui aurait la
+ * bonne forme, ce que personne n'aurait décidé.
  *
- * **Ajouter une table ici est un arbitrage, pas un ajustement.** `deleteRow`
- * n'efface qu'une ligne que rien ne référence — la clé étrangère `restrict` de
- * `products.entity_id` en est le dernier barrage —, si bien qu'aucune donnée
- * métier ne disparaît jamais avec elle. Une table dont les lignes sont
- * référencées par du fait d'accompagnement n'entre pas dans cette union.
+ * **Les trois n'ont pas la même barrière, et c'est ce qu'il faut savoir avant
+ * d'en ajouter une quatrième :**
  *
- * L'écart à la règle 4 est arbitré par l'humain le 21/08/2026 et consigné dans
- * `JOURNAL-TECHNIQUE.md` — `CLAUDE.md` ne s'écrit pas d'ici.
+ *   — `entities` (21/08/2026) — bornée par `products.entity_id`, déclarée
+ *     `on delete restrict`. La base refuse d'effacer une entité qui a qualifié
+ *     un produit, archivé compris. Rien ne se perd jamais.
+ *   — `persons` (28/08/2026) — bornée par `project_members.person_id` et
+ *     `activity_participants.person_id`, toutes deux `restrict`. La base refuse
+ *     d'effacer qui a été sur un accompagnement ou dans une activité. Ce qui
+ *     part avec la ligne est `person_skills` (`cascade`) ; ce que la personne a
+ *     créé reste, son nom en moins (`created_by` et `events.actor_id` sont
+ *     `set null`).
+ *   — `projects` (28/08/2026) — **aucune barrière**. Les dix clés étrangères
+ *     qui pointent `projects.id` sont `on delete cascade` : métiers, approches,
+ *     équipe, activités — donc participants et résultats —, ressources,
+ *     adoptions d'indicateurs, budget, liens déclarés et **journal** partent
+ *     avec l'accompagnement. C'est `F1-D3` renversé, à la demande de l'humain,
+ *     et le seul garde-fou est le panneau de confirmation qui l'annonce.
+ *
+ * **Ajouter une table ici est un arbitrage humain, jamais une décision de
+ * ticket.** Et depuis `projects`, ce n'est plus « une ligne que rien ne
+ * référence » qu'on autorise : la clause à énoncer est ce que la cascade
+ * emporte.
+ *
+ * Les deux écarts à la règle 4 sont arbitrés par l'humain — le 21/08/2026, puis
+ * le 28/08/2026 — et consignés dans `JOURNAL-TECHNIQUE.md` ; `CLAUDE.md` ne
+ * s'écrit pas d'ici.
  */
-export type DeletableTable = typeof entities;
+export type DeletableTable =
+  | typeof entities
+  | typeof persons
+  | typeof projects;
 
 /**
  * `Omit` et non `Except` serait plus court — et faux.
@@ -736,24 +773,33 @@ export function forDomain(scope: Scope) {
   }
 
   /**
-   * Supprime une ligne de référentiel — l'exception à la règle 4, et la seule.
+   * Supprime une ligne — l'écart à la règle 4, borné aux trois tables que
+   * `DeletableTable` nomme.
    *
-   * **Le typage la borne** : `DeletableTable` n'énumère aujourd'hui que
-   * `entities`, si bien que `deleteRow(products, …)` ne compile pas. C'est la
+   * **Le typage la borne** : `deleteRow(products, …)` ne compile pas. C'est la
    * méthode d'`unlink`, dont le type refuse déjà toute table archivable.
    *
-   * **Elle ne vérifie pas que la ligne est libre, et c'est délibéré.** La clé
-   * étrangère `products.entity_id` est déclarée `on delete restrict`
-   * (`schema.ts`) : PostgreSQL refuse lui-même l'effacement d'une entité
-   * qu'un produit porte encore, archivé compris. Un décompte préalable serait
-   * une seconde autorité, qui divergerait un jour de la première — et il
-   * laisserait de toute façon la fenêtre entre le compte et l'effacement.
-   * L'appelant compte pour **parler** — dire combien de produits s'y opposent —,
-   * jamais pour décider ; c'est cette barrière-ci qui décide.
+   * **Elle ne vérifie jamais que la ligne est libre, et c'est délibéré — mais
+   * ce que cela garantit dépend de la table.** Pour `entities` et `persons`,
+   * une clé étrangère `restrict` (`products.entity_id`,
+   * `project_members.person_id`, `activity_participants.person_id`) fait que
+   * PostgreSQL refuse lui-même l'effacement de ce qui a servi : la barrière est
+   * en base, et un décompte préalable serait une seconde autorité qui
+   * divergerait un jour de la première — sans compter la fenêtre qu'il laisse
+   * ouverte entre le compte et l'effacement.
    *
-   * Le refus de la base est traduit en `IntegrityError`, la classe prévue pour
-   * « une règle que l'appelant a violée » — sans quoi l'écran rendrait un 500
-   * là où l'on attend un message.
+   * **Pour `projects`, il n'y a aucune barrière** : les dix clés étrangères qui
+   * le pointent sont `cascade`, et cet appel efface donc l'accompagnement
+   * entier — activités, ressources, résultats, budget, liens et journal
+   * compris. Ce que la base ne refusera pas ici, c'est **le panneau de
+   * confirmation** qui doit l'avoir annoncé. Voir `DeletableTable`.
+   *
+   * L'appelant compte donc pour **parler** — dire ce qui s'oppose au geste, ou
+   * ce qu'il emporte —, jamais pour décider.
+   *
+   * Le refus de la base, quand il existe, est traduit en `IntegrityError`, la
+   * classe prévue pour « une règle que l'appelant a violée » — sans quoi
+   * l'écran rendrait un 500 là où l'on attend un message.
    *
    * Rend le nombre de lignes effacées : `0` quand l'identifiant est inconnu ou
    * appartient à un autre domaine, la couche étant scopée et ne distinguant

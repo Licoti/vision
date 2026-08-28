@@ -68,8 +68,13 @@ import { revalidatePath } from "next/cache";
 import type { ConfirmState } from "@/components/ui/confirm-panel";
 import { requireSession } from "@/lib/auth/provider";
 import type { Session } from "@/lib/auth/session";
-import { personSkills, persons } from "@/lib/db/schema";
-import { DomainScopeError, type Row } from "@/lib/db/scoped";
+import {
+  activityParticipants,
+  personSkills,
+  persons,
+  projectMembers,
+} from "@/lib/db/schema";
+import { DomainScopeError, IntegrityError, type Row } from "@/lib/db/scoped";
 import {
   parsePersonForm,
   readPersonForm,
@@ -189,9 +194,34 @@ async function openPerson(
 }
 
 /**
+ * La porte de la **suppression** — la même, moins le refus de l'archivage
+ * (28/08/2026).
+ *
+ * `openPerson` refuse une personne archivée parce qu'une ligne rangée ne reçoit
+ * plus de saisie. Ici, ce refus serait faux : **ranger puis effacer est le
+ * chemin naturel**, et l'interdire obligerait à rétablir avant de supprimer.
+ * C'est la forme d'`openEntity` (`administration/actions.ts`), qui ne regarde
+ * pas `archived_at` non plus.
+ *
+ * Le droit reste `manageDomain`, énoncé avant toute lecture.
+ */
+async function openPersonForDelete(
+  session: Session,
+  personId: string,
+): Promise<{ person: Row<typeof persons> } | { message: string }> {
+  if (!session.can.manageDomain) return { message: RESERVED };
+
+  const person = await session.db.find(persons, personId);
+  if (!person) {
+    return { message: "Cette personne n'existe plus dans ce domaine." };
+  }
+
+  return { person };
+}
+
+/**
  * La même porte, plus le refus de l'**intervenant côté entité** — arbitrage (d)
- * de C5bis : les compétences sont une propriété du centre, comme la
- * disponibilité.
+ * de C5bis : les compétences sont une propriété du centre.
  *
  * **Et le refus est dans l'action**, jamais dans le rendu : la fiche d'un
  * `stakeholder` n'affiche aucun point d'entrée de compétence, mais un point
@@ -376,6 +406,104 @@ export async function archivePerson(
 
   revalidatePath(ROUTES.team);
 
+  return { ok: true };
+}
+
+/**
+ * Le refus, quand la personne a accompagné — la phrase que la clé étrangère ne
+ * sait pas dire.
+ *
+ * **Deux décomptes et non un** : une personne peut être membre d'une équipe sans
+ * avoir participé à une activité, et l'inverse. Ne dire que l'un laisserait
+ * l'utilisateur devant un refus dont il ne verrait pas la cause.
+ */
+function refusalOfAnyTrace(members: number, participations: number): string {
+  const parts: string[] = [];
+  if (members > 0) {
+    parts.push(
+      `${members} accompagnement${members > 1 ? "s l'ont dans leur équipe" : " l'a dans son équipe"}`,
+    );
+  }
+  if (participations > 0) {
+    parts.push(
+      `${participations} activité${participations > 1 ? "s la comptent" : " la compte"} parmi ses participants`,
+    );
+  }
+  return `${parts.join(" et ")}. Une personne qui a accompagné ne s'efface pas — archivez-la : rien n'est alors perdu.`;
+}
+
+/**
+ * Supprimer une personne — **définitivement** (28/08/2026).
+ *
+ * **C'est la règle 4 écartée**, arbitrage humain daté, consigné dans
+ * `JOURNAL-TECHNIQUE.md` ; `CLAUDE.md` ne s'écrit pas d'ici (règle 7).
+ *
+ * **Le geste n'existe que pour la ligne créée par erreur** — un doublon, une
+ * faute de frappe corrigée en créant une seconde personne. C'est l'argument
+ * exact de `deleteEntity`, et il tient ici pour la même raison :
+ * `project_members.person_id` et `activity_participants.person_id` sont
+ * déclarées `on delete restrict`, si bien qu'une personne qui a accompagné
+ * **ne peut pas** disparaître. La règle 4 garde ses droits sur tout ce qui a
+ * servi.
+ *
+ * **Le décompte parle, les clés étrangères décident.** Les deux `count`
+ * ci-dessous servent à dire *ce qui* s'oppose au geste ; ce qui l'interdit est
+ * `restrict`, que `deleteRow` traduit en `IntegrityError`. Le second existe
+ * parce que le premier ne peut pas tenir la fenêtre entre le compte et
+ * l'effacement — et parce qu'une garde qui ne vit que dans l'appelant est une
+ * garde qu'un prochain appelant oubliera.
+ *
+ * **Ce qui part avec elle** : ses compétences déclarées (`person_skills` est
+ * `cascade`). **Ce qui reste sans son nom** : tout ce qu'elle a créé —
+ * `created_by` et `events.actor_id` sont `set null`, les phrases du journal
+ * survivent, leur auteur devient anonyme. Le panneau le dit avant le geste.
+ *
+ * **Aucun rétablissement**, et c'est la nature du geste.
+ */
+export async function deletePerson(
+  personId: string,
+  _previous: ConfirmState,
+  _formData: FormData,
+): Promise<ConfirmState> {
+  const session = await requireSession();
+
+  const gate = await openPersonForDelete(session, personId);
+  if ("message" in gate) return { message: gate.message };
+
+  const [members, participations] = await Promise.all([
+    session.db.count(projectMembers, {
+      where: eq(projectMembers.personId, personId),
+    }),
+    session.db.count(activityParticipants, {
+      where: eq(activityParticipants.personId, personId),
+    }),
+  ]);
+  if (members > 0 || participations > 0) {
+    return { message: refusalOfAnyTrace(members, participations) };
+  }
+
+  try {
+    const removed = await session.db.deleteRow(persons, personId);
+    if (removed === 0) {
+      return { message: "Cette personne n'existe plus dans ce domaine." };
+    }
+  } catch (error) {
+    /* La barrière qui décide. Elle se déclenche là où le décompte ne pouvait
+       pas : une écriture concurrente entre les deux. */
+    if (error instanceof IntegrityError) {
+      return {
+        message:
+          "Cette personne a été rattachée à un accompagnement entre-temps : elle ne peut plus être supprimée.",
+      };
+    }
+    throw error;
+  }
+
+  revalidatePath(ROUTES.team);
+
+  /* **Aucune redirection**, à la différence de `deleteProject` : `/equipe` reste
+     entière, seule la fiche disparaît, et `ConfirmPanel` la referme sur ce
+     succès (TD.2). */
   return { ok: true };
 }
 
