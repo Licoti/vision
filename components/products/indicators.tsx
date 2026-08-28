@@ -1,18 +1,30 @@
 /**
- * Le bloc « Vision produit » de la page produit — **la question, puis la mesure
- * de la question.**
+ * Les **deux premiers blocs** de la page produit — « Vision produit », puis
+ * « Indicateurs ». **La question, la mesure de la question, puis le reste de ce
+ * qu'on mesure.**
  *
  * Récrit hors ticket le 17/08/2026 d'après
- * `docs/design/maquettes/blocs/northstar/NorthStar.dc.html`, puis **élargi le
- * 18/08/2026** : il ne disait que comment le produit se mesure, jamais pourquoi
- * il existe. Une North Star sans vision est une métrique posée sans l'intention
- * qu'elle sert. Quatre rangs, dans l'ordre où la question se pose :
+ * `docs/design/maquettes/blocs/northstar/NorthStar.dc.html`, élargi le
+ * 18/08/2026 — il ne disait que comment le produit se mesure, jamais pourquoi
+ * il existe —, puis **coupé en deux le 28/08/2026** :
  *
- *   1. la **vision produit** — pourquoi ce produit existe, et où il veut aller ;
- *   2. la **North Star** — l'indicateur qui dit si l'on avance dans cette
- *      direction. Sa courbe, sa cible, son dernier relevé ;
- *   3. les **indicateurs associés**, en cartes, sous un séparateur nommé ;
- *   4. sous chacun, **l'accompagnement qui le porte**, en puce discrète.
+ *   Bloc 1, « Vision produit » · la **vision** — pourquoi ce produit existe —,
+ *   puis la **North Star**, l'indicateur qui dit si l'on avance dans cette
+ *   direction : sa courbe, sa cible, son dernier relevé.
+ *
+ *   Bloc 2, « Indicateurs » · les **autres mesures**, en cartes, et sous
+ *   chacune **l'accompagnement qui la porte**, en puce discrète.
+ *
+ * **Ce second bloc était un `<details>` replié** au pied du premier, depuis le
+ * 18/08/2026. Le repli rendait au premier rang la place de ses cartes ; il
+ * coûtait davantage — les indicateurs n'existaient plus pour qui ne remarquait
+ * pas un chevron de 10 px, et « Ajouter un indicateur », qui vivait dans la
+ * grille en carte pointillée, était enterré avec eux. Le bloc porte désormais
+ * son en-tête, son geste et son état vide, et **aucune lecture n'a été
+ * ajoutée** : ce sont les mêmes tableaux, séparés par le même `filter`.
+ *
+ * Le fichier rend donc **deux `Block` dans un fragment**, que `Page` espace de
+ * son `gap-6` comme deux blocs quelconques.
  *
  * **Vision et North Star sont deux concepts ajoutés hors des `docs/`**, absents
  * de `docs/02` et de `docs/04` ; les deux écarts sont consignés dans
@@ -53,32 +65,34 @@
  * page projet garde son bloc « Indicateurs adoptés », qui reste le lieu des
  * quatre valeurs chiffrées ; ici, un nom, et c'est tout. L'écart est consigné.
  *
- * **Des marges par élément, jamais un `gap` uniforme.** Un `gap` met la même
- * valeur partout ; les maquettes rythment. La règle a toujours valu dans
- * `NorthStar` et dans `IndicatorCard` ; elle **revaut au premier rang du bloc**
- * depuis la reprise de `northstar-v2` (18/08/2026), qui rythme 16/30-26/14/34-16.
- * Le 17/08 l'avait retirée au profit du `gap-5` de `Block`, par souci de
- * cohérence avec les deux blocs voisins ; la nouvelle maquette la rétablit, et
- * c'est le même arbitrage que celui de l'en-tête ci-dessous. Tout le contenu du
- * bloc tient donc dans **un seul enfant de `Block`** — le `gap-5` ne s'applique
- * plus qu'à lui, et le rythme se porte en marges.
+ * **Le rythme est revenu au `gap-5` de `Block`** (28/08/2026). La reprise de
+ * `northstar-v2` avait posé, le 18/08/2026, des marges élément par élément —
+ * 16/30-26/14/34-16 — et fait tenir tout le contenu dans un seul enfant de
+ * `Block`, ce qu'exigeait le kebab posé en absolu. Le kebab reparti dans
+ * l'en-tête, la contrainte tombe avec lui, et le bloc reprend le rythme de ses
+ * voisins. `NorthStar` et `IndicatorCard` gardent le leur : ce sont des cartes,
+ * pas des colonnes de bloc.
  *
- * **La coquille est celle de `components/ui/block.tsx`, l'en-tête ne l'est
- * plus** (18/08/2026). `Block tone="primary"` ne bouge pas : rayon, filet,
- * surface bleue, `p-6`. `BlockHeader`, si — la maquette remplace la ligne
- * « titre + note + menu » par un **surtitre** de 12 pixels en capitales et un
- * kebab posé en absolu au coin. Ce bloc porte donc désormais un langage
- * d'en-tête que les autres blocs de la page ne partagent pas : **c'est un écart
- * assumé**, arbitré le 18/08/2026, consigné
- * dans `JOURNAL-TECHNIQUE.md`. Il défait pour ce bloc seul l'unification du
- * 17/08.
+ * **La coquille ET l'en-tête sont ceux de `components/ui/block.tsx`**
+ * (28/08/2026). Le 18/08/2026 avait remplacé, pour ce bloc seul, la ligne
+ * « titre + note + menu » de `BlockHeader` par un **surtitre** de 12 pixels en
+ * capitales et un kebab posé en absolu au coin — un langage d'en-tête que les
+ * autres blocs de la page ne partageaient pas, consigné comme **écart assumé**
+ * dans `JOURNAL-TECHNIQUE.md`. L'écart est refermé : le premier bloc de la page
+ * était celui qui se lisait le moins comme un bloc.
  *
- * **La hiérarchie des titres, elle, ne bouge pas** : le surtitre « Vision
- * produit » porte le `h2` que `BlockHeader` portait, « North Star » et
- * « Indicateurs associés » restent des `h3`. Un surtitre n'est un surtitre que
- * visuellement — pour l'assistance, c'est le titre du bloc, et la page produit
- * en compte trois au même rang. Les marques (le filet, le ★) sortent de l'arbre
- * d'accessibilité : la couleur ne porte jamais seule (`docs/06` §11).
+ * Deux choses tombent avec lui. Le kebab reprend sa place d'action d'en-tête,
+ * si bien que le contenu n'a plus à tenir dans un unique enfant `relative` : le
+ * bloc redevient une colonne à `gap-5`, et **le rythme en marges élément par
+ * élément disparaît**. Et la vision passe de 30 à 24 pixels — à 30 elle était
+ * le plus gros texte de l'écran, plus gros que le nom du produit, et sa mesure
+ * se lisait comme sa note de bas de page. **L'ordre, lui, ne bouge pas** : la
+ * vision reste avant la North Star, comme `docs/03` la pose.
+ *
+ * **La hiérarchie des titres ne bouge pas non plus** : « Vision produit » et
+ * « Indicateurs » portent chacun le `h2` de leur bloc, « North Star » reste un
+ * `h3`. Les marques (le ★) sortent de l'arbre d'accessibilité : la couleur ne
+ * porte jamais seule (`docs/06` §11).
  *
  * **La North Star vit dans une carte blanche** (18/08/2026), ce qui est le
  * changement structurel de la maquette : le rang du milieu se détache de la
@@ -107,12 +121,12 @@ import {
   MENU_ITEM,
   MENU_ITEM_DANGER,
 } from "@/components/ui/action-menu";
-import { Block, BlockDivider } from "@/components/ui/block";
+import { Block, BlockHeader } from "@/components/ui/block";
+import { buttonClass } from "@/components/ui/button";
 import { BlockNote } from "@/components/ui/empty-state";
 import { Tag } from "@/components/ui/tag";
 import { ACTION_LINK } from "@/components/ui/action-link";
 import {
-  formatComplementaryIndicators,
   formatDateMonth,
   formatIndicatorDirection,
   formatMonthTick,
@@ -158,43 +172,51 @@ function gapSentence(
 }
 
 /**
- * Un surtitre de rang : une marque, un mot en capitales, et rien d'autre.
+ * L'en-tête d'un **rang** dans un bloc : une marque, un titre, une note, une
+ * action.
  *
- * **C'est le langage propre à ce bloc**, celui que la maquette `northstar-v2`
- * substitue à `BlockHeader` — voir l'avertissement de l'en-tête. Il vit ici et
- * non dans `components/ui/block.tsx` précisément parce qu'il n'est **pas**
- * partagé : le jour où un second bloc le reprend, il déménagera, et pas avant.
- * `BlockDivider` reste, lui, dans le langage commun — il porte un filet fuyant
- * que celui-ci n'a pas.
+ * **Il remplace le surtitre de `northstar-v2`** (28/08/2026). Ce bloc portait
+ * depuis le 18/08/2026 un langage d'en-tête que les deux autres blocs de la
+ * page ne partageaient pas — un surtitre de 12 px en capitales et un kebab posé
+ * en absolu au coin —, et l'écart était consigné comme assumé. Il ne l'est
+ * plus : le bloc reprend `BlockHeader` pour son titre, et ce qui reste ici est
+ * l'en-tête d'un **rang intérieur**, que `BlockHeader` ne peut pas rendre — son
+ * titre est un `h2`, et un bloc n'en porte qu'un.
  *
- * Le niveau de titre arrive en prop : le premier surtitre est le titre du bloc
- * (`h2`), le second une de ses parties (`h3`). Un surtitre n'est un surtitre
- * que visuellement.
+ * Le `h3` est celui qu'`Eyebrow` portait, à la même place dans la hiérarchie :
+ * seul son dessin change — 16 px gras au lieu de 12 px capitales, la taille
+ * d'un rang qui porte une carte et non celle d'un intertitre.
+ *
+ * **L'action est alignée en haut**, la règle de `BlockHeader` : elle doit rester
+ * à hauteur du titre quand la note tient sur deux lignes.
  */
-function Eyebrow({
-  level,
+function RankHeader({
   mark,
   title,
-  tone,
+  note,
+  action,
 }: {
-  level: "h2" | "h3";
-  /** **Décorative** : elle sort de l'arbre d'accessibilité. */
-  mark: ReactNode;
+  /** **Décorative** : elle sort de l'arbre d'accessibilité (`docs/06` §11). */
+  mark?: ReactNode;
   title: string;
-  /** La classe de couleur du texte — le bleu du produit, le rouge de la cible. */
-  tone: string;
+  note?: string;
+  action?: ReactNode;
 }) {
-  const Heading = level;
-
   return (
-    <Heading
-      className={`flex items-center gap-2 text-xs font-bold uppercase ${tone}`}
-    >
-      <span aria-hidden="true" className="flex items-center">
-        {mark}
-      </span>
-      {title}
-    </Heading>
+    <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="min-w-0 flex-1">
+        <h3 className="flex items-center gap-2 text-md font-bold text-content-neutral-darkest">
+          {mark ? <span aria-hidden="true">{mark}</span> : null}
+          {title}
+        </h3>
+        {note ? (
+          <p className="mt-1 max-w-160 text-sm leading-175 text-content-neutral-dark">
+            {note}
+          </p>
+        ) : null}
+      </div>
+      {action}
+    </div>
   );
 }
 
@@ -264,89 +286,102 @@ export function Indicators({
   const designate = setNorthStar;
 
   return (
-    <Block tone="primary">
-      {/* **Un seul enfant de `Block`**, et c'est structurel : le `gap-5` de la
-          coquille ne s'applique alors qu'à lui, et le rythme propre de la
-          maquette se porte en marges élément par élément. `relative` ancre le
-          kebab — `ActionMenu` refuse tout `className`, sa racine portant
-          elle-même le `relative` dont son déroulant a besoin (cf. son en-tête),
-          et qui veut le placer l'enveloppe. */}
-      <div className="relative">
-        {visionHref || designate ? (
-          <div className="absolute right-0 top-0 z-10">
-            <ActionMenu
-              /* Le rang discret, comme celui d'« Utilisateurs et usages » :
-                 c'est le rang des gestes en haut à droite d'un bloc
-                 (21/08/2026). Sur la surface bleue, les trois points tiennent
-                 15,14:1 — mesuré, pas supposé. */
-              variant="tertiary"
-              label="Options du bloc de la vision produit"
-            >
-              {/* **Le geste de la vision en tête**, avant les désignations :
-                  c'est l'ordre de lecture du bloc, et un menu qui rangerait le
-                  premier rang après le second se lirait à l'envers. */}
-              {visionHref ? (
-                <DrawerLink
-                  href={visionHref}
-                  request={{ kind: "vision" }}
-                  role="menuitem"
-                  className={MENU_ITEM}
-                >
-                  {vision
-                    ? "Modifier la vision produit"
-                    : "Ajouter la vision produit"}
-                </DrawerLink>
-              ) : null}
-              {designate
-                ? indicators.map((indicator) => (
-                    <form
-                      key={indicator.id}
-                      action={designate.bind(null, indicator.id)}
-                    >
-                      <button
-                        type="submit"
-                        role="menuitem"
-                        disabled={indicator.isNorthStar}
-                        className={`${MENU_ITEM} disabled:text-content-neutral-light`}
-                      >
-                        {indicator.isNorthStar
-                          ? `★ ${indicator.label}`
-                          : `Désigner ${indicator.label}`}
-                      </button>
-                    </form>
-                  ))
-                : null}
-              {designate && northStar ? (
-                <form action={designate.bind(null, null)}>
-                  <button
-                    type="submit"
+    <>
+      {/* ================= Bloc 1 · la vision et sa mesure ================= */}
+
+      {/* **`BlockHeader`, et non plus le surtitre de `northstar-v2`**
+          (28/08/2026). Le bloc portait depuis le 18/08/2026 un langage
+          d'en-tête que les deux autres blocs de la page ne partageaient pas ;
+          l'écart, consigné comme assumé, est refermé. Le kebab reprend du même
+          coup sa place d'action d'en-tête : il était posé en absolu au coin de
+          la carte, ce qui obligeait tout le contenu du bloc à tenir dans un
+          seul enfant `relative` et à porter son rythme en marges. Le bloc
+          redevient une colonne à `gap-5`, comme ses voisins. */}
+      <Block tone="primary">
+        <BlockHeader
+          title="Vision produit"
+          note="Pourquoi ce produit existe, et la mesure qui dit s'il y va."
+          /* **Deux droits, un seul menu.** Ils tombent séparément —
+             `visionHref` sur `manageDomain`, `setNorthStar` sur le droit dérivé
+             des accompagnements —, et le menu se rend dès que l'un des deux est
+             ouvert. Une personne peut donc n'y voir qu'un geste, ou l'autre :
+             c'est exact, et c'est ce que les deux règles disent. */
+          action={
+            visionHref || designate ? (
+              <ActionMenu
+                /* Le rang discret, celui des gestes en haut à droite d'un bloc
+                   (21/08/2026). Sur la surface bleue, les trois points tiennent
+                   15,14:1 — mesuré, pas supposé. */
+                variant="tertiary"
+                label="Options du bloc de la vision produit"
+              >
+                {/* **Le geste de la vision en tête**, avant les désignations :
+                    c'est l'ordre de lecture du bloc, et un menu qui rangerait
+                    le premier rang après le second se lirait à l'envers. */}
+                {visionHref ? (
+                  <DrawerLink
+                    href={visionHref}
+                    request={{ kind: "vision" }}
                     role="menuitem"
-                    className={MENU_ITEM_DANGER}
+                    className={MENU_ITEM}
                   >
-                    Retirer la North Star
-                  </button>
-                </form>
-              ) : null}
-            </ActionMenu>
-          </div>
-        ) : null}
+                    {vision
+                      ? "Modifier la vision produit"
+                      : "Ajouter la vision produit"}
+                  </DrawerLink>
+                ) : null}
+                {designate
+                  ? indicators.map((indicator) => (
+                      <form
+                        key={indicator.id}
+                        action={designate.bind(null, indicator.id)}
+                      >
+                        <button
+                          type="submit"
+                          role="menuitem"
+                          disabled={indicator.isNorthStar}
+                          className={`${MENU_ITEM} disabled:text-content-neutral-light`}
+                        >
+                          {indicator.isNorthStar
+                            ? `★ ${indicator.label}`
+                            : `Désigner ${indicator.label}`}
+                        </button>
+                      </form>
+                    ))
+                  : null}
+                {designate && northStar ? (
+                  <form action={designate.bind(null, null)}>
+                    <button
+                      type="submit"
+                      role="menuitem"
+                      className={MENU_ITEM_DANGER}
+                    >
+                      Retirer la North Star
+                    </button>
+                  </form>
+                ) : null}
+              </ActionMenu>
+            ) : null
+          }
+        />
 
         {/* ---- Rang 1 · la vision ------------------------------------- */}
-
-        {/* Le filet de 22×3 de la maquette. L'interlettrage de `.16em` n'est
-            toujours pas rendu — aucun jeton, dette n°4. */}
-        <Eyebrow
-          level="h2"
-          mark={
-            <span className="block h-0.5 w-5 rounded-xs bg-content-primary-dark" />
-          }
-          title="Vision produit"
-          tone="text-content-primary-dark"
-        />
 
         {/* La question à laquelle le produit répond. Elle est écrite, jamais
             déduite — Vision ne synthétise pas une intention à partir des
             accompagnements qu'elle enregistre.
+
+            **Elle passe de 30 à 24 px** (28/08/2026) : à 30 elle était le plus
+            gros texte de l'écran, plus gros que le nom du produit en tête de
+            page, et la North Star — l'objet mesuré du bloc — se lisait comme sa
+            note de bas de page. La hiérarchie de lecture ne bouge pas pour
+            autant : la vision reste **avant** sa mesure, comme `docs/03` la
+            pose. C'est le poids qui se rééquilibre, pas l'ordre.
+
+            **La phrase d'explication a disparu** : « La raison d'être de ce
+            produit… » disait exactement ce que la note de `BlockHeader` dit
+            désormais deux centimètres plus haut, et l'écrire deux fois serait
+            bégayer.
 
             **La barre d'accent tient dans les deux états**, écrit ou vide :
             c'est le gabarit du rang, et un état vide qui la perdrait ne se
@@ -354,31 +389,21 @@ export function Indicators({
             existants — le bleu du produit vers le rouge de la cible, ce que le
             rang dit exactement —, si bien qu'aucune valeur ne s'invente là où
             `tokens.css` §9 nomme ses gradients sans les définir. */}
-        <div className="mt-4 flex max-w-215 gap-5">
+        <div className="flex max-w-215 gap-5">
           <span
             aria-hidden="true"
             className="w-1 flex-none rounded-sm bg-linear-to-b from-content-primary-dark to-content-warning-darker"
           />
           <div className="min-w-0">
             {vision ? (
-              <>
-                <p className="text-3xl font-semibold leading-325 text-content-neutral-darkest">
-                  {vision}
-                </p>
-                <p className="mt-3 text-sm leading-175 text-content-neutral-dark">
-                  La raison d&apos;être de ce produit, et la direction
-                  qu&apos;il se donne. Tous les indicateurs ci-dessous servent
-                  cette vision.
-                </p>
-              </>
+              <p className="text-2xl font-semibold leading-275 text-content-neutral-darkest">
+                {vision}
+              </p>
             ) : (
               /* L'état vide est un **paragraphe et non un `EmptyState`**, la
-                 règle des deux blocs voisins : deux phrases distinctes, là où
-                 `EmptyState` n'a qu'un `description`. Il ne reprend pas la note
-                 du cas écrit — « ce bloc dira pourquoi ce produit existe » la
-                 dit déjà, et l'afficher deux fois serait bégayer. Il ne prend
-                 pas non plus les 30 pixels de la vision : une absence ne se
-                 crie pas.
+                 règle des blocs voisins : deux phrases distinctes, là où
+                 `EmptyState` n'a qu'un `description`. Une absence ne se crie
+                 pas — elle ne prend pas les 24 pixels de la vision.
 
                  Le lien n'apparaît qu'au responsable de domaine — et ce n'est
                  pas ce rendu qui protège : `updateProductVision` redérive le
@@ -406,23 +431,39 @@ export function Indicators({
 
         {/* ---- Rang 2 · la North Star --------------------------------- */}
 
-        {/* Le filet pleine largeur de la maquette, là où le 17/08 posait un
-            `BlockDivider` à filet fuyant. Il sépare deux rangs de même poids ;
-            un filet qui s'arrête à mi-course hiérarchise, et ce n'est pas ce
-            que ces deux-là sont l'un pour l'autre. */}
-        <div
-          aria-hidden="true"
-          className="mt-7 mb-6 h-px bg-border-primary-lighter"
-        />
+        {/* Le filet pleine largeur de la maquette. Il sépare deux rangs de même
+            poids ; un filet qui s'arrête à mi-course hiérarchise, et ce n'est
+            pas ce que ces deux-là sont l'un pour l'autre. */}
+        <div aria-hidden="true" className="h-px bg-border-primary-lighter" />
 
-        {/* Le ★ suit la North Star : il titrait le bloc tant qu'elle le
-            titrait, il descend avec elle. Décoratif — le titre est écrit juste
-            à côté, et la couleur ne porte jamais seule (`docs/06` §11). */}
-        <Eyebrow
-          level="h3"
+        {/* **Le rang nomme l'indicateur qu'il porte** (28/08/2026) : « North
+            Star · métrique principale » disait sa fonction, pas son nom, et le
+            nom se répétait ensuite en tête de la carte. Le ★ suit la North Star
+            — il titrait le bloc tant qu'elle le titrait, il descend avec elle.
+            Décoratif : le titre est écrit juste à côté (`docs/06` §11).
+
+            **Le geste de relevé remonte ici** : il vivait dans le menu de
+            chaque carte, et la North Star n'a pas de carte à menu. C'est le
+            rang le plus consulté du bloc, et saisir un relevé y était le seul
+            geste courant sans point d'entrée visible. Ce n'est pas ce rendu qui
+            protège : l'action redérive le droit sur l'identifiant reçu. */}
+        <RankHeader
           mark={<span className="text-sm leading-none">★</span>}
-          title="North Star · métrique principale"
-          tone="text-content-warning-darker"
+          title={
+            northStar ? `North Star · ${northStar.label}` : "North Star"
+          }
+          note="La mesure qui dit si le produit avance dans la direction que sa vision lui donne."
+          action={
+            northStar && addReadingHref ? (
+              <DrawerLink
+                href={addReadingHref(northStar.id)}
+                request={{ kind: "reading", id: northStar.id }}
+                className={buttonClass({ variant: "secondary" })}
+              >
+                Ajouter un relevé
+              </DrawerLink>
+            ) : null
+          }
         />
 
         {northStar ? (
@@ -432,7 +473,7 @@ export function Indicators({
              `#ffffff` n'a pas de jeton de surface ici, c'est la règle
              qu'`action-menu.tsx` posait déjà. Sans ombre : `tokens.css` §8
              nomme trois élévations sans leur donner de valeur. */
-          <div className="mt-3 rounded-2xl border border-border-primary-lighter bg-surface-neutral-pale p-6">
+          <div className="rounded-2xl border border-border-primary-lighter bg-surface-neutral-pale p-6">
             <NorthStar
               indicator={northStar}
               series={series.get(northStar.id) ?? []}
@@ -441,65 +482,58 @@ export function Indicators({
           </div>
         ) : (
           /* Un paragraphe et non un `EmptyState` — la règle de `Resources` et
-             d'`Indicators` : **deux phrases distinctes**, là où `EmptyState` n'a
-             qu'un `description`. N'avoir aucun indicateur et n'en avoir désigné
-             aucun ne sont pas la même chose, et l'écran ne les confond pas.
+             d'`Indicators` : **deux phrases distinctes**, là où `EmptyState`
+             n'a qu'un `description`. N'avoir aucun indicateur et n'en avoir
+             désigné aucun ne sont pas la même chose, et l'écran ne les confond
+             pas.
 
              **Sans la carte** : elle encadre une North Star, et une carte
              blanche vide dirait qu'il manque quelque chose à l'endroit où il
              n'y a rien à encadrer. Un état vide est un écran à part entière
              (règle 5), pas la version creuse de l'écran plein. */
-          <BlockNote className="mt-3">
+          <BlockNote>
             {indicators.length === 0
               ? "Aucun indicateur pour l'instant. Le premier que ce produit portera pourra être désigné North Star : celui qui dit où le produit veut aller."
               : "Aucune North Star désignée. Le menu de ce bloc permet de choisir lequel de ces indicateurs porte l'objectif global du produit."}
           </BlockNote>
         )}
+      </Block>
 
-        {/* ---- Rang 3 · les indicateurs associés ----------------------- */}
+      {/* ================= Bloc 2 · les autres indicateurs ================= */}
 
-        {/* **« Indicateurs associés » et non « Autres indicateurs »**
-            (18/08/2026) : « autres » ne disait qu'une exclusion — ce qui n'est
-            pas la North Star. Le mot juste dit ce qu'ils sont : les mesures qui
-            accompagnent celle-là.
+      {/* **Un bloc à part entière depuis le 28/08/2026**, là où c'était un
+          `<details>` replié au pied du bloc précédent. Le repli avait été
+          demandé le 18/08/2026 pour rendre au premier rang la place de ses
+          cartes ; il coûtait plus qu'il ne rendait — trois indicateurs
+          n'existaient plus pour qui ne remarquait pas un chevron de 10 px, et
+          « Ajouter un indicateur » était enterré avec eux.
 
-            Le décompte est neuf (maquette `northstar-v2`) et dit
-            « complémentaire » là où l'intertitre dit « associé » : répéter le
-            même mot à dix centimètres n'aurait rien ajouté.
+          Le bloc porte donc son propre en-tête, son propre geste, et son propre
+          état vide. Il n'y a **aucune lecture neuve** : ce sont les mêmes
+          tableaux, séparés par le même `filter`. */}
+      <Block>
+        <BlockHeader
+          title="Indicateurs"
+          note="Ce que ce produit mesure, en plus de sa North Star. Chaque valeur est reportée d'un outil externe, avec sa date."
+          /* **Le geste sort de la grille** : il y vivait en carte pointillée,
+             ce qui en faisait un dessin de plus pour un geste que les deux
+             autres blocs de la page portent en bouton d'en-tête. Un rang, une
+             forme. */
+          action={
+            addHref ? (
+              <DrawerLink
+                href={addHref}
+                request={{ kind: "indicator" }}
+                className={buttonClass({ variant: "secondary" })}
+              >
+                Ajouter un indicateur
+              </DrawerLink>
+            ) : null
+          }
+        />
 
-            **Replié par défaut** (18/08/2026, demande de l'humain) : le rang
-            gagne la place de ses cartes tant qu'on ne les demande pas, et la
-            question du produit — la vision, puis la North Star — reste seule à
-            l'écran. C'est un `<details>` natif, sans JavaScript, comme le
-            groupe « Annulé » de la roadmap projet ; l'intertitre en devient le
-            `<summary>`, décompte compris — savoir combien d'indicateurs sont
-            repliés est ce qui donne envie de les déplier.
-
-            **L'ajout se replie avec eux.** « Ajouter un indicateur » vit dans
-            la grille, et l'en sortir pour le garder visible aurait déplacé un
-            point d'entrée que la maquette pose là. Il reste à un clic, et le
-            menu du bloc n'est pas le seul chemin. */}
-        <details className="group mt-8">
-          <BlockDivider
-            as="summary"
-            /* Le chevron **remplace le triangle natif**, que `flex` retire à
-               `<summary>` : il tourne d'un quart de tour à l'ouverture. Il est
-               décoratif — `<summary>` expose déjà l'état à l'assistance, et la
-               couleur ne porte jamais seule (`docs/06` §11). */
-            mark={
-              <span className="inline-block text-2xs leading-none transition-transform group-open:rotate-90">
-                ▶
-              </span>
-            }
-            title="Indicateurs associés"
-            note={formatComplementaryIndicators(others.length)}
-            rule="bg-border-primary-lighter"
-          />
-
-          {/* La grille **ne bouge pas** : la maquette `northstar-v2` ne porte
-              plus les cartes, et c'est une omission de la maquette, pas une
-              suppression demandée. */}
-          <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
+        {others.length > 0 ? (
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
             {others.map((indicator) => (
               <IndicatorCard
                 key={indicator.id}
@@ -512,27 +546,19 @@ export function Indicators({
                 setNorthStar={setNorthStar}
               />
             ))}
-
-            {addHref ? (
-              <DrawerLink
-                href={addHref}
-                request={{ kind: "indicator" }}
-                className="flex min-h-24 items-center justify-center gap-2 rounded-2xl border border-dashed border-border-primary-light text-sm font-semibold text-content-primary-dark"
-              >
-                <span aria-hidden="true" className="text-lg leading-none">
-                  +
-                </span>
-                Ajouter un indicateur
-              </DrawerLink>
-            ) : null}
-
-            {others.length === 0 && !addHref ? (
-              <BlockNote>Aucun indicateur associé sur ce produit.</BlockNote>
-            ) : null}
           </div>
-        </details>
-      </div>
-    </Block>
+        ) : (
+          /* Un paragraphe et non un `EmptyState` — la règle du bloc voisin. Le
+             geste, quand il existe, est déjà dans l'en-tête : le redonner ici
+             ferait deux points d'entrée à dix centimètres l'un de l'autre. */
+          <BlockNote>
+            {northStar
+              ? "Aucun autre indicateur pour l'instant. Ce bloc réunira les mesures qui accompagnent la North Star, chacune avec sa dernière valeur et sa date."
+              : "Aucun indicateur pour l'instant. Ce bloc réunira ce que ce produit mesure — chaque valeur reportée d'un outil externe, avec sa date."}
+          </BlockNote>
+        )}
+      </Block>
+    </>
   );
 }
 
@@ -543,11 +569,12 @@ export function Indicators({
  * sur l'autre au lieu de s'aligner en haut, ce qui évite la colonne de gauche
  * flottant dans le vide sous une courbe plus haute qu'elle.
  *
- * Quatre éléments à gauche, et pas un de plus — c'est ce qui a raccourci le
- * bloc : la ligne « Cible du produit » a disparu (la jauge la porte) et la
- * ligne « Adopté par… » aussi (arbitrage du 17/08/2026, « strictement la
- * maquette »). Le rattachement aux accompagnements se lit sur la page projet,
- * bloc « Indicateurs adoptés ».
+ * Trois éléments à gauche, et pas un de plus — c'est ce qui a raccourci le
+ * bloc : la ligne « Cible du produit » a disparu (la jauge la porte), la ligne
+ * « Adopté par… » aussi (arbitrage du 17/08/2026, « strictement la maquette »),
+ * et le **libellé** le 28/08/2026, quand `RankHeader` s'est mis à nommer la
+ * North Star au-dessus de la carte. Le rattachement aux accompagnements se lit
+ * sur la page projet, bloc « Indicateurs adoptés ».
  */
 function NorthStar({
   indicator,
@@ -591,12 +618,12 @@ function NorthStar({
   return (
     <div className="grid gap-y-6 lg:grid-cols-[20rem_1fr] lg:items-center lg:gap-x-11">
       <div>
-        <p className="text-lg font-semibold leading-125 text-content-neutral-darkest">
-          {indicator.label}
-        </p>
-
+        {/* **Le libellé n'est plus ici** (28/08/2026) : `RankHeader` nomme la
+            North Star deux centimètres plus haut, et l'écrire deux fois faisait
+            lire le même nom deux fois à la synthèse vocale comme à l'œil. La
+            carte commence donc par ce qu'elle seule porte — la valeur. */}
         {lastValue && indicator.lastReadOn ? (
-          <p className="mt-4 flex flex-wrap items-baseline gap-2">
+          <p className="flex flex-wrap items-baseline gap-2">
             <span className="text-4xl font-bold leading-none text-content-neutral-darkest">
               {lastValue}
             </span>

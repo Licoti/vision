@@ -7374,3 +7374,98 @@ d'authentification replie sur la première personne éligible du premier domaine
 sans échéance depuis que le SSO est sorti de C7 —, pas de cette action. L'éprouver ici ferait croire
 que ce fichier la couvre. Le cas qui prouve quelque chose est celui d'une personne réelle **sans**
 `manageDomain`.
+
+
+---
+
+## Page produit — reprise d'ergonomie, hors ticket (28/08/2026)
+
+Sept gestes sur la page produit, demandés par l'humain après une lecture d'ensemble de l'écran, et
+**explicitement dispensés de ticket** — la règle 3 est donc écartée par celui qui la pose, comme
+elle l'a été dix-sept fois entre le 17 et le 28/08/2026.
+
+### Un écart refermé, et un écart créé
+
+**Refermé — le langage d'en-tête propre au bloc de vision.** Le 18/08/2026, la reprise de
+`northstar-v2` avait substitué à `BlockHeader`, *pour ce bloc seul*, un surtitre de 12 px en
+capitales et un kebab posé en absolu au coin ; l'écart était consigné ici comme assumé. Il ne l'est
+plus. La conséquence était structurelle et coûtait plus que son dessin : le kebab en absolu obligeait
+**tout** le contenu du bloc à tenir dans un unique enfant `relative`, donc à porter son rythme en
+marges élément par élément plutôt qu'au `gap-5` de `Block`. Les deux repartent ensemble.
+
+**Créé — `Indicators` rend deux blocs.** Le composant retourne un fragment de deux `<Block>`, ce
+qu'aucun autre composant de bloc ne fait. L'alternative était deux composants exportés recevant six
+props identiques depuis la page ; elle a été écartée parce que les deux blocs partagent leurs
+tableaux (`indicators` séparé en `northStar` / `others` par le même `filter`) et **tous** leurs
+droits. Le jour où les deux divergent, la coupure se fait à ce `filter`.
+
+### La ligne de faits n'est pas un indice
+
+`formatCoverage` rend l'étendue couverte par un produit — « janv. 2025 → juin 2026 » — à partir des
+dates de ses accompagnements. **Ce n'est pas un chiffre calculé par Vision au sens des interdits
+d'interface** : les deux bornes sont des dates saisies, la fonction ne fait que les retrouver, et
+rien n'est qualifié — pas de durée en mois, pas de rythme, pas de densité. La frontière que
+`CLAUDE.md` trace est celle de l'**indice qui qualifie**, et elle n'est pas franchie ; le décompte
+d'accompagnements, servi depuis T2.2 dans le surtitre, est de la même famille.
+
+**Ce qui a été écarté le même jour** : nommer l'accompagnement *en cours* dans cette ligne. Plusieurs
+peuvent l'être à la fois, et aucun document ne donne la règle qui en désignerait un — l'écrire au
+singulier aurait demandé d'inventer une préséance.
+
+### Une dette assumée, à la demande
+
+**La page reste sans repère de position.** La barre d'ancres collante de la page projet
+(`components/projects/subnav.tsx`, avec le `scroll-mt-19` de `Section`) avait été proposée pour
+l'écran produit ; elle a été **refusée par l'humain le 28/08/2026** — « elle rajoute de la
+complexité ». La friction est donc entière, et elle s'aggrave d'un cran : « Indicateurs » ayant
+quitté le repli du bloc de vision, la page compte désormais quatre blocs là où elle en comptait
+trois. Le levier le moins coûteux, s'il revient, n'est pas une barre mais l'ordre des blocs.
+
+### Deux mesures, et une valeur qui ne se règle pas seule
+
+`IDENTITY_WIDTH` et `AXIS_LEFT` **vont toujours ensemble** : les filets verticaux sont posés en
+absolu et doivent commencer là où finissent la colonne et son `gap-6`. Le couple passe de 352/376 à
+264/288 — `w-66` et `left-72`, soit `calc(var(--number-4) * 66)` et `* 72` dans la feuille servie.
+Les changer séparément décrocherait les graduations des barres, en silence.
+
+### Le contraste, mesuré
+
+Un seul couple est **neuf par la position** : le bouton secondaire, jamais posé jusqu'ici sur la
+surface bleue du bloc de vision (« Ajouter un relevé »).
+
+| couple | mesure | seuil |
+|---|---|---|
+| texte `content-neutral-dark` sur `surface-neutral-pale` | 8,12:1 | 4,5 |
+| **filet** `content-neutral-normal` sur `surface-primary-lightest` | **3,74:1** | 3 |
+| fond `surface-neutral-pale` sur `surface-primary-lightest` | 1,04:1 | — |
+
+C'est le **filet** qui porte la limite de 3:1, pas le fond : la frontière visible d'un composant
+qu'il faut savoir viser est son contour. L'argument est celui que `tag.tsx` écrivait déjà, à ceci
+près qu'ici le contour la tient largement.
+
+Les quatre autres couples introduits ne sont neufs ni par la couleur ni par la position — ligne de
+faits (7,72:1), titre et note de `RankHeader` (17,21:1 et 7,82:1), période sur le tracé (4,98:1) —
+et sont mesurés par acquit.
+
+### Les tests mis en défaut
+
+`formatCoverage` est la seule règle neuve éprouvable en unité. Deux neutralisations, deux résultats
+exacts :
+
+| neutralisation | ce qui tombe |
+|---|---|
+| la comparaison des deux bornes **après mise en forme** | les 2 tests du mois unique, et eux seuls |
+| le tri des dates connues | le seul test des deux bornes dans l'ordre |
+
+Le reste du diff est du rendu : il s'éprouve dans le HTML servi, pas en unité. Ce qui y a été lu —
+la ligne de faits « 1 accompagnement · juil. 2026 → août 2026 », le préréglage « Tout » en
+`aria-pressed="true"`, l'absence de tout `<details>`, l'absence de la phrase de masquage, la
+hiérarchie `h1 · h2 h3 · h2 · h2 · h2 h3 h3` sans niveau sauté, et le libellé de la North Star écrit
+**une** fois dans le rendu visible.
+
+### Aucun point d'entrée neuf
+
+Le bouton « Ajouter un relevé » du rang North Star emprunte `addReadingHref`, la route que le menu de
+chaque carte d'indicateur ouvrait déjà, sous le même `canWriteIndicators`. Aucune action, aucune
+route et aucune dérivation de droit n'ont été touchées : **le diff ne déplace que du rendu**, ce qui
+est précisément la raison pour laquelle il n'y avait rien à éprouver par l'action.

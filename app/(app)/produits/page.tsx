@@ -43,12 +43,19 @@ export const metadata = {
 };
 
 /** Les gabarits de colonne, tenus en un seul endroit pour que l'en-tête et
- *  les lignes ne puissent pas diverger. */
+ *  les lignes ne puissent pas diverger.
+ *
+ *  **Toute ligne tient sur une ligne** : un nom de produit long se coupe
+ *  (`truncate`) au lieu de passer à la ligne, et les colonnes courtes ne se
+ *  replient pas (`whitespace-nowrap`). La hauteur de ligne devient constante,
+ *  ce qui est ce qu'on demande à une liste qu'on balaie. « Accompagnements »
+ *  reçoit la largeur nécessaire à « Aucun accompagnement » ; elle est prise
+ *  sur la colonne « Produit », seule colonne élastique. */
 const COLUMN = {
-  name: "min-w-0 flex-1",
-  entity: "w-40 flex-none",
-  count: "w-40 flex-none",
-  freshness: "w-36 flex-none text-right",
+  name: "min-w-0 flex-1 truncate",
+  entity: "w-40 flex-none truncate",
+  count: "w-52 flex-none whitespace-nowrap",
+  freshness: "w-36 flex-none text-right whitespace-nowrap",
 } as const;
 
 export default async function ProductsPage({

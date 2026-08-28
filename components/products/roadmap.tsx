@@ -155,15 +155,37 @@ const TICK_ANCHOR = {
  * **Les deux valeurs vont ensemble** : les filets verticaux sont posés en
  * absolu sur toute la hauteur du tracé, et ils doivent commencer exactement là
  * où finissent la colonne et l'écart qui la suit (`gap-6`, 24 px). Les changer
- * séparément décrocherait les graduations des barres — 352 + 24 = 376.
+ * séparément décrocherait les graduations des barres — 264 + 24 = 288.
  *
- * La colonne est passée de 280 à 352 px le 21/08/2026 : elle porte désormais
- * l'objectif, versé par le bloc « Tous les accompagnements ». Elle ne rétrécit
- * pas quand l'équipe en repart le même jour — un objectif de deux lignes vaut
- * mieux qu'un objectif de quatre.
+ * **Elle est repassée de 352 à 264 px le 28/08/2026.** À 352, la colonne
+ * mangeait un tiers de la largeur utile : sur les 1 064 px du contenu d'un
+ * bloc, il restait 688 px de tracé, et chaque ligne coûtait un balayage de
+ * 352 px avant d'arriver à sa barre. Ce que la colonne perd, elle le perd sans
+ * rien lâcher de ce qu'elle disait : **la période est partie sur le tracé**, où
+ * elle est lue au départ de la barre plutôt que dans une colonne de texte.
  */
-const IDENTITY_WIDTH = "w-88";
-const AXIS_LEFT = "left-94";
+const IDENTITY_WIDTH = "w-66";
+const AXIS_LEFT = "left-72";
+
+/**
+ * Où écrire la période d'une bande, et de quel côté l'ancrer.
+ *
+ * Le libellé est posé en absolu sur la zone de tracé, comme les graduations :
+ * au **départ** de la barre, qui est l'endroit où l'œil arrive. Une bande qui
+ * commence dans le dernier tiers ferait déborder son libellé hors de la carte —
+ * il est alors ancré sur sa **fin**, et se lit vers la gauche.
+ *
+ * Le seuil de 70 % est celui de la place : au-delà, `whitespace-nowrap` sur une
+ * période de vingt-trois caractères sort du cadre.
+ */
+function periodPlacement(
+  left: number,
+  width: number,
+): { left: string; anchor: string } {
+  return left + width >= 70
+    ? { left: `${left + width}%`, anchor: "-translate-x-full" }
+    : { left: `${left}%`, anchor: "" };
+}
 
 /**
  * La ligne des repères, **masquée pour le POC** (demande du 17/08/2026).
@@ -189,29 +211,25 @@ const SHOW_MILESTONES = false;
  * colonne est la ceinture de cette bretelle — un mot sans espace ne déborde pas
  * sur l'axe.
  *
+ * **La période n'y est plus** (28/08/2026) : elle est écrite sur le tracé, au
+ * départ de la barre, ce qui rend à la colonne la largeur qu'elle occupait et
+ * met la date là où le temps se lit. Elle reste écrite — la barre ne porte
+ * toujours rien seule (`docs/06` §11) —, et les accompagnements **sans date**
+ * n'en ont par construction aucune à montrer.
+ *
  * **L'équipe n'y est plus** (21/08/2026, second passage) : la pile d'avatars y a
  * tenu une demi-journée. Elle prenait plus de place qu'elle n'en disait — un
  * visage ne dit pas ce qu'on a fait sur ce produit —, et elle se lit sur la page
  * de l'accompagnement, où elle a son bloc.
  */
-function ProjectIdentity({
-  project,
-  period,
-}: {
-  project: ProductProject;
-  /** La période déjà formulée, ou `null` quand il n'y en a pas à écrire. */
-  period: string | null;
-}) {
+function ProjectIdentity({ project }: { project: ProductProject }) {
   return (
     <div className="flex min-w-0 flex-col gap-1 overflow-hidden">
-      {/* La pastille et la période tiennent **sur une seule ligne** : pas de
-          `flex-wrap`, et la période abrégée pour qu'elle y entre — « sept.
-          2024 » là où `formatPeriod` écrirait « septembre 2024 ». */}
+      {/* La pastille seule sur sa ligne depuis que la période l'a quittée. Le
+          `flex` reste : `StatusPill` porte `flex-none`, et c'est lui qui
+          l'empêche d'être comprimée par la colonne. */}
       <span className="flex items-center gap-2 text-xs">
         <StatusPill nature={project.statusNature} label={project.statusLabel} />
-        {period ? (
-          <span className="truncate text-content-neutral-base">{period}</span>
-        ) : null}
       </span>
 
       <span className="text-sm font-semibold text-content-neutral-darkest">
@@ -311,32 +329,45 @@ function Timeline({
             `title` sur la barre, mais une règle de navigation prime sur un
             dessin. Le contour de focus est celui de tout le produit
             (`*:focus-visible`, `app/globals.css`). */}
-        {bands.map((band) => (
-          <Link
-            key={band.project.id}
-            href={ROUTES.project(band.project.id)}
-            className="flex items-center gap-6 border-t border-surface-neutral-lighter py-4"
-          >
-            <div className={`${IDENTITY_WIDTH} flex-none`}>
-              <ProjectIdentity
-                project={band.project}
-                period={formatPeriodShort(
-                  band.project.startedOn,
-                  band.project.expectedEndOn,
-                )}
-              />
-            </div>
+        {bands.map((band) => {
+          const placement = periodPlacement(band.left, band.width);
 
-            {/* La barre est **décorative** : le statut et la période sont écrits
-                dans la colonne de gauche, et la couleur ne porte jamais seule. */}
-            <div aria-hidden="true" className="relative h-4 min-w-0 flex-1">
-              <div
-                className={`absolute top-1 h-2 rounded-full ${BAND_BG[band.project.statusNature]}`}
-                style={{ left: `${band.left}%`, width: `${band.width}%` }}
-              />
-            </div>
-          </Link>
-        ))}
+          return (
+            <Link
+              key={band.project.id}
+              href={ROUTES.project(band.project.id)}
+              className="flex items-center gap-6 border-t border-surface-neutral-lighter py-4"
+            >
+              <div className={`${IDENTITY_WIDTH} flex-none`}>
+                <ProjectIdentity project={band.project} />
+              </div>
+
+              {/* **La période est écrite ici depuis le 28/08/2026**, au départ
+                  de la barre : c'est ce qui a permis de rendre 88 px à la
+                  colonne de gauche, et c'est l'endroit où le temps se lit. La
+                  zone n'est donc plus `aria-hidden` — seule la barre l'est,
+                  elle qui reste **décorative** : le statut est écrit dans la
+                  pastille, la période juste au-dessus d'elle, et la couleur ne
+                  porte jamais seule (`docs/06` §11). */}
+              <div className="relative h-9 min-w-0 flex-1">
+                <span
+                  className={`absolute top-0 whitespace-nowrap text-xs text-content-neutral-base ${placement.anchor}`}
+                  style={{ left: placement.left }}
+                >
+                  {formatPeriodShort(
+                    band.project.startedOn,
+                    band.project.expectedEndOn,
+                  )}
+                </span>
+                <div
+                  aria-hidden="true"
+                  className={`absolute top-6 h-2 rounded-full ${BAND_BG[band.project.statusNature]}`}
+                  style={{ left: `${band.left}%`, width: `${band.width}%` }}
+                />
+              </div>
+            </Link>
+          );
+        })}
 
         {/* ---- Les repères : une activité porteuse d'un résultat ----
 
@@ -425,7 +456,7 @@ function Undated({ projects }: { projects: ProductProject[] }) {
       <List flush label="Les accompagnements de ce produit sans date">
         {projects.map((project) => (
           <ListRow key={project.id} flush href={ROUTES.project(project.id)}>
-            <ProjectIdentity project={project} period={null} />
+            <ProjectIdentity project={project} />
           </ListRow>
         ))}
       </List>
@@ -536,13 +567,21 @@ export function Roadmap({
     })),
   ];
 
-  /* **La fenêtre d'ouverture est l'année en cours**, et l'axe entier quand elle
-     n'y est pas — la règle de `defaultWindow`, transposée aux clés : sans le
-     repli, un produit terminé en 2024 s'ouvrirait sur un préréglage qui n'existe
-     pas. La lecture de l'horloge est ici, comme avant : une fonction qui lirait
-     l'heure ne s'éprouverait pas par un test. */
-  const currentYear = new Date().getFullYear();
-  const initial = years.includes(currentYear) ? String(currentYear) : "all";
+  /* **La fenêtre d'ouverture est l'axe entier** depuis le 28/08/2026, et non
+     plus l'année en cours.
+     
+     La règle précédente lisait l'horloge et retombait sur « Tout » quand
+     l'année en cours n'était pas au calendrier du produit. Elle protégeait donc
+     du cas vide, mais pas du cas **tronqué** : un produit accompagné de 2025 à
+     2026 s'ouvrait sur 2026 en masquant la moitié de son histoire, et le disait
+     dans une phrase de rattrapage sous la frise. Or la question de la page est
+     « qu'avons-nous fait sur ce produit **dans le temps** » : y répondre en
+     cachant l'avant, c'est répondre à une autre.
+
+     Les millésimes ne disparaissent pas — ils redeviennent ce qu'ils sont, un
+     resserrement qu'on demande. Et l'horloge cesse d'être lue : ce qui se
+     rendait différemment selon le jour se rend maintenant pareil. */
+  const initial = "all";
 
   return (
     <Block>

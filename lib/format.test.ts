@@ -32,6 +32,7 @@ import {
   formatIndicatorDirection,
   formatMonthTick,
   formatPeriodShort,
+  formatCoverage,
   formatComplementaryIndicators,
   formatProducts,
   formatReadings,
@@ -193,6 +194,47 @@ describe("formatPeriodShort", () => {
     // à l'ouest rendrait « déc. 2025 ».
     expect(formatPeriodShort("2026-01-01", "2026-01-31")).toBe(
       "janv. 2026 → janv. 2026",
+    );
+  });
+});
+
+describe("formatCoverage", () => {
+  test("les deux bornes de l'ensemble, dans l'ordre", () => {
+    /* Les dates arrivent dans le désordre de la page — les accompagnements sont
+       rendus du plus récent au plus ancien, et chacun donne deux dates. */
+    expect(
+      formatCoverage(["2026-03-31", "2025-01-01", "2026-06-30", "2025-09-01"]),
+    ).toBe("janv. 2025 → juin 2026");
+  });
+
+  test("les dates absentes n'étendent rien", () => {
+    // Un accompagnement sans date ne compte pas : il n'a rien à situer.
+    expect(formatCoverage([null, "2025-05-01", null, "2025-07-31"])).toBe(
+      "mai 2025 → juil. 2025",
+    );
+  });
+
+  test("un seul mois se dit une seule fois", () => {
+    /* Deux jours du même mois donnent la même borne mise en forme :
+       « mars 2025 → mars 2025 » se lirait comme une erreur. */
+    expect(formatCoverage(["2025-03-01", "2025-03-31"])).toBe("mars 2025");
+  });
+
+  test("une seule date connue se suffit", () => {
+    expect(formatCoverage([null, "2025-03-12"])).toBe("mars 2025");
+  });
+
+  test("aucune date connue ne rend rien à écrire", () => {
+    // `null`, et non une phrase d'absence : la page n'écrit alors pas la ligne.
+    expect(formatCoverage([])).toBeNull();
+    expect(formatCoverage([null, null])).toBeNull();
+  });
+
+  test("un premier du mois ne recule pas d'un mois", () => {
+    // Le piège du fuseau, celui de `formatPeriodShort` : sans `timeZone: "UTC"`,
+    // un serveur à l'ouest rendrait « déc. 2025 ».
+    expect(formatCoverage(["2026-01-01", "2026-12-31"])).toBe(
+      "janv. 2026 → déc. 2026",
     );
   });
 });

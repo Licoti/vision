@@ -207,6 +207,41 @@ export function formatPeriodShort(
 }
 
 /**
+ * L'**étendue couverte** par une collection de dates — « janv. 2025 → juin 2026 ».
+ *
+ * Ce n'est pas la période d'un objet mais celle d'un ensemble : la page produit
+ * s'en sert pour dire, en tête, de quand à quand ce produit a été accompagné.
+ *
+ * **C'est un fait, non un indice** : les deux bornes sont des dates saisies, et
+ * la fonction ne fait que les retrouver. Rien n'est qualifié, rien n'est noté —
+ * la frontière que `CLAUDE.md` trace entre le chiffre reporté et le chiffre
+ * calculé par Vision n'est pas franchie.
+ *
+ * **Un seul mois se dit une seule fois.** Un produit accompagné sur un unique
+ * trimestre rendrait « mars 2025 → mars 2025 », qui se lit comme une erreur
+ * plutôt que comme une durée courte : les deux bornes sont comparées **après
+ * mise en forme**, au mois, et non sur les jours.
+ *
+ * Les dates absentes ne comptent pas — un accompagnement sans date n'étend rien
+ * —, et `null` quand aucune ne reste : la page n'a alors rien à écrire, et
+ * `docs/06` §9 proscrit d'écrire l'absence là où elle n'apprend rien.
+ */
+export function formatCoverage(
+  dates: readonly (string | null)[],
+): string | null {
+  const known = dates.filter((date): date is string => date !== null).sort();
+
+  const first = known[0];
+  const last = known[known.length - 1];
+  if (!first || !last) return null;
+
+  const start = MONTH_SHORT_YEAR.format(parseDay(first));
+  const end = MONTH_SHORT_YEAR.format(parseDay(last));
+
+  return start === end ? start : `${start} → ${end}`;
+}
+
+/**
  * La période d'une **activité**, au mois (D13).
  *
  * « août 2026 » · « mars 2026 → mai 2026 » · « À planifier » ·

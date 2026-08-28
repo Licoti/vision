@@ -88,8 +88,8 @@ export function PersonasRank({
            la hiérarchie des titres autant que du dessin : le `h3` d'un
            `EmptyState` suivrait ici le `h3` de l'intertitre.
 
-           Le geste est dans le menu du bloc ; le lien inline est le second
-           chemin, celui d'`indicators.tsx` pour la vision absente. */
+           Le geste est en tête du bloc ; le lien inline est le second chemin,
+           celui d'`indicators.tsx` pour la vision absente. */
         <BlockNote>
           Aucun persona pour l&apos;instant. Ce rang réunira les profils pour
           lesquels ce produit est conçu — leur rôle, ce qu&apos;ils cherchent à

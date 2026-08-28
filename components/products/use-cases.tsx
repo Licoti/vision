@@ -83,18 +83,22 @@ export function UseCasesRank({
       />
 
       {useCases.length > 0 ? (
-        /* Le retrait négatif compense le rembourrage, et il est là pour une
-           raison qu'on ne voit qu'au clavier : `overflow-x` non visible fait
-           calculer `overflow-y` en `auto`, si bien qu'un conteneur sans marge
-           intérieure **rognerait le liseré de focus** de chaque carte, haut et
-           bas. Quatre pixels de chaque côté, repris en marge, et le rythme du
-           rang ne bouge pas. */
+        /* **Une grille, comme le rang voisin** (28/08/2026). C'était une ligne
+           défilante horizontale : dans une page qui défile verticalement, elle
+           cachait ses dernières cartes sans l'annoncer — pas de dégradé de
+           bord, pas de flèche, et un défilement latéral que rien ne suggère. Le
+           quatrième use case n'existait pas pour qui n'y pensait pas.
+
+           Les deux rangs répondent à la même question — pour qui, et pour quoi
+           faire — et se lisent désormais pareil. Le retrait négatif qui
+           protégeait le liseré de focus part avec le défilement : sans
+           `overflow-x`, plus rien ne rogne. */
         <ul
           role="list"
-          className="-m-1 flex gap-4 overflow-x-auto p-1 pb-3"
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
         >
           {useCases.map((useCase) => (
-            <li key={useCase.id} className="w-72 flex-none">
+            <li key={useCase.id} className="min-w-0">
               <UseCaseCard
                 useCase={useCase}
                 personas={personasOf(useCase, personas)}
@@ -106,8 +110,8 @@ export function UseCasesRank({
       ) : (
         /* **Un paragraphe et non un `EmptyState`**, la règle du rang voisin
            depuis la fusion : l'intertitre est déjà le titre de ce quart vide,
-           et un second `h3` le doublerait. Le geste est dans le menu du bloc,
-           le lien inline est le second chemin. */
+           et un second `h3` le doublerait. Le geste est en tête du bloc, le
+           lien inline est le second chemin. */
         <BlockNote>
           Aucun use case pour l&apos;instant. Ce rang réunira les grands
           scénarios d&apos;usage de ce produit — ce qu&apos;on vient y faire, et
@@ -146,10 +150,10 @@ export function UseCasesRank({
  * position sans que rien de neuf soit introduit — donc **aucun couple de
  * couleurs neuf par la position**, et rien de nouveau à mesurer.
  *
- * **La description est tronquée à trois lignes**, et c'est la seule raison
- * d'être de la fiche : une carte qui porterait le texte entier ferait varier la
- * hauteur de la ligne d'une carte à l'autre, et la ligne défilante n'aurait plus
- * de hauteur. `line-clamp` tronque à l'affichage seulement — le texte reste
+ * **La description est tronquée à trois lignes** : une carte qui porterait le
+ * texte entier ferait varier la hauteur des cartes d'une colonne à l'autre, et
+ * c'est la fiche qui porte le texte entier. La raison a survécu au passage de
+ * la ligne défilante à la grille (28/08/2026) — elle a seulement changé d'axe. `line-clamp` tronque à l'affichage seulement — le texte reste
  * entier dans le HTML servi, donc entier pour la synthèse vocale.
  */
 function UseCaseCard({

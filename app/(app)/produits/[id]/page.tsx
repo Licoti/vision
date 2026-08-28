@@ -21,6 +21,13 @@
  * 404 : la seconde réponse ne se distingue pas de la première, et c'est
  * volontaire.
  *
+ * **L'en-tête porte une ligne de faits** depuis le 28/08/2026 : le décompte
+ * des accompagnements, qui vivait dans le surtitre à côté de l'entité, et
+ * l'**étendue couverte** — de quand à quand ce produit a été accompagné. Deux
+ * faits datés, tirés de ce que la page a déjà lu, et rien de plus : nommer
+ * l'accompagnement *en cours* a été écarté le même jour, plusieurs pouvant
+ * l'être à la fois et aucun document ne donnant la règle qui en désignerait un.
+ *
  * **« Modifier ce produit », « Archiver » et « Nouvel accompagnement »
  * n'apparaissent qu'au responsable de domaine** (F1-D1, D9) : les actions sont
  * absentes du rendu pour tout autre, pas grisées. **Les deux premières vivent
@@ -105,7 +112,7 @@ import {
   PRODUCT_PANEL_PARAMS,
   resolveProductDrawer,
 } from "@/lib/drawers/product";
-import { formatAccompaniments } from "@/lib/format";
+import { formatAccompaniments, formatCoverage } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
 import {
   listProductAdoptions,
@@ -229,6 +236,20 @@ export default async function ProductPage({
     (session.can.manageDomain ||
       projects.some((project) => session.can.writeProject(project.id)));
 
+  /* **L'étendue couverte par le produit**, écrite en tête depuis le 28/08/2026.
+     Aucune lecture neuve : ce sont les dates des accompagnements que la page
+     vient de lire pour la frise, et `formatCoverage` ne fait que retrouver
+     leurs deux bornes. Un produit dont aucun accompagnement n'est daté n'a rien
+     à écrire, et la ligne se réduit alors au décompte.
+
+     **L'accompagnement en cours n'y figure pas**, et c'est une décision du
+     28/08/2026 : plusieurs peuvent l'être à la fois, et le nommer au singulier
+     demanderait une règle de choix qu'aucun document ne donne. Le bloc
+     « Accompagnements » les porte tous, avec leur statut écrit. */
+  const coverage = formatCoverage(
+    projects.flatMap((project) => [project.startedOn, project.expectedEndOn]),
+  );
+
   const {
     archiver,
     indicateur,
@@ -313,9 +334,17 @@ export default async function ProductPage({
         ) : null}
 
         <PageHeader
-          overline={`${product.entityLabel} · ${formatAccompaniments(projects.length)}`}
+          overline={product.entityLabel}
           title={product.name}
           {...(product.description ? { lead: product.description } : {})}
+          /* Le décompte a quitté le surtitre pour la ligne de faits, où il
+             peut s'accompagner de l'étendue couverte sans faire une ligne de
+             capitales de trois segments. */
+          facts={
+            coverage
+              ? `${formatAccompaniments(projects.length)} · ${coverage}`
+              : formatAccompaniments(projects.length)
+          }
           action={
             session.can.manageDomain ? (
               <span className="flex flex-wrap items-center gap-3">
@@ -365,18 +394,22 @@ export default async function ProductPage({
           }
         />
 
-        {/* **Le premier bloc de la page** depuis le 17/08/2026, et **« Vision
-              produit » depuis le 18/08/2026** : la vision porte la raison
-              d'être du produit et la North Star la mesure, et c'est ce qu'on
-              lit d'abord.
-              Le bloc est en pleine largeur, comme la liste — la page produit ne
-              porte aucune grille de blocs de référence, à la différence de la
-              page projet.
+        {/* **Les deux premiers blocs de la page** — « Vision produit » et
+              « Indicateurs ». Un seul composant les rend, dans un fragment :
+              ils partagent les mêmes tableaux et les mêmes droits, et les
+              séparer en deux appels aurait fait passer six props deux fois.
+              `Page` les espace de son `gap-6` comme deux blocs quelconques.
 
-              **Un seul bloc** : les courbes de T5.6 y ont été fusionnées, avec
-              la North Star en tête. Il reçoit les mêmes tableaux qu'avant —
-              aucune lecture de plus —, plus les adoptions, qui remplacent les
-              seules cibles.
+              La vision porte la raison d'être du produit et la North Star la
+              mesure, et c'est ce qu'on lit d'abord. Les blocs sont en pleine
+              largeur — la page produit ne porte aucune grille de blocs de
+              référence, à la différence de la page projet.
+
+              **Le second bloc était un `<details>` replié au pied du premier**
+              jusqu'au 28/08/2026 : trois indicateurs et leur point d'entrée
+              d'écriture disparaissaient derrière un chevron de 10 px. Aucune
+              lecture n'a changé — ce sont les mêmes tableaux, séparés par le
+              même `filter`.
 
               Les points d'entrée tombent tous avec le même `canWriteIndicators` :
               le droit dérivé (arbitrage (b)) et la lecture seule d'un produit
@@ -426,9 +459,10 @@ export default async function ProductPage({
             canWriteIndicators ? setNorthStar.bind(null, product.id) : null
           }
         />
-        {/* **Le deuxième bloc de la page** depuis le 21/08/2026, et il a
-              **remonté de deux rangs** : ce qu'on fait sur ce produit se lit
-              avant ce que le produit est. C'est aussi le seul à porter les
+        {/* **Le troisième bloc de la page** — le deuxième jusqu'à ce que
+              « Indicateurs » quitte le repli du premier, le 28/08/2026 —, et il
+              a **remonté de deux rangs** le 21/08/2026 : ce qu'on fait sur ce
+              produit se lit avant ce que le produit est. C'est aussi le seul à porter les
               accompagnements — « Tous les accompagnements », qui le suivait,
               lisait le même tableau dans le même ordre vers la même destination
               de clic, et ce qui n'existait que là est versé dedans : l'objectif

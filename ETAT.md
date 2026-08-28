@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 28/08/2026, après la suppression définitive et la disponibilité déduite,
-livrées hors ticket. Dernier balayage : découpage de C7. **Le fichier dépasse les 250 lignes de la
-règle 5** — le balayage appartient à la session de découpage de C8.
+**Dernière mise à jour :** 28/08/2026, après la reprise d'ergonomie de la page produit, livrée
+hors ticket. Dernier balayage : découpage de C7. **Le fichier dépasse les 250 lignes de la
+règle 5 — 302 au 28/08/2026** ; le balayage appartient à la session de découpage de C8.
 **Chantier en cours :** **C7 — Finitions**, dix tickets, découpés dans `tickets-C7.md`. **Dernier
 chantier du POC** — `docs/05` §5 n'en a pas de huitième.
 **Ticket suivant :** **T7.3 — Administration : l'écran devient multi-référentiel, et les quatre
@@ -78,11 +78,19 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   (migration `0010`, première destructive depuis `0001`), et sa base est **corrigée le jour même** :
   un accompagnement **terminé** ne pèse plus. 23 tests neufs, sept neutralisations, et un **500
   trouvé par le HTML servi** que ni `tsc`, ni ESLint, ni 1 226 tests n'avaient vu.
-- **Reprise d'interface hors ticket — dix-sept gestes, du 17 au 28/08/2026.** Menu « … » de la
+- **Reprise d'interface hors ticket — vingt-quatre gestes, du 17 au 28/08/2026.** Menu « … » de la
   roadmap, « Vision produit » et sa reprise `northstar-v2`, « Personae », « Use Cases »,
   « Démarrage » (migrations 0005 à 0008), page projet en `project-v2`, bouton à trois rangs, entités
-  en `/administration`, hiérarchie de la page produit — puis, le 28/08, **deux blocs de la page
+  en `/administration`, hiérarchie de la page produit, puis, le 28/08, **deux blocs de la page
   projet qui s'effacent** : « Projets liés » entièrement, « Démarrage » dès la première activité.
+- **Page produit — reprise d'ergonomie, hors ticket, 28/08/2026.** Sept gestes tirés d'un diagnostic
+  d'écran : une **ligne de faits** en tête (décompte + étendue couverte, `formatCoverage`),
+  **l'écart d'en-tête du 18/08 refermé** — `BlockHeader` partout, vision à 24 px, le rythme rendu au
+  `gap-5` —, **« Indicateurs » sorti du repli** en bloc à part entière, la frise **resserrée de 352
+  à 264 px** avec sa période passée sur le tracé, la fenêtre **« Tout » à l'ouverture** (l'horloge
+  n'est plus lue), les **use cases en grille**, et les gestes d'ajout en **boutons d'en-tête**.
+  Ni migration ni journal ; 6 tests neufs, deux neutralisations. **La barre d'ancres a été refusée**
+  — la page reste sans repère de position, dette au journal technique.
 
 ---
 

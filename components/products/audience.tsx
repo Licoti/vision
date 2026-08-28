@@ -14,13 +14,16 @@
  * une **ligne défilante** pour les use cases. Le regroupement change le nombre
  * de cartes, pas la lecture.
  *
- * **Un seul menu pour les deux gestes.** Les deux « Ajouter » étaient deux
- * liens d'en-tête ; ils sont devenus les deux entrées d'un `ActionMenu` en haut
- * du bloc, au rang **tertiaire** — celui que la demande fixe pour les gestes en
- * haut à droite d'un bloc. Un rang n'a pas d'en-tête, donc pas d'action
- * d'en-tête : c'est ce qui a fait remonter les deux gestes ici. Chacun reste
- * atteignable d'un second chemin, le lien inline du paragraphe d'absence de son
- * rang.
+ * **Deux boutons, et non plus un menu** (28/08/2026). Les deux « Ajouter »
+ * avaient été rangés dans un `ActionMenu` le 21/08/2026 ; ils en ressortent au
+ * rang **secondaire**, la forme que les deux autres blocs de la page donnent
+ * désormais à leur geste d'ajout. La page portait cinq dessins pour un même
+ * geste — bouton primaire, menu d'en-tête, menu de bloc, lien souligné, carte
+ * pointillée ; elle en porte deux, et chacun dit son rang. Un menu qui n'aurait
+ * plus rien à cacher n'est qu'un clic de plus.
+ *
+ * Chaque geste reste atteignable d'un second chemin, le lien inline du
+ * paragraphe d'absence de son rang.
  *
  * **Composant serveur**, comme les deux rangs qu'il porte : il n'a aucun état,
  * ne lit aucune base, et **ne connaît aucun droit** — les points d'entrée
@@ -28,8 +31,8 @@
  * ne protège rien : les actions redérivent le droit sur les identifiants reçus.
  */
 
-import { ActionMenu, MENU_ITEM } from "@/components/ui/action-menu";
 import { Block, BlockHeader } from "@/components/ui/block";
+import { buttonClass } from "@/components/ui/button";
 import { DrawerLink } from "@/components/ui/drawer";
 import { PersonasRank } from "@/components/products/personas";
 import { UseCasesRank } from "@/components/products/use-cases";
@@ -62,22 +65,19 @@ export function Audience({
       <BlockHeader
         title="Utilisateurs et usages"
         note="Pour qui ce produit est conçu, et ce qu'on vient y faire."
-        /* **Le menu ne se rend pas du tout quand les deux gestes sont nuls** :
-           un kebab qui n'ouvrirait rien est un bouton qui ment. Les deux
-           conditions restent séparées à l'intérieur — le jour où les deux
-           droits divergeront, le menu n'aura pas à changer de forme. */
+        /* **Rien ne se rend quand les deux gestes sont nuls**, et les deux
+           conditions restent séparées : le jour où les deux droits divergeront,
+           l'en-tête n'aura pas à changer de forme — il ne portera qu'un bouton.
+           `flex-wrap` parce que deux boutons de cette longueur passent à la
+           ligne avant le titre sur un écran étroit. */
         action={
           addPersonaHref || addUseCaseHref ? (
-            <ActionMenu
-              variant="tertiary"
-              label="Options du bloc « Utilisateurs et usages »"
-            >
+            <span className="flex flex-wrap items-center gap-2">
               {addPersonaHref ? (
                 <DrawerLink
                   href={addPersonaHref}
                   request={{ kind: "persona" }}
-                  role="menuitem"
-                  className={MENU_ITEM}
+                  className={buttonClass({ variant: "secondary" })}
                 >
                   Ajouter un persona
                 </DrawerLink>
@@ -86,13 +86,12 @@ export function Audience({
                 <DrawerLink
                   href={addUseCaseHref}
                   request={{ kind: "useCase" }}
-                  role="menuitem"
-                  className={MENU_ITEM}
+                  className={buttonClass({ variant: "secondary" })}
                 >
                   Ajouter un use case
                 </DrawerLink>
               ) : null}
-            </ActionMenu>
+            </span>
           ) : null
         }
       />

@@ -6,6 +6,13 @@
  * (docs/06 §2). C'est la discipline centrale du document : un écran qui ne
  * sait pas énoncer sa question n'a pas de raison d'exister.
  *
+ * Il porte en outre, depuis le 28/08/2026, une **ligne de faits** sous le
+ * chapeau : ce que l'écran sait de son objet en quelques mots — un décompte,
+ * une étendue de dates. **Des faits, jamais un indice** : la ligne ne reçoit
+ * que des valeurs saisies ou dénombrées, et la frontière que `CLAUDE.md` trace
+ * entre le chiffre reporté et le chiffre calculé par Vision reste où elle est.
+ * C'est l'appelant qui la compose ; le socle ne sait pas ce qu'elle dit.
+ *
  * Il accepte en outre une action, à droite du titre — exactement comme
  * `SectionHeader` en accepte une depuis T1.6, et au même endroit : l'action
  * d'un écran doit être visible sans avoir à parcourir son contenu. Elle est
@@ -30,11 +37,14 @@ export function PageHeader({
   overline,
   title,
   lead,
+  facts,
   action,
 }: {
   overline?: string;
   title: string;
   lead?: string;
+  /** Ce que l'écran sait de son objet, en faits séparés par des points médians. */
+  facts?: string;
   action?: ReactNode;
 }) {
   return (
@@ -49,6 +59,16 @@ export function PageHeader({
         {lead ? (
           <p className="max-w-180 text-md leading-200 text-content-neutral-dark">
             {lead}
+          </p>
+        ) : null}
+        {/* **Sous le chapeau, jamais dans le surtitre** : le surtitre nomme la
+            catégorie de l'objet, ces faits le décrivent. Les empiler dans le
+            même trait aurait donné une ligne de capitales qu'on cesse de lire.
+            `content-neutral-dark` sur le fond de page : le couple du chapeau
+            juste au-dessus, aucun couple neuf par la position. */}
+        {facts ? (
+          <p className="text-sm leading-175 text-content-neutral-dark">
+            {facts}
           </p>
         ) : null}
       </div>

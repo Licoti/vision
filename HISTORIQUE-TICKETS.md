@@ -4618,3 +4618,49 @@ réussite du `beforeAll` — le point ouvert des trois fichiers fautifs ne gagne
 **Le résultat.** `npx tsc --noEmit`, `npm run lint` (`--max-warnings=0`), `npm run build` et les
 **1 227 tests** passent. Une migration (`0010`, première destructive depuis `0001`), appliquée à la branche de test ;
 **la base de développement reste à migrer par l'humain**.
+
+
+---
+
+## Page produit — reprise d'ergonomie, hors ticket (28/08/2026)
+
+Sept gestes, tirés d'un diagnostic d'écran fait avant d'écrire une ligne : la page s'était
+construite par sédimentation depuis le 17/08/2026, chaque geste juste localement, et les frictions
+ne se voyaient plus qu'à l'échelle de la page entière.
+
+**Ce qui a changé, dans l'ordre de l'écran.**
+
+1. **Une ligne de faits en tête.** Le surtitre ne porte plus que l'entité ; le décompte
+   d'accompagnements le quitte pour une ligne sous le chapeau, où il s'accompagne de l'**étendue
+   couverte** — « 6 accompagnements · janv. 2025 → juin 2026 ». `formatCoverage` est neuve
+   (`lib/format.ts`, 6 tests) ; `PageHeader` gagne une prop `facts`, la première depuis T1.6.
+2. **L'écart d'en-tête du 18/08/2026 est refermé.** Le bloc de vision reprend `BlockHeader` — titre,
+   note, action —, le kebab quitte sa position absolue, le contenu quitte son enfant `relative`
+   unique, et le rythme en marges élément par élément revient au `gap-5` de `Block`. La vision passe
+   de 30 à 24 px : elle était le plus gros texte de l'écran, plus gros que le nom du produit.
+   **L'ordre ne bouge pas** — la vision reste avant sa mesure.
+3. **Le rang North Star nomme son indicateur** et porte « Ajouter un relevé ». Le libellé disparaît
+   de la carte, où il était écrit une seconde fois.
+4. **« Indicateurs » devient un bloc.** C'était un `<details>` replié au pied du précédent : trois
+   indicateurs et leur point d'entrée d'écriture derrière un chevron de 10 px. Il a désormais son
+   en-tête, son geste et son état vide — et **aucune lecture neuve**, les mêmes tableaux séparés par
+   le même `filter`.
+5. **La frise se resserre.** `IDENTITY_WIDTH` passe de 352 à 264 px avec son `AXIS_LEFT`, et la
+   **période part sur le tracé**, écrite au départ de la barre — ancrée à droite quand la bande
+   commence après 70 %, faute de quoi elle sortirait du cadre.
+6. **La fenêtre d'ouverture devient « Tout ».** Elle était l'année en cours, ce qui ouvrait un
+   produit accompagné de 2025 à 2026 sur la moitié de son histoire, rattrapée par une phrase sous la
+   frise. L'horloge n'est plus lue : le rendu ne dépend plus du jour.
+7. **Les use cases passent en grille**, comme les personae, et les gestes d'ajout deviennent des
+   **boutons d'en-tête** — la page portait cinq dessins pour un même geste, elle en porte deux.
+
+**Ce qui a été proposé et refusé** : la barre d'ancres collante de la page projet. La page reste
+donc sans repère de position, et la friction s'aggrave d'un bloc — dette au journal technique.
+
+**Vérification.** 1 233 tests verts, `tsc` et `npm run lint --max-warnings=0` propres. Les deux
+neutralisations de `formatCoverage` font tomber exactement les tests attendus. Le critère se lit
+dans le HTML servi : la ligne de faits, « Tout » en `aria-pressed="true"`, plus aucun `<details>`,
+plus de phrase de masquage, une hiérarchie de titres sans niveau sauté, et les six utilitaires neufs
+qui résolvent tous vers un jeton dans la feuille servie. Le seul couple de couleurs neuf par la
+position — bouton secondaire sur la surface bleue — est mesuré à **3,74:1 sur son filet**. Les
+mesures et les dettes sont au journal technique.
