@@ -8,6 +8,25 @@
  * contenu depuis T7.1**, qui livre le dernier, « Budget » (D28) : plus aucun
  * bloc de ce tableau n'est une annonce.
  *
+ * **Deux blocs se sont effacés le 28/08/2026, hors ticket et à la demande**, et
+ * les deux gestes ne sont pas de même nature :
+ *
+ *   - **« Projets liés » n'est plus rendu du tout.** Le bloc n'apporte pas de
+ *     valeur au stade où le produit se démontre, et ses cinq requêtes se payaient
+ *     à chaque affichage. **C'est un écart à `docs/06` §5** — dont la liste de
+ *     blocs de référence est close —, consigné au journal technique. Rien n'est
+ *     supprimé : le composant reste sans appelant, comme `subnav.tsx` depuis le
+ *     21/08, et le bloc revient d'une dizaine de lignes.
+ *   - **« Démarrage » n'est rendu que sur un accompagnement sans activité.** Il
+ *     dit ce qu'on **peut** faire, et la question ne se pose plus une fois
+ *     l'accompagnement ouvert. Le référentiel, lui, reste lu et son panneau reste
+ *     ouvrable : c'est par `?piste=` que le geste d'ajout d'une activité viendra
+ *     le rouvrir.
+ *
+ * **Aucun des deux n'est une protection**, et c'est la distinction qui compte :
+ * `?lien=` et `?piste=` ouvrent encore, un rendu absent n'ayant jamais gardé le
+ * point d'entrée HTTP qui l'accompagne.
+ *
  * **Elle passe à `docs/design/maquettes/blocs/project-v2` le 20/08/2026**, hors
  * ticket, et c'est le plus large changement de forme qu'un écran de Vision ait
  * reçu. Cinq gestes, aucune donnée perdue :
@@ -115,7 +134,6 @@ import {
   archiveResource,
   archiveResult,
   removeAdoption,
-  removeProjectLink,
   transitionActivity,
 } from "./actions";
 import { restoreProject } from "../actions";
@@ -123,7 +141,6 @@ import { AdoptedIndicators } from "@/components/projects/adopted-indicators";
 import { Budget } from "@/components/projects/budget";
 import { Resources } from "@/components/projects/resources";
 import { Journal } from "@/components/projects/journal";
-import { RelatedProjects } from "@/components/projects/related";
 import { Starters } from "@/components/projects/starters";
 import { Roadmap } from "@/components/projects/roadmap";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
@@ -149,7 +166,6 @@ import { listProjectRoadmap } from "@/lib/queries/activities";
 import { findProjectBudget } from "@/lib/queries/budgets";
 import { listProjectAdoptions } from "@/lib/queries/indicators";
 import { listProjectJournal } from "@/lib/queries/journal";
-import { listDeclaredLinks, listRelatedProjects } from "@/lib/queries/links";
 import {
   findAccompanimentRank,
   findProjectDetail,
@@ -253,17 +269,21 @@ export default async function ProjectPage({
      prennent pas d'identifiant : c'est un référentiel du domaine, le même sur
      tous les accompagnements.
 
-     **Ni le journal ni les voisins n'attendent un droit** : leur lecture est
+     **Ni le journal ni le budget n'attendent un droit** : leur lecture est
      ouverte à tout le domaine (D9), archivé compris, et ils partent donc dans
-     le même vol que les cinq autres plutôt que derrière un `canWrite`. Les
-     liens déduits sont **quatre requêtes de plus** (T6.4) et rien de stocké :
-     c'est ce qui garantit qu'ils sont toujours vrais, et le coût est celui que
-     `docs/04` §5 accepte à quinze projets. Les liens **déclarés** (T6.5), eux,
-     se lisent en une requête sur `project_links` — dans les deux sens, la
-     lecture étant symétrique. Le **budget** rejoint le vol en dernier (T7.1) :
-     c'est une lecture de plus dans le même aller-retour, pas un tour de plus, et
-     elle est ouverte à tout le domaine comme les autres — un accompagnement se
-     lit entier, seul le geste tombe avec le droit. */
+     le même vol que les cinq autres plutôt que derrière un `canWrite`. Le
+     **budget** l'a rejoint en dernier (T7.1) : c'est une lecture de plus dans
+     le même aller-retour, pas un tour de plus, et elle est ouverte à tout le
+     domaine comme les autres — un accompagnement se lit entier, seul le geste
+     tombe avec le droit.
+
+     **Le vol est repassé de neuf lectures à sept le 28/08/2026**, « Projets
+     liés » ayant quitté le rendu : `listRelatedProjects` en emportait
+     **quatre** — les liens déduits ne sont rien de stocké (T6.4) — et
+     `listDeclaredLinks` une cinquième. Cinq requêtes par affichage qu'un bloc
+     invisible n'a aucune raison de payer. Les deux fonctions restent entières
+     et testées dans `lib/queries/links.ts` ; ce sont leurs appels qui s'en
+     vont. */
   const [
     rank,
     roadmap,
@@ -271,8 +291,6 @@ export default async function ProjectPage({
     adoptions,
     starters,
     journal,
-    related,
-    declared,
     budget,
   ] = await Promise.all([
     findAccompanimentRank(session.db, project),
@@ -281,10 +299,24 @@ export default async function ProjectPage({
     listProjectAdoptions(session.db, project.id),
     listStarters(session.db),
     listProjectJournal(session.db, project.id),
-    listRelatedProjects(session.db, project.id),
-    listDeclaredLinks(session.db, project.id),
     findProjectBudget(session.db, project.id),
   ]);
+
+  /* **« Démarrage » ne se rend que sur un accompagnement sans activité**
+     (28/08/2026, à la demande). Le bloc dit ce qu'on **peut** faire, et la
+     question ne se pose plus une fois l'accompagnement ouvert : sa raison
+     d'être est le projet neuf, dont la page ne dit rien du possible.
+
+     **Aucun état ne fait exception** — « annulé » et « à planifier » comptent
+     comme les autres : le critère est *la roadmap est vide*, et non un jugement
+     sur ce qui a vraiment commencé, qui serait l'indice calculé par Vision que
+     D39 interdit. Une activité **archivée** ne compte pas : elle a quitté la
+     roadmap, et le projet redevient un projet qu'on ouvre.
+
+     Le décompte porte sur les **activités**, non sur les groupes.
+     `listProjectRoadmap` ne rend aujourd'hui aucun groupe vide, mais un critère
+     adossé à cette propriété se casserait le jour où elle changerait. */
+  const hasActivity = roadmap.some((group) => group.activities.length > 0);
 
   /* La roadmap et les pistes sont **déjà lues** pour l'écran : la résolution
      les reçoit plutôt que de les relire. C'est `loadProjectDrawerContext` qui
@@ -537,43 +569,43 @@ export default async function ProjectPage({
                 seul dont le point d'entrée ne soit jamais nul : une piste se lit
                 par tout le domaine (D9), et son référentiel a son écran de
                 gestion en C7 (D25). Il n'y a rien ici que `canWrite` puisse
-                fermer. */}
-            <Starters
-              starters={starters}
-              detailHref={(starterId) =>
-                ROUTES.projectStarter(project.id, starterId)
-              }
-            />
+                fermer.
 
-            {/* **« Projets liés » porte ses deux natures depuis T6.5** : les
-                liens déduits de T6.4, puis les liens déclarés avec leur raison
-                — l'ordre exact de `docs/06` §5. Le bloc se rend juste avant la
-                carte annoncée qui reste, et **il n'entre pas dans la rangée** —
-                un bloc qui porte son contenu n'annonce plus rien.
+                **Il ne se rend plus que sur un accompagnement sans activité**
+                (28/08/2026) — la condition est `hasActivity`, plus haut. Ce
+                qui disparaît est le **bloc**, jamais la piste : `?piste=<id>`
+                ouvre encore son panneau sur un projet peuplé, `listStarters`
+                reste dans le vol pour l'alimenter, et c'est par là que le geste
+                d'ajout d'une activité viendra le rouvrir. Le composant, lui, ne
+                connaît toujours rien du projet — la condition vit ici. */}
+            {hasActivity ? null : (
+              <Starters
+                starters={starters}
+                detailHref={(starterId) =>
+                  ROUTES.projectStarter(project.id, starterId)
+                }
+              />
+            )}
 
-                Dans la colonne du récit, et non dans le rail : le rail porte
-                les blocs de **chiffres reportés**, et une raison en toutes
-                lettres — « Camille Roux et Sofia Marchand en commun », ou la
-                phrase qu'un collègue a tapée — ne se lit pas sur 380 px.
+            {/* **« Projets liés » a été masqué le 28/08/2026**, à la demande :
+                le bloc n'apporte pas de valeur au stade où le produit se
+                démontre. Il vivait ici depuis T6.4 pour ses liens déduits et
+                T6.5 pour ses liens déclarés.
 
-                **Le droit n'entre que par la moitié déclarée**, et par le
-                **même** `canWrite` que les dix gestes qui précèdent — **aucune
-                condition ne s'ajoute ici**. La lecture des deux moitiés reste
-                ouverte à tout le domaine (D9) : c'est pourquoi `declared` part
-                dans le vol de lectures et non derrière un droit. */}
-            <RelatedProjects
-              related={related}
-              declared={declared}
-              addHref={canWrite ? ROUTES.projectLinkNew(project.id) : null}
-              editHref={
-                canWrite
-                  ? (linkId) => ROUTES.projectLinkEdit(project.id, linkId)
-                  : null
-              }
-              removeProjectLink={
-                canWrite ? removeProjectLink.bind(null, project.id) : null
-              }
-            />
+                **C'est un écart à `docs/06` §5**, dont la liste de blocs de
+                référence est close : elle en énumère cinq, la page en rend
+                quatre. Consigné dans `JOURNAL-TECHNIQUE.md`.
+
+                **Il ne laisse aucune dette, et revient d'une dizaine de
+                lignes** — le geste de la barre d'ancres, retirée le
+                21/08/2026. `components/projects/related.tsx` reste en place
+                sans appelant, `listRelatedProjects` et `listDeclaredLinks`
+                restent entières et testées, le panneau `?lien=` reste résolu et
+                les trois actions d'écriture gardent leurs portes. **Le masquage
+                n'est donc pas une protection et ne prétend pas en être une** :
+                `?lien=nouveau` ouvre encore le panneau à qui porte `canWrite`,
+                et c'est `openLink` qui décide, pas ce rendu. La clé reste dans
+                `keys` : le décompte d'exclusivité reste à neuf. */}
 
             {/* **Le dernier bloc de `docs/06` §5, et il porte enfin son
                 contenu** (T7.1, D28). Il était le seul qui restait annoncé, et
@@ -581,7 +613,9 @@ export default async function ProjectPage({
                 et son `map` s'en vont, un tableau vide et une boucle dessus
                 étant une annonce que plus personne ne lit.
 
-                À sa place exacte — après « Projets liés », avant « Journal ».
+                À sa place exacte — après « Projets liés », avant « Journal » ;
+                le premier ayant été masqué le 28/08/2026, il suit désormais la
+                roadmap, sans que son rang dans `docs/06` §5 ait bougé.
                 Dans la colonne du récit et non dans le rail : il porte quatre
                 couples nom/valeur et un lien sortant en rangée, qui ne tiennent
                 pas sur 380 px.

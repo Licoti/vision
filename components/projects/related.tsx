@@ -36,6 +36,15 @@
  *
  * Le composant ne lit aucune base : `related` et `declared` sont ce que
  * `listRelatedProjects` et `listDeclaredLinks` ont déjà lu, rapproché et trié.
+ *
+ * **Ce fichier n'a plus d'appelant depuis le 28/08/2026**, hors ticket et à la
+ * demande : le bloc n'apporte pas de valeur au stade où le produit se démontre,
+ * et ses cinq requêtes se payaient à chaque affichage de la page projet. C'est
+ * la situation de `subnav.tsx` depuis le 21/08 — **rien n'est supprimé, et le
+ * bloc revient d'une dizaine de lignes** : le composant, `listRelatedProjects`,
+ * `listDeclaredLinks`, le panneau `?lien=` et les trois actions d'écriture
+ * restent entiers et testés. Un fichier sans appelant est un fichier qu'on
+ * relit un jour sans savoir pourquoi ; celui-ci le dit ici.
  */
 
 import type { ReactNode } from "react";

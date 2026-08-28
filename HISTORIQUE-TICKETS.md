@@ -4458,3 +4458,60 @@ hors ticket. **Il fallait deux tickets, dans cet ordre**, et c'est le second.
   sept que le document énumère. T7.2 a posé leurs **filtres**, pas leurs **colonnes** : son
   « Attendu » ne les nommait pas, et la règle 3 tranche. Aucun ticket de C7 n'ouvre cet écran pour du
   contenu — T7.9 s'interdit nommément de rouvrir T7.2. → **C8.**
+
+
+---
+
+## Hors ticket — deux blocs masqués sur la page projet, 28/08/2026
+
+**La demande.** Deux blocs de la colonne du récit ne servent pas le MVP tel qu'il se démontre.
+« Projets liés » n'apporte pas de valeur au stade actuel. « Démarrage » en apporte, mais **au projet
+neuf seulement** : il dit ce qu'on *peut* faire, et la question ne se pose plus une fois
+l'accompagnement ouvert. Il doit revenir plus tard par le geste d'ajout d'une activité — annoncé,
+donc pas fait (règle 3).
+
+**Deux arbitrages rendus avant écriture**, tous deux par l'humain. **(1)** Le critère de
+« Démarrage » est *la roadmap est vide*, **sans exception d'état** : distinguer ce qui a « vraiment
+commencé » aurait été l'indice calculé par Vision que D39 interdit. **(2)** Le masquage de « Projets
+liés » retire le rendu **et ses deux lectures**, rien d'autre — le précédent exact de la barre
+d'ancres du 21/08 : *rien n'est supprimé, le bloc revient d'une dizaine de lignes.*
+
+**Le geste, trois fichiers.** Dans `app/(app)/projets/[id]/page.tsx` : trois imports en moins, le
+bloc `<RelatedProjects>` retiré, et un `hasActivity` — `roadmap.some((group) =>
+group.activities.length > 0)` — qui garde `<Starters>`. Le décompte porte sur les **activités** et
+non sur les groupes : `listProjectRoadmap` n'en rend aujourd'hui aucun de vide, mais un critère
+adossé à cette propriété se casserait le jour où elle changerait. Les en-têtes de `related.tsx` et de
+`starters.tsx` disent chacun leur nouvelle situation — un fichier sans appelant est un fichier qu'on
+relit un jour sans savoir pourquoi.
+
+**Le vol de lectures repasse de neuf à sept.** `listRelatedProjects` en emportait **quatre** — les
+liens déduits ne sont rien de stocké (T6.4) — et `listDeclaredLinks` une cinquième. Cinq requêtes par
+affichage qu'un bloc invisible n'a aucune raison de payer. `listStarters` reste, elle : `starters`
+alimente aussi la résolution du panneau, et `?piste=` doit continuer d'ouvrir sur un projet peuplé —
+c'est le point d'entrée que la suite réemploiera.
+
+**La vérification, en quatre disciplines.**
+
+- **Le critère se lit dans le HTML servi**, avec son étape témoin : les sept projets vivants du
+  domaine et un projet archivé sans activité, mesurés **avant** le geste — tous à sept `<section>`,
+  `id="demarrage"` et `id="projets-lies"` présents. Après : le projet sans activité rend **six**
+  sections — `Roadmap · Démarrage · Budget · Journal` à gauche —, les projets peuplés en rendent
+  **cinq**, sans « Démarrage ». Aucun `id="projets-lies"` nulle part.
+- **Les deux nuances du critère, par sonde avec rétablissement.** Sur un projet portant une activité
+  *terminée* et une *annulée*, archiver la terminée laisse « Démarrage » **absent** — l'annulée
+  compte, arbitrage (1) mesuré ; archiver l'annulée à son tour le fait **revenir** — une activité
+  archivée ne compte pas. Base rétablie à l'identique, `archived_at` relu ligne à ligne.
+- **La règle se met en défaut**, faute de test à neutraliser : aucun test du dépôt ne rend cette
+  page. `hasActivity` forcé à `false` fait réapparaître **exactement** le bloc — un `<h2>`, un
+  `id="demarrage"`, quatre mentions d'outil, huit liens `piste=` — et rien d'autre ; `projets-lies`
+  reste à zéro, les deux gestes sont donc indépendants. Rétabli, le balisage est identique au
+  caractère près, scripts de développement Next exclus.
+- **Le contraste** n'a rien de neuf à mesurer, et c'est dit plutôt que sauté : aucune couleur n'est
+  ajoutée, aucun couple ne change de position, les blocs restants gardent leur fond.
+- **Le droit s'éprouve par l'action.** `?lien=nouveau` ouvre encore le panneau à Camille Roux et rend
+  la page nue à Sofia Marchand, non contributrice — **le masquage n'a rien protégé et ne le prétend
+  pas**. `?piste=` ouvre pour les deux (D9). `?lien=nouveau&piste=<id>` n'ouvre rien en 200 : le
+  décompte d'exclusivité **reste à neuf clés**, sans qu'un caractère change.
+
+**Le résultat.** `npm run lint` (`--max-warnings=0`), `npx tsc --noEmit`, `npm run build` et les
+**1 207 tests** passent. Aucune migration, aucune suppression, aucun test touché.

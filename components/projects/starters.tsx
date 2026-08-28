@@ -14,6 +14,15 @@
  * du domaine (arbitrage du 20/08/2026). Rien ici ne regarde le projet, donc
  * rien ne peut lui reprocher ce qu'il n'a pas fait.
  *
+ * **Le bloc ne se rend plus que sur un accompagnement sans activité**
+ * (28/08/2026, hors ticket et à la demande) : il dit ce qu'on **peut** faire, et
+ * la question ne se pose plus une fois l'accompagnement ouvert. **La condition
+ * vit dans la page, pas ici** — c'est ce qui permet à la phrase du dessus de
+ * rester vraie : le composant ne connaît toujours rien du projet, il ne sait
+ * même pas qu'il a une raison de disparaître. Ce qui s'efface est le bloc,
+ * jamais la piste : `?piste=<id>` ouvre encore son panneau, et c'est par là que
+ * le geste d'ajout d'une activité viendra le rouvrir.
+ *
  * **Le bloc se place avant « Ressources », et c'est un écart assumé.**
  * `docs/06` §5 donne une liste close de blocs de référence, ordonnée par
  * fréquence de consultation, où « Démarrage » ne figure pas. La roadmap garde

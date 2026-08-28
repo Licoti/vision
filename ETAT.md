@@ -2,7 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 28/08/2026, fin de T7.2. Dernier balayage : découpage de C7.
+**Dernière mise à jour :** 28/08/2026, après le masquage hors ticket de deux blocs de la page
+projet. Dernier balayage : découpage de C7. **Le fichier dépasse les 250 lignes de la règle 5** — le
+balayage appartient à la session de découpage de C8.
 **Chantier en cours :** **C7 — Finitions**, dix tickets, découpés dans `tickets-C7.md`. **Dernier
 chantier du POC** — `docs/05` §5 n'en a pas de huitième.
 **Ticket suivant :** **T7.3 — Administration : l'écran devient multi-référentiel, et les quatre
@@ -69,10 +71,11 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   dimensions de sa répartition : le filtre d'abord, le chiffre ensuite — l'ordre qu'imposait T6.7.
   **Contrat mesuré sur seize valeurs, dont sept à zéro** — suivre le lien rend le nombre annoncé.
   Ni migration ni journal ; 18 tests neufs, sept neutralisations.
-- **Reprise d'interface hors ticket — seize gestes, du 17 au 21/08/2026.** Menu « … » de la roadmap,
-  « Vision produit » et sa reprise `northstar-v2`, « Personae », « Use Cases », « Démarrage »
-  (migrations 0005 à 0008), page projet en `project-v2`, bouton à trois rangs, entités en
-  `/administration`, hiérarchie de la page produit.
+- **Reprise d'interface hors ticket — dix-sept gestes, du 17 au 28/08/2026.** Menu « … » de la
+  roadmap, « Vision produit » et sa reprise `northstar-v2`, « Personae », « Use Cases »,
+  « Démarrage » (migrations 0005 à 0008), page projet en `project-v2`, bouton à trois rangs, entités
+  en `/administration`, hiérarchie de la page produit — puis, le 28/08, **deux blocs de la page
+  projet qui s'effacent** : « Projets liés » entièrement, « Démarrage » dès la première activité.
 
 ---
 
@@ -112,7 +115,16 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   qui reste est un parcours clavier à faire. → **T7.7.**
 - **La barre d'ancres de la page projet n'est pas rendue.** `subnav.tsx` est sans appelant, ses `id`
   de section et son `scroll-mt-19` restent posés et inertes depuis le 20/08/2026, et la question de
-  l'entrée active — que seul le défilement désigne — se reposera telle quelle. → **T7.5.**
+  l'entrée active — que seul le défilement désigne — se reposera telle quelle. **Elle a désormais
+  deux cibles de moins** : `projets-lies` a disparu du rendu, `demarrage` n'y est que sur un projet
+  sans activité — une barre d'ancres se construit donc à partir de ce qui est rendu, jamais d'une
+  liste figée. → **T7.5.**
+- **Deux blocs de la page projet ont été masqués le 28/08/2026, hors ticket et à la demande.**
+  « Projets liés » n'est plus rendu — **écart à la liste close de `docs/06` §5**, cinq blocs
+  énumérés pour quatre rendus —, et « Démarrage » ne l'est que sur un accompagnement sans activité.
+  Rien n'est supprimé : composants, requêtes, panneaux `?lien=`/`?piste=` et actions restent entiers
+  et testés, et le premier revient d'une dizaine de lignes. Ce qui reste à faire est **le point
+  d'entrée annoncé de « Démarrage » — le geste d'ajout d'une activité**. → **C8.**
 - **La carte de la personne courante manque à la barre latérale.** Second bloc écarté par T1.6 ; le
   premier, l'entrée Administration, a été livré le 21/08/2026. → **T7.5.**
 - **Le contenu rédigé d'`/a-propos` reste à écrire.** La page a son en-tête et son état vide ; son

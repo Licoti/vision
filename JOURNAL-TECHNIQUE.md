@@ -7131,3 +7131,64 @@ du ticket (règle 3).
 Aucun ticket de C7 n'ouvre le périmètre de cet écran pour du contenu : T7.9, le seul qui traite des
 colonnes qu'aucun écran ne lit, **s'interdit nommément** de rouvrir T7.2, et T7.6 comme T7.7 sont
 des tickets de forme. Le point part donc en C8, avec sa raison.
+
+
+---
+
+## Deux blocs masqués sur la page projet — hors ticket, 28/08/2026
+
+**La demande.** « Projets liés » n'apporte pas de valeur au stade où le produit se démontre, et le
+bloc « Démarrage » n'a de raison d'être que sur un accompagnement qu'on ouvre : il dit ce qu'on
+**peut** faire, question qui ne se pose plus une fois la roadmap peuplée. Le second doit revenir plus
+tard **par le geste d'ajout d'une activité**, pas par un bloc permanent.
+
+**Deux arbitrages rendus avant écriture**, tous deux par l'humain le 28/08/2026.
+
+**(1) Le critère de « Démarrage » est « la roadmap est vide », sans exception d'état.** Une activité
+*annulée* ou *à planifier* compte comme une autre. C'était le point à trancher, et il se tranche par
+D39 : distinguer ce qui a « vraiment commencé » de ce qui est seulement prévu serait un jugement
+**calculé par Vision** sur l'avancement d'un accompagnement — exactement l'indice que la frontière du
+chiffre interdit. Le critère retenu ne juge rien, il constate une liste vide. Une activité
+**archivée** ne compte pas, et c'est la conséquence directe : elle a quitté la roadmap, le projet
+redevient un projet qu'on ouvre, et le bloc revient. Mesuré par sonde dans les deux sens.
+
+**(2) Le masquage de « Projets liés » retire le rendu et ses deux lectures, et rien d'autre.** Le
+composant reste sans appelant — la situation de `subnav.tsx` depuis le 21/08 —, `listRelatedProjects`
+et `listDeclaredLinks` restent entières et testées, le panneau `?lien=` reste résolu, les trois
+actions d'écriture gardent leurs portes. Le vol de lectures de la page **repasse de neuf à sept** :
+les liens déduits coûtaient **quatre requêtes** et les déclarés une cinquième, à chaque affichage,
+pour un bloc qu'on ne regarde pas. Retirer les appels sans toucher aux fonctions est ce qui rend le
+geste réversible en une dizaine de lignes.
+
+**L'écart documentaire, et il est franc.** `docs/06` §5 donne une **liste close** de cinq blocs de
+référence, ordonnée par fréquence de consultation. La page en rend quatre, et le cinquième —
+« Démarrage » — n'y figurait déjà pas, écart consigné le 20/08. Le tableau du document décrit
+désormais la page à deux corrections près. Aucune décision de `docs/07` n'est rouverte : D31 tient
+(la roadmap garde sa position dominante), D39 est ce qui **motive** l'arbitrage (1), et D28 laisse le
+budget à son rang — il suit maintenant la roadmap sans avoir changé de rang dans le document.
+
+**Le masquage n'est pas une protection, et c'est la ligne à ne pas franchir.** `?lien=nouveau` ouvre
+encore le panneau de déclaration à qui porte `canWrite` ; c'est `openLink` qui décide, comme avant.
+Mesuré sous deux identités : Camille Roux (responsable) obtient le dialogue, Sofia Marchand (membre
+du domaine, non contributrice de ce projet) obtient la page nue en 200. **Le rendu des deux blocs
+masqués est identique sous les deux identités** — ce n'est pas un droit, c'est une décision
+d'affichage, et les deux ne se confondent pas. `?piste=` ouvre pour les deux : une piste se lit par
+tout le domaine (D9), et c'est précisément le point d'entrée que la suite réemploiera.
+
+**Le décompte d'exclusivité reste à neuf clés**, sans qu'un caractère de sa logique change. `lien`
+reste dans `searchParams`, dans `keys`, dans `projectRequestFromParams` et dans
+`PROJECT_PANEL_PARAMS` : retirer la clé aurait fait tomber le compte à huit, cassé une phrase que
+l'en-tête de la page raconte depuis T4.4, et transformé un masquage réversible en modification de
+contrat d'URL. `?lien=nouveau&piste=<id>` n'ouvre rien et rend 200 — la règle unique tient.
+
+**La mise en défaut, faute de test à neutraliser.** Aucun test du dépôt ne rend cette page : le
+critère se lit dans le HTML servi, donc la neutralisation s'y lit aussi. `hasActivity` forcé à
+`false` fait **réapparaître exactement** le bloc « Démarrage » sur un projet peuplé — un `<h2>`, un
+`id="demarrage"`, quatre mentions d'outil, huit liens `piste=` — et rien d'autre ne bouge ;
+`projets-lies` reste à zéro, ce qui prouve que les deux gestes sont indépendants. Règle rétablie, le
+balisage servi est **identique au caractère près** au relevé d'avant la neutralisation, scripts de
+développement Next exclus (ils portent un identifiant de rendu par requête).
+
+**Une dette de forme reste, et elle a sa destination.** La barre d'ancres que T7.5 doit rendre a
+maintenant **deux cibles de moins**, dont une conditionnelle. Elle devra se construire à partir de ce
+que la page rend, jamais d'une liste figée — sans quoi elle pointera vers des sections absentes.
