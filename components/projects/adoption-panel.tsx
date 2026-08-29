@@ -39,9 +39,19 @@
  * quand le produit n'en porte aucun à adopter, le panneau le dit et renvoie vers
  * la page du produit, plutôt que d'offrir un `select` sans option.
  *
- * **Aucun cinquième chiffre**, et aucune comparaison entre les trois : la cible
- * est un repère, jamais un état (arbitrage (g), D39). Le panneau n'affiche ni
- * écart, ni progression, ni « cible atteinte ».
+ * **Aucune cible ici** (29/08/2026). Elle appartient à l'indicateur, donc au
+ * produit, et se saisit sur la page produit : un accompagnement qui adopte
+ * l'indicateur reprend cette cible-là. Deux champs pour une même valeur, c'était
+ * deux vérités qui divergeaient. `finalValue` part avec elle — ce qu'un
+ * indicateur vaut à la clôture se lit sur sa série de relevés, qui est datée.
+ *
+ * Retirer le champ **ne protège rien** : c'est `readAdoptionForm` qui nomme les
+ * champs un par un, et la colonne supprimée qui ferme la question. Le panneau ne
+ * fait que cesser de proposer ce que plus rien n'écrit.
+ *
+ * **Aucune comparaison entre les valeurs**, et aucun écart : la cible est un
+ * repère, jamais un état (arbitrage (g), D39). Le panneau n'affiche ni écart, ni
+ * progression, ni « cible atteinte ».
  */
 
 import Link from "next/link";
@@ -168,10 +178,12 @@ export function AdoptionPanel({
         )}
       </FormField>
 
-      {/* Les trois valeurs sont **facultatives**, et le disent : adopter
-          un indicateur sans fixer de cible est un geste normal. Elles sont
-          rangées dans l'ordre du temps — d'où l'on part, où l'on va, où
-          l'on est arrivé —, qui est aussi celui du bloc.
+      {/* La référence est **facultative**, et le dit : adopter un
+          indicateur sans rien renseigner d'autre est un geste normal. Elle
+          est seule depuis le 29/08/2026 — la cible et la valeur finale ont
+          quitté ce panneau —, et elle reste parce qu'elle est la seule des
+          trois à dire quelque chose que le produit ne dit pas : où en était
+          la mesure au démarrage de **cet** accompagnement.
 
           `type="text"` et non `type="number"` : le champ numérique refuse
           la virgule française selon la locale du navigateur, et ne rend
@@ -204,49 +216,6 @@ export function AdoptionPanel({
         />
       </FormField>
 
-      <FormField
-        label="Cible"
-        htmlFor="adoption-cible"
-        note="Facultative. La valeur visée — un repère, que Vision n'évalue jamais."
-        error={errors.targetValue}
-        errorId="adoption-cible-erreur"
-      >
-        <input
-          id="adoption-cible"
-          name="targetValue"
-          type="text"
-          inputMode="decimal"
-          defaultValue={values.targetValue}
-          autoComplete="off"
-          aria-invalid={errors.targetValue ? true : undefined}
-          aria-describedby={
-            errors.targetValue ? "adoption-cible-erreur" : undefined
-          }
-          className={`${CONTROL} ${borderOf(errors.targetValue)}`}
-        />
-      </FormField>
-
-      <FormField
-        label="Valeur finale"
-        htmlFor="adoption-finale"
-        note="Facultative. La valeur constatée à la clôture, si elle est connue."
-        error={errors.finalValue}
-        errorId="adoption-finale-erreur"
-      >
-        <input
-          id="adoption-finale"
-          name="finalValue"
-          type="text"
-          inputMode="decimal"
-          defaultValue={values.finalValue}
-          autoComplete="off"
-          aria-invalid={errors.finalValue ? true : undefined}
-          aria-describedby={
-            errors.finalValue ? "adoption-finale-erreur" : undefined
-          }
-          className={`${CONTROL} ${borderOf(errors.finalValue)}`}
-        />
-      </FormField>
     </Panel>
   );
 }

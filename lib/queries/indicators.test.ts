@@ -133,6 +133,8 @@ async function seedDomain(label: string): Promise<Fixture> {
     unit?: string | null;
     direction?: "higher_is_better" | "lower_is_better";
     source?: string | null;
+    /* **La cible vit ici depuis le 29/08/2026, et nulle part ailleurs.** */
+    targetValue?: string | null;
   }) =>
     scope.insert(indicators, {
       productId: values.productId,
@@ -140,6 +142,7 @@ async function seedDomain(label: string): Promise<Fixture> {
       unit: values.unit ?? null,
       direction: values.direction ?? "higher_is_better",
       source: values.source ?? null,
+      targetValue: values.targetValue ?? null,
     });
 
   const reading = async (values: {
@@ -160,6 +163,9 @@ async function seedDomain(label: string): Promise<Fixture> {
     unit: "%",
     direction: "higher_is_better",
     source: "Portail analytics",
+    /* La cible du brief §7 — **portée par l'indicateur**. C'est elle que
+       lisent toutes ses adoptions, et elle seule. */
+    targetValue: "85",
   });
 
   /* Les trois relevés du brief §7, écrits **du plus récent au plus ancien** :
@@ -235,10 +241,15 @@ async function seedDomain(label: string): Promise<Fixture> {
   const loose = await project("Sans adoption", full.id);
   const otherProject = await project("Voisin", other.id);
 
-  /* « Autonomie » porte les trois valeurs, « Doublon » n'en porte aucune : les
-     colonnes sont toutes nullables (`docs/04` §3), et l'écran doit rendre les
-     deux cas. Elles sont écrites **dans le désordre alphabétique**, comme les
-     indicateurs : c'est la requête qui trie. */
+  /* « Autonomie » porte une référence, « Doublon » n'en porte aucune : la
+     colonne est nullable, et l'écran doit rendre les deux cas. Elles sont
+     écrites **dans le désordre alphabétique**, comme les indicateurs : c'est
+     la requête qui trie.
+
+     **Aucune ne porte de cible** — elles ne le peuvent plus depuis le
+     29/08/2026, la colonne ayant été supprimée. « Autonomie » en a une, mais
+     c'est celle de l'indicateur, et « Doublon » n'en a aucune : les deux cas
+     restent couverts, à un étage au-dessus. */
   await scope.insert(projectIndicators, {
     projectId: adopter.id,
     indicatorId: tie.id,
@@ -248,8 +259,6 @@ async function seedDomain(label: string): Promise<Fixture> {
     projectId: adopter.id,
     indicatorId: autonomy.id,
     baselineValue: "54",
-    targetValue: "85",
-    finalValue: "71",
   });
 
   /* L'adoption d'un indicateur **archivé**. Elle n'est plus atteignable par
@@ -259,7 +268,6 @@ async function seedDomain(label: string): Promise<Fixture> {
   const archivedAdoption = await scope.insert(projectIndicators, {
     projectId: adopter.id,
     indicatorId: archived.id,
-    targetValue: "100",
   });
 
   /* L'adoption du **voisin**, sur son propre indicateur : elle ne doit déborder
@@ -741,34 +749,69 @@ describe("listProjectAdoptions", () => {
     expect(rows.map((row) => row.label)).toEqual(["Autonomie a", "Doublon a"]);
   });
 
-  test("une adoption rend ses trois valeurs, le libellé et le dernier relevé", async () => {
+  test("une adoption rend sa référence, le libellé et le dernier relevé", async () => {
     const rows = await listProjectAdoptions(a.scope, a.adopterId);
     const autonomy = rows.find((row) => row.id === a.autonomyAdoptionId);
 
     expect(autonomy).toMatchObject({
       indicatorId: a.autonomyId,
       label: "Autonomie a",
-      // L'unité vient de l'indicateur : les quatre chiffres la partagent.
+      // L'unité vient de l'indicateur : les trois chiffres la partagent.
       unit: "%",
       baselineValue: "54.0000",
-      targetValue: "85.0000",
-      finalValue: "71.0000",
       lastValue: "71.0000",
       lastReadOn: "2026-06-01",
     });
   });
 
-  test("les trois valeurs sont nulles quand rien n'est saisi", async () => {
-    /* Les colonnes sont nullables (`docs/04` §3) : une adoption qui ne fixe
-       aucune cible est une adoption normale, et l'écran le dit plutôt que de
-       poser un zéro. */
+  test("l'adoption rend la cible du produit, jamais une cible à elle", async () => {
+    /* **La propriété du 29/08/2026, et celle que la mise en défaut vise.**
+       `project_indicators` ne porte plus de cible : `productTargetValue` est
+       lue sur l'indicateur, par la jointure qui portait déjà le libellé et
+       l'unité. Aucune adoption de la fixture n'a jamais écrit « 85 » — cette
+       valeur ne peut venir que d'`indicators.target_value`. */
+    const rows = await listProjectAdoptions(a.scope, a.adopterId);
+    const autonomy = rows.find((row) => row.id === a.autonomyAdoptionId);
+
+    expect(autonomy?.productTargetValue).toBe("85.0000");
+  });
+
+  test("deux accompagnements qui adoptent le même indicateur lisent la même cible", async () => {
+    /* **La divergence rendue impossible.** C'est le geste que le second lieu
+       de vérité autorisait : deux adoptions, deux cibles, et deux écrans qui
+       ne disaient pas la même chose. L'écriture est faite ici et défaite en
+       `finally` — la fixture est partagée, et un décompte d'adoptions qui
+       changerait ferait tomber les tests de T5.4 sans qu'ils soient en cause. */
+    const second = await a.scope.insert(projectIndicators, {
+      projectId: a.looseId,
+      indicatorId: a.autonomyId,
+    });
+
+    try {
+      const here = await listProjectAdoptions(a.scope, a.adopterId);
+      const there = await listProjectAdoptions(a.scope, a.looseId);
+
+      const mine = here.find((row) => row.id === a.autonomyAdoptionId);
+      const theirs = there.find((row) => row.id === second.id);
+
+      expect(mine?.productTargetValue).toBe("85.0000");
+      expect(theirs?.productTargetValue).toBe(mine?.productTargetValue);
+    } finally {
+      await a.scope.unlink(projectIndicators, second.id);
+    }
+  });
+
+  test("la référence est nulle quand rien n'est saisi", async () => {
+    /* La colonne est nullable : une adoption qui ne pose aucune référence est
+       une adoption normale, et l'écran le dit plutôt que de poser un zéro.
+       « Doublon » n'a pas non plus de cible — celle de son indicateur est
+       nulle, et c'est ce que la lecture rend. */
     const rows = await listProjectAdoptions(a.scope, a.adopterId);
     const tie = rows.find((row) => row.indicatorId === a.tieId);
 
     expect(tie).toMatchObject({
       baselineValue: null,
-      targetValue: null,
-      finalValue: null,
+      productTargetValue: null,
     });
   });
 
@@ -931,7 +974,7 @@ describe("listAdoptableIndicators", () => {
    ========================================================================== */
 
 describe("listProductAdoptions", () => {
-  test("une cible se lit avec l'accompagnement qui la porte", async () => {
+  test("une adoption se lit avec l'accompagnement qui la porte", async () => {
     const rows = await listProductAdoptions(a.scope, a.fullId);
     const autonomy = rows.find((row) => row.indicatorId === a.autonomyId);
 
@@ -939,37 +982,39 @@ describe("listProductAdoptions", () => {
       projectId: a.adopterId,
       projectName: "Adoptant a",
       // `numeric(18,4)` revient en chaîne : la mise en forme est à l'écran.
-      targetValue: "85.0000",
+      baselineValue: "54.0000",
     });
   });
 
-  test("une adoption sans cible se lit quand même, cible à `null`", async () => {
+  test("une adoption nue se lit quand même", async () => {
     /* **C'est ce qui change avec `listProductTargets`**, qui filtrait sur
-       `isNotNull(targetValue)`. Le bloc fusionné nomme sous chaque indicateur
-       les accompagnements qui l'ont adopté, cible ou non : une adoption sans
-       cible n'a pas de repère à tracer, mais elle a un nom à écrire. */
+       `isNotNull(targetValue)`. Le bloc nomme sous chaque indicateur les
+       accompagnements qui l'ont adopté : une adoption nue n'a rien à
+       reporter, mais elle a un nom à écrire. */
     const rows = await listProductAdoptions(a.scope, a.fullId);
     const tie = rows.find((row) => row.indicatorId === a.tieId);
 
     expect(tie).toBeDefined();
-    expect(tie?.targetValue).toBeNull();
+    expect(tie?.baselineValue).toBeNull();
   });
 
-  test("la référence et la valeur finale sont rendues avec la cible", async () => {
-    /* Les trois colonnes de l'adoption voyagent ensemble : elles sont posées
-       côte à côte à l'écran, jamais soustraites l'une de l'autre. */
+  test("la lecture ne porte plus de cible", async () => {
+    /* **Le pendant de la suppression du 29/08/2026.** La cible du produit se
+       lit sur `listProductIndicators`, jamais ici : deux chemins vers la même
+       valeur, c'est le second lieu de vérité qui revient par la fenêtre. */
     const rows = await listProductAdoptions(a.scope, a.fullId);
     const autonomy = rows.find((row) => row.indicatorId === a.autonomyId);
 
-    expect(autonomy).toHaveProperty("baselineValue");
-    expect(autonomy).toHaveProperty("finalValue");
+    expect(autonomy).toBeDefined();
+    expect(autonomy).not.toHaveProperty("targetValue");
+    expect(autonomy).not.toHaveProperty("finalValue");
   });
 
-  test("la cible d'un accompagnement archivé n'est pas rendue", async () => {
+  test("l'adoption d'un accompagnement archivé n'est pas rendue", async () => {
     /* **Le test qui isole `isNull(projects.archivedAt)`.** La frise écarte déjà
-       les accompagnements rangés de ses bandes et de ses repères : une cible
-       qui survivrait serait un repère orphelin sur un axe qui ne porte plus
-       l'accompagnement qui se l'était donnée. */
+       les accompagnements rangés de ses bandes et de ses repères : une adoption
+       qui survivrait serait un nom orphelin sur un axe qui ne porte plus
+       l'accompagnement qui l'avait déclarée. */
     const archivedProject = await a.scope.insert(projects, {
       name: `Range ${suffix}`,
       productId: a.fullId,
@@ -978,14 +1023,14 @@ describe("listProductAdoptions", () => {
     const adoption = await a.scope.insert(projectIndicators, {
       projectId: archivedProject.id,
       indicatorId: a.autonomyId,
-      targetValue: "90",
+      baselineValue: "90",
     });
     await a.scope.archive(projects, archivedProject.id);
 
     try {
       const rows = await listProductAdoptions(a.scope, a.fullId);
 
-      expect(rows.map((row) => row.targetValue)).not.toContain("90.0000");
+      expect(rows.map((row) => row.baselineValue)).not.toContain("90.0000");
       expect(rows.map((row) => row.projectId)).not.toContain(
         archivedProject.id,
       );
@@ -994,10 +1039,10 @@ describe("listProductAdoptions", () => {
     }
   });
 
-  test("la cible d'un indicateur archivé se lit encore, et l'écran l'ignore", async () => {
+  test("l'adoption d'un indicateur archivé se lit encore, et l'écran l'ignore", async () => {
     /* La lecture ne joint pas `indicators`, et c'est délibéré : le composant
-       range chaque cible sous la bande de son indicateur, et un indicateur
-       archivé n'a **aucune bande** — la cible n'a nulle part où se poser. Une
+       range chaque adoption sous la bande de son indicateur, et un indicateur
+       archivé n'a **aucune bande** — elle n'a nulle part où se poser. Une
        seconde jointure ne changerait rien à l'écran et coûterait une table de
        plus à filtrer. Le test dit ce que la lecture rend vraiment, plutôt que
        de laisser croire à un filtre qui n'existe pas. */
@@ -1012,7 +1057,7 @@ describe("listProductAdoptions", () => {
     const full = await listProductAdoptions(a.scope, a.fullId);
     const neighbour = await listProductAdoptions(a.scope, a.otherId);
 
-    /* Le voisin adopte son indicateur **sans cible** : là où
+    /* Le voisin adopte son indicateur **sans rien renseigner** : là où
        `listProductTargets` ne rendait rien, cette lecture rend l'adoption. */
     expect(neighbour.map((row) => row.indicatorId)).toEqual([
       a.otherIndicatorId,
@@ -1026,15 +1071,15 @@ describe("listProductAdoptions", () => {
     expect(await listProductAdoptions(a.scope, a.emptyId)).toEqual([]);
   });
 
-  test("les cibles d'un produit d'un autre domaine ne se lisent pas", async () => {
+  test("les adoptions d'un produit d'un autre domaine ne se lisent pas", async () => {
     /* L'étanchéité par l'adoption : les identifiants sont réels, les lectures
        sont faites sous l'autre domaine. Sans `filter(projectIndicators)`, la
-       cible de 85 du domaine voisin se lirait ici. */
+       référence de 54 du domaine voisin se lirait ici. */
     expect(await listProductAdoptions(a.scope, b.fullId)).toEqual([]);
     expect(await listProductAdoptions(b.scope, a.fullId)).toEqual([]);
   });
 
-  test("une cible portée par un accompagnement d'un autre domaine ne se lit pas", async () => {
+  test("une adoption portée par un accompagnement d'un autre domaine ne se lit pas", async () => {
     /* **Le test qui isole `filter(projects)`**, et il a dû être écrit : le
        premier jet — les deux lectures croisées ci-dessus — restait vert au
        retrait du filtre, l'adoption du domaine `a` ne pointant jamais, en
@@ -1044,15 +1089,15 @@ describe("listProductAdoptions", () => {
        domaine se rattrapent ».
 
        La ligne forgée est la seule qui puisse encore l'éprouver : une adoption
-       du domaine `a`, portant une cible, sur un accompagnement du domaine `b`.
-       Aucune écriture de l'application ne la produit — la couche scopée la
+       du domaine `a`, portant une référence, sur un accompagnement du domaine
+       `b`. Aucune écriture de l'application ne la produit — la couche scopée la
        refuserait. Sans `filter(projects)`, elle sortirait de la lecture faite
        sous `a` sur le produit voisin. */
     await db.insert(projectIndicators).values({
       domainId: a.domainId,
       projectId: b.looseId,
       indicatorId: b.autonomyId,
-      targetValue: "77",
+      baselineValue: "77",
     });
 
     expect(await listProductAdoptions(a.scope, b.fullId)).toEqual([]);
@@ -1073,11 +1118,14 @@ describe("listProductAdoptions", () => {
 
 describe("la North Star — le drapeau et son unicité", () => {
   test("la lecture rend le drapeau et la cible du produit", async () => {
+    /* **Seul le drapeau se défait en `finally`.** La cible, elle, appartient
+       désormais à la fixture — « Autonomie » la porte depuis le 29/08/2026, et
+       les adoptions la lisent. La remettre à `null` ici viderait la propriété
+       que `listProjectAdoptions` éprouve deux `describe` plus haut, selon
+       l'ordre d'exécution : un test qui range mal ce qu'il a dérangé est un
+       test qui en casse un autre à distance. */
     try {
-      await a.scope.update(indicators, a.autonomyId, {
-        isNorthStar: true,
-        targetValue: "85",
-      });
+      await a.scope.update(indicators, a.autonomyId, { isNorthStar: true });
 
       const rows = await listProductIndicators(a.scope, a.fullId);
       const autonomy = rows.find((row) => row.id === a.autonomyId);
@@ -1086,10 +1134,7 @@ describe("la North Star — le drapeau et son unicité", () => {
       // `numeric(18,4)` revient en chaîne : la mise en forme est à l'écran.
       expect(autonomy?.targetValue).toBe("85.0000");
     } finally {
-      await a.scope.update(indicators, a.autonomyId, {
-        isNorthStar: false,
-        targetValue: null,
-      });
+      await a.scope.update(indicators, a.autonomyId, { isNorthStar: false });
     }
   });
 

@@ -477,7 +477,6 @@ export function Indicators({
             <NorthStar
               indicator={northStar}
               series={series.get(northStar.id) ?? []}
-              adoptions={adopted.get(northStar.id) ?? []}
             />
           </div>
         ) : (
@@ -579,12 +578,10 @@ export function Indicators({
 function NorthStar({
   indicator,
   series,
-  adoptions,
 }: {
   indicator: ProductIndicator;
   /** Du plus récent au plus ancien — l'ordre de la lecture. */
   series: ProductReading[];
-  adoptions: ProductAdoption[];
 }) {
   /* La courbe se lit du plus ancien au plus récent, l'inverse de la série
      écrite. **Une copie est inversée**, jamais le tableau du groupement : il est
@@ -594,12 +591,11 @@ function NorthStar({
 
   /* **Une seule échelle pour la jauge et la courbe** : la jauge est la
      projection du dernier point sur l'axe du tracé. */
+  /* **Les cibles d'adoption ne rentrent plus dans l'échelle** (29/08/2026) :
+     il n'y en a plus. La seule cible est celle de l'indicateur, et c'est la
+     seule valeur hors série que l'axe doit contenir. */
   const scale = axisScale(
-    [
-      ...ordered.map((reading) => reading.value),
-      ...adoptions.map((adoption) => adoption.targetValue),
-      indicator.targetValue,
-    ],
+    [...ordered.map((reading) => reading.value), indicator.targetValue],
     indicator.unit,
   );
 
@@ -672,7 +668,6 @@ function NorthStar({
           unit={indicator.unit}
           series={ordered}
           productTarget={indicator.targetValue}
-          adoptions={adoptions}
           gap={gap}
         />
       ) : null}
@@ -763,15 +758,17 @@ function Curve({
   unit,
   series,
   productTarget,
-  adoptions,
   gap,
 }: {
   scale: ValueScale;
   unit: string | null;
   /** Du plus ancien au plus récent. Au moins un élément. */
   series: readonly ProductReading[];
+  /**
+   * La cible de l'indicateur — **la seule**. Le tracé n'a donc qu'un trait
+   * tireté à poser, là où il en posait un par adoption jusqu'au 29/08/2026.
+   */
   productTarget: string | null;
-  adoptions: readonly ProductAdoption[];
   /**
    * L'écart du dernier relevé à la cible du produit, **déjà calculé** par
    * `NorthStar`. ⚠ C'est l'indice que D39 interdit — voir l'en-tête.
@@ -812,21 +809,6 @@ function Curve({
           label: `+${formatResultValue(String(gap.distance), unit)}`,
         }
       : null;
-
-  /* Les cibles d'adoption qui **ajoutent quelque chose** : ni celle du produit
-     répétée, ni deux fois la même. `valueOffset` sert de clé plutôt que la
-     chaîne brute — « 85 » et « 85.0000 » sont la même cible, et se
-     superposeraient au pixel près. */
-  const seen = new Set(
-    productTarget === null ? [] : [valueOffset(scale, productTarget)],
-  );
-  const distinctTargets = adoptions.flatMap((adoption) => {
-    if (adoption.targetValue === null) return [];
-    const at = valueOffset(scale, adoption.targetValue);
-    if (seen.has(at)) return [];
-    seen.add(at);
-    return [{ projectId: adoption.projectId, value: adoption.targetValue }];
-  });
 
   return (
     <div>
@@ -873,28 +855,6 @@ function Curve({
               </span>
             </>
           ) : null}
-
-          {/* Les cibles d'accompagnement, **dédoublonnées de celle du produit**
-              (correctif du 17/08/2026) : quand un accompagnement s'est donné la
-              même cible que le produit — le cas courant —, son trait se
-              superposait exactement à celui du produit et son libellé
-              s'affichait par-dessus. Deux fois « Cible 85 % » au même endroit.
-              `distinctTargets` ne garde que les valeurs qui disent autre chose.
-
-              Même rouge que la cible du produit : ce sont des cibles, et la
-              couleur les dit. C'est le libellé ★ du produit qui distingue
-              l'objectif global, pas une seconde teinte. */}
-          {distinctTargets.map((target) => (
-            <div
-              key={target.projectId}
-              className="absolute inset-x-0 border-t border-dashed border-content-warning-darker"
-              style={{ top: `${topOf(target.value)}%` }}
-            >
-              <span className="absolute left-0.5 -translate-y-1/2 bg-surface-neutral-pale px-1.5 text-2xs font-semibold text-content-warning-darker">
-                Cible {formatResultValue(target.value, unit)}
-              </span>
-            </div>
-          ))}
 
           {/* **La gouttière de droite se resserre** (18/08/2026). Elle valait 96
               pixels depuis le 17/08 pour protéger le libellé de cible, qui

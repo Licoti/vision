@@ -86,12 +86,9 @@ export type ProductIndicator = {
    */
   isNorthStar: boolean;
   /**
-   * La cible **du produit** sur cet indicateur, brute — « 85.0000 ».
-   *
-   * **Ce n'est pas la cible d'une adoption.** Celle-ci vit sur
-   * `project_indicators` et dit ce qu'un accompagnement s'est fixé ; celle-là
-   * dit l'objectif global du produit. Les deux se lisent côte à côte dans le
-   * bloc, nommées distinctement.
+   * La cible de cet indicateur, brute — « 85.0000 ». **Et la seule** : depuis le
+   * 29/08/2026, `project_indicators` n'en porte plus. Un accompagnement qui
+   * adopte l'indicateur reprend celle-ci, il ne s'en donne pas une autre.
    */
   targetValue: string | null;
 };
@@ -555,10 +552,17 @@ export type ProjectAdoption = {
    * un `select` existant, pas une requête de plus.
    */
   isNorthStar: boolean;
-  /** Brutes — « 85.0000 ». La mise en forme appartient à l'écran. */
+  /** Brute — « 54.0000 ». La mise en forme appartient à l'écran. */
   baselineValue: string | null;
-  targetValue: string | null;
-  finalValue: string | null;
+  /**
+   * La cible **de l'indicateur**, et non de l'adoption — celle-ci n'en porte
+   * plus depuis le 29/08/2026. Le nom le dit : l'écran la sert en lecture, le
+   * panneau d'adoption ne l'écrit pas, et elle se corrige sur la page produit.
+   *
+   * Deux accompagnements qui adoptent le même indicateur lisent donc la même
+   * valeur, ce qui est toute la propriété qu'on cherchait.
+   */
+  productTargetValue: string | null;
   /** La valeur du dernier relevé vivant, ou `null` : l'écran le dit. */
   lastValue: string | null;
   /** « YYYY-MM-DD », et jamais posée à aujourd'hui (`docs/03` §7). */
@@ -583,8 +587,8 @@ export type ProjectAdoption = {
  * antérieures, et la cohérence entre les deux écrans prime.
  *
  * Le groupement se fait sur les deux clés primaires : celle de l'adoption pour
- * ses trois valeurs, celle de l'indicateur pour son libellé et son unité — la
- * dépendance fonctionnelle ne traverse pas une jointure.
+ * sa référence, celle de l'indicateur pour son libellé, son unité et sa cible —
+ * la dépendance fonctionnelle ne traverse pas une jointure.
  *
  * Un accompagnement sans adoption rend un tableau vide : l'état vide appartient
  * à l'écran (règle 5).
@@ -602,8 +606,11 @@ export function listProjectAdoptions(
         unit: indicators.unit,
         isNorthStar: indicators.isNorthStar,
         baselineValue: projectIndicators.baselineValue,
-        targetValue: projectIndicators.targetValue,
-        finalValue: projectIndicators.finalValue,
+        /* **La cible vient de la table jointe**, et c'est tout le changement du
+           29/08/2026 : une ligne de `select` qui change de table, aucune requête
+           de plus. L'`innerJoin` ci-dessous portait déjà le libellé, l'unité et
+           le drapeau North Star. */
+        productTargetValue: indicators.targetValue,
         lastValue: sql<string | null>`(array_agg(${indicatorReadings.value} order by ${indicatorReadings.readOn} desc, ${indicatorReadings.id} desc))[1]`,
         lastReadOn: sql<string | null>`(array_agg(${indicatorReadings.readOn} order by ${indicatorReadings.readOn} desc, ${indicatorReadings.id} desc))[1]`,
       })
@@ -709,23 +716,21 @@ export function listAdoptableIndicators(
 /* ==========================================================================
    Les adoptions d'un produit — T5.6, élargi hors ticket le 17/08/2026
 
-   Ce qu'un accompagnement s'est donné sur un indicateur du produit : sa
-   référence, sa cible, sa valeur finale. Une même mesure peut en porter deux si
+   Quels accompagnements ont repris à leur compte chaque indicateur du produit,
+   et avec quelle valeur de référence. Une même mesure peut en porter deux si
    deux accompagnements l'ont adoptée.
 
    **Cette lecture remplace `listProductTargets`**, qui ne rendait que les
    adoptions porteuses d'une cible. Le bloc fusionné a besoin des autres : il
-   écrit sous chaque indicateur les accompagnements qui l'ont adopté, cible ou
-   non. Une lecture qui filtrait pour un seul usage en servait un ; celle-ci en
-   sert deux sans coûter davantage — le `where` tombe, rien d'autre ne change.
+   écrit sous chaque indicateur les accompagnements qui l'ont adopté, et c'est
+   désormais tout ce qu'il en tire.
 
-   **La cible d'adoption n'est pas la cible du produit.** Depuis le 17/08/2026,
-   `indicators.target_value` porte l'objectif global du produit ; celle-ci reste
-   ce qu'un accompagnement donné s'est fixé (`docs/02` §4). Les deux se lisent
-   côte à côte et l'écran les nomme distinctement.
+   **Elle ne porte plus de cible** (29/08/2026). Il n'y en a qu'une, sur
+   l'indicateur, et la courbe n'a donc plus qu'un trait à tracer — le
+   dédoublonnage que le 17/08/2026 avait dû ajouter n'a plus d'objet.
    ========================================================================== */
 
-/** Ce qu'un accompagnement s'est donné sur un indicateur du produit. */
+/** Quel accompagnement a adopté quel indicateur du produit. */
 export type ProductAdoption = {
   /** L'indicateur visé — la clé du regroupement par indicateur. */
   indicatorId: string;
@@ -735,10 +740,8 @@ export type ProductAdoption = {
    * lui, rien ne dirait laquelle vient d'où.
    */
   projectName: string;
-  /** Brutes — « 85.0000 ». La mise en forme appartient à l'écran. */
+  /** Brute — « 54.0000 ». La mise en forme appartient à l'écran. */
   baselineValue: string | null;
-  targetValue: string | null;
-  finalValue: string | null;
 };
 
 /**
@@ -752,7 +755,7 @@ export type ProductAdoption = {
  * rattachement au produit, le nom de l'accompagnement, et son archivage. **Les
  * accompagnements archivés sont écartés parce que la roadmap les écarte déjà** —
  * `listProductProjects` pour les barres, `listProductMilestones` pour les
- * repères : une cible sans accompagnement sous lequel se lire serait un repère
+ * repères : une adoption sans accompagnement sous lequel se lire serait un nom
  * orphelin.
  *
  * **Aucune jointure sur `indicators`**, et c'est délibéré : le composant range
@@ -775,8 +778,6 @@ export function listProductAdoptions(
         projectId: projects.id,
         projectName: projects.name,
         baselineValue: projectIndicators.baselineValue,
-        targetValue: projectIndicators.targetValue,
-        finalValue: projectIndicators.finalValue,
       })
       .from(projectIndicators)
       .innerJoin(

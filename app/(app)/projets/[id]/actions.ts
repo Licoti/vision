@@ -1666,6 +1666,14 @@ export async function archiveResult(
    adoption est une **liaison**, `project_indicators` ne porte pas
    `archived_at`, et `LinkTable` l'impose à la compilation. Rien de la mémoire du
    centre ne s'y perd — les relevés vivent sur l'indicateur, pas sur l'adoption.
+
+   **Ce que ces trois gestes écrivent a rétréci le 29/08/2026** : la cible et la
+   valeur finale ont quitté `project_indicators`. La cible appartient à
+   l'indicateur, donc au produit, et se corrige sur la page du produit — un
+   accompagnement qui adopte l'indicateur reprend celle-là, il ne s'en donne pas
+   une autre. Aucune de ces actions n'a eu à changer pour autant : elles écrivent
+   l'`AdoptionRowInput` que `lib/forms/adoption.ts` leur rend, jamais un
+   `FormData` étalé, et c'est ce qui a fait tenir la frontière toute seule.
    ========================================================================== */
 
 /**
@@ -1893,7 +1901,8 @@ export async function createAdoption(
  * **L'indicateur peut changer** : corriger une adoption, c'est aussi s'être
  * trompé d'indicateur. Les trois contrôles valent alors comme à la création —
  * appartenance au produit, archivage, unicité —, l'adoption éditée exceptée
- * d'elle-même.
+ * d'elle-même. Changer d'indicateur change donc aussi la cible affichée : elle
+ * suit l'indicateur, elle n'est pas une valeur de cette ligne.
  */
 export async function updateAdoption(
   projectId: string,

@@ -27,12 +27,17 @@
  * dans `JOURNAL-TECHNIQUE.md`.
  *
  * **C'est la table qui relie l'accompagnement à son effet supposé, et elle ne
- * calcule rien** (`docs/04` §3). Quatre valeurs **reportées** — la référence, la
- * cible, la dernière valeur datée, la valeur finale — et jamais un cinquième
+ * calcule rien** (`docs/04` §3). Trois valeurs **reportées** — la cible du
+ * produit, la référence, la dernière valeur datée — et jamais un quatrième
  * chiffre : ni écart à la cible, ni pourcentage de progression, ni barre de
- * remplissage, ni badge « cible atteinte ». **Les quatre survivent au changement
- * de dessin** : la maquette n'en montre que deux, et les deux autres se
- * seraient perdues sans qu'aucun écran les reprenne.
+ * remplissage, ni badge « cible atteinte ».
+ *
+ * **La cible vient du produit, et se lit seulement ici** (29/08/2026). Elle
+ * n'appartient plus à l'adoption : `project_indicators.target_value` et
+ * `final_value` ont été supprimées, et la cible de l'indicateur les remplace,
+ * une pour toutes les adoptions. C'est ce qui rend impossible la divergence
+ * qu'on lisait auparavant entre l'objectif du produit et celui d'un
+ * accompagnement.
  *
  * Rien n'est tiré de `direction` non plus : le sens de lecture d'une courbe
  * n'est pas un jugement porté sur une valeur, et cette lecture ne le remonte
@@ -148,8 +153,8 @@ export function AdoptedIndicators({
  *
  * La North Star porte la surface bleue, le surtitre `★ NORTH STAR` et la grande
  * valeur ; les autres portent le filet neutre, l'étiquette « Complémentaire » et
- * une valeur d'un rang au-dessous. Tout le reste — la cible, les deux valeurs
- * reportées, les deux gestes — est **commun**, et c'est délibéré : deux
+ * une valeur d'un rang au-dessous. Tout le reste — la cible du produit, la
+ * référence, les deux gestes — est **commun**, et c'est délibéré : deux
  * composants auraient divergé à la première correction, ce que TD.1 a mesuré
  * quatre fois.
  *
@@ -204,15 +209,22 @@ function AdoptionCard({
           La date se lit **au mois** (D13), et un indicateur sans relevé le dit :
           il n'est **jamais posé à aujourd'hui** (`docs/03` §7).
 
-          **La cible, la référence et la valeur finale tiennent désormais la
-          même rangée que lui** (28/08/2026) : elles s'empilaient sur trois
-          niveaux parce que le bloc vivait dans un rail de 380 px, et le bloc a
-          quitté le rail. Les quatre nombres se lisent d'un seul balayage.
+          **La cible et la référence tiennent la même rangée que lui**
+          (28/08/2026) : elles s'empilaient sur trois niveaux parce que le bloc
+          vivait dans un rail de 380 px, et le bloc a quitté le rail. Les trois
+          nombres se lisent d'un seul balayage.
+
+          **Trois nombres et non plus quatre** (29/08/2026) : « Valeur finale »
+          a disparu, et « Cible » est devenue « Cible du produit ». Ce n'est pas
+          un raccourci de mise en page — c'est que la cible n'appartient plus à
+          l'adoption. Elle est **en lecture seule ici** et se corrige sur la page
+          du produit ; l'étiquette dit d'où elle vient, faute de quoi on la
+          croirait modifiable depuis « Modifier ».
 
           **La cible reste un repère, et rien de plus** : un nombre écrit à côté
           d'un autre, sans barre qui les rapporte l'un à l'autre ni phrase qui
-          dise ce qu'il en manque (D39). La mettre en `Field` comme ses deux
-          voisines lui retire même le `ml-auto` qui l'appariait au relevé.
+          dise ce qu'il en manque (D39). La mettre en `Field` comme sa voisine
+          lui retire même le `ml-auto` qui l'appariait au relevé.
 
           `Field` est repris tel quel — mêmes jetons, mêmes balises —, la rangée
           seule est écrite ici : le filet supérieur de `FieldRow` appartenait à
@@ -223,22 +235,22 @@ function AdoptionCard({
         </p>
 
         <dl className="flex flex-wrap items-end gap-x-8 gap-y-4">
-          {/* **La cible passe par `Reported`, comme ses deux voisines**
+          {/* **La cible passe par `Reported`, comme sa voisine**
               (28/08/2026). Elle écrivait sa propre absence — « Pas de cible
               définie » —, ce qui était juste tant qu'elle vivait hors d'un
-              couple nom/valeur ; sous une étiquette « Cible », la phrase se
-              redisait elle-même. Et `Reported` documente précisément ce cas :
-              *adopter un indicateur sans fixer de cible est un geste normal.*
-              Un mot pour les trois absences, et une seule règle de mise en
-              forme du chiffre. */}
-          <Field label="Cible">
-            <Reported value={adoption.targetValue} unit={adoption.unit} />
+              couple nom/valeur ; sous une étiquette, la phrase se redisait
+              elle-même. Et `Reported` documente précisément ce cas : un produit
+              qui n'a pas posé de cible est un état normal, pas un manque. Un
+              mot pour les deux absences, et une seule règle de mise en forme du
+              chiffre. */}
+          <Field label="Cible du produit">
+            <Reported
+              value={adoption.productTargetValue}
+              unit={adoption.unit}
+            />
           </Field>
           <Field label="Référence">
             <Reported value={adoption.baselineValue} unit={adoption.unit} />
-          </Field>
-          <Field label="Valeur finale">
-            <Reported value={adoption.finalValue} unit={adoption.unit} />
           </Field>
         </dl>
 
@@ -294,8 +306,8 @@ function AdoptionCard({
  *
  * **Un champ sans valeur ne se masque pas** : « Non renseignée » est une
  * information, un trou n'en est pas une (la règle de `Field` depuis T2.4). Et
- * c'est une absence de saisie, pas un zéro : adopter un indicateur sans fixer de
- * cible est un geste normal.
+ * c'est une absence de saisie, pas un zéro : adopter un indicateur sans poser de
+ * référence est un geste normal, et un produit sans cible en est un autre.
  */
 function Reported({
   value,

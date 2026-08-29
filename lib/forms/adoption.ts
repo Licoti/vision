@@ -13,32 +13,44 @@
  * au domaine, donc à l'action et à `lib/db/scoped.ts`. Revérifier ici poserait
  * une seconde autorité, qui divergerait un jour de la première.
  *
- * **Quatre champs, et pas un de plus** (fiche T5.4) : l'indicateur, la valeur de
- * référence, la cible, la valeur finale. `project_id` ne se lit pas ici — il est
- * lié côté serveur. **`note` non plus** : la colonne existe (`docs/04` §3), la
- * fiche ne l'ouvre pas, et une colonne écrite qu'aucun écran ne relit est une
- * colonne qu'on relit un jour sans savoir pourquoi (règle 3, leçon de T5.2).
+ * **Deux champs, et pas un de plus** : l'indicateur, la valeur de référence.
+ * `project_id` ne se lit pas ici — il est lié côté serveur. **`note` non plus** :
+ * la colonne existe (`docs/04` §3), aucune fiche ne l'ouvre, et une colonne
+ * écrite qu'aucun écran ne relit est une colonne qu'on relit un jour sans savoir
+ * pourquoi (règle 3, leçon de T5.2).
+ *
+ * **La cible n'est plus un champ de ce formulaire** (29/08/2026). Elle appartient
+ * à l'indicateur — donc au produit —, et s'y saisit une fois pour toutes ; tout
+ * accompagnement qui adopte l'indicateur reprend celle-là. C'est ce qui fait
+ * qu'il n'existe qu'une cible par indicateur, là où deux colonnes en portaient
+ * deux et pouvaient diverger. `final_value` disparaît avec elle, sans
+ * remplaçante : ce qu'un indicateur vaut à la clôture d'un accompagnement se lit
+ * sur sa série de relevés, qui est datée. Écart assumé à `docs/02` §5 et
+ * `docs/04` §3, consigné dans `JOURNAL-TECHNIQUE.md`.
+ *
+ * C'est aussi ce module qui **tient le point d'entrée HTTP**, et non le panneau :
+ * `readAdoptionForm` nomme ses champs un par un, si bien qu'un `targetValue`
+ * glissé dans une requête forgée n'est lu par personne. Retirer un champ d'un
+ * formulaire n'a jamais protégé une colonne — c'est la lecture nominative qui le
+ * fait, et la colonne supprimée qui l'achève.
  *
  * **Une seule obligation, et c'est le rattachement.** `project_indicators` ne
- * rend `not null` que ses deux clés étrangères : `baseline_value`,
- * `target_value` et `final_value` sont nullables, toutes les trois. Adopter un
- * indicateur sans fixer de cible est un geste normal — « le projet déclare la
- * cible visée » (`docs/02` §5) est ce qu'il *peut* déclarer, pas ce qu'il doit.
- * Une adoption nue dit déjà quelque chose : cet accompagnement regarde cet
+ * rend `not null` que ses deux clés étrangères : `baseline_value` est nullable.
+ * Adopter un indicateur sans rien renseigner d'autre est un geste normal — une
+ * adoption nue dit déjà quelque chose : cet accompagnement regarde cet
  * indicateur.
  *
  * **Le contrôle décimal n'est pas réécrit ici** : `isDecimal`, `normalizeDecimal`
- * et `decimalAsTyped` vivent dans `lib/forms/result.ts` et y sont éprouvés. Les
- * trois colonnes sont le **même** `numeric(18,4)` que `results.value` et
- * `indicator_readings.value`, et trois copies d'une règle de validation
- * divergent le jour où l'une des précisions bouge. L'import croisé est la règle
- * du dossier, posée en T5.3 : ce qui se recopie ici, ce sont les libellés et les
- * messages ; ce qui s'importe, ce sont les règles.
+ * et `decimalAsTyped` vivent dans `lib/forms/result.ts` et y sont éprouvés. La
+ * colonne est le **même** `numeric(18,4)` que `results.value` et
+ * `indicator_readings.value`, et deux copies d'une règle de validation divergent
+ * le jour où l'une des précisions bouge. L'import croisé est la règle du dossier,
+ * posée en T5.3 : ce qui se recopie ici, ce sont les libellés et les messages ;
+ * ce qui s'importe, ce sont les règles.
  *
- * **Aucune des trois valeurs n'est comparée aux autres.** Ni « la cible doit
- * dépasser la référence », ni « la valeur finale doit être atteinte » : ce
- * serait juger un chiffre reporté, et `direction` n'est pas davantage un
- * arbitre — elle oriente la lecture d'une courbe, elle ne qualifie pas une
+ * **La référence n'est comparée à rien.** Ni à la cible du produit, ni au dernier
+ * relevé : ce serait juger un chiffre reporté, et `direction` n'est pas davantage
+ * un arbitre — elle oriente la lecture d'une courbe, elle ne qualifie pas une
  * valeur (arbitrage (g), D39).
  */
 
@@ -55,16 +67,12 @@ import {
    Ce que la personne a saisi
    ========================================================================== */
 
-/** Quatre chaînes, jamais un objet métier. */
+/** Deux chaînes, jamais un objet métier. */
 export type AdoptionFormValues = {
   /** L'indicateur adopté. Obligatoire — c'est le rattachement même. */
   indicatorId: string;
   /** La valeur au démarrage. Facultative — la colonne est nullable. */
   baselineValue: string;
-  /** La cible visée. Facultative, et c'est un **repère**, jamais un état. */
-  targetValue: string;
-  /** La valeur constatée à la clôture, « si elle est connue » (`docs/02` §5). */
-  finalValue: string;
 };
 
 export type AdoptionFormErrors = Partial<
@@ -96,12 +104,10 @@ export type AdoptionFormState = {
 export const EMPTY_ADOPTION_VALUES: AdoptionFormValues = {
   indicatorId: "",
   baselineValue: "",
-  targetValue: "",
-  finalValue: "",
 };
 
 /**
- * L'adoption déjà enregistrée, ramenée aux quatre chaînes du formulaire — le
+ * L'adoption déjà enregistrée, ramenée aux deux chaînes du formulaire — le
  * pré-remplissage du panneau en correction.
  *
  * Jumeau de `toResultFormValues` (T4bis.6), `toIndicatorFormValues` (T5.2) et
@@ -109,26 +115,25 @@ export const EMPTY_ADOPTION_VALUES: AdoptionFormValues = {
  * formulaire**, jamais une ligne de base. C'est ce qui laisse un refus les
  * remplacer sans que rien ne change de forme entre les deux chemins.
  *
- * Les trois valeurs passent par `decimalAsTyped` : la colonne rend « 85.0000 »,
- * et le poser tel quel dans le champ serait une invitation à retaper une valeur
- * que personne n'a écrite ainsi. `null` devient `""` : le formulaire ne connaît
- * que des chaînes, et l'absence s'y écrit vide.
+ * La référence passe par `decimalAsTyped` : la colonne rend « 54.0000 », et le
+ * poser tel quel dans le champ serait une invitation à retaper une valeur que
+ * personne n'a écrite ainsi. `null` devient `""` : le formulaire ne connaît que
+ * des chaînes, et l'absence s'y écrit vide.
  *
  * La forme du paramètre est celle de `ProjectAdoption`
  * (`lib/queries/indicators.ts`), déjà lue pour l'écran : la correction n'ajoute
- * **aucune lecture en base**.
+ * **aucune lecture en base**. `productTargetValue` n'y est pas repris — c'est une
+ * valeur du produit, que ce formulaire affiche peut-être un jour mais n'écrit
+ * jamais.
  */
 export function toAdoptionFormValues(row: {
   indicatorId: string;
   baselineValue: string | null;
-  targetValue: string | null;
-  finalValue: string | null;
 }): AdoptionFormValues {
   return {
     indicatorId: row.indicatorId,
-    baselineValue: row.baselineValue === null ? "" : decimalAsTyped(row.baselineValue),
-    targetValue: row.targetValue === null ? "" : decimalAsTyped(row.targetValue),
-    finalValue: row.finalValue === null ? "" : decimalAsTyped(row.finalValue),
+    baselineValue:
+      row.baselineValue === null ? "" : decimalAsTyped(row.baselineValue),
   };
 }
 
@@ -149,8 +154,6 @@ export function readAdoptionForm(formData: FormData): AdoptionFormValues {
   return {
     indicatorId: field(formData, "indicatorId"),
     baselineValue: field(formData, "baselineValue"),
-    targetValue: field(formData, "targetValue"),
-    finalValue: field(formData, "finalValue"),
   };
 }
 
@@ -159,9 +162,9 @@ export function readAdoptionForm(formData: FormData): AdoptionFormValues {
    ========================================================================== */
 
 /**
- * Le message d'une valeur qui n'est pas un nombre — **une phrase, trois
- * champs**. Les trois colonnes ont la même règle ; leur donner trois messages
- * différents laisserait croire à trois règles.
+ * Le message d'une valeur qui n'est pas un nombre. La phrase est celle qui
+ * servait les trois colonnes avant le 29/08/2026 ; elle en sert une, sans
+ * changer d'un mot — c'est la même règle, et la même précision de colonne.
  */
 const NOT_A_NUMBER =
   "La valeur doit être un nombre : 71, 68,5 — sans séparateur de milliers.";
@@ -184,18 +187,12 @@ export function validateAdoptionForm(
     errors.indicatorId = "Cet indicateur n'existe pas sur ce produit.";
   }
 
-  /* Facultatives, toutes les trois — les colonnes sont nullables. Saisies,
-     elles doivent être des nombres : le patron de `results.value`, et non celui
-     de `reading.value` qui est obligatoire. Aucune n'est comparée aux deux
-     autres : un écart calculé serait l'indice que D39 interdit. */
+  /* Facultative — la colonne est nullable. Saisie, elle doit être un nombre :
+     le patron de `results.value`, et non celui de `reading.value` qui est
+     obligatoire. Elle n'est comparée à rien, ni à la cible du produit ni au
+     dernier relevé : un écart calculé serait l'indice que D39 interdit. */
   if (values.baselineValue && !isDecimal(values.baselineValue)) {
     errors.baselineValue = NOT_A_NUMBER;
-  }
-  if (values.targetValue && !isDecimal(values.targetValue)) {
-    errors.targetValue = NOT_A_NUMBER;
-  }
-  if (values.finalValue && !isDecimal(values.finalValue)) {
-    errors.finalValue = NOT_A_NUMBER;
   }
 
   return errors;
@@ -210,14 +207,12 @@ export function validateAdoptionForm(
  * plus.
  *
  * `projectId` n'y figure pas : il est lié côté serveur par l'action, jamais
- * transmis par un champ. `note` non plus — la fiche ne l'ouvre pas.
+ * transmis par un champ. `note` non plus — aucune fiche ne l'ouvre.
  */
 export type AdoptionRowInput = {
   indicatorId: string;
-  /** `null` quand rien n'est saisi : les trois colonnes sont nullables. */
+  /** `null` quand rien n'est saisi : la colonne est nullable. */
   baselineValue: string | null;
-  targetValue: string | null;
-  finalValue: string | null;
 };
 
 /** Point décimal pour la colonne, ou `null` quand le champ est vide. */
@@ -232,8 +227,8 @@ function decimalOrNull(value: string): string | null {
  * `input` est non nul **si et seulement si** `errors` est vide : la propriété
  * posée en T2.5, tenue depuis.
  *
- * Les valeurs partent **normalisées** — point décimal, comme les colonnes
- * l'attendent — et non telles qu'elles ont été tapées. Les valeurs rendues au
+ * La valeur part **normalisée** — point décimal, comme la colonne l'attend — et
+ * non telle qu'elle a été tapée. Les valeurs rendues au
  * panneau en cas de refus restent, elles, celles de la personne : `values` et
  * `input` ne servent pas le même propos.
  */
@@ -255,8 +250,6 @@ export function parseAdoptionForm(formData: FormData): {
     input: {
       indicatorId: values.indicatorId,
       baselineValue: decimalOrNull(values.baselineValue),
-      targetValue: decimalOrNull(values.targetValue),
-      finalValue: decimalOrNull(values.finalValue),
     },
   };
 }

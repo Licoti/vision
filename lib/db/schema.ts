@@ -1129,14 +1129,19 @@ export const indicators = pgTable(
      */
     isNorthStar: boolean("is_north_star").notNull().default(false),
     /**
-     * La cible **du produit** sur cet indicateur — l'objectif global.
+     * La cible de cet indicateur — **et la seule**.
      *
-     * **Ce n'est pas la cible de `project_indicators`**, qui reste celle d'une
-     * adoption : ce qu'un accompagnement donné s'est fixé (`docs/02` §4, « toute
-     * cible d'indicateur appartient à un projet »). Les deux coexistent et ne
-     * disent pas la même chose ; l'écran doit les nommer distinctement pour
-     * qu'on ne les confonde pas. Second lieu de vérité assumé, consigné dans
-     * `JOURNAL-TECHNIQUE.md`.
+     * Elle vivait en double jusqu'au 29/08/2026 : ici l'objectif du produit, sur
+     * `project_indicators.target_value` ce qu'un accompagnement s'était fixé. Le
+     * second lieu de vérité que `JOURNAL-TECHNIQUE.md` assumait au 17/08/2026 est
+     * refermé — la colonne d'adoption a été supprimée (migration `0011`), et un
+     * accompagnement qui adopte l'indicateur reprend cette cible-ci sans pouvoir
+     * la contredire.
+     *
+     * **C'est un écart à `docs/02` §4**, qui écrit « toute cible d'indicateur
+     * appartient à un projet », et à `docs/04` §3, qui porte `target_value` sur
+     * l'adoption. Aucune décision de `docs/07` ne place la cible ; l'écart est
+     * consigné dans `JOURNAL-TECHNIQUE.md`.
      */
     targetValue: numeric("target_value", { precision: 18, scale: 4 }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
@@ -1195,9 +1200,17 @@ export const indicatorReadings = pgTable(
 );
 
 /**
- * L'adoption d'un indicateur par un projet : référence, cible, valeur finale.
- * C'est la table qui relie l'accompagnement à son effet supposé. Elle ne
- * calcule rien — Vision juxtapose, elle ne prouve pas.
+ * L'adoption d'un indicateur par un projet : le rattachement, et sa valeur de
+ * référence. C'est la table qui relie l'accompagnement à son effet supposé. Elle
+ * ne calcule rien — Vision juxtapose, elle ne prouve pas.
+ *
+ * **`target_value` et `final_value` l'ont quittée le 29/08/2026** (migration
+ * `0011`). La cible est celle de l'indicateur, et une seule : deux lieux pour
+ * une même valeur, c'est une divergence qui attend son heure. `baseline_value`
+ * reste, elle : « où en était l'indicateur au démarrage de **cet**
+ * accompagnement » ne se dit nulle part ailleurs, et ne peut pas contredire une
+ * cible. Écart à `docs/02` §5 et `docs/04` §3, consigné dans
+ * `JOURNAL-TECHNIQUE.md`.
  */
 export const projectIndicators = pgTable(
   "project_indicators",
@@ -1211,8 +1224,6 @@ export const projectIndicators = pgTable(
       .notNull()
       .references(() => indicators.id, { onDelete: "cascade" }),
     baselineValue: numeric("baseline_value", { precision: 18, scale: 4 }),
-    targetValue: numeric("target_value", { precision: 18, scale: 4 }),
-    finalValue: numeric("final_value", { precision: 18, scale: 4 }),
     note: text("note"),
     ...stamps,
   },

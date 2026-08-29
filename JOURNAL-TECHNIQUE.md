@@ -7527,6 +7527,12 @@ celui de la page produit le même jour, et pour la même raison : son contenu ti
 et un chevron de 10 px coûte plus cher que ce qu'il cache. La règle d'or reste tenue autrement — le
 journal est **en dernier**, et sa place dit qu'il est une information de contrôle.
 
+> **Écart refermé le 29/08/2026, sur demande.** Le repli est rétabli, et l'argument ci-dessus est
+> celui qui était faux : « son contenu tient en quatre lignes » mesurait le coût du repli sur un
+> journal **vide ou presque**, ce qu'il ne reste pas — chaque correction, chaque archivage y ajoute
+> une ligne, et c'est le bloc de la page dont la hauteur croît sans borne. `docs/06` §5 avait raison
+> de bout en bout. Voir l'entrée du 29/08 en fin de journal.
+
 ### Un écart refermé, que le diagnostic n'avait pas vu
 
 **Le rail rendait « Indicateurs adoptés » avant « Ressources »**, sous un commentaire qui affirmait
@@ -7962,3 +7968,82 @@ dix-huit liens du contrat ont été lus par requête ; `min-w-24` a été vérif
 la façon dont les deux plus longs libellés d'approche passent à la ligne dans 320 px, n'ont été
 vérifiés sur aucune largeur réelle.** C'est la contrepartie annoncée de la direction retenue ; elle
 reste à regarder.
+
+**Hors ticket, 29/08/2026 — le second lieu de vérité de la cible est refermé, et voici par quoi.**
+L'entrée du 17/08/2026 plus haut assumait deux cibles : `indicators.target_value` pour l'objectif du
+produit, `project_indicators.target_value` pour ce qu'un accompagnement s'était fixé, et concluait
+que « le risque est qu'on saisisse l'une pour l'autre ». Le risque s'était **déjà matérialisé** :
+le correctif de dédoublonnage du même jour — `distinctTargets` dans `components/products/indicators.tsx`
+— existait parce qu'un accompagnement reprenant la cible du produit, « le cas courant » disait son
+commentaire, dessinait deux traits superposés et deux fois « Cible 85 % » au même pixel. On traitait
+le symptôme. La colonne d'adoption est supprimée (migration `0011`), la cible de l'indicateur reste
+seule, et `distinctTargets` disparaît avec sa raison d'être. `final_value` part avec elle : ce qu'un
+indicateur vaut à la clôture d'un accompagnement se lit sur sa série de relevés, qui est datée.
+
+**Hors ticket, 29/08/2026 — l'écart à `docs/02` et `docs/04`, et pourquoi il était ouvrable.**
+`docs/02` §4 écrit « toute activité, ressource et **cible d'indicateur** appartient à un projet »,
+§5 liste les trois valeurs de l'adoption, §7 les redit dans le schéma relationnel, et `docs/04` §3
+porte les trois colonnes. **Ces quatre passages restent en vigueur et disent le contraire du code** ;
+qui les relira trouvera la divergence, et c'est ici qu'elle s'explique. Ce n'est **pas** une décision
+de `docs/07` qui se rouvre — D11 dit à quel produit appartient un indicateur, D23 qui le saisit, D41
+que la courbe est attendue ; aucune ne place la cible. C'est le même geste que l'écart de C5 sur le
+lieu de création d'un indicateur : arbitré par l'humain, consigné, et le travail continue.
+`baseline_value` est **restée**, et pour une raison qui se dit en une phrase : elle est la seule des
+trois à porter quelque chose que le produit ne porte pas — où en était la mesure au démarrage de
+**cet** accompagnement — et donc la seule qui ne pouvait pas diverger d'une cible.
+
+**Hors ticket, 29/08/2026 — `drizzle-kit` ne génère qu'un `drop column`, et l'appliquer seul aurait
+perdu la cible du seed.** La commande produit deux `ALTER TABLE … DROP COLUMN` et rien d'autre. Or
+`scripts/seed.ts` écrivait `targetValue: "85"` sur l'**adoption** et jamais sur l'indicateur : la
+North Star du brief aurait perdu sa jauge, son étoile et sa phrase d'écart d'un seul coup. La
+migration reçoit donc un `UPDATE` écrit à la main **en tête** du fichier généré, qui remonte la cible
+des adoptions vers leur indicateur quand elles s'accordent toutes sur la même valeur, et le
+`HAVING COUNT(DISTINCT …) = 1` laisse le désaccord non tranché — l'indicateur reste sans cible, et
+l'écran le dit déjà. Vérifié en base après migration : « Remplissage des CRA » porte 92, valeur qui
+n'existait que sur une adoption avant. **Une migration générée n'est pas une migration finie** dès
+qu'une colonne supprimée portait la seule copie d'une valeur.
+
+**Hors ticket, 29/08/2026 — retirer deux champs d'un panneau n'a protégé aucun point d'entrée, et la
+mise en défaut l'a montré à l'envers.** La discipline demandait que le champ retiré ne suffise pas ;
+elle a rendu mieux que prévu. Rétablir la lecture de `targetValue` dans `readAdoptionForm` fait
+tomber **quatre** tests, tous de la lecture, y compris celui qui s'appelle « une cible envoyée à la
+main n'est lue par personne » — c'est donc bien la lecture nominative qui tient, et non le panneau.
+Mais `parseAdoptionForm`, lui, **reste vert** sous la même mutation : `AdoptionRowInput` ne construit
+pas le champ, si bien que la ligne écrite reste propre même quand la lecture laisse passer. Deux
+couches, et la troisième est la colonne supprimée. Éprouvé pour de bon par un **POST forgé** sur
+`createAdoption` — les champs cachés `$ACTION_*` du HTML servi, sans en-tête `Next-Action`, plus
+`targetValue=999` et `finalValue=888` : la ligne écrite ne porte que sa référence, et la cible lue
+est celle de l'indicateur. La ligne d'épreuve a été retirée après lecture.
+
+**Hors ticket, 29/08/2026 — un test qui range mal ce qu'il a dérangé en casse un autre à distance.**
+Le test « la lecture rend le drapeau et la cible du produit » posait `targetValue: "85"` sur
+« Autonomie » puis le remettait à `null` en `finally`. La cible appartenant désormais à la fixture —
+c'est elle que les adoptions lisent —, ce `finally` **vidait** la valeur qu'éprouvent les deux tests
+neufs de `listProjectAdoptions`, deux `describe` plus haut. Vert ou rouge selon l'ordre d'exécution.
+Corrigé en ne défaisant que le drapeau. La règle du fichier — « les écritures sont défaites en
+`finally` » — est juste, mais elle ne dit pas *jusqu'où* : on défait ce qu'on a posé, jamais ce que
+la fixture portait déjà.
+
+**Hors ticket, 29/08/2026 — le journal du projet est de nouveau replié, et l'aller-retour est la
+leçon.** Le 28/08 l'avait déplié en écrivant, dans le code même, que « son contenu tient en quatre
+lignes, et un chevron de 10 px est un prix de découverte plus cher que ce qu'il cache ». L'argument
+se mesurait sur l'état **de départ** d'un journal — vide, ou trois lignes de seed. Or `events` est
+la seule table de la page qui n'a **aucune borne haute** : chaque correction, chaque archivage, chaque
+rétablissement y ajoute une ligne et n'en retire jamais. Un bloc qu'on juge court le jour où on le
+dessine, et qui croît à chaque écriture, était le cas exact que `docs/06` §5 visait en le posant
+« replié par défaut ». **L'écart consigné le 28/08 est donc refermé, et son entrée récrite sur place**
+plutôt que contredite plus bas — la règle du fichier.
+
+Rien n'a été inventé pour cela : `SectionHeader` porte `as="summary"` et `mark` depuis T6.3, le socle
+n'a pas bougé d'un caractère, et la forme rétablie est celle de `cd2fd98` — `<details className="group">`,
+chevron ▶ qui pivote en `group-open`, `mt-4` sur les deux contenus parce que le `gap-4` de `Section`
+ne s'applique plus dès que le `<details>` en devient l'unique enfant. **Une seule chose change par
+rapport à T6.3** : la `note` du 28/08 reste, et elle sert le repli mieux qu'elle ne servait le bloc
+déplié — « une information de contrôle, pas de compréhension » se lit désormais **avant** d'ouvrir,
+c'est-à-dire au moment précis où l'on décide de ne pas ouvrir.
+
+Vérifié dans le HTML servi : `<details class="group">` **sans attribut `open`** — c'est son absence
+qui replie, donc l'état replié est bien celui qui est servi et non un état posé au montage —, un seul
+`<details>` sur la page, et le `<ol>` des événements **présent dans le document** malgré le repli.
+C'est la propriété qui distingue `<details>` d'un menu, et celle qui rend le critère lisible sans
+navigateur.

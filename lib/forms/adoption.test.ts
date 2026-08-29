@@ -6,18 +6,23 @@
  * règle plutôt que de l'observer sur une fixture.
  *
  * Trois propriétés portent le poids du fichier. **L'obligation unique** — sans
- * indicateur il n'y a pas d'adoption —, et c'est elle que la mise en défaut du
- * ticket neutralise. **Les trois facultatives**, parce que c'est la différence
- * avec le relevé : `baseline_value`, `target_value` et `final_value` sont
- * nullables, et une adoption nue est une adoption normale. Et le **tour exact**
+ * indicateur il n'y a pas d'adoption. **La référence facultative**, parce que
+ * c'est la différence avec le relevé : `baseline_value` est nullable, et une
+ * adoption nue est une adoption normale. Et le **tour exact**
  * `toAdoptionFormValues` → `parseAdoptionForm` : ce qu'on réaffiche en
  * correction doit se re-soumettre à l'identique sans rien changer en base, sans
- * quoi rouvrir un panneau et enregistrer déplacerait les trois valeurs.
+ * quoi rouvrir un panneau et enregistrer déplacerait la valeur.
+ *
+ * **Une quatrième depuis le 29/08/2026** : la cible et la valeur finale ont
+ * quitté ce formulaire, et le test qui compte est celui qui les **envoie
+ * quand même**. Retirer deux champs d'un panneau n'a jamais protégé un point
+ * d'entrée HTTP ; ce qui protège est la lecture nominative de
+ * `readAdoptionForm`, et c'est elle qu'on éprouve.
  *
  * Le contrôle décimal lui-même n'est **pas re-testé ici** : il vit dans
  * `lib/forms/result.ts`, où `result.test.ts` l'éprouve forme par forme. Ce qui
- * est éprouvé ici est qu'il est bien **appelé, et sur les trois champs** — deux
- * formes suffisent pour cela, une acceptée et une refusée.
+ * est éprouvé ici est qu'il est bien **appelé** — deux formes suffisent pour
+ * cela, une acceptée et une refusée.
  *
  * Ce qui n'est pas testé ici, et ne doit pas l'être : l'existence de
  * l'indicateur, son appartenance au produit de cet accompagnement (D11), son
@@ -46,8 +51,6 @@ function values(
   return {
     indicatorId: INDICATOR,
     baselineValue: "54",
-    targetValue: "85",
-    finalValue: "71",
     ...overrides,
   };
 }
@@ -66,16 +69,14 @@ function formOf(overrides: Partial<AdoptionFormValues> = {}): FormData {
    ========================================================================== */
 
 describe("readAdoptionForm", () => {
-  test("les quatre champs sont lus et rognés", () => {
+  test("les deux champs sont lus et rognés", () => {
     const data = formOf();
     data.set("indicatorId", `  ${INDICATOR}  `);
-    data.set("targetValue", "  85  ");
+    data.set("baselineValue", "  54  ");
 
     expect(readAdoptionForm(data)).toEqual({
       indicatorId: INDICATOR,
       baselineValue: "54",
-      targetValue: "85",
-      finalValue: "71",
     });
   });
 
@@ -85,25 +86,43 @@ describe("readAdoptionForm", () => {
 
   test("un champ qui n'est pas du texte vaut « vide »", () => {
     const data = formOf();
-    data.set("targetValue", new File([], "piege.txt"));
+    data.set("baselineValue", new File([], "piege.txt"));
 
-    expect(readAdoptionForm(data).targetValue).toBe("");
+    expect(readAdoptionForm(data).baselineValue).toBe("");
   });
 
   test("un champ étranger est ignoré", () => {
     /* La ligne ne se construit jamais par étalement du `FormData` : un champ
        caché ajouté par n'importe qui deviendrait une colonne écrite. `note` est
-       ici le champ étranger le plus tentant — la colonne existe, ce ticket ne
-       l'ouvre pas. */
+       ici le champ étranger le plus tentant — la colonne existe, aucune fiche
+       ne l'ouvre. */
     const data = formOf();
     data.set("note", "Cible négociée en comité");
     data.set("projectId", "un-autre-accompagnement");
 
     expect(Object.keys(readAdoptionForm(data)).sort()).toEqual([
       "baselineValue",
-      "finalValue",
       "indicatorId",
-      "targetValue",
+    ]);
+  });
+
+  test("une cible envoyée à la main n'est lue par personne", () => {
+    /* **Le geste qui compte au 29/08/2026.** Les deux champs ont disparu du
+       panneau, mais un panneau n'a jamais protégé un point d'entrée HTTP :
+       Next sérialise l'action en clair, et une soumission forgée peut porter ce
+       qu'elle veut. Ce qui protège est cette lecture-ci, qui nomme ses champs
+       un par un — et, derrière elle, les colonnes supprimées par la migration
+       `0011`. */
+    const data = formOf();
+    data.set("targetValue", "999");
+    data.set("finalValue", "999");
+
+    const read = readAdoptionForm(data);
+
+    expect(read).toEqual({ indicatorId: INDICATOR, baselineValue: "54" });
+    expect(Object.keys(parseAdoptionForm(data).input ?? {})).toEqual([
+      "indicatorId",
+      "baselineValue",
     ]);
   });
 });
@@ -141,61 +160,35 @@ describe("validateAdoptionForm — l'indicateur", () => {
 });
 
 /* ==========================================================================
-   La validation — les trois valeurs, toutes facultatives
+   La validation — la référence, facultative
    ========================================================================== */
 
-describe("validateAdoptionForm — les trois valeurs", () => {
+describe("validateAdoptionForm — la valeur de référence", () => {
   test("une adoption sans aucune valeur est valide", () => {
-    /* **La différence avec le relevé.** Les trois colonnes sont nullables :
-       adopter un indicateur sans fixer de cible est un geste normal — une
+    /* **La différence avec le relevé.** La colonne est nullable : adopter un
+       indicateur sans rien renseigner d'autre est un geste normal — une
        adoption nue dit déjà que cet accompagnement regarde cet indicateur. */
-    expect(
-      validateAdoptionForm(
-        values({ baselineValue: "", targetValue: "", finalValue: "" }),
-      ),
-    ).toEqual({});
+    expect(validateAdoptionForm(values({ baselineValue: "" }))).toEqual({});
   });
 
-  test("chacune des trois est refusée quand elle n'est pas un nombre", () => {
+  test("elle est refusée quand elle n'est pas un nombre", () => {
     /* Le contrôle décimal est éprouvé forme par forme dans `result.test.ts` :
-       ce qui se vérifie ici est qu'il est **appelé sur les trois champs**, et
-       qu'aucun n'a été oublié. */
-    const message =
-      "La valeur doit être un nombre : 71, 68,5 — sans séparateur de milliers.";
-
+       ce qui se vérifie ici est qu'il est **appelé**. */
     expect(
       validateAdoptionForm(values({ baselineValue: "beaucoup" })).baselineValue,
-    ).toBe(message);
-    expect(
-      validateAdoptionForm(values({ targetValue: "beaucoup" })).targetValue,
-    ).toBe(message);
-    expect(
-      validateAdoptionForm(values({ finalValue: "beaucoup" })).finalValue,
-    ).toBe(message);
+    ).toBe("La valeur doit être un nombre : 71, 68,5 — sans séparateur de milliers.");
   });
 
-  test("la virgule française est acceptée sur les trois", () => {
-    expect(
-      validateAdoptionForm(
-        values({
-          baselineValue: "54,5",
-          targetValue: "85,25",
-          finalValue: "71,75",
-        }),
-      ),
-    ).toEqual({});
+  test("la virgule française est acceptée", () => {
+    expect(validateAdoptionForm(values({ baselineValue: "54,5" }))).toEqual({});
   });
 
-  test("aucune valeur n'est comparée aux deux autres", () => {
-    /* Une cible **en deçà** de la référence, et une valeur finale au-delà de la
-       cible : deux formes qu'un outil de justification refuserait. Vision
-       juxtapose, elle ne prouve pas — et `direction` n'arbitre rien (arbitrage
-       (g), D39). */
-    expect(
-      validateAdoptionForm(
-        values({ baselineValue: "85", targetValue: "54", finalValue: "999" }),
-      ),
-    ).toEqual({});
+  test("la référence n'est comparée à rien", () => {
+    /* Une référence **au-delà** de toute cible imaginable : une forme qu'un
+       outil de justification refuserait. Vision juxtapose, elle ne prouve pas —
+       et la cible ne vit même plus ici pour servir d'arbitre (arbitrage (g),
+       D39). */
+    expect(validateAdoptionForm(values({ baselineValue: "9999" }))).toEqual({});
   });
 });
 
@@ -210,9 +203,7 @@ describe("parseAdoptionForm", () => {
       { indicatorId: "" },
       { indicatorId: "nouvel" },
       { baselineValue: "beaucoup" },
-      { targetValue: "beaucoup" },
-      { finalValue: "beaucoup" },
-      { baselineValue: "", targetValue: "", finalValue: "" },
+      { baselineValue: "" },
     ];
 
     for (const override of cases) {
@@ -221,38 +212,30 @@ describe("parseAdoptionForm", () => {
     }
   });
 
-  test("la ligne porte les quatre colonnes, et pas une de plus", () => {
+  test("la ligne porte les deux colonnes, et pas une de plus", () => {
     const { input } = parseAdoptionForm(formOf());
 
     expect(input).toEqual({
       indicatorId: INDICATOR,
       baselineValue: "54",
-      targetValue: "85",
-      finalValue: "71",
     });
   });
 
-  test("les valeurs vides deviennent `null`, jamais zéro", () => {
+  test("une valeur vide devient `null`, jamais zéro", () => {
     /* « Non renseignée » et « 0 » ne disent pas la même chose : la colonne est
        nullable, et un zéro écrit serait une valeur reportée que personne n'a
        relevée. */
-    const { input } = parseAdoptionForm(
-      formOf({ baselineValue: "", targetValue: "85", finalValue: "" }),
-    );
+    const { input } = parseAdoptionForm(formOf({ baselineValue: "" }));
 
-    expect(input).toMatchObject({
-      baselineValue: null,
-      targetValue: "85",
-      finalValue: null,
-    });
+    expect(input).toMatchObject({ baselineValue: null });
   });
 
   test("la virgule part en point, les valeurs rendues restent celles tapées", () => {
     const { values: kept, input } = parseAdoptionForm(
-      formOf({ baselineValue: "54,5", targetValue: "85,25" }),
+      formOf({ baselineValue: "54,5" }),
     );
 
-    expect(input).toMatchObject({ baselineValue: "54.5", targetValue: "85.25" });
+    expect(input).toMatchObject({ baselineValue: "54.5" });
     // Ce qui reviendrait au panneau en cas de refus : ce que la personne a tapé.
     expect(kept.baselineValue).toBe("54,5");
   });
@@ -263,48 +246,38 @@ describe("parseAdoptionForm", () => {
    ========================================================================== */
 
 describe("toAdoptionFormValues", () => {
-  test("les trois valeurs de la colonne se réaffichent sans leurs zéros", () => {
+  test("la valeur de la colonne se réaffiche sans ses zéros", () => {
     expect(
       toAdoptionFormValues({
         indicatorId: INDICATOR,
-        baselineValue: "54.0000",
-        targetValue: "85.0000",
-        finalValue: "71.5000",
+        baselineValue: "54.5000",
       }),
     ).toEqual({
       indicatorId: INDICATOR,
-      baselineValue: "54",
-      targetValue: "85",
-      finalValue: "71.5",
+      baselineValue: "54.5",
     });
   });
 
-  test("les valeurs nulles se réaffichent vides", () => {
+  test("une valeur nulle se réaffiche vide", () => {
     expect(
       toAdoptionFormValues({
         indicatorId: INDICATOR,
         baselineValue: null,
-        targetValue: null,
-        finalValue: null,
       }),
     ).toEqual({
       indicatorId: INDICATOR,
       baselineValue: "",
-      targetValue: "",
-      finalValue: "",
     });
   });
 
   test("le tour est exact : réafficher puis re-soumettre ne déplace rien", () => {
     /* **La propriété qui compte** : ouvrir la correction, ne rien changer,
        enregistrer — la ligne écrite doit être identique à celle qu'on a lue.
-       Sans elle, rouvrir un panneau et cliquer suffirait à déplacer trois
-       chiffres reportés. */
+       Sans elle, rouvrir un panneau et cliquer suffirait à déplacer un chiffre
+       reporté. */
     const row = {
       indicatorId: INDICATOR,
       baselineValue: "54.0000",
-      targetValue: "85.0000",
-      finalValue: null,
     };
 
     const shown = toAdoptionFormValues(row);
@@ -317,8 +290,6 @@ describe("toAdoptionFormValues", () => {
     expect(input).toEqual({
       indicatorId: row.indicatorId,
       baselineValue: "54",
-      targetValue: "85",
-      finalValue: null,
     });
   });
 });

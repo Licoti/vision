@@ -132,6 +132,28 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   1,05:1, invisible. Ni migration, ni requête, ni action, ni droit ; **aucun test neuf, et c'est une
   révision** : le diff ne déplace que du rendu. **Le contrat des seize chiffres a été éprouvé lien
   par lien**, et la sonde mise en défaut avant d'être crue. 1 254 tests, inchangés.
+- **Une seule cible par indicateur, portée par le produit — hors ticket, 29/08/2026.** Le second lieu
+  de vérité assumé le 17/08/2026 est **refermé** : `project_indicators.target_value` et `final_value`
+  sont supprimées (migration `0011`, avec reprise des cibles d'adoption vers l'indicateur quand
+  toutes s'accordent), la cible vit sur `indicators` et se saisit sur la page produit, et toute
+  adoption la lit — `productTargetValue`, une ligne de `select` qui change de table dans une jointure
+  déjà là, **aucune requête de plus**. Le panneau d'adoption tombe de quatre champs à deux ;
+  `baseline_value` reste, seule des trois à dire ce que le produit ne dit pas. La courbe perd les
+  traits d'adoption et le dédoublonnage que le 17/08 avait dû ajouter. **Écart assumé à `docs/02` §4
+  et §5 et à `docs/04` §3**, consigné ; aucune décision de `docs/07` n'est rouverte. Trois tests
+  neufs, **deux mises en défaut** (la cible neutralisée fait tomber deux tests et rien d'autre ; la
+  lecture nominative rétablie en fait tomber quatre, tous de `readAdoptionForm`), et **le droit
+  éprouvé par un POST forgé** portant les deux champs supprimés : la ligne écrite ne porte que sa
+  référence. 1 257 tests.
+- **Le journal de la fiche accompagnement est de nouveau replié — hors ticket, 29/08/2026.** Demande
+  de l'humain : c'est une partie secondaire, dont le détail n'a pas à se lire au premier niveau. Le
+  `<details>` retiré le 28/08 est rétabli dans la forme de T6.3 — `SectionHeader as="summary"` et sa
+  `mark`, socle inchangé —, la `note` du 28/08 restant sur le `<summary>`, où elle justifie le repli
+  avant qu'on ouvre. **L'écart à `docs/06` §5 consigné le 28/08 est refermé**, et son entrée récrite
+  sur place : « son contenu tient en quatre lignes » mesurait un journal vide, or `events` est la
+  seule table de la page sans borne haute. Un seul fichier touché, aucun test ne portait sur le
+  repli. Vérifié dans le HTML servi : `<details>` **sans `open`**, et le `<ol>` des événements
+  présent dans le document malgré le repli. 1 257 tests, inchangés.
 
 ---
 
@@ -223,8 +245,10 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   `persons.kind` sur les deux lectures de projet, qui affichent tous les membres à l'identique.
   → **T7.9.**
 - **`project_indicators.note` n'a ni écrivain ni lecteur.** Colonne posée en T1.2 ; le panneau
-  d'adoption saisit quatre champs, pas un cinquième. Ce qui manque est **une phrase sur le pourquoi
-  d'une cible** (`docs/04` §3). → **T7.9.**
+  d'adoption saisit deux champs depuis le 29/08/2026, pas un troisième. Ce qui manque n'est plus
+  « une phrase sur le pourquoi d'une cible » — la cible a quitté l'adoption — mais **une phrase sur
+  le pourquoi de cette adoption** : ce que cet accompagnement va chercher sur cet indicateur.
+  → **T7.9.**
 - **Corriger une personne du centre en intervenant côté entité lui laisse ses compétences.**
   `parsePersonForm` efface la disponibilité — le `CHECK` l'exige — mais rien d'équivalent n'existe
   pour `person_skills` : les liaisons restent affichées et **illisibles en écriture**. Aucune donnée

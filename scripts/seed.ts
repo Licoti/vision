@@ -725,20 +725,28 @@ const RESOURCES: {
  * par le second accompagnement.
  *
  * `direction` se lit dans la cible : de 54 % vers 85 %, plus haut vaut mieux.
- * `baseline_value` et `final_value` restent nuls, le brief ne les donne pas :
- * seule la cible est écrite.
+ *
+ * **La cible est portée par l'indicateur**, et non par l'adoption : depuis le
+ * 29/08/2026 il n'y en a plus qu'une, et c'est celle du produit. Elle vivait sur
+ * l'adoption jusque-là, ce que la migration `0011` reprend pour les bases déjà
+ * amorcées — ici c'est la constante qui la place au bon endroit dès l'écriture.
+ *
+ * `baseline_value` reste nul : le brief ne le donne pas. L'adoption est donc
+ * **nue** — un pur rattachement, ce qui est un état normal, et le seul que le
+ * brief permette d'écrire.
  */
 const INDICATOR = {
   product: "Espace client web",
   label: "Part des virements réalisés sans contact support",
   unit: "%",
   direction: "higher_is_better" as const,
+  targetValue: "85",
   readings: [
     { value: "54", readOn: "2024-09-01" },
     { value: "63", readOn: "2025-03-01" },
     { value: "71", readOn: "2026-06-01" },
   ],
-  adoption: { project: "Autonomie des opérations courantes", targetValue: "85" },
+  adoption: { project: "Autonomie des opérations courantes" },
 };
 
 /**
@@ -1362,6 +1370,7 @@ async function seed(): Promise<void> {
           label: INDICATOR.label,
           unit: INDICATOR.unit,
           direction: INDICATOR.direction,
+          targetValue: INDICATOR.targetValue,
         },
       },
     ],
@@ -1391,7 +1400,6 @@ async function seed(): Promise<void> {
         values: {
           projectId: idOf(projectIndex, INDICATOR.adoption.project, "Projet"),
           indicatorId,
-          targetValue: INDICATOR.adoption.targetValue,
         },
       },
     ],

@@ -188,11 +188,18 @@ export function IndicatorPanel({
         />
       </FormField>
 
-      {/* **La cible du produit, et non celle d'un accompagnement.** Les deux
-          existent et ne disent pas la même chose : celle-ci est l'objectif
-          global, celle de `project_indicators` est ce qu'un accompagnement
-          s'est fixé et se saisit dans le panneau d'adoption de la page projet.
-          La note le dit, faute de quoi on saisirait l'une pour l'autre.
+      {/* **La cible, et il n'y en a qu'une** (29/08/2026). Elle vivait aussi
+          sur `project_indicators` jusque-là, où chaque accompagnement pouvait
+          s'en donner une autre — deux lieux pour une même valeur, donc deux
+          écrans qui finissaient par ne plus dire la même chose. La colonne
+          d'adoption a été supprimée : ce champ est désormais le **seul** endroit
+          où une cible se saisit, et tout accompagnement qui adopte cet
+          indicateur reprend celle-ci.
+
+          Le libellé garde « du produit » : ce n'est plus une distinction d'avec
+          une autre cible, c'est le rappel de l'échelle à laquelle elle se pose
+          — un objectif qui vit plus longtemps que les accompagnements qui
+          cherchent à l'atteindre.
 
           `inputMode="decimal"` et jamais `type="number"` : la règle de
           `results.value` et du relevé — un `number` refuse la virgule
@@ -201,7 +208,7 @@ export function IndicatorPanel({
       <FormField
         label="Cible du produit"
         htmlFor="indicateur-cible"
-        note="Facultative. L'objectif global du produit sur cette mesure — pas la cible que se donne un accompagnement."
+        note="Facultative. L'objectif visé sur cette mesure. Les accompagnements qui adoptent cet indicateur la reprennent telle quelle."
         error={errors.targetValue}
         errorId="indicateur-cible-erreur"
       >
