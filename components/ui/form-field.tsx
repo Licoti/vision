@@ -95,8 +95,11 @@ export function FormAlert({
 /**
  * Un champ : son intitulé, sa note, son contrôle, son message.
  *
- * `required` n'est passé que par les panneaux, jamais par les deux formulaires
- * pleine page — leur rendu est donc inchangé au caractère près.
+ * `required` n'était passé que par les panneaux, et la phrase qui vivait ici
+ * — « jamais par les deux formulaires pleine page » — a cessé d'être vraie le
+ * 29/08/2026 : la reprise d'ergonomie du formulaire de projet le passe sur ses
+ * trois champs obligatoires, qui ne le disaient nulle part. `product-form.tsx`
+ * ne l'a pas suivi ; l'écart est ouvert dans `ETAT.md`, il n'est pas assumé.
  */
 export function FormField({
   label,

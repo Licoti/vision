@@ -4779,3 +4779,77 @@ intact : `team:<uuid>` et `participantIds` inchangés, une personne non retenue 
 **1 254 tests** (1 233 + 21), `tsc` et `npm run lint` verts. **Les écrans n'ont pas été parcourus
 au navigateur** : le mode enrichi n'est éprouvé que par une sonde de rendu serveur, et le clavier
 reste à faire.
+
+---
+
+## Formulaire de projet — reprise d'ergonomie, direction A, hors ticket (29/08/2026)
+
+Sept gestes, tirés d'un **canevas de maquettes** qui a porté, avant qu'une ligne ne soit écrite, un
+diagnostic de l'écran — douze frictions, chacune vérifiée dans le code — et **trois directions
+comparées côte à côte**, chacune avec sa motivation et sa contrepartie. La direction A a été
+retenue : *quatre sections, et le pied qui les referme.*
+
+C'est le dernier écran de saisie que les deux reprises du 28/08 n'avaient pas touché. Il était resté
+au vocabulaire visuel d'avant : neuf champs à plat dans un `flex max-w-160 flex-col gap-6`, un écart
+identique de 24 px partout, et les gestes tout en bas, après le bloc le plus lourd de l'écran.
+
+**Le défaut central tient en une comparaison de deux chaînes.** La légende de `<fieldset>` portait
+`text-2xs font-semibold text-content-neutral-dark uppercase` ; le `<label>` de `FormField` porte la
+même chaîne, au caractère près. « Période » et « Début » se ressemblaient donc exactement, et rien ne
+disait lequel des deux contenait l'autre.
+
+**Deux directions écartées, et pourquoi.** La direction B — un rail de 320 px récapitulant la saisie
+et portant les gestes — était **la seule des trois à coûter quelque chose de mesurable** : son rail
+ne peut pas se remplir sans état client, et la propriété « ce formulaire fonctionne sans une ligne de
+JavaScript », mesurée à l'octet le matin même, s'en serait trouvée déplacée. La direction C — les
+trois champs obligatoires, puis quatre `<details>` — butait sur un interdit : un volet replié est un
+champ qu'on oublie, et l'indicateur de complétude qui le rattraperait est nommément proscrit.
+
+**Ce qui a changé, dans l'ordre de l'écran.**
+
+1. **Quatre `Section`** — *Rattachement et identité*, *Période*, *Cadre de l'accompagnement*,
+   *Équipe* —, le langage de carte de la page projet. Le titre fait 20 px et du gras : il ne se
+   confond plus avec un intitulé de champ de 10 px, **et aucun libellé de champ ne bouge**.
+2. **Les trois champs obligatoires le disent.** `FormField` portait `required` depuis TD.1 ; les
+   formulaires pleine page ne le lui passaient pas, et l'on découvrait l'obligation en se la voyant
+   refuser. Seul ce formulaire est repris ; `product-form.tsx` garde l'écart, ouvert dans `ETAT.md`.
+3. **Deux `<legend>` passent en `sr-only`** — « Période » et « Équipe », désormais des titres. Le
+   `<fieldset>` reste : c'est **lui** qui nomme le groupe quand on entre dans un contrôle, là où le
+   `h2` ne se rencontre qu'en parcourant les titres. Les légendes des deux référentiels restent
+   visibles : elles cohabitent avec « Commanditaire », et c'est là qu'elles distinguent encore.
+4. **Les cases deviennent des pastilles de 44 px.** Treize valeurs de référentiel se cochaient sur
+   une bande de vingt pixels ; `CHIP` porte `px-4 py-3` autour du couple case + texte. **La case
+   reste**, et c'est elle qui porte l'information : le fond et le filet la redoublent.
+5. **L'état coché est en CSS, jamais calculé au rendu.** La première écriture le tirait de
+   `selected.has(…)` — juste au premier affichage, faux à la première coche, les cases étant non
+   contrôlées. `has-checked:` fait porter l'état par `:has(:checked)` : il suit le clic, et il
+   fonctionne sans JavaScript.
+6. **Le pied devient une barre délimitée** — le filet de `panel.tsx`, que les six panneaux latéraux
+   portaient déjà et que les quatre formulaires pleine page n'avaient pas — et « Annuler » y passe du
+   lien souligné au **rang secondaire**, par `buttonClass({ variant: "secondary" })` sur le `<Link>`.
+   `ETAT.md` posait ce geste depuis TD.3.
+7. **`objective` et `sponsor` reçoivent `aria-invalid` et `aria-describedby`**, qu'ils n'avaient
+   jamais portés alors qu'ils recevaient bien la bordure rouge. Le trou était **latent, pas vivant** :
+   `validateProjectForm` ne pose aucune règle sur ces deux champs. Rien n'est observable aujourd'hui.
+
+**Le contrat de saisie ne bouge pas d'un caractère.** Aucun `name`, aucune valeur, aucune règle : ce
+que l'action serveur reçoit est identique, et l'ordre de tabulation servi est celui mesuré en T2.6 —
+produit, nom, objectif, statut, les deux dates, commanditaire, les métiers, les approches, l'équipe,
+puis les deux gestes, sans un seul `tabindex`.
+
+**Aucun test neuf, et c'est délibéré.** Il n'y a pas de règle neuve à mettre en défaut, et le dépôt
+n'outille pas le rendu (`vitest.config.mts` n'inclut que `lib/**` et `app/**`). Les **1 254 tests
+existants passent inchangés** — c'est eux qui prouvent que le contrat n'a pas bougé.
+
+**La vérification, en trois temps.** Le rendu nominal lu dans le HTML servi : quatre `<section>`,
+quatre `h2`, trois mentions « (obligatoire) » et pas une de plus, deux légendes `sr-only`, deux
+visibles, treize pastilles, et l'ordre des champs. Le refus **frappé en HTTP** en rejouant les champs
+cachés `$ACTION_*` — le chemin exact d'un navigateur sans JavaScript — pour lire le bandeau
+`role="alert"`, les quatre messages servis chacun exactement deux fois hors sérialisation, et
+`aria-invalid` sur les seuls champs refusés. Les écrans **ouverts au navigateur** à 1440 px et
+900 px, et l'état coché vérifié sur un projet qui porte un métier et une approche.
+
+**Deux écarts laissés ouverts**, tous deux hors du périmètre annoncé : le formulaire de produit n'a
+pas suivi, et le bloc des personnes retenues n'a toujours pas d'état vide — `Picker` ne rend rien
+quand personne n'est retenu, et la carte titrée « Équipe » rend désormais cette absence visible sans
+la dire. Le second geste vit dans le socle et toucherait les deux appelants.

@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 29/08/2026, après la refonte de la sélection d'une personne, livrée
-hors ticket. Dernier balayage : découpage de C7. **Le fichier dépasse les 250 lignes de la
-règle 5 — 335 au 29/08/2026** ; le balayage appartient à la session de découpage de C8.
+**Dernière mise à jour :** 29/08/2026, après la reprise d'ergonomie du formulaire de projet,
+livrée hors ticket. Dernier balayage : découpage de C7. **Le fichier dépasse les 250 lignes de la
+règle 5 — 361 au 29/08/2026** ; le balayage appartient à la session de découpage de C8.
 **Chantier en cours :** **C7 — Finitions**, dix tickets, découpés dans `tickets-C7.md`. **Dernier
 chantier du POC** — `docs/05` §5 n'en a pas de huitième.
 **Ticket suivant :** **T7.3 — Administration : l'écran devient multi-référentiel, et les quatre
@@ -108,6 +108,18 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   commentaire qui affirmait le contraire. Ni migration, ni lecture, ni action, ni droit : le diff ne
   déplace que du rendu. **Aucun test neuf — et c'est une révision** : la ligne de faits prévue au
   plan est tombée sur un interdit documenté de `lib/format.ts`. 1 233 tests, inchangés.
+- **Formulaire de projet — reprise d'ergonomie, direction A, hors ticket, 29/08/2026.** Sept gestes
+  tirés d'un canevas de maquettes (douze frictions, trois directions) : les neuf champs à plat
+  passent en **quatre `Section`**, dont le titre de 20 px ne se confond plus avec un intitulé de
+  champ de 10 px — c'était le défaut, et il tombe **sans qu'un libellé de champ bouge** ; les trois
+  champs obligatoires le disent enfin (`required`, écrit depuis TD.1 et jamais passé) ; les cases des
+  deux référentiels deviennent des pastilles de 44 px dont l'état coché est en `has-checked:`, donc
+  en CSS et non calculé au rendu ; le pied prend le filet de `panel.tsx` et « Annuler » passe au rang
+  secondaire ; `objective` et `sponsor` reçoivent l'`aria-invalid` que sept champs sur neuf avaient.
+  Ni migration, ni requête, ni action, ni droit — **aucun `name` ni aucune valeur ne bouge**, et
+  l'ordre de tabulation de T2.6 est servi à l'identique. **Aucun test neuf, et c'est délibéré** : le
+  contrat de saisie est inchangé, les 1 254 tests existants le prouvent. Le refus a été **frappé en
+  HTTP sans JavaScript**, et son rendu lu dans le HTML servi.
 
 ---
 
@@ -223,13 +235,27 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 - **Les deux use cases de la fixture n'ont aucun persona rattaché.** `scripts/seed.ts` n'en sème
   aucun. Le rattachement est facultatif et le lien a été éprouvé par sonde scopée : ce qui manque est
   un **jeu d'essai**. → **au prochain ticket qui sème des personae.**
-- **Deux capacités du bouton n'ont aucun appelant, et c'est une entorse assumée.** Le rang `tertiary`
-  et les props d'icône de `Button` enfreignent l'en-tête de `button.tsx` — objet même de la demande,
-  **éprouvés par sonde**. Premier appelant naturel : le « Annuler » des quatre pieds de formulaire.
-  → **au prochain ticket qui ouvre un pied de formulaire.**
-- **`disabled:opacity-60` est servi sur onze balises qui ne peuvent pas être désactivées** — les
+- **Les props d'icône de `Button` n'ont toujours aucun appelant.** Elles enfreignent l'en-tête de
+  `button.tsx` — objet même de la demande, **éprouvées par sonde**. Le rang `tertiary` a trouvé le
+  sien le 21/08 (le kebab de roadmap) ; l'icône attend encore. → **au prochain ticket qui pose un
+  geste porteur d'icône.**
+- **Un pied de formulaire sur quatre a son « Annuler » au rang secondaire.** Celui du formulaire de
+  projet (29/08). Les trois autres — `product-form.tsx` et les deux pieds de `panel.tsx` et
+  `confirm-panel.tsx` — gardent le lien souligné `ACTION_LINK_SM`, et **la divergence est réelle** :
+  le même geste porte deux rangs selon l'écran. → **au prochain ticket qui ouvre un pied de
+  formulaire.**
+- **`disabled:opacity-60` est servi sur douze balises qui ne peuvent pas être désactivées** — les
   `<a>`, `<Link>` et `<DrawerLink>` qui portent un bouton, contre une seule source pour l'état
-  désactivé. → **sans échéance.**
+  désactivé. La douzième est le « Annuler » du formulaire de projet (29/08). → **sans échéance.**
+- **Le formulaire de projet dit « (obligatoire) », celui de produit non.** `FormField` porte la prop
+  depuis TD.1 ; seul le premier des deux formulaires pleine page la passe, depuis le 29/08. La
+  reprise était bornée à un écran, et l'écart est donc **ouvert, pas assumé**. → **au prochain ticket
+  qui ouvre `product-form.tsx`.**
+- **Le bloc des personnes retenues n'a pas d'état vide.** `Picker` ne rend rien quand personne n'est
+  retenu (`kept.length > 0 ? … : null`), et depuis que la section « Équipe » est une carte titrée,
+  l'absence se voit sans se dire — ce que la règle 5 refuse. Le geste est dans le socle et touche
+  **les deux appelants**, dont les participants du panneau d'activité. → **au prochain ticket qui
+  ouvre `picker.tsx`.**
 
 ### c. Dettes assumées, sans échéance
 

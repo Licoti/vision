@@ -7736,3 +7736,135 @@ prouve qu'il compose (combobox, `aria-expanded`, `aria-autocomplete`, aucun `nam
 et rien de plus. Restent à éprouver au clavier, JavaScript actif : la bascule au montage, `↓`/`↑`,
 `Entrée` qui retient sans soumettre, `Échap` qui ferme la liste **sans** fermer le tiroir, le clic
 extérieur, et le bouton « Retirer ». Le point est ouvert dans `ETAT.md`.
+
+---
+
+## Formulaire de projet — reprise d'ergonomie, direction A, hors ticket (29/08/2026)
+
+Septième reprise hors ticket. **La règle 3 est écartée par celui qui la pose**, comme les
+dix-huit fois précédentes. Le geste est celui des deux reprises du 28/08 : un canevas de maquettes
+porte le diagnostic — douze frictions, chacune vérifiée dans le code — et trois directions
+comparées côte à côte ; l'humain en retient une, et elle seule est écrite.
+
+### Ce que les trois directions coûtaient, et pourquoi A l'emporte
+
+La direction B — un rail de 320 px récapitulant la saisie et portant les gestes, collants — était
+la plus séduisante et **la seule des trois à coûter quelque chose de mesurable** : son rail ne peut
+pas se remplir sans état client, et la propriété « ce formulaire fonctionne sans une ligne de
+JavaScript », mesurée à l'octet le 29/08 au matin, se serait déplacée le jour même où elle venait
+d'être prouvée. La direction C — les trois champs obligatoires puis quatre `<details>` — butait sur
+un interdit : un volet replié est un champ qu'on oublie, et l'indicateur de complétude qui le
+rattraperait est nommément proscrit. Ses volets devaient donc rester ouverts, ce qui annulait son
+bénéfice. **A ne coûte rien à personne**, et c'est le seul argument qui l'a départagée.
+
+### Le défaut réparé tient en une comparaison de deux chaînes
+
+La légende de `<fieldset>` du formulaire portait
+`text-2xs font-semibold text-content-neutral-dark uppercase` ; le `<label>` de `FormField` porte
+`text-2xs font-semibold text-content-neutral-dark uppercase`. **Les deux chaînes sont identiques au
+caractère près.** « Période » et « Début » se ressemblaient donc exactement, et rien dans le rendu
+ne disait lequel des deux contenait l'autre. Le titre de `SectionHeader` fait 20 px et du gras :
+l'ambiguïté tombe **sans qu'un seul libellé de champ change**, ce qui était la condition pour ne pas
+toucher à l'ordre de tabulation mesuré en T2.6.
+
+### Deux `<legend>` en `sr-only`, et pourquoi le `<fieldset>` reste
+
+« Période » et « Équipe » sont devenus des titres de section. Les répéter en légende visible aurait
+fait lire deux fois le même mot ; les supprimer aurait coûté quelque chose de réel — **c'est le
+`<fieldset>` qui nomme le groupe au moment où l'on entre dans un contrôle**, là où le `h2` ne se
+rencontre qu'en parcourant les titres. Le `<fieldset>` reste donc, sa légende passe en `sr-only`, et
+les deux publics gardent chacun le sien. Les légendes des deux référentiels restent **visibles** :
+« Métiers mobilisés » et « Approches » cohabitent dans une section avec « Commanditaire », et c'est
+là, et là seulement, qu'une légende a encore quelque chose à distinguer.
+
+### Le piège de la pastille : un état calculé au rendu aurait menti
+
+La première écriture choisissait la teinte de la pastille depuis `selected.has(option.id)`, c'est-à-dire
+**au rendu**. Elle aurait été juste au premier affichage et fausse à la première coche : les cases
+sont non contrôlées, rien ne re-rend ce `<label>`, et l'utilisateur aurait vu une case cochée dans
+une pastille restée grise. Corrigé avant la première exécution, par `has-checked:` — le sélecteur
+`:has(:checked)`, vérifié compilé dans la feuille servie, qui pointe bien
+`var(--border-primary-base)` et `var(--surface-primary-lightest)` (règle 2 tenue). **Il suit le
+clic, et il fonctionne sans JavaScript** : c'était la condition pour que la pastille soit une
+amélioration et non un troisième état à tenir.
+
+### Contrastes, mesurés
+
+| Couple, neuf par la position | Mesure | Seuil |
+|---|---|---|
+| pastille au repos — `content-neutral-darkest` sur `surface-neutral-pale` | 17,87:1 | 4,5 |
+| pastille au repos — filet `content-neutral-normal` sur la carte | 3,88:1 | 3 |
+| pastille cochée — `content-primary-dark` sur `surface-primary-lightest` | 15,14:1 | 4,5 |
+| pastille cochée — filet `border-primary-base` sur la carte | 13,65:1 | 3 |
+| « (obligatoire) » — `content-neutral-base` sur la carte | 4,98:1 | 4,5 |
+
+**Le filet de la pastille est celui des contrôles, pas celui des blocs**, et le choix est
+raisonné : ce qui se mesure à 3:1 au titre de WCAG 1.4.11 est la **case native**, dessinée par le
+navigateur ; la pastille n'est que l'aire de son intitulé. Elle porte quand même
+`content-neutral-normal` parce qu'une valeur qu'on coche est un contrôle et doit se lire comme tel —
+et parce qu'un filet de bloc (`surface-neutral-lighter`, 1,24:1 sur la carte) aurait été invisible.
+**Aucun substitut n'est inventé** : la règle de T2.3 tient, il n'y a toujours qu'un seul endroit où
+l'enfreindre.
+
+Les trois couples qui échouent — carte sur fond de page 1,05:1, filet de carte 1,24:1, filet du
+pied 1,18:1 — sont la dette déjà consignée « une carte ne se détache d'aucun fond ». Ils sont
+**hérités de `Section`, pas introduits ici**, et repris tels quels.
+
+### Le refus a été frappé, pas raisonné
+
+Le rendu nominal se lit dans le HTML servi ; l'état de refus ne s'y lit pas, puisqu'il n'existe
+qu'après une soumission. Il a donc été **frappé en HTTP**, en rejouant les champs cachés
+`$ACTION_*` du formulaire servi — c'est-à-dire par **le chemin exact d'un navigateur sans
+JavaScript**. Lus dans la réponse : le bandeau `role="alert"`, les quatre messages au mot près de
+`lib/forms/project.ts`, chacun servi **exactement deux fois** hors sérialisation (bandeau et sous
+son champ), `aria-invalid` et `aria-describedby` sur les quatre champs refusés et sur aucun autre,
+et la saisie réaffichée telle quelle. Les occurrences excédentaires vivaient dans `self.__next_f` et
+dans `$ACTION_1:1` — **deux sérialisations d'état, pas deux affichages** ; les compter aurait fait
+conclure à un défaut qui n'existe pas.
+
+### La friction 5 est refermée, et elle ne se voit pas
+
+`objective` et `sponsor` recevaient `borderOf(errors.…)` — donc la bordure rouge — sans jamais
+`aria-invalid` ni `aria-describedby` : deux champs sur neuf sortaient du contrat que les sept autres
+tenaient. **Le trou était latent, pas vivant** : `validateProjectForm` ne pose aucune règle sur ces
+deux champs, aucun refus ne les a donc jamais colorés. Rien n'est observable aujourd'hui ; ce qui
+change est qu'une règle ajoutée demain ne trouvera plus le trou ouvert. Dit ici plutôt que porté au
+crédit du diff.
+
+### Ce qui n'a pas été touché, et c'est la condition de la reprise
+
+Ni migration, ni schéma, ni requête, ni action, ni droit, ni route. **Aucun `name`, aucune valeur,
+aucune règle** : ce que l'action serveur reçoit est identique au caractère près, et l'ordre de
+tabulation servi est celui mesuré en T2.6 — produit, nom, objectif, statut, les deux dates,
+commanditaire, les métiers, les approches, l'équipe, puis les deux gestes, **sans un seul
+`tabindex`**. Les 1 254 tests passent inchangés, et **aucun n'a été ajouté, délibérément** : il n'y a
+pas de règle neuve à mettre en défaut, et un test de rendu n'est de toute façon pas outillé ici
+(`vitest.config.mts` n'inclut que `lib/**` et `app/**`).
+
+### Une pastille de plus, et l'extraction qu'on ne fait pas
+
+`CHIP` est la **quatrième écriture d'une pastille** dans le dépôt, après les chips de filtre des
+produits, ceux de la roadmap et la bascule d'échelle. Aucune des trois n'est une case à cocher — les
+trois sont des liens ou des boutons —, et un composant de socle tiré de quatre formes qui ne
+partagent que le rayon serait un composant que le suivant emploierait de travers. **L'extraction se
+fera le jour où deux pastilles seront des cases à cocher**, pas avant. Consigné plutôt que fait.
+
+### Deux écarts ouverts par cette reprise, et volontairement laissés
+
+**Le formulaire de produit n'a pas suivi.** « (obligatoire) », le pied délimité et le rang
+secondaire d'« Annuler » ne valent aujourd'hui que pour le formulaire de projet : le même geste porte
+donc deux rangs selon l'écran. La reprise était bornée à un écran par la demande ; l'écart est
+**ouvert dans `ETAT.md`, pas assumé**.
+
+**Le bloc des personnes retenues n'a toujours pas d'état vide.** `Picker` ne rend rien quand
+personne n'est retenu, et la carte titrée « Équipe » rend désormais cette absence visible sans la
+dire — ce que la règle 5 refuse. Le geste vit dans le socle et toucherait **les deux appelants** ;
+il sort du périmètre annoncé. Ouvert.
+
+### Ce qui a été parcouru, cette fois
+
+Contrairement à la reprise du 29/08 au matin, **les écrans ont été ouverts** : `/projets/nouveau` et
+`/projets/{id}/modifier` rendus à 1440 px et à 900 px, JavaScript actif, et l'état coché des
+pastilles vérifié sur un projet qui porte un métier et une approche. Rien n'est clipé, les pastilles
+se replient, les deux dates tiennent côte à côte. **Le clavier du `Picker` n'a toujours pas été
+parcouru** — le point reste ouvert, cette reprise ne l'a pas refermé.

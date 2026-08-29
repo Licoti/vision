@@ -17,6 +17,46 @@
  * connaît ni le domaine ni l'identifiant du projet. C'est le serveur qui
  * décide ce que ce formulaire écrit, jamais un champ caché.
  *
+ * ## La reprise du 29/08/2026 — direction A, « Sections », hors ticket
+ *
+ * Le formulaire empilait neuf champs à plat, séparés d'un écart identique de
+ * 24 px, et **rien ne distinguait une section d'un champ** : la légende de
+ * `<fieldset>` portait exactement la typographie du `<label>` de `FormField` —
+ * `text-2xs font-semibold uppercase`, au caractère près. Un canevas de
+ * maquettes a comparé trois directions ; celle-ci a été retenue, et c'est la
+ * seule des trois qui ne coûte rien à la propriété ci-dessus.
+ *
+ * **Quatre `Section`, le langage de carte de la page projet.** Le titre de
+ * section est un `h2` de 20 px gras : il ne peut plus se confondre avec un
+ * intitulé de champ de 10 px. C'était le défaut, et il tombe **sans qu'un seul
+ * libellé de champ bouge**. Le formulaire cesse au passage d'être le dernier
+ * écran de Vision qui ne soit pas composé de cartes.
+ *
+ * **L'ordre des champs ne bouge pas d'un cran** — donc l'ordre de tabulation
+ * non plus : produit, nom, objectif, statut, les deux dates, commanditaire, les
+ * métiers, les approches, l'équipe, puis les deux gestes. C'est l'ordre mesuré
+ * en T2.6, et une reprise d'ergonomie qui le réécrirait aurait à le prouver.
+ *
+ * **Les trois champs obligatoires le disent enfin.** `FormField` sait écrire
+ * « (obligatoire) » depuis TD.1 ; les deux formulaires pleine page ne le lui
+ * passaient pas, et l'on découvrait l'obligation en se la voyant refuser. Seul
+ * ce formulaire est repris — `product-form.tsx` garde l'écart, consigné.
+ *
+ * **Deux `<legend>` passent en `sr-only`.** « Période » et « Équipe » sont
+ * désormais des titres de section ; les répéter en légende visible ferait lire
+ * deux fois le même mot. Le `<fieldset>` reste, lui, et c'est tout l'enjeu :
+ * c'est **lui** qui nomme le groupe à l'assistance quand on entre dans un
+ * contrôle, là où le `h2` ne se rencontre qu'en parcourant les titres. Les deux
+ * légendes des référentiels restent visibles : « Métiers mobilisés » et
+ * « Approches » cohabitent dans une même section avec « Commanditaire », et
+ * c'est là, et là seulement, qu'une légende a encore quelque chose à distinguer.
+ *
+ * **Le pied devient une barre délimitée** — le filet de `panel.tsx`, que les
+ * six panneaux latéraux portaient déjà et que les formulaires pleine page
+ * n'avaient pas —, et « Annuler » y passe du lien souligné au **rang
+ * secondaire**. `ETAT.md` posait le geste depuis TD.3 : « premier appelant
+ * naturel : le "Annuler" des quatre pieds de formulaire ». Il en a un.
+ *
  * **L'entité ne se saisit pas** : elle vient du produit (D24, `docs/02` — elle
  * qualifie les produits). Elle est donc écrite dans le libellé de chaque
  * option, où elle se lit sans JavaScript, plutôt que dans un champ qui aurait
@@ -44,7 +84,9 @@
  *
  * **Rien du contrat de saisie ne bouge.** Une personne non retenue n'a
  * simplement pas de champ `team:<uuid>` dans le `FormData`, ce que
- * `readProjectForm` et `syncMembers` traitent déjà comme un retrait.
+ * `readProjectForm` et `syncMembers` traitent déjà comme un retrait. La reprise
+ * du 29/08 ne touche à **aucun `name`, aucune valeur, aucune règle** : ce que
+ * l'action serveur reçoit est identique, et ses tests le sont donc aussi.
  *
  * Le filet des contrôles est plus sombre que celui des blocs, pour la raison
  * mesurée en T2.3 et reprise en T2.5 : la bordure d'un champ est la limite d'un
@@ -57,7 +99,7 @@ import { useActionState, useId, useState } from "react";
 
 import { AvailabilityDot } from "@/components/team/availability-dot";
 import { ACTION_LINK_SM } from "@/components/ui/action-link";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import {
   borderOf,
   CONTROL_TEXT,
@@ -65,6 +107,7 @@ import {
   FormField,
 } from "@/components/ui/form-field";
 import { Picker } from "@/components/ui/picker";
+import { Section, SectionHeader } from "@/components/ui/section";
 
 import {
   EMPTY_PROJECT_VALUES,
@@ -83,8 +126,53 @@ import type {
 /** Une valeur de référentiel : statut, métier, approche. */
 type ProjectFormOption = { id: string; label: string };
 
-const BLOCK =
-  "flex flex-col gap-3 rounded-lg border border-content-neutral-normal bg-surface-neutral-pale px-4 py-4";
+/**
+ * La pastille d'une valeur de référentiel — une case à cocher, en plus grand.
+ *
+ * **Le défaut réparé est une cible de clic.** Une case native mesure une
+ * quinzaine de pixels et son seul agrandissement est le `<label>` qui la suit ;
+ * treize valeurs de référentiel se cochaient donc sur une bande de vingt
+ * pixels. La pastille porte `px-4 py-3` autour du couple case + texte, ce qui
+ * donne un peu plus de 44 px de haut — le confort visé pour une cible, et le
+ * seul motif de ce changement.
+ *
+ * **La case reste là, et c'est ce qui autorise le filet clair de l'état coché.**
+ * Le contrôle qui se mesure à 3:1 (WCAG 1.4.11) est la case native, dessinée par
+ * le navigateur ; la pastille est l'aire de son intitulé. Elle porte quand même
+ * `content-neutral-normal` au repos — le filet de tous les contrôles de ce
+ * formulaire, 3,88:1 sur la carte — plutôt qu'un filet de bloc, parce qu'une
+ * valeur qu'on coche est un contrôle et se lit comme tel.
+ *
+ * **L'état ne tient pas à la couleur seule** : la case est cochée, et c'est elle
+ * qui porte l'information. Le fond et le filet la redoublent, ils ne la
+ * remplacent pas.
+ *
+ * **La teinte est en CSS, jamais calculée au rendu, et c'est un défaut évité de
+ * peu.** Une classe choisie depuis `selected` aurait été juste au premier
+ * affichage et fausse à la première coche : rien ne re-rend ce `<label>`, les
+ * cases étant non contrôlées. `has-checked:` fait porter l'état par le sélecteur
+ * `:has(:checked)` — il suit le clic, il suit une remise à zéro du formulaire,
+ * et **il fonctionne sans une ligne de JavaScript**, comme le reste de cet
+ * écran.
+ *
+ * Les deux couples sont mesurés sur `surface-neutral-pale`, le fond de la carte :
+ *
+ * | Couple | Ratio |
+ * |---|---|
+ * | `content-neutral-darkest` sur `surface-neutral-pale` — au repos | 17,87:1 |
+ * | `content-neutral-normal` — le filet au repos | 3,88:1 |
+ * | `content-primary-dark` sur `surface-primary-lightest` — coché | 15,14:1 |
+ * | `border-primary-base` — le filet coché | 13,65:1 |
+ *
+ * **C'est la quatrième écriture d'une pastille dans le dépôt**, après les deux
+ * chips de filtre et la bascule d'échelle. Aucune des trois n'est une case à
+ * cocher ; l'extraction se fera le jour où deux le seront. Consigné.
+ */
+const CHIP = [
+  "flex items-center gap-2 rounded-lg border px-4 py-3 text-sm",
+  "border-content-neutral-normal bg-surface-neutral-pale text-content-neutral-darkest",
+  "has-checked:border-border-primary-base has-checked:bg-surface-primary-lightest has-checked:font-medium has-checked:text-content-primary-dark",
+].join(" ");
 
 /**
  * Le rôle qu'affiche une ligne au premier rendu.
@@ -182,316 +270,354 @@ export function ProjectForm({
   );
 
   return (
-    <form action={submit} className="flex max-w-160 flex-col gap-6" noValidate>
+    <form action={submit} className="flex max-w-180 flex-col gap-6" noValidate>
       <FormAlert message={state.message} errors={errors} />
 
-      <FormField
-        label="Produit accompagné"
-        htmlFor={id("productId")}
-        error={errors.productId}
-        errorId={errorId("productId")}
-        note="Le rattachement est obligatoire. L'entité, indiquée à côté de chaque produit, en découle : elle ne se saisit pas."
-      >
-        <select
-          id={id("productId")}
-          name="productId"
-          defaultValue={values.productId}
-          aria-invalid={errors.productId ? true : undefined}
-          aria-describedby={errors.productId ? errorId("productId") : undefined}
-          className={`${CONTROL_TEXT} ${borderOf(errors.productId)}`}
-        >
-          <option value="">Choisir un produit</option>
-          {products.map((product) => (
-            <option key={product.id} value={product.id}>
-              {product.name} — {product.entityLabel}
-            </option>
-          ))}
-        </select>
-      </FormField>
-
-      <FormField
-        label="Nom de l'accompagnement"
-        htmlFor={id("name")}
-        error={errors.name}
-        errorId={errorId("name")}
-      >
-        <input
-          id={id("name")}
-          name="name"
-          type="text"
-          defaultValue={values.name}
-          autoComplete="off"
-          aria-invalid={errors.name ? true : undefined}
-          aria-describedby={errors.name ? errorId("name") : undefined}
-          className={`${CONTROL_TEXT} ${borderOf(errors.name)}`}
+      <Section>
+        <SectionHeader
+          title="Rattachement et identité"
+          note="Sur quel produit porte l'accompagnement, comment il se nomme, et où il en est."
         />
-      </FormField>
 
-      <FormField
-        label="Objectif"
-        htmlFor={id("objective")}
-        error={errors.objective}
-        errorId={errorId("objective")}
-        note="Facultatif. Une phrase qui dit ce que cet accompagnement cherche à obtenir."
-      >
-        <textarea
-          id={id("objective")}
-          name="objective"
-          rows={2}
-          defaultValue={values.objective}
-          className={`${CONTROL_TEXT} ${borderOf(errors.objective)}`}
-        />
-      </FormField>
-
-      <FormField
-        label="Statut"
-        htmlFor={id("statusId")}
-        error={errors.statusId}
-        errorId={errorId("statusId")}
-        note="Le statut est saisi, jamais déduit des activités."
-      >
-        <select
-          id={id("statusId")}
-          name="statusId"
-          defaultValue={values.statusId}
-          aria-invalid={errors.statusId ? true : undefined}
-          aria-describedby={errors.statusId ? errorId("statusId") : undefined}
-          className={`${CONTROL_TEXT} ${borderOf(errors.statusId)}`}
+        <FormField
+          label="Produit accompagné"
+          htmlFor={id("productId")}
+          error={errors.productId}
+          errorId={errorId("productId")}
+          required
+          note="L'entité, indiquée à côté de chaque produit, en découle : elle ne se saisit pas."
         >
-          <option value="">Choisir un statut</option>
-          {statuses.map((status) => (
-            <option key={status.id} value={status.id}>
-              {status.label}
-            </option>
-          ))}
-        </select>
-      </FormField>
+          <select
+            id={id("productId")}
+            name="productId"
+            defaultValue={values.productId}
+            aria-invalid={errors.productId ? true : undefined}
+            aria-describedby={errors.productId ? errorId("productId") : undefined}
+            className={`${CONTROL_TEXT} ${borderOf(errors.productId)}`}
+          >
+            <option value="">Choisir un produit</option>
+            {products.map((product) => (
+              <option key={product.id} value={product.id}>
+                {product.name} — {product.entityLabel}
+              </option>
+            ))}
+          </select>
+        </FormField>
+
+        <FormField
+          label="Nom de l'accompagnement"
+          htmlFor={id("name")}
+          error={errors.name}
+          errorId={errorId("name")}
+          required
+        >
+          <input
+            id={id("name")}
+            name="name"
+            type="text"
+            defaultValue={values.name}
+            autoComplete="off"
+            aria-invalid={errors.name ? true : undefined}
+            aria-describedby={errors.name ? errorId("name") : undefined}
+            className={`${CONTROL_TEXT} ${borderOf(errors.name)}`}
+          />
+        </FormField>
+
+        {/* **`aria-invalid` et `aria-describedby` arrivent ici et sur
+            « Commanditaire »** (29/08/2026). Les deux champs recevaient bien la
+            bordure rouge de `borderOf`, et rien d'autre : la couleur portait
+            seule une information que l'assistance ne recevait pas. Deux champs
+            sur neuf sortaient du contrat que les sept autres tenaient. */}
+        <FormField
+          label="Objectif"
+          htmlFor={id("objective")}
+          error={errors.objective}
+          errorId={errorId("objective")}
+          note="Facultatif. Une phrase qui dit ce que cet accompagnement cherche à obtenir."
+        >
+          <textarea
+            id={id("objective")}
+            name="objective"
+            rows={2}
+            defaultValue={values.objective}
+            aria-invalid={errors.objective ? true : undefined}
+            aria-describedby={errors.objective ? errorId("objective") : undefined}
+            className={`${CONTROL_TEXT} ${borderOf(errors.objective)}`}
+          />
+        </FormField>
+
+        <FormField
+          label="Statut"
+          htmlFor={id("statusId")}
+          error={errors.statusId}
+          errorId={errorId("statusId")}
+          required
+          note="Le statut est saisi, jamais déduit des activités."
+        >
+          <select
+            id={id("statusId")}
+            name="statusId"
+            defaultValue={values.statusId}
+            aria-invalid={errors.statusId ? true : undefined}
+            aria-describedby={errors.statusId ? errorId("statusId") : undefined}
+            className={`${CONTROL_TEXT} ${borderOf(errors.statusId)}`}
+          >
+            <option value="">Choisir un statut</option>
+            {statuses.map((status) => (
+              <option key={status.id} value={status.id}>
+                {status.label}
+              </option>
+            ))}
+          </select>
+        </FormField>
+      </Section>
 
       {/* La période se saisit au jour et se lit au mois (D13) : on saisit plus
           fin qu'on n'affiche, et la fin reste une fin **attendue**. */}
-      <fieldset className="flex flex-col gap-3">
-        <legend className="text-2xs font-semibold text-content-neutral-dark uppercase">
-          Période
-        </legend>
-        <p className="text-xs text-content-neutral-base">
-          {"Facultative. Un accompagnement qui n'a pas de fin prévue s'affichera « depuis » son mois de début."}
-        </p>
-        <div className="flex flex-wrap gap-4">
-          <FormField
-            label="Début"
-            htmlFor={id("startedOn")}
-            error={errors.startedOn}
-            errorId={errorId("startedOn")}
-            className="flex-1"
-          >
-            <input
-              id={id("startedOn")}
-              name="startedOn"
-              type="date"
-              defaultValue={values.startedOn}
-              aria-invalid={errors.startedOn ? true : undefined}
-              aria-describedby={
-                errors.startedOn ? errorId("startedOn") : undefined
-              }
-              className={`${CONTROL_TEXT} ${borderOf(errors.startedOn)}`}
-            />
-          </FormField>
-
-          <FormField
-            label="Fin attendue"
-            htmlFor={id("expectedEndOn")}
-            error={errors.expectedEndOn}
-            errorId={errorId("expectedEndOn")}
-            className="flex-1"
-          >
-            <input
-              id={id("expectedEndOn")}
-              name="expectedEndOn"
-              type="date"
-              defaultValue={values.expectedEndOn}
-              aria-invalid={errors.expectedEndOn ? true : undefined}
-              aria-describedby={
-                errors.expectedEndOn ? errorId("expectedEndOn") : undefined
-              }
-              className={`${CONTROL_TEXT} ${borderOf(errors.expectedEndOn)}`}
-            />
-          </FormField>
-        </div>
-      </fieldset>
-
-      <FormField
-        label="Commanditaire"
-        htmlFor={id("sponsor")}
-        error={errors.sponsor}
-        errorId={errorId("sponsor")}
-        note="Facultatif, en texte libre (D6) : qui, côté entité, porte la demande."
-      >
-        <input
-          id={id("sponsor")}
-          name="sponsor"
-          type="text"
-          defaultValue={values.sponsor}
-          autoComplete="off"
-          className={`${CONTROL_TEXT} ${borderOf(errors.sponsor)}`}
+      <Section>
+        <SectionHeader
+          title="Période"
+          note="Facultative. Un accompagnement qui n'a pas de fin prévue s'affichera « depuis » son mois de début."
         />
-      </FormField>
+        <fieldset>
+          {/* Le titre de section le dit à l'œil ; la légende le dit au moment
+              où l'on entre dans l'un des deux champs. Les deux sont nécessaires
+              et un seul est visible. */}
+          <legend className="sr-only">Période</legend>
+          <div className="flex flex-wrap gap-4">
+            <FormField
+              label="Début"
+              htmlFor={id("startedOn")}
+              error={errors.startedOn}
+              errorId={errorId("startedOn")}
+              className="flex-1"
+            >
+              <input
+                id={id("startedOn")}
+                name="startedOn"
+                type="date"
+                defaultValue={values.startedOn}
+                aria-invalid={errors.startedOn ? true : undefined}
+                aria-describedby={
+                  errors.startedOn ? errorId("startedOn") : undefined
+                }
+                className={`${CONTROL_TEXT} ${borderOf(errors.startedOn)}`}
+              />
+            </FormField>
 
-      {/* D44 — les métiers déclarés du projet font foi pour le filtrage et
-          l'affichage, indépendamment de ceux que porte l'équipe. */}
-      <CheckboxGroup
-        legend="Métiers mobilisés"
-        note="Les métiers déclarés ici font foi pour la liste des projets. Ils peuvent différer de ceux de l'équipe."
-        name="jobIds"
-        idFor={id}
-        options={jobs}
-        checked={values.jobIds}
-        error={errors.jobIds}
-        errorId={errorId("jobIds")}
-        empty="Aucun métier au référentiel du domaine."
-      />
+            <FormField
+              label="Fin attendue"
+              htmlFor={id("expectedEndOn")}
+              error={errors.expectedEndOn}
+              errorId={errorId("expectedEndOn")}
+              className="flex-1"
+            >
+              <input
+                id={id("expectedEndOn")}
+                name="expectedEndOn"
+                type="date"
+                defaultValue={values.expectedEndOn}
+                aria-invalid={errors.expectedEndOn ? true : undefined}
+                aria-describedby={
+                  errors.expectedEndOn ? errorId("expectedEndOn") : undefined
+                }
+                className={`${CONTROL_TEXT} ${borderOf(errors.expectedEndOn)}`}
+              />
+            </FormField>
+          </div>
+        </fieldset>
+      </Section>
 
-      <CheckboxGroup
-        legend="Approches"
-        note="Plusieurs approches par accompagnement sont possibles."
-        name="approachIds"
-        idFor={id}
-        options={approaches}
-        checked={values.approachIds}
-        error={errors.approachIds}
-        errorId={errorId("approachIds")}
-        empty="Aucune approche au référentiel du domaine."
-      />
+      <Section>
+        <SectionHeader
+          title="Cadre de l'accompagnement"
+          note="Qui porte la demande côté entité, et ce que le centre mobilise."
+        />
+
+        <FormField
+          label="Commanditaire"
+          htmlFor={id("sponsor")}
+          error={errors.sponsor}
+          errorId={errorId("sponsor")}
+          note="Facultatif, en texte libre (D6) : qui, côté entité, porte la demande."
+        >
+          <input
+            id={id("sponsor")}
+            name="sponsor"
+            type="text"
+            defaultValue={values.sponsor}
+            autoComplete="off"
+            aria-invalid={errors.sponsor ? true : undefined}
+            aria-describedby={errors.sponsor ? errorId("sponsor") : undefined}
+            className={`${CONTROL_TEXT} ${borderOf(errors.sponsor)}`}
+          />
+        </FormField>
+
+        {/* D44 — les métiers déclarés du projet font foi pour le filtrage et
+            l'affichage, indépendamment de ceux que porte l'équipe. */}
+        <CheckboxGroup
+          legend="Métiers mobilisés"
+          note="Les métiers déclarés ici font foi pour la liste des projets. Ils peuvent différer de ceux de l'équipe."
+          name="jobIds"
+          idFor={id}
+          options={jobs}
+          checked={values.jobIds}
+          error={errors.jobIds}
+          errorId={errorId("jobIds")}
+          empty="Aucun métier au référentiel du domaine."
+        />
+
+        <CheckboxGroup
+          legend="Approches"
+          note="Plusieurs approches par accompagnement sont possibles."
+          name="approachIds"
+          idFor={id}
+          options={approaches}
+          checked={values.approachIds}
+          error={errors.approachIds}
+          errorId={errorId("approachIds")}
+          empty="Aucune approche au référentiel du domaine."
+        />
+      </Section>
 
       {/* D9 — appartenir à l'équipe et avoir le droit d'écrire sont deux
           choses distinctes. Une seule valeur par personne les porte toutes
           les deux : l'état « contributeur sans être membre » n'existe pas. */}
-      <fieldset className="flex flex-col gap-3">
-        <legend className="text-2xs font-semibold text-content-neutral-dark uppercase">
-          Équipe
-        </legend>
-        <Picker
-          searchLabel="Rechercher une personne"
-          placeholder="Un nom, un métier…"
-          note={
-            <p className="text-xs text-content-neutral-base">
-              {"Un membre figure dans l'équipe. Un contributeur y figure et peut, en plus, saisir dans cet accompagnement."}
-            </p>
-          }
-          options={teamOptions}
-          chosen={chosen}
-          onChoose={(personId) =>
-            setChosen((was) =>
-              was.includes(personId) ? was : [...was, personId],
-            )
-          }
-          renderRow={(person, enhanced) => (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              {/* Le nom seul reste dans le `<label>` : c'est le nom
-                  accessible du `select`, et le lui allonger du métier et de
-                  la disponibilité ferait annoncer un profil là où l'on
-                  demande « quel rôle pour cette personne ? ». Le second rang
-                  est donc un frère, désigné par `aria-describedby` — il se
-                  lit à l'œil comme à l'assistance, sans se confondre avec le
-                  nom du contrôle. */}
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <label
-                  htmlFor={id(`team-${person.id}`)}
-                  className="text-sm text-content-neutral-darkest"
-                >
-                  {person.fullName}
-                  {person.kind === "stakeholder" ? (
-                    <span className="text-xs text-content-neutral-dark">
-                      {" · côté entité"}
-                    </span>
-                  ) : null}
-                </label>
-                <span
-                  id={id(`team-${person.id}-profil`)}
-                  className="flex flex-wrap items-center gap-2 text-xs text-content-neutral-base"
-                >
-                  {person.jobLabel ?? "Métier non renseigné"}
-                  {/* Un intervenant côté entité n'a pas de disponibilité :
-                      c'est une propriété du centre, et la ligne n'en invente
-                      aucune (arbitrage (d) de C5bis). */}
-                  {person.availability ? (
-                    <>
-                      <span aria-hidden="true">·</span>
-                      <AvailabilityDot availability={person.availability} />
-                    </>
-                  ) : null}
-                </span>
-              </span>
-              {/* Le rang du rôle : le `select` seul dans le repli — le
-                  balisage d'avant, au caractère près —, le `select` et le
-                  retrait côte à côte quand la recherche est là. */}
-              {enhanced ? (
-                <span className="flex flex-wrap items-center gap-3">
-                  {roleSelect(person, enhanced)}
-                  {/* Le nom accessible dit **qui** on retire : un formulaire
-                      d'équipe en porte autant que de membres, et « Retirer »
-                      seul ne les distinguerait pas. */}
-                  <Button
-                    type="button"
-                    variant="tertiary"
-                    onClick={() =>
-                      setChosen((was) =>
-                        was.filter((kept) => kept !== person.id),
-                      )
-                    }
-                  >
-                    Retirer
-                    <span className="sr-only">{` ${person.fullName} de l'équipe`}</span>
-                  </Button>
-                </span>
-              ) : (
-                roleSelect(person, enhanced)
-              )}
-            </div>
-          )}
-          emptyOptions={
-            <p className="text-sm text-content-neutral-dark">
-              {"Aucune personne référencée dans ce domaine. Une personne se crée dans Équipe, et nulle part ailleurs."}
-            </p>
-          }
-          noMatch="Aucune personne ne correspond à cette recherche."
-          countLabel={(shown, total) =>
-            shown < total
-              ? `${shown} personnes proposées sur ${total} qui correspondent.`
-              : total === 1
-                ? "1 personne correspond."
-                : `${total} personnes correspondent.`
-          }
+      <Section>
+        <SectionHeader
+          title="Équipe"
+          note="Un membre figure dans l'équipe. Un contributeur y figure et peut, en plus, saisir dans cet accompagnement."
         />
+        <fieldset className="flex flex-col gap-3">
+          <legend className="sr-only">Équipe</legend>
+          <Picker
+            searchLabel="Rechercher une personne"
+            placeholder="Un nom, un métier…"
+            /* La note est montée dans le titre de section : la laisser ici en
+               ferait deux, à la même phrase. `Picker` la rend telle qu'on la
+               lui passe, et ne rien passer ne rend rien. */
+            note={null}
+            options={teamOptions}
+            chosen={chosen}
+            onChoose={(personId) =>
+              setChosen((was) =>
+                was.includes(personId) ? was : [...was, personId],
+              )
+            }
+            renderRow={(person, enhanced) => (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                {/* Le nom seul reste dans le `<label>` : c'est le nom
+                    accessible du `select`, et le lui allonger du métier et de
+                    la disponibilité ferait annoncer un profil là où l'on
+                    demande « quel rôle pour cette personne ? ». Le second rang
+                    est donc un frère, désigné par `aria-describedby` — il se
+                    lit à l'œil comme à l'assistance, sans se confondre avec le
+                    nom du contrôle. */}
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <label
+                    htmlFor={id(`team-${person.id}`)}
+                    className="text-sm text-content-neutral-darkest"
+                  >
+                    {person.fullName}
+                    {person.kind === "stakeholder" ? (
+                      <span className="text-xs text-content-neutral-dark">
+                        {" · côté entité"}
+                      </span>
+                    ) : null}
+                  </label>
+                  <span
+                    id={id(`team-${person.id}-profil`)}
+                    className="flex flex-wrap items-center gap-2 text-xs text-content-neutral-base"
+                  >
+                    {person.jobLabel ?? "Métier non renseigné"}
+                    {/* Un intervenant côté entité n'a pas de disponibilité :
+                        c'est une propriété du centre, et la ligne n'en invente
+                        aucune (arbitrage (d) de C5bis). */}
+                    {person.availability ? (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <AvailabilityDot availability={person.availability} />
+                      </>
+                    ) : null}
+                  </span>
+                </span>
+                {/* Le rang du rôle : le `select` seul dans le repli — le
+                    balisage d'avant, au caractère près —, le `select` et le
+                    retrait côte à côte quand la recherche est là. */}
+                {enhanced ? (
+                  <span className="flex flex-wrap items-center gap-3">
+                    {roleSelect(person, enhanced)}
+                    {/* Le nom accessible dit **qui** on retire : un formulaire
+                        d'équipe en porte autant que de membres, et « Retirer »
+                        seul ne les distinguerait pas. */}
+                    <Button
+                      type="button"
+                      variant="tertiary"
+                      onClick={() =>
+                        setChosen((was) =>
+                          was.filter((kept) => kept !== person.id),
+                        )
+                      }
+                    >
+                      Retirer
+                      <span className="sr-only">{` ${person.fullName} de l'équipe`}</span>
+                    </Button>
+                  </span>
+                ) : (
+                  roleSelect(person, enhanced)
+                )}
+              </div>
+            )}
+            emptyOptions={
+              <p className="text-sm text-content-neutral-dark">
+                {"Aucune personne référencée dans ce domaine. Une personne se crée dans Équipe, et nulle part ailleurs."}
+              </p>
+            }
+            noMatch="Aucune personne ne correspond à cette recherche."
+            countLabel={(shown, total) =>
+              shown < total
+                ? `${shown} personnes proposées sur ${total} qui correspondent.`
+                : total === 1
+                  ? "1 personne correspond."
+                  : `${total} personnes correspondent.`
+            }
+          />
 
-        {/* Le seul reste du bloc d'ajout : une adresse. Elle ouvre le panneau
-            de création d'`/equipe` au rendu serveur — même droit
-            `manageDomain` que ce formulaire — et quitte donc cette page : la
-            saisie en cours est perdue, comme elle l'est déjà par le « Créer un
-            produit » de l'état vide. */}
-        <p className="text-xs text-content-neutral-base">
-          <Link href={ROUTES.teamPersonNew} className={ACTION_LINK_SM}>
-            Ajouter une personne dans Équipe
-          </Link>
-        </p>
-
-        {errors.team ? (
-          <p className="text-xs font-semibold text-content-danger-dark">
-            {errors.team}
+          {/* Le seul reste du bloc d'ajout : une adresse. Elle ouvre le panneau
+              de création d'`/equipe` au rendu serveur — même droit
+              `manageDomain` que ce formulaire — et quitte donc cette page : la
+              saisie en cours est perdue, comme elle l'est déjà par le « Créer un
+              produit » de l'état vide. */}
+          <p className="text-xs text-content-neutral-base">
+            <Link href={ROUTES.teamPersonNew} className={ACTION_LINK_SM}>
+              Ajouter une personne dans Équipe
+            </Link>
           </p>
-        ) : null}
-      </fieldset>
 
-      <div className="flex flex-wrap items-center gap-4">
-        <Button
-          type="submit"
-          disabled={pending}
-        >
+          {errors.team ? (
+            <p className="text-xs font-semibold text-content-danger-dark">
+              {errors.team}
+            </p>
+          ) : null}
+        </fieldset>
+      </Section>
+
+      {/* Le pied, délimité — le filet de `panel.tsx`, que les six panneaux
+          latéraux portaient déjà et que les quatre formulaires pleine page
+          n'avaient pas. Il ne colle pas : une barre flottante aurait mangé la
+          dernière ligne de l'équipe sur un écran court, et le formulaire tient
+          désormais en une hauteur qu'on parcourt.
+
+          « Annuler » est un `<Link>` — c'est une adresse, jamais un `<button>`
+          déguisé —, et il porte le rang secondaire par `buttonClass`. Il gagne
+          au passage le `disabled:opacity-60` que la classe sert aux onze balises
+          qui ne peuvent pas être désactivées : douzième, et le point ouvert
+          d'`ETAT.md` reste ouvert. */}
+      <div className="flex flex-wrap items-center gap-4 border-t border-surface-neutral-lighter pt-5">
+        <Button type="submit" disabled={pending}>
           {pending ? "Enregistrement…" : submitLabel}
         </Button>
-        <Link
-          href={cancelHref}
-          className={ACTION_LINK_SM}
-        >
+        <Link href={cancelHref} className={buttonClass({ variant: "secondary" })}>
           Annuler
         </Link>
       </div>
@@ -504,6 +630,11 @@ export function ProjectForm({
  *
  * Un référentiel vide n'est pas une erreur : il se dit, et le formulaire reste
  * soumettable — métiers et approches sont facultatifs (règle 5).
+ *
+ * **La légende reste visible ici, et nulle part ailleurs dans ce formulaire.**
+ * Ces deux groupes partagent une section avec « Commanditaire » : sans leur
+ * légende, on ne saurait pas où finit un champ et où commence un référentiel.
+ * Elle ne se confond plus avec un titre, qui fait désormais 20 px et du gras.
  */
 function CheckboxGroup({
   legend,
@@ -536,12 +667,12 @@ function CheckboxGroup({
       <p className="text-xs text-content-neutral-base">{note}</p>
 
       {options.length > 0 ? (
-        <div className={`${BLOCK} flex-row flex-wrap gap-x-6 gap-y-3`}>
+        <div className="flex flex-wrap gap-2">
           {options.map((option) => (
             <label
               key={option.id}
               htmlFor={idFor(`${name}-${option.id}`)}
-              className="flex items-center gap-2 text-sm text-content-neutral-darkest"
+              className={CHIP}
             >
               <input
                 id={idFor(`${name}-${option.id}`)}
