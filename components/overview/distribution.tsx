@@ -1,8 +1,15 @@
 /**
- * Le bloc « Répartition » — le deuxième des quatre blocs de la vue d'ensemble
- * (`docs/06` §3) : *« combien de projets par statut, par entité, par approche.
- * Sous forme de chiffres et de filtres cliquables, pas de graphiques
- * décoratifs. »*
+ * Le bloc « Répartition » — `docs/06` §3 : *« combien de projets par statut,
+ * par entité, par approche. Sous forme de chiffres et de filtres cliquables,
+ * pas de graphiques décoratifs. »*
+ *
+ * **Il vit dans le rail depuis la reprise du 29/08/2026**, et ce n'est pas un
+ * déplacement de confort : c'est ce qui referme la friction centrale de
+ * l'écran. Posé pleine largeur, `justify-between` séparait « Cadrage » de
+ * « 3 projets » de **1 104 px** — 1240 de `max-w-310`, moins les 80 de `px-10`
+ * sur `main`, moins les 56 de `px-7` sur `Section`. Le rail de 320 px ramène
+ * cet écart à la largeur d'une ligne, et le chiffre passe **devant** son
+ * libellé, comme le fait la maquette de `docs/design/maquettes/vision.html`.
  *
  * **Aucun graphique, et c'est D33 qui le dit** : ce bloc n'a ni barre, ni
  * secteur, ni jauge. Un histogramme dirait la même chose en moins précis et en
@@ -68,7 +75,14 @@ export function Distribution({
     <Section>
       <SectionHeader
         title="Répartition"
-        note="Combien d'accompagnements par statut, par entité et par approche. Chaque nombre ouvre la liste correspondante."
+        /* **La note ne redit plus les trois dimensions** (29/08/2026) : elle
+           énumérait « par statut, par entité et par approche » juste au-dessus
+           des trois `h3` qui portent ces mots-là. C'est le défaut que la
+           reprise de la page projet a nommé — la note dit ce que le bloc est,
+           elle ne récite pas son contenu — et il coûtait quatre lignes dans un
+           rail de 320 px. Ce qui reste est ce que la note seule sait dire :
+           que ces nombres sont des liens. */
+        note="Chaque nombre ouvre la liste correspondante."
       />
 
       {hasAny ? (
@@ -180,8 +194,29 @@ function Dimension({
 }
 
 /**
- * Un chiffre cliquable : le libellé à gauche, le décompte à droite, la ligne
+ * Un chiffre cliquable : le décompte à gauche, le libellé à sa droite, la ligne
  * entière étant la cible du clic.
+ *
+ * **Le chiffre est passé devant le 29/08/2026, et ce n'est pas une préférence
+ * de dessin.** `justify-between` posait le décompte au bord opposé de la carte
+ * — 1 104 px pleine largeur — et l'œil devait traverser un vide pour apparier
+ * « Cadrage » et « 3 projets ». Le vide était en outre **cliquable sans rien
+ * qui le signale** : la cible faisait toute la ligne, le soulignement une
+ * fraction. En rapprochant les deux, l'inversion referme les deux défauts d'un
+ * seul geste — il ne reste de cliquable hors du texte que la fin de ligne.
+ *
+ * **Aucune surface de survol n'a été posée, et c'est une mesure qui l'a
+ * décidé.** `surface-neutral-lightest` sur le fond de carte donne **1,05:1**,
+ * et le plus franc des `surface-neutral-*` plafonne à **2,22:1** : un état de
+ * survol qu'on ne voit pas est pire qu'aucun. C'est le point ouvert d'`ETAT.md`
+ * — *une carte ne se détache d'aucun fond* — rencontré une fois de plus, et
+ * aucun neuvième substitut ne s'invente. Le clavier, lui, est servi :
+ * `*:focus-visible` pose son contour dans `globals.css`.
+ *
+ * **La colonne du nombre est un minimum, pas une largeur.** `min-w-24` aligne
+ * les libellés sur une même verticale tant que le décompte tient dedans, et
+ * cède quand « Aucun projet » dépasse — plutôt que de tronquer le seul cas que
+ * `formatProjects` écrit en toutes lettres.
  *
  * **Le nombre porte le lien, et pas seulement le libellé** : la fiche demande
  * *des chiffres cliquables qui filtrent*, et un chiffre qu'il faudrait viser à
@@ -191,7 +226,8 @@ function Dimension({
  * **Le soulignement porte la nature du lien sans la couleur** : un lien qui ne
  * se distinguerait que par sa teinte serait invisible à qui ne la perçoit pas
  * (`docs/06` §11). `content-info-base` souligné sur `surface-neutral-pale` est
- * le couple servi dans cette position depuis T4.1, repris par le flux voisin.
+ * le couple servi dans cette position depuis T4.1, repris par le flux voisin —
+ * et l'inversion ne le change pas : elle déplace le mot, pas ses couleurs.
  *
  * **Zéro s'écrit « Aucun projet »**, par `formatProjects` — la fonction du
  * compteur de la liste transverse, celle-là même que le lien va rendre. Deux
@@ -211,14 +247,16 @@ function Entry({
        connaître son rang — et non sur le lien, qui est toujours le premier
        enfant du sien. */
     <li className="border-t border-surface-neutral-lighter first:border-t-0">
-      <Link
-        href={href}
-        className="flex items-center justify-between gap-3 py-2"
-      >
-        {children}
-        <span className="text-sm font-semibold text-content-info-base underline">
+      {/* `items-baseline` et non `items-center` : dans 320 px, les deux plus
+          longs libellés d'approche passent à la ligne, et le nombre doit rester
+          aligné sur leur **première** ligne. La pastille de statut s'y range
+          par la ligne de base de son propre texte, donc à la hauteur du
+          nombre. */}
+      <Link href={href} className="flex items-baseline gap-3 py-2">
+        <span className="min-w-24 flex-none text-right text-sm font-semibold text-content-info-base underline">
           {formatProjects(count)}
         </span>
+        {children}
       </Link>
     </li>
   );

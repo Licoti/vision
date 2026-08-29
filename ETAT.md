@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 29/08/2026, après la reprise d'ergonomie du formulaire de projet,
-livrée hors ticket. Dernier balayage : découpage de C7. **Le fichier dépasse les 250 lignes de la
-règle 5 — 361 au 29/08/2026** ; le balayage appartient à la session de découpage de C8.
+**Dernière mise à jour :** 29/08/2026, après la reprise d'ergonomie de la vue d'ensemble, livrée
+hors ticket. Dernier balayage : découpage de C7. **Le fichier dépasse les 250 lignes de la
+règle 5 — 398 au 29/08/2026** ; le balayage appartient à la session de découpage de C8.
 **Chantier en cours :** **C7 — Finitions**, dix tickets, découpés dans `tickets-C7.md`. **Dernier
 chantier du POC** — `docs/05` §5 n'en a pas de huitième.
 **Ticket suivant :** **T7.3 — Administration : l'écran devient multi-référentiel, et les quatre
@@ -120,6 +120,18 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   l'ordre de tabulation de T2.6 est servi à l'identique. **Aucun test neuf, et c'est délibéré** : le
   contrat de saisie est inchangé, les 1 254 tests existants le prouvent. Le refus a été **frappé en
   HTTP sans JavaScript**, et son rendu lu dans le HTML servi.
+- **Vue d'ensemble — reprise d'ergonomie, direction B, hors ticket, 29/08/2026.** Cinq gestes tirés
+  d'un canevas de maquettes (douze frictions, trois directions) : **la répartition passe dans un rail
+  de 320 px**, le récit garde la colonne de lecture, et le flux **ferme** l'écran là où il l'ouvrait.
+  La mesure a mené la reprise — retirer « Accès direct » ne rendait que 235 px sur ≈ 2 830, la
+  hauteur étant portée par les deux listes : **la largeur était le seul levier**, et le chiffre de la
+  répartition, séparé de son libellé de **1 104 px**, est passé devant lui. Les deux décomptes
+  d'« Accès direct » remontent en ligne de faits — `PageHeader.facts`, écrite le 28/08 et **sans
+  aucun appelant dans le dépôt**. **Deux écarts à `docs/06` §3**, assumés : l'ordre des blocs, et le
+  quatrième qui n'est plus rendu. **La surface de survol prévue au plan a été retirée sur mesure** —
+  1,05:1, invisible. Ni migration, ni requête, ni action, ni droit ; **aucun test neuf, et c'est une
+  révision** : le diff ne déplace que du rendu. **Le contrat des seize chiffres a été éprouvé lien
+  par lien**, et la sonde mise en défaut avant d'être crue. 1 254 tests, inchangés.
 
 ---
 
@@ -179,6 +191,25 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   requêtes, panneaux `?lien=`/`?piste=`/`?budget=` et actions restent entiers et testés, et
   « Projets liés » revient d'une dizaine de lignes. Ce qui reste à faire est **le point d'entrée
   annoncé de « Démarrage » — le geste d'ajout d'une activité**. → **C8.**
+- **La liste de `docs/06` §3 porte deux écarts, du 29/08/2026, hors ticket et à la demande.**
+  L'ordre des blocs, que le document dit non neutre, est changé : « Activité récente » **ferme**
+  l'écran au lieu de l'ouvrir. Et **« Accès direct » n'est plus rendu** — quatre blocs énumérés,
+  **trois rendus**. Rien n'est perdu : `countProjects` et `countProducts` gardent un lecteur dans la
+  ligne de faits d'en-tête, avec leurs tests ; seul `shortcuts.tsx` est supprimé, et il ne portait
+  que du rendu. Ce qui reste à trancher est **si le document suit ou si l'écart tient** — `docs/06`
+  §3 est figé, et lui seul dit encore que le flux vient en premier. → **arbitrage humain, sinon C8.**
+- **Deux frictions de l'écran d'accueil sont diagnostiquées et non refermées.** Les deux listes se
+  rendent **ligne pour ligne de la même façon** — même `ol`, même `text-sm` puis
+  `text-xs content-neutral-base` — et leurs titres partagent le mot « activité » pour deux objets
+  sans rapport, `events` d'un côté, `activities` de l'autre (le piège de `docs/04` §4). Les refermer demanderait
+  de changer soit la grammaire de ligne du flux, que `feed.tsx` argumente sur quinze lignes, soit
+  deux titres qui viennent mot pour mot de `docs/06` §3. Aucune reprise d'ergonomie n'a ce droit
+  seule. → **arbitrage humain.**
+- **`/produits` n'affiche aucun compteur, là où `/projets` en affiche un.** Mesuré le 29/08/2026 en
+  suivant les liens de la vue d'ensemble : `app/(app)/projets/page.tsx:184` rend
+  `formatProjects(rows.length)`, la liste des produits ne rend rien d'équivalent — et le commentaire
+  de `shortcuts.tsx`, supprimé le même jour, **affirmait le contraire**. La ligne de faits annonce
+  donc « 5 produits » vers un écran qui rend bien cinq lignes mais ne dit pas son nombre. → **C8.**
 - **La page projet ne consomme toujours pas la prop `facts` de `PageHeader`**, et ce n'est plus un
   oubli : le seul fait qu'on y écrirait est un décompte d'activités, que `lib/format.ts` interdit
   noir sur blanc hors du panneau de suppression — « nulle part ailleurs, et surtout pas sur un écran
@@ -229,9 +260,12 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   suivant. Restent `projets/`, `produits/` et `administration/actions.test.ts` ; le quatrième,
   `equipe/actions.test.ts` (28/08), retient son `domainId` **dès la création du domaine**, hors de la
   fixture — c'est la forme à reprendre. → **au prochain.**
-- **`uiLayerSeal` ne scelle ni `components/shell/` ni `components/overview/`.** Il nomme trois
-  dossiers métier ; il y en a **cinq**, et le second trou compte quatre fichiers (T6.6, T6.7).
-  `eslint.config.mjs` est hors périmètre à chaque fois. → **au prochain qui l'ouvre.**
+- **`uiLayerSeal` ne scelle ni `components/shell/` ni `components/overview/`, et la destination
+  « au prochain qui l'ouvre » a échoué.** Le dossier a été ouvert le 29/08/2026 par la reprise de la
+  vue d'ensemble — trois fichiers touchés, un supprimé — et **le sceau n'a pas été posé** : la
+  reprise ne déplaçait que du rendu, et poser une règle ESLint y aurait été un geste hors périmètre
+  (règle 3). Le trou compte désormais **trois** fichiers et non quatre. Une destination qui désigne
+  un événement plutôt qu'un ticket ne se déclenche pas : celle-ci en reçoit une. → **C8.**
 - **Les deux use cases de la fixture n'ont aucun persona rattaché.** `scripts/seed.ts` n'en sème
   aucun. Le rattachement est facultatif et le lien a été éprouvé par sonde scopée : ce qui manque est
   un **jeu d'essai**. → **au prochain ticket qui sème des personae.**
@@ -263,11 +297,14 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   capitales et le kebab en absolu de `northstar-v2` ; ses voisins gardent `BlockHeader`, sur demande.
   Au second bloc à surtitre, `Eyebrow` quitte `indicators.tsx` pour `block.tsx`.
   → **arbitrage humain.**
-- **Une carte ne se détache d'aucun fond, et c'est le design system qui manque.** Trois positions :
+- **Une carte ne se détache d'aucun fond, et c'est le design system qui manque.** Quatre positions :
   la North Star (1,04:1, sa bordure la sauve à 1,33:1), les cartes de personae (1,05:1, le filet à
-  1,17:1), le panneau de T5bis.4 (1,24:1). Le plus franc des `surface-neutral-*` plafonne à 2,22:1,
-  sous 3:1. **Tous les couples de texte passent 4,5:1.** T7.7 le mesure sans le refermer.
-  → **design system, sinon C8.**
+  1,17:1), le panneau de T5bis.4 (1,24:1), et depuis le 29/08/2026 **la surface de survol d'une
+  ligne de répartition** — `surface-neutral-lightest` sur le fond de carte, **1,05:1**, prévue au
+  plan de la reprise et **retirée sur mesure**. Le plus franc des `surface-neutral-*` plafonne à
+  2,22:1, sous 3:1. **Tous les couples de texte passent 4,5:1.** Le manque ne coûtait qu'un contour
+  de carte ; il coûte désormais **un état d'interaction**, ce qui est une autre affaire. T7.7 le
+  mesure sans le refermer. → **design system, sinon C8.**
 - **Le design system a huit manques, et aucun n'a été inventé.** Trois élévations et deux gradients
   nommés sans valeur ; aucun jeton de bordure de contrôle, de bordure d'erreur, d'interlettrage, de
   voile au-delà de 40 %, de séparateur, de mouvement (`--duration-drawer`, `--easing-drawer` sont

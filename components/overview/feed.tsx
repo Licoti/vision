@@ -1,7 +1,17 @@
 /**
- * Le bloc « Activité récente » — le premier des quatre blocs de la vue
- * d'ensemble (`docs/06` §3), et *« le seul endroit du produit qui donne le
- * sentiment que Vision est vivante »*.
+ * Le bloc « Activité récente » — `docs/06` §3, *« le seul endroit du produit
+ * qui donne le sentiment que Vision est vivante »*.
+ *
+ * **Il ferme l'écran depuis le 29/08/2026, là où il l'ouvrait.** C'est un
+ * **écart assumé à l'ordre de `docs/06` §3**, demandé par l'humain, et la
+ * mesure le justifie : quinze événements font ≈ 900 px, et l'écran commençait
+ * donc par son bloc le plus long — la répartition n'apparaissait qu'après. Le
+ * document reste la référence sur *ce que* l'écran porte ; il a cédé sur
+ * l'ordre. Aucune décision numérotée n'est rouverte : D33 et D41 tiennent.
+ *
+ * **Le bloc lui-même n'a pas bougé d'une classe.** Le flux garde sa liste
+ * ordonnée, ses trois libellés portés en propre et ses interdits ; ce qui a
+ * changé est l'endroit où la page le rend.
  *
  * **Ses lignes sont des événements, jamais des activités**, et c'est ici que
  * le piège de `docs/04` §4 coûte le plus cher. Le bloc porte le nom que

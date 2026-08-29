@@ -1,7 +1,10 @@
 /**
- * Le bloc « Projets sans activité récente » — le troisième des quatre blocs de
- * la vue d'ensemble (`docs/06` §3), qui le veut *« une liste courte, factuelle,
- * sans alerte ni badge »*.
+ * Le bloc « Projets sans activité récente » — `docs/06` §3, qui le veut *« une
+ * liste courte, factuelle, sans alerte ni badge »*.
+ *
+ * **Il ouvre la colonne du récit depuis le 29/08/2026**, le flux ayant pris sa
+ * place en pied d'écran. Le bloc n'a pas bougé d'une classe : c'est la page qui
+ * l'ordonne, et elle seule.
  *
  * **Il dit une date, il ne juge pas.** C'est l'arbitrage (h) de
  * `tickets-C6.md`, et c'est là que la règle coûte le plus cher : rien n'est

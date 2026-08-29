@@ -7868,3 +7868,97 @@ Contrairement à la reprise du 29/08 au matin, **les écrans ont été ouverts**
 pastilles vérifié sur un projet qui porte un métier et une approche. Rien n'est clipé, les pastilles
 se replient, les deux dates tiennent côte à côte. **Le clavier du `Picker` n'a toujours pas été
 parcouru** — le point reste ouvert, cette reprise ne l'a pas refermé.
+
+---
+
+## Vue d'ensemble — reprise d'ergonomie, direction B, hors ticket (29/08/2026)
+
+### La mesure a renversé le plan
+
+Le diagnostic partait de l'évidence : quatre cartes empilées, un écran trop long, deux blocs à
+retirer ou déplacer. **L'addition des hauteurs a dit autre chose.** « Accès direct » ne pèse que
+≈ 235 px sur ≈ 2 830, et la répartition ≈ 795. Ce qui porte la hauteur, ce sont **les deux listes** —
+≈ 900 px pour quinze événements, ≈ 630 pour dix dormants — dont les plafonds sont écrits dans la
+requête (`RECENT_EVENTS_LIMIT`, `STALE_PROJECTS_LIMIT`) et que `feed.tsx` interdit d'annoncer ou de
+paginer.
+
+Aucun geste d'ordre ne pouvait donc raccourcir l'écran de façon décisive. **Le seul levier restant
+était la largeur** : 1 104 px — 1240 de `max-w-310`, moins 80 de `px-10`, moins 56 de `px-7` — dont
+aucun bloc ne se servait, et à travers lesquels `justify-between` jetait le décompte de la
+répartition à l'opposé de son libellé. C'est ce constat, et non l'ordre des blocs, qui a fait
+préférer la direction du rail.
+
+### Le fond de survol prévu au plan est tombé sur une mesure
+
+Le canevas dessinait une surface de survol sur la ligne de répartition, pour refermer la friction
+« la cible du clic dépasse ce qui la signale ». Elle a été **mesurée avant d'être écrite** :
+
+| Fond de survol | Sur `surface-neutral-pale` |
+|---|---|
+| `surface-neutral-lightest` | **1,05:1** |
+| `surface-primary-lightest` | 1,04:1 |
+| `surface-info-lightest` | 1,03:1 |
+| `surface-info-subtle` | 1,13:1 |
+| `surface-neutral-lighter` | 1,24:1 |
+| `surface-neutral-light` | **2,22:1** — le plafond |
+
+Aucun jeton n'atteint 3:1. **Un état de survol qu'on ne voit pas est pire qu'aucun**, et aucun
+neuvième substitut ne s'invente : la surface a été retirée. C'est le point ouvert *« une carte ne se
+détache d'aucun fond »* rencontré une **quatrième** fois — et pour la première fois il coûte un état
+d'interaction, pas seulement un contour. `ETAT.md` est récrit en conséquence.
+
+La friction n'est pas restée entière pour autant : **l'inversion la referme d'elle-même**. Ce qui
+était cliquable sans être signalé, c'était le vide de 1 000 px entre le libellé et le nombre ; en
+rapprochant les deux, il ne reste de cliquable hors du texte que la fin de ligne.
+
+### Les couples mesurés
+
+Quatre couples neufs par la position, tous au-dessus de leur seuil : `content-info-base` sur
+`surface-neutral-lightest` **6,09:1**, `content-neutral-darkest` sur ce même fond **16,98:1**,
+`content-neutral-dark` de la ligne de faits **7,72:1**. Les quatre pastilles de statut, reportées à
+l'identique dans leur nouvelle position, de **6,42:1** à **11,83:1**. Aucun substitut inventé.
+
+### La sonde du contrat, mise en défaut avant d'être crue
+
+Le contrat de la répartition — *suivre le lien rend exactement le nombre annoncé* — a été éprouvé
+**lien par lien sur les seize valeurs**, plus les deux de la ligne de faits.
+
+La première mesure a rendu **neuf défauts**, tous à exactement le double de l'annonce. Le défaut
+était dans la sonde : **une ligne de `/projets` porte deux liens**, l'accompagnement et son produit
+de rattachement, que `docs/06` §4 veut cliquable sur chaque ligne. La sonde comptait les deux.
+Corrigée, elle rend **seize valeurs sur seize**, dont neuf à zéro.
+
+Puis la sonde a été mise en défaut délibérément : `count={entry.count + 1}` sur la seule dimension
+des statuts fait tomber **exactement les quatre lignes de statut, et rien d'autre**. Sans cette
+étape, seize « ok » n'auraient prouvé que la capacité de la sonde à dire « ok ».
+
+### Un commentaire supprimé qui affirmait un fait faux
+
+`shortcuts.tsx` écrivait : *« Les deux pages de destination affichent d'ailleurs déjà ces mêmes
+nombres (`formatProjects`, `formatProducts`) »*. **C'est faux pour la moitié.**
+`app/(app)/projets/page.tsx:184` rend bien `formatProjects(rows.length)` ; la liste des produits ne
+rend **aucun compteur**, et `formatProducts` sert à l'écran Administration, pas à `/produits`. Le
+fait a été trouvé en suivant les liens, pas en lisant le commentaire — et il n'aurait jamais été
+trouvé par `tsc`, par ESLint ni par les 1 254 tests. L'asymétrie est ouverte dans `ETAT.md`.
+
+### Aucun test neuf, et c'est une révision
+
+Le diff ne déplace que du rendu : ni schéma, ni migration, ni requête, ni action, ni droit. Les cinq
+lectures et leur `Promise.all` sont inchangés — `countProjects` et `countProducts` ont changé de
+lecteur, pas d'appelant. **Ce dépôt n'a aucun test de présentation** (`vitest.config.mts` n'inclut
+que `lib/**` et `app/**`), et les 1 254 tests existants passent sans qu'une ligne bouge : c'est
+exactement ce qu'on attend d'un déplacement de rendu, et c'est ce qui le prouve.
+
+Le droit ne s'éprouve pas ici parce qu'**il n'y a rien à éprouver** : la route ne porte aucune
+action serveur — vérifié, `app/(app)/actions.ts` n'existe pas —, les cinq lectures sont ouvertes à
+tout le domaine (D9), et la reprise n'a introduit ni condition ni point d'entrée.
+
+### Ce qui n'a pas été parcouru
+
+**Les écrans n'ont pas été ouverts au navigateur.** Le HTML servi, la feuille de style servie et les
+dix-huit liens du contrat ont été lus par requête ; `min-w-24` a été vérifié dans le CSS généré —
+`calc(var(--number-4) * 24)`, donc par le jeton et non par une valeur —, ainsi que
+`xl:grid-cols-[1fr_320px]` et les deux `xl:col-start-*`. **Mais le repli sous le point d'arrêt, et
+la façon dont les deux plus longs libellés d'approche passent à la ligne dans 320 px, n'ont été
+vérifiés sur aucune largeur réelle.** C'est la contrepartie annoncée de la direction retenue ; elle
+reste à regarder.

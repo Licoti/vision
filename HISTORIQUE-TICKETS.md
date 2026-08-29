@@ -4853,3 +4853,76 @@ cachés `$ACTION_*` — le chemin exact d'un navigateur sans JavaScript — pour
 pas suivi, et le bloc des personnes retenues n'a toujours pas d'état vide — `Picker` ne rend rien
 quand personne n'est retenu, et la carte titrée « Équipe » rend désormais cette absence visible sans
 la dire. Le second geste vit dans le socle et toucherait les deux appelants.
+
+---
+
+## Vue d'ensemble — reprise d'ergonomie, direction B, hors ticket (29/08/2026)
+
+Cinq gestes, tirés d'un **canevas de maquettes** qui a porté, avant qu'une ligne ne soit écrite, un
+diagnostic de l'écran — douze frictions, chacune vérifiée dans le code — et **trois directions
+comparées côte à côte**, chacune avec son axe et sa contrepartie. La direction B a été retenue :
+*le rail des chiffres.*
+
+C'était le **dernier écran de lecture principal qui n'avait pas été relu**. Il s'était construit en
+deux temps — T6.6 pour le flux, T6.7 pour les trois autres blocs —, chaque bloc juste localement, et
+c'est l'écran entier qui portait le défaut : quatre cartes de poids strictement identique, empilées
+sur ≈ 2 830 px, dans une colonne de 1 104 px dont aucune ne se servait.
+
+**Deux gestes demandés, fermes.** « Activité récente » passe en dernier ; « Accès direct »
+disparaît. Les deux forment un **écart à `docs/06` §3**, du même rang que les trois que porte déjà
+`ETAT.md` sur la liste close de §5.
+
+**Quatre arbitrages rendus avant d'écrire.** Aucun graphique, aucune barre, aucune jauge — D33 tient
+et la mini-barre de la maquette de référence n'est pas reprise. Aucun décompte d'événements ni badge
+sur un dormant. Aucune lecture neuve. Aucun geste d'écriture : l'écran reste en lecture seule.
+
+**Ce qui a changé, dans l'ordre de l'écran.**
+
+1. **L'en-tête reçoit sa ligne de faits.** `PageHeader` porte `facts` depuis le 28/08/2026 et
+   **n'avait aucun appelant dans tout le dépôt** ; les deux décomptes d'« Accès direct » y remontent
+   — « 12 projets · 4 produits », au point médian de la page produit. `countProjects` et
+   `countProducts` gardent donc leur lecteur, et leurs tests leur objet.
+2. **La page prend une grille `1fr 320px`**, celle de la page projet, avec ses deux `col-start`
+   explicites : l'ordre du DOM — répartition, dormants, flux — reste l'ordre de lecture et de
+   tabulation dans les deux mises en page, et **le flux est dernier des deux côtés**.
+3. **La répartition part dans le rail**, où son chiffre passe **devant** son libellé, dans une
+   colonne `min-w-24` alignée à droite. C'est le geste central : `justify-between` séparait
+   « Cadrage » de « 3 projets » de **1 104 px**, et la maquette de `docs/design/maquettes/vision.html`
+   mettait déjà le nombre à gauche.
+4. **Sa note cesse de redire son contenu.** Elle énumérait « par statut, par entité et par approche »
+   juste au-dessus des trois `h3` qui portent ces mots — le défaut nommé par la reprise de la page
+   projet. Ce qui reste est ce que la note seule sait dire : que ces nombres sont des liens.
+5. **`shortcuts.tsx` est supprimé** — 118 lignes, dont l'en-tête assumait que le bloc redisait la
+   barre latérale. Avec lui tombe le gabarit de ligne recopié à l'identique dans deux fichiers.
+
+**Ce qui a été prévu et retiré.** Le canevas dessinait une surface de survol sur la ligne de
+répartition. Mesurée avant d'être écrite : `surface-neutral-lightest` sur le fond de carte donne
+**1,05:1**, et le plus franc des `surface-neutral-*` plafonne à **2,22:1**. Aucun jeton n'atteint
+3:1, aucun neuvième substitut ne s'invente, et un état de survol qu'on ne voit pas est pire
+qu'aucun : la surface est tombée. La friction qu'elle visait est refermée autrement — c'est
+l'inversion qui supprime les 1 000 px de vide cliquable.
+
+**Vérification.** 1 254 tests verts, **inchangés, et c'est la conséquence de ce que le diff est** :
+il ne déplace que du rendu, et ce dépôt n'a aucun test de présentation. `tsc` et
+`npm run lint --max-warnings=0` propres.
+
+Le critère se lit dans le HTML servi : **plus aucune occurrence d'« Accès direct »**, la ligne de
+faits rendue, la grille `xl:grid-cols-[1fr_320px]` avec ses deux `col-start`, la ligne de
+répartition servie **nombre d'abord, pastille ensuite**, et l'ordre des titres
+`h1 · h2 Répartition · h3 ×3 · h2 Projets sans activité récente · h2 Activité récente` **sans niveau
+sauté**. `min-w-24` a été lu dans la feuille servie : `calc(var(--number-4) * 24)`, donc par le
+jeton.
+
+Le contrat des chiffres cliquables a été **éprouvé lien par lien** — seize valeurs sur seize, dont
+neuf à zéro, plus les deux de la ligne de faits. La sonde a rendu neuf faux défauts au premier
+passage (une ligne de `/projets` porte deux liens, l'accompagnement et son produit), puis a été
+**mise en défaut délibérément** : un `+1` sur la seule dimension des statuts fait tomber exactement
+ses quatre lignes, et rien d'autre.
+
+Le droit ne s'éprouve pas ici parce qu'il n'y a rien à éprouver : la route ne porte **aucune action
+serveur**, et les cinq lectures sont ouvertes à tout le domaine (D9).
+
+**Et une affirmation fausse a été trouvée en mesurant** : le commentaire de `shortcuts.tsx` disait
+que les deux pages de destination affichaient déjà ces nombres. `/produits` n'affiche **aucun
+compteur** — l'asymétrie est ouverte dans `ETAT.md`. Les mesures de contraste, la mesure des
+hauteurs et les deux frictions laissées ouvertes sont au journal technique.
