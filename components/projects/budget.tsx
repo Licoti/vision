@@ -1,17 +1,25 @@
 /**
- * Le bloc « Budget » — le dernier des cinq blocs de référence de `docs/06` §5,
- * et la dernière promesse non tenue de la page projet (D28).
+ * Le budget — **un rang de la fiche d'identité** depuis le 28/08/2026, et le
+ * dernier des cinq blocs de référence de `docs/06` §5 à avoir reçu son contenu
+ * (D28).
  *
  * `budgets` était au schéma depuis la migration `0000` et n'avait jamais reçu
  * une ligne : le bloc s'annonçait en carte de référence, avec la phrase de ce
  * qu'il porterait un jour. **Il porte désormais son contenu, donc il n'annonce
- * plus rien** — c'est la règle de « Projets liés » en T6.4, et la rangée des
- * blocs annoncés disparaît avec lui puisqu'il n'en restait qu'un.
+ * plus rien** — c'est la règle de « Projets liés » en T6.4.
  *
- * Il se rend **après « Projets liés », avant « Journal »**, dans la colonne du
- * récit et non dans le rail droit. Le rail porte les blocs que l'on consulte de
- * biais — indicateurs, ressources — sur 380 px ; le budget porte quatre couples
- * nom/valeur et un lien sortant, qui se lisent en rangée.
+ * **Il a cessé d'être un bloc**, et c'est un écart assumé à `docs/06` §5, dont
+ * la liste de cinq est close. C'est le **deuxième** à cette même liste, après
+ * « Projets liés » masqué le 28/08 : la page rend trois de ses blocs et porte le
+ * quatrième en rang. La raison est de mise en page — quatre couples nom/valeur
+ * et un lien sortant sont exactement ce qu'une fiche de référence sait porter,
+ * là où un bloc de la colonne du récit leur donnait une carte entière. Consigné
+ * dans `JOURNAL-TECHNIQUE.md`.
+ *
+ * **Conséquence à écrire pendant qu'elle est visible** : l'ancre `#budget`
+ * disparaît avec la `Section`. Une future barre de sous-navigation
+ * (`components/projects/subnav.tsx`, sans appelant depuis le 21/08) a donc une
+ * cible de moins — comme elle en avait déjà perdu deux le 28/08.
  *
  * **Une synthèse macro et un lien, rien d'autre** (`docs/02` §5). Ce que ce bloc
  * n'affiche pas est aussi important que ce qu'il affiche : **aucun reste à
@@ -28,23 +36,23 @@
  * qui quitte Vision doit être reconnaissable avant le clic.* La marque est une
  * forme et un texte, jamais une couleur seule.
  *
- * `editHref` à `null` retire le geste des **deux** emplacements — l'en-tête et
- * l'état vide. Le composant ne connaît aucun droit : c'est l'appelant qui les
- * lit, la règle de `Roadmap`, de `Resources` et de `RelatedProjects`. Et un
- * état vide qui proposerait un geste à qui ne peut pas l'accomplir serait un
- * cul-de-sac de plus.
+ * `editHref` à `null` retire le geste des **deux** emplacements — la rangée
+ * d'actions et l'état vide. Le composant ne connaît aucun droit : c'est
+ * l'appelant qui les lit, la règle de `Roadmap`, de `Resources` et de
+ * `RelatedProjects`. Et un état vide qui proposerait un geste à qui ne peut pas
+ * l'accomplir serait un cul-de-sac de plus.
  *
  * Le composant ne lit aucune base : `budget` est ce que `findProjectBudget` a
  * déjà lu et joint.
  */
 
 import { ACTION_LINK } from "@/components/ui/action-link";
+import { BlockDivider } from "@/components/ui/block";
 import { ButtonIcon, buttonClass } from "@/components/ui/button";
 import { DrawerLink } from "@/components/ui/drawer";
 import { BlockNote } from "@/components/ui/empty-state";
 import { ExternalLink } from "@/components/ui/external-link";
 import { Field } from "@/components/ui/field";
-import { Section, SectionHeader } from "@/components/ui/section";
 import { formatDay, formatResultValue } from "@/lib/format";
 import type { BudgetUnit, ProjectBudget } from "@/lib/queries/budgets";
 
@@ -74,7 +82,7 @@ function Missing({ feminine = false }: { feminine?: boolean }) {
   );
 }
 
-export function Budget({
+export function BudgetRank({
   budget,
   editHref,
 }: {
@@ -93,24 +101,24 @@ export function Budget({
   const consumed = budget ? formatResultValue(budget.consumed, unit) : null;
 
   return (
-    <Section id="budget">
-      <SectionHeader
-        title="Budget"
-        {...(budget && editHref
-          ? {
-              action: (
-                <DrawerLink
-                  href={editHref}
-                  request={{ kind: "budget" }}
-                  aria-label="Modifier le budget de cet accompagnement"
-                  className={ACTION_LINK}
-                >
-                  Modifier
-                </DrawerLink>
-              ),
-            }
-          : {})}
-      />
+    <>
+      {/* L'intertitre de rang de la page produit, repris tel quel : c'est le
+          langage que `components/ui/block.tsx` porte depuis le 18/08/2026, et
+          `personas.tsx`, `use-cases.tsx` et la roadmap produit lui passent tous
+          le même filet sur une surface pâle. Un troisième dessin de coupure
+          n'avait aucune raison d'être inventé ici.
+
+          Le `h3` est le seul de la page projet, et il ne saute aucun niveau :
+          il vit sous le `h2` de la fiche. */}
+      {/* **Sans note, et c'est la largeur qui tranche.** `BlockDivider` pose
+          son titre, sa note et son filet sur une seule ligne `flex` : dans le
+          rail de 320 px, une note d'une phrase prend toute la place restante et
+          **le filet disparaît**, si bien que l'intertitre ne se lit plus comme
+          une coupure mais comme une étiquette égarée. Mesuré au rendu, pas
+          supposé. Les notes que les autres appels lui passent sont des
+          décomptes — « 3 accompagnements » —, et c'est la largeur qu'il sait
+          porter ici. Le titre suffit : « Budget » ne demande pas de glose. */}
+      <BlockDivider title="Budget" rule="bg-surface-neutral-lighter" />
 
       {budget ? (
         /* Quatre couples nom/valeur : `Field` les écrit en `<dt>`/`<dd>`, ce qui
@@ -162,6 +170,30 @@ export function Budget({
           ) : null}
         </div>
       )}
-    </Section>
+
+      {/* **Le geste quitte l'en-tête faute d'en-tête**, et prend la rangée
+          alignée à droite que `resources.tsx` et `adopted-indicators.tsx`
+          servent déjà sous leurs cartes. Aucun dessin neuf : c'est le même
+          `ACTION_LINK`, au même endroit relatif — après ce qu'il modifie.
+
+          Il ne paraît qu'avec un budget à modifier : l'état vide porte son
+          propre geste, « Saisir le budget », et les deux ne se rencontrent
+          jamais.
+
+          Un `div` et non un `p` : la rangée voisine porte un `<form>` chez ses
+          deux modèles, et le gabarit reste le leur. */}
+      {budget && editHref ? (
+        <div className="flex flex-wrap items-center justify-end gap-4">
+          <DrawerLink
+            href={editHref}
+            request={{ kind: "budget" }}
+            aria-label="Modifier le budget de cet accompagnement"
+            className={ACTION_LINK}
+          >
+            Modifier
+          </DrawerLink>
+        </div>
+      ) : null}
+    </>
   );
 }

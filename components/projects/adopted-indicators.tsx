@@ -97,6 +97,7 @@ export function AdoptedIndicators({
     <Section id="indicateurs">
       <SectionHeader
         title="Indicateurs adoptés"
+        note="Les indicateurs du produit que cet accompagnement reprend à son compte."
         {...(addHref
           ? {
               action: <AdoptIndicator href={addHref} variant="secondary" />,
@@ -120,10 +121,13 @@ export function AdoptedIndicators({
         </ul>
       ) : (
         <div className="flex flex-col items-start gap-4">
+          {/* Même geste que chez « Ressources » et « Journal » : la moitié qui
+              annonçait le bloc est devenue la `note` de l'en-tête, et ce qui
+              reste ici est ce qu'elle ne dit pas — le chemin de création, qui
+              n'est pas sur cet écran. Sans lui, l'état vide serait un
+              cul-de-sac. */}
           <BlockNote>
-            Les indicateurs du produit que cet accompagnement reprend à son
-            compte s&apos;afficheront ici, avec leur valeur de référence, la
-            cible fixée et le dernier relevé. Un indicateur se crée sur{" "}
+            Un indicateur se crée sur{" "}
             <Link
               href={productHref}
               className="text-content-info-base underline"
@@ -169,7 +173,6 @@ function AdoptionCard({
   removeAdoption?: () => Promise<void>;
 }) {
   const northStar = adoption.isNorthStar;
-  const target = formatResultValue(adoption.targetValue, adoption.unit);
 
   return (
     <div
@@ -201,71 +204,86 @@ function AdoptionCard({
           La date se lit **au mois** (D13), et un indicateur sans relevé le dit :
           il n'est **jamais posé à aujourd'hui** (`docs/03` §7).
 
-          **La cible est à droite, et elle reste un repère** : un nombre écrit à
-          côté d'un autre, sans barre qui les rapporte l'un à l'autre ni phrase
-          qui dise ce qu'il en manque (D39). */}
-      <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <LastReading adoption={adoption} big={northStar} />
-        <span
-          className={`ml-auto text-xs font-semibold ${
-            northStar
-              ? "text-content-warning-darker"
-              : "text-content-neutral-dark"
-          }`}
-        >
-          {target === null ? "Pas de cible définie" : `Cible ${target}`}
-        </span>
-      </div>
+          **La cible, la référence et la valeur finale tiennent désormais la
+          même rangée que lui** (28/08/2026) : elles s'empilaient sur trois
+          niveaux parce que le bloc vivait dans un rail de 380 px, et le bloc a
+          quitté le rail. Les quatre nombres se lisent d'un seul balayage.
 
-      {/* Les deux valeurs que la maquette ne montre pas, et qui n'ont aucun
-          autre écran : la référence d'où l'accompagnement est parti, et la
-          valeur qu'il a inscrite en fin de parcours. `Field` est repris tel
-          quel — mêmes jetons, mêmes balises —, la rangée seule est écrite ici :
-          le filet supérieur de `FieldRow` appartient à l'en-tête de la page. */}
-      <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2">
-        <Field label="Référence">
-          <Reported value={adoption.baselineValue} unit={adoption.unit} />
-        </Field>
-        <Field label="Valeur finale">
-          <Reported value={adoption.finalValue} unit={adoption.unit} />
-        </Field>
-      </dl>
+          **La cible reste un repère, et rien de plus** : un nombre écrit à côté
+          d'un autre, sans barre qui les rapporte l'un à l'autre ni phrase qui
+          dise ce qu'il en manque (D39). La mettre en `Field` comme ses deux
+          voisines lui retire même le `ml-auto` qui l'appariait au relevé.
 
-      {/* Un `div` et non un `p` : `<form>` est du contenu de flux, et un
-          paragraphe n'accepte que du phrasé — le balisage servi serait réécrit
-          par le navigateur, et l'hydratation divergerait (T4bis.5).
+          `Field` est repris tel quel — mêmes jetons, mêmes balises —, la rangée
+          seule est écrite ici : le filet supérieur de `FieldRow` appartenait à
+          l'en-tête de la page, qui n'en a plus. */}
+      <div className="mt-4 flex flex-wrap items-end gap-x-8 gap-y-4">
+        <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <LastReading adoption={adoption} big={northStar} />
+        </p>
 
-          **« Retirer », et non « Archiver »** : le geste défait une liaison par
-          `unlink` (arbitrage (f)), il n'archive rien. Sans confirmation :
-          `docs/06` §9 la proscrit là où elle ne protège rien.
+        <dl className="flex flex-wrap items-end gap-x-8 gap-y-4">
+          {/* **La cible passe par `Reported`, comme ses deux voisines**
+              (28/08/2026). Elle écrivait sa propre absence — « Pas de cible
+              définie » —, ce qui était juste tant qu'elle vivait hors d'un
+              couple nom/valeur ; sous une étiquette « Cible », la phrase se
+              redisait elle-même. Et `Reported` documente précisément ce cas :
+              *adopter un indicateur sans fixer de cible est un geste normal.*
+              Un mot pour les trois absences, et une seule règle de mise en
+              forme du chiffre. */}
+          <Field label="Cible">
+            <Reported value={adoption.targetValue} unit={adoption.unit} />
+          </Field>
+          <Field label="Référence">
+            <Reported value={adoption.baselineValue} unit={adoption.unit} />
+          </Field>
+          <Field label="Valeur finale">
+            <Reported value={adoption.finalValue} unit={adoption.unit} />
+          </Field>
+        </dl>
 
-          Le nom accessible porte le libellé de l'indicateur : « Modifier »
-          répété quatre fois dans une liste de liens ne dit pas laquelle. */}
-      {editHref || removeAdoption ? (
-        <div className="mt-3 flex flex-wrap items-center justify-end gap-4">
-          {editHref ? (
-            <DrawerLink
-              href={editHref}
-              request={{ kind: "adoption", id: adoption.id }}
-              aria-label={`Modifier l'adoption de l'indicateur ${adoption.label}`}
-              className={ACTION_LINK}
-            >
-              Modifier
-            </DrawerLink>
-          ) : null}
-          {removeAdoption ? (
-            <form action={removeAdoption}>
-              <button
-                type="submit"
-                aria-label={`Retirer l'adoption de l'indicateur ${adoption.label}`}
+        {/* **Les deux gestes rejoignent la rangée des nombres** (28/08/2026),
+            poussés à son extrémité par `ml-auto` plutôt qu'empilés dessous.
+            Aucun dessin neuf : le même `ACTION_LINK`, le même formulaire nu,
+            les mêmes libellés — seule la place change, et elle change pour la
+            raison qui l'avait fixée là, la largeur du rail.
+
+            Un `div` et non un `p` : `<form>` est du contenu de flux, et un
+            paragraphe n'accepte que du phrasé — le balisage servi serait
+            réécrit par le navigateur, et l'hydratation divergerait (T4bis.5).
+
+            **« Retirer », et non « Archiver »** : le geste défait une liaison
+            par `unlink` (arbitrage (f)), il n'archive rien. Sans confirmation :
+            `docs/06` §9 la proscrit là où elle ne protège rien.
+
+            Le nom accessible porte le libellé de l'indicateur : « Modifier »
+            répété quatre fois dans une liste de liens ne dit pas laquelle. */}
+        {editHref || removeAdoption ? (
+          <div className="ml-auto flex flex-wrap items-center gap-4">
+            {editHref ? (
+              <DrawerLink
+                href={editHref}
+                request={{ kind: "adoption", id: adoption.id }}
+                aria-label={`Modifier l'adoption de l'indicateur ${adoption.label}`}
                 className={ACTION_LINK}
               >
-                Retirer
-              </button>
-            </form>
-          ) : null}
-        </div>
-      ) : null}
+                Modifier
+              </DrawerLink>
+            ) : null}
+            {removeAdoption ? (
+              <form action={removeAdoption}>
+                <button
+                  type="submit"
+                  aria-label={`Retirer l'adoption de l'indicateur ${adoption.label}`}
+                  className={ACTION_LINK}
+                >
+                  Retirer
+                </button>
+              </form>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

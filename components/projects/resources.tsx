@@ -86,6 +86,7 @@ export function Resources({
     <Section id="ressources">
       <SectionHeader
         title="Ressources"
+        note="Les documents produits par l'accompagnement, là où ils sont hébergés."
         {...(addHref
           ? {
               action: <LinkResource href={addHref} variant="secondary" />,
@@ -98,42 +99,50 @@ export function Resources({
           {resources.map((resource) => (
             <li
               key={resource.id}
-              className="rounded-xl border border-surface-neutral-lighter p-4"
+              className="flex flex-wrap items-center gap-4 rounded-xl border border-surface-neutral-lighter p-4"
             >
-              <ExternalLink
-                href={resource.url}
-                className="text-sm font-semibold text-content-info-base underline"
-              >
-                {resource.title}
-              </ExternalLink>
+              <div className="min-w-60 flex-1">
+                <ExternalLink
+                  href={resource.url}
+                  className="text-sm font-semibold text-content-info-base underline"
+                >
+                  {resource.title}
+                </ExternalLink>
 
-              {/* Les libellés sont portés en propre pour l'assistance : hors du
-                  contexte visuel, « PowerPoint · Test utilisateur » ne dit pas
-                  lequel des deux est le type. Le `·` est décoratif — la même
-                  règle que sur la liste transverse depuis T2.3.
+                {/* Les libellés sont portés en propre pour l'assistance : hors du
+                    contexte visuel, « PowerPoint · Test utilisateur » ne dit pas
+                    lequel des deux est le type. Le `·` est décoratif — la même
+                    règle que sur la liste transverse depuis T2.3.
 
-                  Il garde en revanche la couleur du texte qu'il sépare, là où
-                  les trois écrans précédents l'écrivent en
-                  `content-neutral-light` : ici les deux côtés ont exactement la
-                  même graisse et la même taille, et un séparateur mesuré à
-                  2,22:1 entre eux laisserait lire « PowerPoint Test
-                  utilisateur ». Aucun couple neuf n'est introduit — c'est celui
-                  du texte, à 4,98:1. */}
-              <p className="mt-1 text-xs text-content-neutral-base">
-                <span className="sr-only">Type : </span>
-                {formatResourceType(resource.resourceType)}
-                {resource.activityLabel ? (
-                  <>
-                    <span aria-hidden="true">{" · "}</span>
-                    <span className="sr-only">Activité : </span>
-                    {resource.activityLabel}
-                  </>
-                ) : null}
-              </p>
+                    Il garde en revanche la couleur du texte qu'il sépare, là où
+                    les trois écrans précédents l'écrivent en
+                    `content-neutral-light` : ici les deux côtés ont exactement la
+                    même graisse et la même taille, et un séparateur mesuré à
+                    2,22:1 entre eux laisserait lire « PowerPoint Test
+                    utilisateur ». Aucun couple neuf n'est introduit — c'est celui
+                    du texte, à 4,98:1. */}
+                <p className="mt-1 text-xs text-content-neutral-base">
+                  <span className="sr-only">Type : </span>
+                  {formatResourceType(resource.resourceType)}
+                  {resource.activityLabel ? (
+                    <>
+                      <span aria-hidden="true">{" · "}</span>
+                      <span className="sr-only">Activité : </span>
+                      {resource.activityLabel}
+                    </>
+                  ) : null}
+                </p>
+              </div>
 
-              {/* Les deux gestes de T4bis.5, sous la ligne de description et
-                  jamais à droite du titre : le bloc vit dans un rail de 380 px,
-                  et une colonne d'actions y écraserait le titre.
+              {/* **Les deux gestes de T4bis.5 sont remontés à droite du titre**
+                  (28/08/2026). Ils vivaient sous la ligne de description, et le
+                  commentaire qui les y tenait disait pourquoi : *le bloc vit
+                  dans un rail de 380 px, et une colonne d'actions y écraserait
+                  le titre.* **Ce n'est plus vrai** — le bloc a quitté le rail
+                  pour la colonne du récit, où la largeur ne manque plus.
+
+                  Aucun dessin neuf : c'est le même `ACTION_LINK`, le même
+                  formulaire nu, les mêmes libellés. Seule la place change.
 
                   Le nom accessible porte le titre de la ressource, comme celui
                   de « Modifier » dans la roadmap : « Modifier » répété dix fois
@@ -150,7 +159,7 @@ export function Resources({
                   serait réécrit par le navigateur, et l'hydratation
                   divergerait. */}
               {editHref || archiveResource ? (
-                <div className="mt-3 flex flex-wrap items-center justify-end gap-4">
+                <div className="flex flex-wrap items-center gap-4">
                   {editHref ? (
                     <DrawerLink
                       href={editHref(resource.id)}
@@ -179,10 +188,14 @@ export function Resources({
         </ul>
       ) : (
         <div className="flex flex-col items-start gap-4">
+          {/* **La phrase a maigri le 28/08/2026, parce que sa moitié est
+              remontée.** Elle annonçait le bloc — « les liens vers les documents
+              de l'accompagnement s'afficheront ici, avec leur type et l'activité
+              qui les a produits » —, et cette moitié-là est devenue la `note` de
+              l'en-tête. Ce qui reste est ce que la note ne dit pas : la règle
+              qui explique pourquoi il n'y a rien à téléverser. */}
           <BlockNote>
-            Les liens vers les documents de l&apos;accompagnement
-            s&apos;afficheront ici, avec leur type et l&apos;activité qui les a
-            produits. Vision n&apos;héberge aucun fichier : elle renvoie vers
+            Vision n&apos;héberge aucun fichier : elle renvoie vers
             l&apos;outil qui le porte.
           </BlockNote>
           {addHref ? <LinkResource href={addHref} variant="primary" /> : null}

@@ -4664,3 +4664,73 @@ plus de phrase de masquage, une hiérarchie de titres sans niveau sauté, et les
 qui résolvent tous vers un jeton dans la feuille servie. Le seul couple de couleurs neuf par la
 position — bouton secondaire sur la surface bleue — est mesuré à **3,74:1 sur son filet**. Les
 mesures et les dettes sont au journal technique.
+
+
+---
+
+## Page projet — reprise d'ergonomie, direction B, hors ticket (28/08/2026)
+
+Huit gestes, tirés d'un **canevas de maquettes** qui a porté deux choses avant qu'une ligne ne soit
+écrite : un diagnostic de l'écran — douze frictions, chacune vérifiée dans le code — et **trois
+directions comparées côte à côte**, chacune avec son axe et son compromis. La direction B a été
+retenue : *la fiche à droite, le récit à gauche.*
+
+La page s'était construite par sédimentation depuis le 20/08/2026 — passage à `project-v2`,
+dégraissage le 21/08, deux blocs effacés le 28/08 au matin. Chaque geste juste localement ; l'écran
+entier n'avait jamais été relu.
+
+**Trois arbitrages rendus avant d'écrire.** Les CTA ne se redessinent pas — `Button`, `buttonClass()`
+et `ACTION_LINK` restent inchangés, seule leur **position** bouge. Le budget devient un rang de la
+fiche. La fiche n'est pas collante.
+
+**Ce qui a changé, dans l'ordre de l'écran.**
+
+1. **L'en-tête perd sa carte.** Les 172 lignes de la carte `project-v2` cèdent à un `PageHeader` nu
+   posé sur le fond de page, comme celui de la page produit : `overline` porte l'entité, et il ne
+   reste que ce qui **nomme** — le nom, l'objectif, les gestes.
+2. **`identity.tsx` est neuf** : une `Section` « Identité » dans le rail, six champs (statut,
+   période, rang, commanditaire, approches, équipe) que l'en-tête portait en deux blocs distincts —
+   une ligne de situation composée à la main et une `FieldRow`. Rangée qui se replie sous `xl`,
+   colonne dans le rail.
+3. **`Budget` devient `BudgetRank`** : plus de `Section`, un `BlockDivider` et les mêmes quatre
+   champs, dans la fiche. **Deuxième écart à la liste close de `docs/06` §5.**
+4. **La grille s'inverse** — `1fr 320px` au lieu de `1fr 380px`, et l'ordre du DOM devient
+   [fiche, récit], retourné à l'écran par deux `col-start` explicites. En pile, la fiche est donc
+   **au-dessus** du récit, là où les deux colonnes se suivaient et faisaient passer le journal devant
+   les indicateurs et les ressources.
+5. **Tout le récit passe à gauche**, et **l'ordre du rail se corrige** : il rendait « Indicateurs
+   adoptés » avant « Ressources » sous un commentaire qui affirmait suivre `docs/06` §5 — dont le
+   tableau donne « Ressources » en premier.
+6. **Hors du rail, les deux blocs cessent d'être comprimés** : leurs gestes remontent à droite du
+   titre de chaque carte, et l'adoption étale sa valeur, sa cible et ses deux valeurs reportées sur
+   une rangée au lieu de trois. Aucun dessin neuf. La cible passe par `Reported`, comme ses deux
+   voisines — elle écrivait sa propre absence, qui se redisait sous une étiquette « Cible ».
+7. **Le journal sort de son `<details>`** — le geste de la page produit, transposé.
+8. **Les quatre titres nus reçoivent leur note**, et les états vides maigrissent d'autant : la note
+   dit ce que le bloc est, l'état vide dit ce qui viendra et offre le geste.
+
+**Ce qui a été prévu et retiré.** Le plan posait une ligne de faits sur `PageHeader` — « 5
+activités · mars 2026 → oct. 2026 ». La fonction et ses tests ont été écrits, et le compilateur a
+révélé que `formatActivities` existait déjà, **avec un interdit dans son en-tête** : un décompte
+d'activités ne s'affiche « nulle part ailleurs, et surtout pas sur un écran de lecture », étant la
+mesure d'activité que D39 interdit. Tout a été rendu à son état d'origine. La prop `facts` reste
+donc sans emploi sur cette page, et le point est ouvert dans `ETAT.md`.
+
+**Vérification.** 1 233 tests verts — **inchangés, et c'est la conséquence du retrait ci-dessus** :
+le diff ne déplace que du rendu, et ce dépôt n'a aucun test de présentation. `tsc` et
+`npm run lint --max-warnings=0` propres.
+
+Le critère se lit dans le HTML servi : **plus aucun `<details>`**, **plus aucune carte d'en-tête**
+(`px-8 py-7` à zéro), le surtitre d'entité, la grille en `1fr 320px` avec ses deux `col-start`,
+l'ordre servi des titres `h1 · h2 Identité · h3 Budget · h2 Roadmap · h2 Ressources · h2 Indicateurs
+· h2 Journal` **sans niveau sauté**, et `?budget=saisie` qui ouvre toujours son panneau — un
+`role="dialog"`, un `inert`, et **rien** quand une seconde clé l'accompagne.
+
+Le droit s'éprouve par l'action : `saveProjectBudget` refuse toujours l'accompagnement archivé
+**reçu**, ce qu'éprouve depuis T7.1 un test qui se lit à la base.
+
+**Et trois défauts n'ont été trouvés qu'au rendu**, invisibles dans le HTML : le filet du rang
+« Budget » écrasé par sa note dans 320 px, les notes de bloc qui redisaient mot pour mot leur état
+vide, et la note de la fiche qui affirmait une stabilité que ses deux premiers champs démentent. Les
+mesures de contraste — trois couples neufs par la position, de 4,73:1 à 16,98:1 — et les écarts sont
+au journal technique.

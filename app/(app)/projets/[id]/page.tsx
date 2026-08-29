@@ -138,7 +138,7 @@ import {
 } from "./actions";
 import { restoreProject } from "../actions";
 import { AdoptedIndicators } from "@/components/projects/adopted-indicators";
-import { Budget } from "@/components/projects/budget";
+import { Identity } from "@/components/projects/identity";
 import { Resources } from "@/components/projects/resources";
 import { Journal } from "@/components/projects/journal";
 import { Starters } from "@/components/projects/starters";
@@ -148,11 +148,7 @@ import { ActionMenu, MENU_ITEM_DANGER } from "@/components/ui/action-menu";
 import { Button, buttonClass } from "@/components/ui/button";
 import { DrawerHost, DrawerLink } from "@/components/ui/drawer";
 import { ArchivedNotice } from "@/components/ui/archived-notice";
-import { AvatarGroup } from "@/components/ui/avatar";
-import { Field, FieldRow } from "@/components/ui/field";
 import { Page, PageHeader } from "@/components/ui/page";
-import { StatusPill } from "@/components/ui/status-pill";
-import { Tag } from "@/components/ui/tag";
 import { loadProjectDrawer } from "./drawers";
 import { requireSession } from "@/lib/auth/provider";
 import {
@@ -160,7 +156,6 @@ import {
   PROJECT_PANEL_PARAMS,
   resolveProjectDrawer,
 } from "@/lib/drawers/project";
-import { formatPeriod, formatRank } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
 import { listProjectRoadmap } from "@/lib/queries/activities";
 import { findProjectBudget } from "@/lib/queries/budgets";
@@ -367,45 +362,27 @@ export default async function ProjectPage({
           />
         ) : null}
 
-        {/* L'en-tête d'identité, dans la carte que dessine
-            `docs/design/maquettes/blocs/project-v2` : le statut et la situation
-            sur une ligne, le nom, l'objectif, les gestes à droite — puis, sous
-            un filet, les quatre champs qui permettent de comprendre le projet
-            sans faire défiler (`docs/06` §5). */}
-        <div className="rounded-2xl border border-surface-neutral-lighter bg-surface-neutral-pale px-8 py-7">
-          {/* **La période et le rang tiennent sur la ligne du statut**
-              (20/08/2026) : « depuis février 2026 · 2ᵉ accompagnement de ce
-              produit ». Le rang menait déjà à la page produit — c'est la règle
-              de continuité de `docs/06` §7, et la maquette, elle, pointait vers
-              l'accompagnement voisin. Il descendait sous l'objectif ; la
-              maquette le remonte, où il se lit comme ce qu'il est : une
-              situation, non un contenu.
+        {/* **L'en-tête perd sa carte** (28/08/2026, direction B) : c'est un
+            `PageHeader` nu posé sur le fond de page, exactement comme celui de
+            la page produit. Il ne porte plus que ce qui **nomme** —
+            l'entité en surtitre, le nom, l'objectif, les gestes.
 
-              Le `·` est décoratif et sépare deux suites de texte de même
-              graisse : il garde donc leur couleur, la règle de T4bis.5. */}
-          <p className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-2 text-xs text-content-neutral-base">
-            <StatusPill
-              nature={project.statusNature}
-              label={project.statusLabel}
-            />
-            <span>{formatPeriod(project.startedOn, project.expectedEndOn)}</span>
-            {rank !== null ? (
-              <>
-                <span aria-hidden="true">·</span>
-                <Link
-                  href={ROUTES.product(project.productId)}
-                  className="text-content-info-base underline"
-                >
-                  {formatRank(rank)}
-                </Link>
-              </>
-            ) : null}
-          </p>
+            Ce qu'il portait en plus descend dans la fiche d'identité du rail :
+            la ligne de situation composée à la main (statut, période, rang) et
+            la rangée de quatre champs. Le détail de l'arbitrage, et l'écart à
+            `docs/06` §5 qu'il ouvre, vivent dans `identity.tsx`.
 
-          <PageHeader
-            title={project.name}
-            {...(project.objective ? { lead: project.objective } : {})}
-            action={
+            **Il ne porte pas de ligne de faits, et c'est une règle du dépôt qui
+            l'en empêche** : le seul fait qu'on aurait écrit ici est un nombre
+            d'activités, et `lib/format.ts` pose noir sur blanc qu'un décompte
+            d'activités ne s'affiche « nulle part ailleurs, et surtout pas sur un
+            écran de lecture » — ce serait la mesure d'activité que D39 interdit.
+            La prop `facts` du socle reste donc sans emploi ici. */}
+        <PageHeader
+          overline={project.entityLabel}
+          title={project.name}
+          {...(project.objective ? { lead: project.objective } : {})}
+          action={
               session.can.manageDomain ? (
                 <span className="flex flex-wrap items-center gap-3">
                   {archived ? (
@@ -492,59 +469,6 @@ export default async function ProjectPage({
             }
           />
 
-          <FieldRow>
-            <Field label="Entité">{project.entityLabel}</Field>
-
-            <Field label="Commanditaire">
-              {project.sponsor ?? (
-                <span className="text-content-neutral-base">Non renseigné</span>
-              )}
-            </Field>
-
-            <Field label="Approches">
-              {project.approachLabels.length > 0 ? (
-                <span className="flex flex-wrap gap-1.5">
-                  {project.approachLabels.map((label) => (
-                    <Tag key={label} label={label} />
-                  ))}
-                </span>
-              ) : (
-                <span className="text-content-neutral-base">
-                  Aucune approche déclarée
-                </span>
-              )}
-            </Field>
-
-            {/* **L'équipe passe en pile d'avatars et décompte** (20/08/2026,
-                maquette `project-v2`), là où les noms s'écrivaient en toutes
-                lettres. Ils ne disparaissent pas : `AvatarGroup` les porte en
-                texte de remplacement, mention « côté entité » comprise, et la
-                teinte de chaque pastille la redit à l'œil. La couleur ne porte
-                donc pas seule (`docs/06` §11) — elle double une information que
-                l'assistance reçoit en toutes lettres. Arbitré le 20/08/2026. */}
-            <Field label="Équipe">
-              {project.team.length > 0 ? (
-                <AvatarGroup
-                  size="md"
-                  count={`${project.team.length} ${
-                    project.team.length > 1 ? "personnes" : "personne"
-                  }`}
-                  names={project.team.map((member) => ({
-                    fullName: member.fullName,
-                    tone: member.kind === "stakeholder" ? "stakeholder" : "center",
-                    ...(member.kind === "stakeholder"
-                      ? { note: "côté entité" }
-                      : {}),
-                  }))}
-                />
-              ) : (
-                <span className="text-content-neutral-base">
-                  Aucun membre désigné
-                </span>
-              )}
-            </Field>
-          </FieldRow>
-        </div>
 
         {/* **La barre d'ancres a été retirée le 21/08/2026**, à la demande.
             Elle vivait ici depuis la veille, d'après la maquette `project-v2`.
@@ -553,19 +477,47 @@ export default async function ProjectPage({
             sections restent posés — un ancrage qui ne coûte rien et qu'aucune
             barre ne vise plus, `scroll-mt-19` compris, que le commentaire de
             `Section` annonce déjà inerte en l'absence d'ancre. */}
-        {/* **Deux colonnes** (maquette `project-v2`) : le récit à gauche, les
-            blocs de référence chiffrés dans un rail de 380 px à droite. La
-            roadmap garde donc sa position dominante — `docs/06` §5 et D31 — et
-            « Ressources » puis « Indicateurs adoptés » restent lisibles sans
-            faire défiler le récit entier, ce qu'une pile ne permettait pas.
-            L'ordre du document est tenu **à l'intérieur du rail**.
+        {/* **Deux colonnes, et l'inverse de celles du 20/08/2026**
+            (28/08/2026, direction B) : le récit et tout ce qu'il produit à
+            gauche, la référence stable à droite. Le rail passe de 380 à 320 px
+            parce qu'il ne porte plus que des couples nom/valeur — ce qui rend
+            aux ressources et aux indicateurs la largeur qui leur manquait.
 
             Le gabarit est un **point d'arrêt de mise en page**, hors de la
-            règle des espacements (arbitrage du journal de T1.6). Sous `xl`, une
-            seule colonne : un rail de 380 px sur une largeur utile de 700 px
-            écraserait le récit. */}
-        <div className="grid items-start gap-5 xl:grid-cols-[1fr_380px]">
-          <div className="flex min-w-0 flex-col gap-5">
+            clause 2 de `spacingScaleLock` (arbitrage du journal de T1.6). Sous
+            `xl`, une seule colonne.
+
+            **L'ordre du DOM est [fiche, récit], et le placement de grille le
+            retourne à l'écran.** C'est ce qui répare la pile : jusqu'ici les
+            deux colonnes se suivaient, si bien que sous `xl` l'ordre servi
+            devenait roadmap → budget → journal → indicateurs → ressources — le
+            journal, « information de contrôle, pas de compréhension », passait
+            devant les deux premiers blocs de référence de `docs/06` §5.
+            Désormais la fiche est en tête de pile, à la place exacte
+            qu'occupait la rangée de champs, et **l'ordre du DOM reste l'ordre
+            de lecture dans les deux mises en page** — donc l'ordre de
+            tabulation aussi. Deux `col-start` explicites plutôt qu'un `order` :
+            la propriété se lit dans la grille, pas dans un décalage. */}
+        <div className="grid items-start gap-5 xl:grid-cols-[1fr_320px]">
+          {/* La fiche d'identité. Le point d'entrée du budget tombe avec le
+              **même** `canWrite` que les douze gestes de la page — le droit
+              d'écrire dans ce projet (D9, arbitrage (e) : `writeProject`,
+              jamais `manageDomain`) et la lecture seule d'un accompagnement
+              archivé (T4bis.3) —, et **aucune condition ne s'ajoute ici**.
+
+              `productHref` n'est pas un droit : c'est la remontée de
+              `docs/06` §7, et elle vaut pour qui lit comme pour qui écrit. */}
+          <div className="flex min-w-0 flex-col gap-5 xl:col-start-2 xl:row-start-1">
+            <Identity
+              project={project}
+              rank={rank}
+              productHref={ROUTES.product(project.productId)}
+              budget={budget}
+              budgetEditHref={canWrite ? ROUTES.projectBudget(project.id) : null}
+            />
+          </div>
+
+          <div className="flex min-w-0 flex-col gap-5 xl:col-start-1 xl:row-start-1">
             {/* Le récit, en position dominante : il vient avant tout bloc de
                 référence (`docs/06` §5). L'action d'ouverture du panneau
                 n'existe que pour qui peut écrire dans ce projet (D9) : le
@@ -648,56 +600,39 @@ export default async function ProjectPage({
                 et c'est `openLink` qui décide, pas ce rendu. La clé reste dans
                 `keys` : le décompte d'exclusivité reste à neuf. */}
 
-            {/* **Le dernier bloc de `docs/06` §5, et il porte enfin son
-                contenu** (T7.1, D28). Il était le seul qui restait annoncé, et
-                la rangée des blocs annoncés disparaît avec lui : `REFERENCE_BLOCKS`
-                et son `map` s'en vont, un tableau vide et une boucle dessus
-                étant une annonce que plus personne ne lit.
+            {/* **Ressources puis Indicateurs — et c'est un ordre qui se
+                corrige** (28/08/2026). Les deux vivaient dans le rail, rendus
+                dans l'ordre inverse sous un commentaire qui affirmait suivre
+                `docs/06` §5 : le tableau du document donne « Ressources » en
+                premier, « Indicateurs » en second. Le rendu disait le contraire
+                de ce qu'il déclarait.
 
-                À sa place exacte — après « Projets liés », avant « Journal » ;
-                le premier ayant été masqué le 28/08/2026, il suit désormais la
-                roadmap, sans que son rang dans `docs/06` §5 ait bougé.
-                Dans la colonne du récit et non dans le rail : il porte quatre
-                couples nom/valeur et un lien sortant en rangée, qui ne tiennent
-                pas sur 380 px.
+                Hors du rail, les deux blocs **cessent d'être comprimés** :
+                leurs gestes remontent à droite du titre de chaque carte, là où
+                380 px les repoussaient sous la description.
 
-                Le point d'entrée tombe avec le **même** `canWrite` que les onze
-                gestes qui précèdent — le droit d'écrire dans ce projet (D9,
-                arbitrage (e) : `writeProject`, jamais `manageDomain`) et la
-                lecture seule d'un accompagnement archivé (T4bis.3) —, et
-                **aucune condition ne s'ajoute ici**. C'est la propriété que ce
-                `&&` cherchait, tenue pour un douzième geste. */}
-            <Budget
-              budget={budget}
-              editHref={canWrite ? ROUTES.projectBudget(project.id) : null}
+                Les points d'entrée de chacun tombent avec le **même** `canWrite`
+                que ceux de la roadmap — le droit d'écrire dans ce projet (D9) et
+                la lecture seule d'un accompagnement archivé (T4bis.3) —, et
+                **aucune condition ne s'ajoute ici**.
+
+                `productHref` n'est pas un droit : c'est le renvoi de l'arbitrage
+                (c), et il vaut pour qui lit comme pour qui écrit — un indicateur
+                se crée sur la page du produit, jamais ici. */}
+            <Resources
+              resources={projectResources}
+              addHref={canWrite ? ROUTES.projectResourceNew(project.id) : null}
+              editHref={
+                canWrite
+                  ? (resourceId) =>
+                      ROUTES.projectResourceEdit(project.id, resourceId)
+                  : null
+              }
+              archiveResource={
+                canWrite ? archiveResource.bind(null, project.id) : null
+              }
             />
 
-            {/* **Le journal en dernier** (`docs/06` §5) : c'est une information
-                de contrôle, pas de compréhension, et sa place dans le document
-                le dit avant que son contenu ne le dise.
-
-                Aucun droit ne lui est passé, et il n'y en a aucun à passer : le
-                bloc ne s'écrit pas, sa lecture est ouverte à tout le domaine
-                (D9), et un accompagnement archivé garde son journal comme il
-                garde sa roadmap (règle 4, T4bis.3). C'est le seul bloc de cette
-                page que `canWrite` ne touche pas. */}
-            <Journal events={journal} />
-          </div>
-
-          {/* Le rail droit. Les deux blocs qui portent des chiffres reportés,
-              dans l'ordre de `docs/06` §5 : les indicateurs, puis les
-              ressources.
-
-              Les points d'entrée de chacun tombent avec le **même** `canWrite`
-              que ceux de la roadmap — le droit d'écrire dans ce projet (D9) et
-              la lecture seule d'un accompagnement archivé (T4bis.3) —, et
-              **aucune condition ne s'ajoute ici**. C'est la propriété que ce
-              `&&` cherchait, tenue pour un dixième geste.
-
-              `productHref` n'est pas un droit : c'est le renvoi de l'arbitrage
-              (c), et il vaut pour qui lit comme pour qui écrit — un indicateur
-              se crée sur la page du produit, jamais ici. */}
-          <div className="flex min-w-0 flex-col gap-5">
             <AdoptedIndicators
               adoptions={adoptions}
               addHref={canWrite ? ROUTES.projectIndicatorNew(project.id) : null}
@@ -713,19 +648,24 @@ export default async function ProjectPage({
               productHref={ROUTES.product(project.productId)}
             />
 
-            <Resources
-              resources={projectResources}
-              addHref={canWrite ? ROUTES.projectResourceNew(project.id) : null}
-              editHref={
-                canWrite
-                  ? (resourceId) =>
-                      ROUTES.projectResourceEdit(project.id, resourceId)
-                  : null
-              }
-              archiveResource={
-                canWrite ? archiveResource.bind(null, project.id) : null
-              }
-            />
+            {/* **Le budget n'est plus ici** (28/08/2026) : il est devenu le
+                rang « Budget » de la fiche d'identité, dans le rail. L'écart à
+                `docs/06` §5 qu'ouvre ce déplacement — le deuxième à la même
+                liste close, après « Projets liés » — est écrit dans
+                `components/projects/budget.tsx`. Le point d'entrée, lui, n'a
+                pas bougé d'un caractère : `?budget=saisie` ouvre le même
+                panneau sous le même `canWrite`. */}
+
+            {/* **Le journal en dernier** (`docs/06` §5) : c'est une information
+                de contrôle, pas de compréhension, et sa place dans le document
+                le dit avant que son contenu ne le dise.
+
+                Aucun droit ne lui est passé, et il n'y en a aucun à passer : le
+                bloc ne s'écrit pas, sa lecture est ouverte à tout le domaine
+                (D9), et un accompagnement archivé garde son journal comme il
+                garde sa roadmap (règle 4, T4bis.3). C'est le seul bloc de cette
+                page que `canWrite` ne touche pas. */}
+            <Journal events={journal} />
           </div>
         </div>
       </Page>

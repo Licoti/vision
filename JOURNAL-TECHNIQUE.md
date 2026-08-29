@@ -7469,3 +7469,140 @@ Le bouton « Ajouter un relevé » du rang North Star emprunte `addReadingHref`,
 chaque carte d'indicateur ouvrait déjà, sous le même `canWriteIndicators`. Aucune action, aucune
 route et aucune dérivation de droit n'ont été touchées : **le diff ne déplace que du rendu**, ce qui
 est précisément la raison pour laquelle il n'y avait rien à éprouver par l'action.
+
+
+---
+
+## Page projet — reprise d'ergonomie, direction B, hors ticket (28/08/2026)
+
+Huit gestes sur la page projet, demandés par l'humain après un canevas de maquettes qui a porté un
+diagnostic d'écran — douze frictions, toutes vérifiées dans le code — et **trois directions
+comparées côte à côte**. La direction B a été retenue : *la fiche à droite, le récit à gauche.*
+**Explicitement dispensés de ticket** — la règle 3 est donc écartée par celui qui la pose, comme
+elle l'a été dix-huit fois entre le 17 et le 28/08/2026.
+
+Trois arbitrages ont été rendus **avant** d'écrire : les CTA ne se redessinent pas (seule leur
+position bouge), le budget devient un rang de la fiche, la fiche n'est pas collante.
+
+### Le piège : une ligne de faits qui n'avait pas le droit d'exister
+
+Le plan validé posait une `facts` sur `PageHeader` — « 5 activités · mars 2026 → oct. 2026 » —, sur
+le modèle exact de la page produit. La fonction a été écrite, ses trois tests aussi, et **`vitest` a
+refusé de compiler : `formatActivities` existait déjà**, écrite le 28/08 le matin même pour le
+panneau de suppression.
+
+Ce n'est pas la collision qui compte, c'est ce que son en-tête disait :
+
+> **Ils ne s'affichent nulle part ailleurs, et surtout pas sur un écran de lecture.** Un nombre
+> d'activités posé à côté d'un accompagnement serait la mesure d'activité que D39 interdit ; ici, il
+> est le contenu d'une mise en garde, lue une fois, avant un geste irréversible.
+
+**L'interdit était écrit, daté, et à l'endroit exact où on allait le franchir.** La ligne de faits a
+donc été retirée entièrement — pas réduite : le second segment seul, une étendue de dates sans son
+décompte, se serait lu comme la période de l'accompagnement, laquelle est écrite trente pixels plus
+loin dans la fiche. Deux périodes sur un écran, dont une sans étiquette, valent moins que zéro.
+
+**La leçon est sur la méthode, pas sur la règle** : un plan qui prévoit d'ajouter une fonction
+n'ajoute rien tant qu'il n'a pas cherché si elle existe. Le `grep` coûtait dix secondes ; il a été
+fait par le compilateur, après l'écriture des tests. La prop `facts` reste donc **sans emploi sur la
+page projet**, et le point est ouvert dans `ETAT.md` : ce qui manque n'est pas du code, c'est
+l'arbitrage de *quel fait un accompagnement peut porter en tête*.
+
+### Trois écarts, dont deux ouverts par ce diff
+
+**1. Le budget cesse d'être un bloc de `docs/06` §5.** La liste des cinq blocs de référence est
+close ; elle en compte désormais **trois rendus et un en rang** — « Projets liés » masqué le matin,
+« Budget » descendu dans la fiche l'après-midi. La raison est de mise en page : quatre couples
+nom/valeur et un lien sortant sont exactement ce qu'une fiche de référence sait porter.
+**Conséquence écrite pendant qu'elle est visible** : l'ancre `#budget` disparaît avec la `Section`,
+et le point T7.5 perd une troisième cible.
+
+**2. L'identité quitte l'en-tête.** `docs/06` §5 veut « tout ce qui permet de comprendre le projet
+sans faire défiler » dans l'en-tête. L'intention tient — sur grand écran la fiche est à droite, sans
+défilement ; en pile elle est **au-dessus** du récit, à la place exacte qu'occupait la `FieldRow` —
+mais la lettre non.
+
+**3. Le journal n'est plus replié.** `docs/06` §5 dit « frise repliée par défaut ». Le geste est
+celui de la page produit le même jour, et pour la même raison : son contenu tient en quatre lignes,
+et un chevron de 10 px coûte plus cher que ce qu'il cache. La règle d'or reste tenue autrement — le
+journal est **en dernier**, et sa place dit qu'il est une information de contrôle.
+
+### Un écart refermé, que le diagnostic n'avait pas vu
+
+**Le rail rendait « Indicateurs adoptés » avant « Ressources »**, sous un commentaire qui affirmait
+suivre `docs/06` §5 — dont le tableau donne « Ressources » en premier. Le rendu disait le contraire
+de ce qu'il déclarait, depuis le 20/08/2026. Il est remis dans l'ordre du document.
+
+C'est le cas d'école du commentaire qui vieillit **faux** plutôt que muet : il nommait sa source, ce
+qui le rendait crédible, et personne ne l'avait rouvert.
+
+### Ce que seul le rendu a trouvé — trois défauts qu'aucune lecture de HTML n'attrape
+
+Le critère se lit dans le HTML servi, et il s'y est lu. Mais **trois défauts n'y étaient pas
+lisibles**, et une capture d'écran les a rendus en un coup d'œil :
+
+| défaut | ce que le HTML disait | ce que le rendu montrait |
+|---|---|---|
+| le filet du rang « Budget » | `BlockDivider` présent, avec sa note | **le filet réduit à zéro** — `flex` le laisse à la note, qui prend toute la place dans 320 px |
+| les notes de bloc | deux `<p>` distincts, l'un dans l'en-tête, l'autre dans l'état vide | **la même phrase deux fois**, à trente pixels d'écart |
+| la note de la fiche | « Ce qui ne change pas au fil de l'accompagnement. » | **elle est fausse** : statut et période changent, et sont les deux premiers champs |
+
+Le premier est une leçon de composant : **la `note` de `BlockDivider` est faite pour un décompte**
+— « 3 accompagnements » —, pas pour une phrase. Sur un `Block` pleine largeur elle passe ; dans un
+rail de 320 px elle mange le filet, et l'intertitre cesse d'être une coupure pour devenir une
+étiquette égarée. Le rang « Budget » n'en porte donc aucune.
+
+Le deuxième est le prix de la friction D7 : ajouter une note à un bloc dont l'état vide annonçait
+déjà le bloc, c'est écrire la phrase deux fois. La règle qui en sort, appliquée aux trois blocs :
+**la note dit ce que le bloc est, l'état vide dit ce qui viendra et offre le geste.** Les trois états
+vides ont maigri d'autant.
+
+### Le contraste, mesuré
+
+**Trois couples seulement sont neufs par la position**, et ce sont ceux de l'en-tête, qui quitte la
+surface d'une carte pour le fond de page :
+
+| couple | mesure | seuil |
+|---|---|---|
+| surtitre `content-neutral-base` sur `surface-neutral-lightest` | 4,73:1 | 4,5 |
+| titre `content-neutral-darkest` sur `surface-neutral-lightest` | 16,98:1 | 4,5 |
+| objectif `content-neutral-dark` sur `surface-neutral-lightest` | 7,72:1 | 4,5 |
+
+**La fiche n'en introduit aucun**, et c'est vérifié plutôt que supposé : `Block` en tonalité
+`neutral` et `Section` portent la **même** surface, `bg-surface-neutral-pale`. Un `BlockDivider`
+posé dans une `Section` est donc, au pixel de couleur près, celui que `personas.tsx` sert depuis le
+18/08 — 8,12:1 pour l'intertitre, 1,24:1 pour le filet, séparateur décoratif qui ne porte aucune
+frontière de composant.
+
+### Ce qui n'a pas été touché, et pourquoi c'est la propriété qui compte
+
+**Ni migration, ni lecture, ni route, ni action, ni dérivation de droit.** Le vol de sept lectures
+ne bouge pas, `canWrite` reste le point de bascule unique, et **aucune condition ne s'ajoute** — la
+propriété que le `&&` de T4bis.3 cherchait, tenue une fois de plus alors que douze gestes changent
+de place.
+
+Le budget en est la démonstration : il change d'emplacement, **pas de porte**. `?budget=saisie`
+ouvre le même panneau sous le même `canWrite` (mesuré au rendu : un `role="dialog"`, un `inert`, et
+**rien** quand une seconde clé accompagne la première — le décompte d'exclusivité reste à dix), et
+`saveProjectBudget` refuse toujours l'accompagnement archivé **reçu**, ce qu'éprouve depuis T7.1 un
+test qui se lit à la base et non au code HTTP.
+
+### La fiche n'est pas collante, et c'est mesuré
+
+La maquette l'annonçait collante. Ses six champs et son rang de budget font près de 700 px : sur une
+fenêtre de portable elle la remplit presque, et **une fiche plus haute que la fenêtre ne se lit pas
+au-delà de son pli**. Le collant aurait coûté un motif neuf pour un bénéfice nul. Arbitré avec
+l'humain avant d'écrire.
+
+En revanche la fiche **change de gabarit avec la largeur** : rangée qui se replie sous `xl`, colonne
+dans le rail. Sans cela, six valeurs courtes empilées sur toute la largeur de l'écran laissaient une
+colonne de vide à leur droite — vu au rendu, corrigé d'une classe.
+
+### Les deux frictions du diagnostic que ce diff ne referme pas
+
+**D6 — quatre dessins pour un même geste** (bouton secondaire d'en-tête, bouton primaire d'état
+vide, lien d'action en ligne, menu « … » par entrée). Écartée par l'arbitrage 1 : *les CTA ne se
+redessinent pas.* Seule leur position a bougé.
+
+**D9 — aucun repère de position.** `subnav.tsx` reste sans appelant. La page compte toujours cinq
+blocs et aucun moyen de savoir où l'on est.

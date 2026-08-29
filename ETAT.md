@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 28/08/2026, après la reprise d'ergonomie de la page produit, livrée
+**Dernière mise à jour :** 28/08/2026, après la reprise d'ergonomie de la page projet, livrée
 hors ticket. Dernier balayage : découpage de C7. **Le fichier dépasse les 250 lignes de la
-règle 5 — 302 au 28/08/2026** ; le balayage appartient à la session de découpage de C8.
+règle 5 — 318 au 28/08/2026** ; le balayage appartient à la session de découpage de C8.
 **Chantier en cours :** **C7 — Finitions**, dix tickets, découpés dans `tickets-C7.md`. **Dernier
 chantier du POC** — `docs/05` §5 n'en a pas de huitième.
 **Ticket suivant :** **T7.3 — Administration : l'écran devient multi-référentiel, et les quatre
@@ -91,6 +91,15 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   n'est plus lue), les **use cases en grille**, et les gestes d'ajout en **boutons d'en-tête**.
   Ni migration ni journal ; 6 tests neufs, deux neutralisations. **La barre d'ancres a été refusée**
   — la page reste sans repère de position, dette au journal technique.
+- **Page projet — reprise d'ergonomie, direction B, hors ticket, 28/08/2026.** Huit gestes tirés du
+  canevas de maquettes qui a porté le diagnostic (douze frictions) et trois directions : **la fiche
+  d'identité passe à droite, tout le récit à gauche**. L'en-tête perd sa carte pour un `PageHeader`
+  nu, `identity.tsx` reçoit les six champs et le rang « Budget », `Budget` cesse d'être un bloc
+  (**deuxième écart à la liste close de `docs/06` §5**), le journal sort de son `<details>`, et
+  **l'ordre du rail se corrige** — il rendait les indicateurs avant les ressources sous un
+  commentaire qui affirmait le contraire. Ni migration, ni lecture, ni action, ni droit : le diff ne
+  déplace que du rendu. **Aucun test neuf — et c'est une révision** : la ligne de faits prévue au
+  plan est tombée sur un interdit documenté de `lib/format.ts`. 1 233 tests, inchangés.
 
 ---
 
@@ -135,15 +144,22 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 - **La barre d'ancres de la page projet n'est pas rendue.** `subnav.tsx` est sans appelant, ses `id`
   de section et son `scroll-mt-19` restent posés et inertes depuis le 20/08/2026, et la question de
   l'entrée active — que seul le défilement désigne — se reposera telle quelle. **Elle a désormais
-  deux cibles de moins** : `projets-lies` a disparu du rendu, `demarrage` n'y est que sur un projet
-  sans activité — une barre d'ancres se construit donc à partir de ce qui est rendu, jamais d'une
-  liste figée. → **T7.5.**
-- **Deux blocs de la page projet ont été masqués le 28/08/2026, hors ticket et à la demande.**
-  « Projets liés » n'est plus rendu — **écart à la liste close de `docs/06` §5**, cinq blocs
-  énumérés pour quatre rendus —, et « Démarrage » ne l'est que sur un accompagnement sans activité.
-  Rien n'est supprimé : composants, requêtes, panneaux `?lien=`/`?piste=` et actions restent entiers
-  et testés, et le premier revient d'une dizaine de lignes. Ce qui reste à faire est **le point
-  d'entrée annoncé de « Démarrage » — le geste d'ajout d'une activité**. → **C8.**
+  trois cibles de moins** : `projets-lies` a disparu du rendu, `demarrage` n'y est que sur un projet
+  sans activité, et `budget` est tombé avec la `Section` du budget le 28/08. Une barre d'ancres se
+  construit donc à partir de ce qui est rendu, jamais d'une liste figée — et ce qui reste à viser
+  est **quatre blocs sur les cinq de `docs/06` §5**. → **T7.5.**
+- **La liste close de `docs/06` §5 porte trois écarts, tous du 28/08/2026, hors ticket et à la
+  demande.** « Projets liés » n'est plus rendu ; « Démarrage » ne l'est que sur un accompagnement
+  sans activité ; et **« Budget » a cessé d'être un bloc** pour devenir un rang de la fiche
+  d'identité. Cinq blocs énumérés, **trois rendus et un en rang**. Rien n'est supprimé : composants,
+  requêtes, panneaux `?lien=`/`?piste=`/`?budget=` et actions restent entiers et testés, et
+  « Projets liés » revient d'une dizaine de lignes. Ce qui reste à faire est **le point d'entrée
+  annoncé de « Démarrage » — le geste d'ajout d'une activité**. → **C8.**
+- **La page projet ne consomme toujours pas la prop `facts` de `PageHeader`**, et ce n'est plus un
+  oubli : le seul fait qu'on y écrirait est un décompte d'activités, que `lib/format.ts` interdit
+  noir sur blanc hors du panneau de suppression — « nulle part ailleurs, et surtout pas sur un écran
+  de lecture », la mesure d'activité de D39. Rouvrir demanderait de trancher **quel fait un
+  accompagnement peut porter en tête**, ce qu'aucun document ne dit. → **arbitrage humain.**
 - **La carte de la personne courante manque à la barre latérale.** Second bloc écarté par T1.6 ; le
   premier, l'entrée Administration, a été livré le 21/08/2026. → **T7.5.**
 - **Le contenu rédigé d'`/a-propos` reste à écrire.** La page a son en-tête et son état vide ; son
