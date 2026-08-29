@@ -430,6 +430,53 @@ describe("updateProject", () => {
     expect(team?.summary).toContain(`Camille ${suffix} change de rôle`);
     expect(team?.summary).toContain(`${NBSP}; `);
   });
+
+  /**
+   * **Le droit s'éprouve par l'action, jamais par l'écran** — et ce cas
+   * n'était couvert par aucun test avant le 29/08/2026, où le formulaire a
+   * cessé de rendre le référentiel entier (`components/ui/picker.tsx`).
+   *
+   * Une ligne absente du rendu ne protège rien : le champ `team:<uuid>` est
+   * ouvert par construction, une soumission forgée en pose ce qu'elle veut, et
+   * c'est `checkReferences` — pas le formulaire — qui confronte chaque
+   * identifiant au domaine. **Seul le décompte en base tranche** : un message
+   * de refus se lirait aussi bien sur une écriture réussie.
+   */
+  test("un `team:` forgé sur une personne étrangère au domaine n'écrit rien", async () => {
+    currentPerson = f.managerId;
+
+    const membersOf = async () =>
+      (
+        await db
+          .select({ id: projectMembers.id })
+          .from(projectMembers)
+          .where(eq(projectMembers.projectId, f.projectId))
+      ).length;
+
+    const before = await membersOf();
+
+    const lines = await written(async () => {
+      const state = await updateProject(
+        f.projectId,
+        EMPTY,
+        saisie({
+          name: `Forgé équipe ${suffix}`,
+          [`${TEAM_FIELD_PREFIX}${f.contributorId}`]: "contributor",
+          // Un UUID que ce domaine ne porte pas — la couche d'accès étant
+          // scopée, une personne d'un autre domaine se comporte à l'identique.
+          [`${TEAM_FIELD_PREFIX}00000000-0000-4000-8000-000000000000`]:
+            "contributor",
+        }),
+      );
+
+      // L'étape témoin : sans elle, un refus et une panne seraient
+      // indiscernables — les trois « 200 muets » du rappel de contexte.
+      expect(state.errors.team).toContain("n'existe pas dans ce domaine");
+    });
+
+    expect(lines).toHaveLength(0);
+    expect(await membersOf()).toBe(before);
+  });
 });
 
 describe("archiveProject et restoreProject", () => {

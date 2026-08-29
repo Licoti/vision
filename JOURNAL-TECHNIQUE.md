@@ -7606,3 +7606,133 @@ redessinent pas.* Seule leur position a bougé.
 
 **D9 — aucun repère de position.** `subnav.tsx` reste sans appelant. La page compte toujours cinq
 blocs et aucun moyen de savoir où l'on est.
+
+---
+
+## La sélection d'une personne devient une recherche — hors ticket (29/08/2026)
+
+Deux écrans rendaient le référentiel des personnes en entier — l'équipe du formulaire de projet
+(une ligne et un `select` par personne du domaine) et les participants du panneau d'activité (une
+case à cocher par personne). À huit personnes cela se lit ; à quarante, désigner deux membres
+demande d'en parcourir trente-huit qui ne serviront pas. Demande humaine : **un champ qui cherche
+et propose au fur et à mesure de la saisie.**
+
+### L'interdit levé n'est pas une décision, et la distinction compte
+
+La fiche de **T5bis.7** écrivait « Aucun filtre ni recherche dans le formulaire de projet — c'est
+l'écran Équipe qui filtre ». C'est un **interdit de fiche de ticket**, levé sur demande humaine ;
+la règle 6 ne s'y applique pas, elle protège `docs/07-decisions.md`.
+
+**Aucune décision n'est rouverte, et c'est vérifié plutôt que supposé.** `docs/06` §8 et **D32**
+posent : « Pas de recherche globale au POC. **Chaque liste porte sa propre recherche.** » Le geste
+livré est exactement celui-là, sur une troisième et une quatrième liste après `/projets` et
+`/equipe`.
+
+### L'amélioration progressive n'est pas une intention, elle est mesurée
+
+Les deux formulaires affirment en tête fonctionner **sans une ligne de JavaScript**, propriété
+tenue depuis T2.5. Un autocomplete en exige. Le parti retenu — arbitré avec l'humain avant
+d'écrire — est que **le HTML servi ne bouge pas** : `Picker` rend le balisage d'aujourd'hui au
+premier rendu, celui du serveur, et ne le remplace par le champ de recherche qu'**au montage**.
+
+Les deux modes passent par **la même `renderRow`** : un repli écrit deux fois est un repli qui
+divergera au premier correctif.
+
+La preuve est un diff, pas une phrase. HTML servi de `/projets/nouveau`, capturé avant et après par
+`git stash` : **le `<form>` entier est identique, 21 042 octets contre 21 042**. Deux écarts
+intermédiaires ont été trouvés par cette mesure et refermés — un `<div>` de clé autour de chaque
+ligne (devenu `Fragment`) et un `<span>` de rang autour du `select` (désormais rendu par le seul
+mode enrichi). Le panneau d'activité, lui, garde **une ligne d'écart** : son cadre passe de
+`gap-2 … py-3` au `gap-3 … py-4` du socle, les deux blocs cessant d'avoir deux rythmes pour un même
+objet. Tout le reste — chaque case, chaque `id`, chaque `aria-describedby` — est au caractère près
+celui d'avant.
+
+### Trois pièges de composant client, dont un défaut trouvé à la relecture
+
+**(a) L'écouteur clavier ne s'attachait jamais.** Posé dans un `useEffect(…, [])`, il s'exécutait
+après le **premier** commit — celui de l'hydratation, qui rend le repli, où le champ de recherche
+n'existe pas encore. `field.current` était `null`, l'effet sortait, et ne se rejouait plus jamais.
+Corrigé en `[mounted]`. Trouvé en relisant, pas en exécutant : le dépôt n'a **aucun moyen
+d'éprouver un composant client** — ni jsdom, ni testing-library, et `vitest.config.mts` n'inclut
+que `lib/**` et `app/**`.
+
+**(b) `Échap` fermait le tiroir au lieu de la liste.** `FocusTrap` écoute `keydown` **sur
+`document`** (`components/ui/focus-trap.tsx:110`). Un `onKeyDown` de React n'y suffit pas : React
+attache ses écouteurs à la racine, et sous l'App Router cette racine **est le document** — un
+`stopPropagation()` synthétique n'empêche pas un second écouteur posé sur le **même** nœud, seul
+`stopImmediatePropagation` le ferait. La parade est un écouteur **natif sur le champ lui-même** :
+il s'exécute à la phase cible, donc avant tout ce qui est en amont. Il porte aussi `Entrée`, qui
+sans lui **soumettrait le formulaire** au premier nom cherché.
+
+**(c) `setState` dans un effet est refusé par le lint.** Le patron habituel du « monté ou non » —
+`useState(false)` basculé dans un `useEffect` — tombe sur `react-hooks/set-state-in-effect`.
+`useSyncExternalStore(NEVER, ON_CLIENT, ON_SERVER)` fait la même chose sans écrire d'état depuis un
+effet : c'est le mécanisme que React prévoit pour distinguer l'instantané du serveur de celui du
+client.
+
+### Une règle pure, parce que c'est la seule qu'on puisse éprouver
+
+`matchOptions` et `normalizeQuery` vivent dans `lib/forms/picker.ts` — ni React, ni base — et non
+dans le `.tsx`, pour la raison du point (a) : une règle écrite dans un composant est une règle
+qu'on croit sur parole. 20 tests, **quatre neutralisations** qui font tomber exactement leurs cas
+et rien d'autre : diacritiques (4), exclusion des retenues (2), plafond (2), saisie vide (2).
+
+Un test s'est révélé faux à la première neutralisation : « ignore les diacritiques de la saisie »
+cherchait « Théo » dans « Théo Benoît » — la mise en minuscules seule le passait. Il fallait une
+option **sans** accent cherchée **avec** un accent ; « Chloe Petit » cherchée par « Chloé » a été
+ajoutée pour cela.
+
+### Une couverture annoncée qui n'existait pas
+
+Le plan affirmait que les tests d'action couvraient déjà le `team:<uuid>` d'une personne étrangère
+au domaine. **C'était faux** : `grep` ne rend aucun test sur `errors.team`. Or c'est exactement la
+garantie que ce diff sollicite — le formulaire ne rend plus le référentiel entier, et un panneau
+absent du rendu n'a jamais protégé le point d'entrée. Le test manquant a donc été écrit
+(`app/(app)/projets/actions.test.ts`), avec son **étape témoin** et un **décompte de
+`project_members` avant et après** ; neutraliser le contrôle de `checkReferences` le fait tomber,
+seul.
+
+Le retrait par **absence de champ** — le mécanisme sur lequel repose tout le mode enrichi — était,
+lui, déjà couvert : « un départ et un changement de rôle tiennent en une phrase » retire Rudy en ne
+postant plus sa clé.
+
+### Contrastes, mesurés
+
+| Couple, neuf par la position | Mesure | Seuil |
+|---|---|---|
+| suggestion `content-neutral-darkest` sur `surface-neutral-pale` | 17,87:1 | 4,5 |
+| indice `content-neutral-base` sur `surface-neutral-pale` | 4,98:1 | 4,5 |
+| suggestion active `content-neutral-pale` sur `surface-primary-base` | 13,65:1 | 4,5 |
+| indicateur d'option active `surface-primary-base` sur `surface-neutral-pale` | 13,65:1 | 3 |
+
+**Aucun substitut n'est inventé.** Le filet de la liste (`surface-neutral-lighter` sur le
+`surface-neutral-lightest` du fond de page) mesure **1,18:1** : c'est la **quatrième position** de
+la dette déjà consignée « une carte ne se détache d'aucun fond », dont le plus franc des
+`surface-neutral-*` plafonne à 2,22:1. `ActionMenu` sert le même couple depuis le 17/08.
+
+### Ce qui n'a pas été touché, et c'est le cœur du parti
+
+Ni migration, ni schéma, ni requête, ni action, ni droit, ni route API — le dépôt n'en a toujours
+aucune. Le contrat des deux formulaires ne bouge pas d'un caractère : `team:<uuid>` et
+`participantIds` restent ce qu'ils étaient, une personne non retenue n'a simplement pas de champ, et
+`syncMembers` comme `readActivityForm` traitaient déjà ce cas.
+
+### Deux limites assumées
+
+**La liste entière reste sérialisée dans la page.** Seul son *affichage* est replié ; le
+rapprochement se fait en mémoire sur ce qui est déjà servi, ce qui rend la suggestion instantanée
+et évite d'inventer la première route API du dépôt. Au-delà de quelques centaines de personnes,
+c'est le **poids de la page** qu'il faudra traiter, pas la lisibilité.
+
+**Le panneau d'activité cherche sur le seul nom.** `ActivityFormPerson` ne porte ni métier ni
+disponibilité, là où `ProjectFormPerson` porte les deux. Étendre `listActivityFormOptions` était le
+« pendant que j'y suis » que la règle 3 interdit.
+
+### Ce qui n'a pas été parcouru, et doit l'être
+
+**Aucun de ces écrans n'a été ouvert au navigateur.** Le repli est lu dans le HTML servi ; le mode
+enrichi a été rendu **côté serveur par une sonde** — instantané serveur forcé à `true` — ce qui
+prouve qu'il compose (combobox, `aria-expanded`, `aria-autocomplete`, aucun `name` sur le champ),
+et rien de plus. Restent à éprouver au clavier, JavaScript actif : la bascule au montage, `↓`/`↑`,
+`Entrée` qui retient sans soumettre, `Échap` qui ferme la liste **sans** fermer le tiroir, le clic
+extérieur, et le bouton « Retirer ». Le point est ouvert dans `ETAT.md`.

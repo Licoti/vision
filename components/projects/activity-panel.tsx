@@ -59,12 +59,29 @@
  * **Aucune ombre.** Le design system nomme ses élévations sans leur donner de
  * valeur (`docs/design/design-system.md` §8) ; la séparation vient du voile et
  * d'un filet, deux jetons du thème.
+ *
+ * **On cherche un participant au lieu de parcourir le référentiel**
+ * (29/08/2026, hors ticket, à la demande — même geste que le formulaire de
+ * projet, même composant). Ce que ce fichier affirme plus haut du
+ * fonctionnement sans JavaScript **reste vrai au caractère près** : le HTML
+ * servi porte toujours une case à cocher par personne du domaine. `Picker`
+ * (`components/ui/picker.tsx`) ne remplace cet affichage qu'**au montage**, et
+ * une personne retenue porte alors un champ caché de même nom — `participantIds`
+ * ne change pas, `readActivityForm` non plus.
+ *
+ * **Une différence avec l'équipe de projet, et elle est assumée** :
+ * `ActivityFormPerson` ne porte ni métier ni disponibilité, là où
+ * `ProjectFormPerson` porte les deux. La recherche ne s'appuie donc ici que sur
+ * le nom. Étendre `listActivityFormOptions` serait le « pendant que j'y suis »
+ * que la règle 3 interdit ; l'écart est au journal technique.
  */
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { borderOf, CONTROL, FormField } from "@/components/ui/form-field";
 import { Panel } from "@/components/ui/panel";
+import { Picker } from "@/components/ui/picker";
 import {
   EMPTY_ACTIVITY_VALUES,
   type ActivityFormState,
@@ -129,6 +146,20 @@ export function ActivityPanel({
 
   const values = state.values;
   const errors = state.errors;
+
+  /* Qui participe. La case à cocher du repli reste non contrôlée : cet état ne
+     gouverne que ce que le mode enrichi affiche, et une soumission refusée le
+     retrouve tel que la personne l'avait laissé. */
+  const [chosen, setChosen] = useState<readonly string[]>(
+    () => initial.participantIds,
+  );
+
+  /* Aucun indice : `ActivityFormPerson` ne porte pas le métier, et l'étendre
+     serait hors du geste demandé. La recherche porte donc sur le seul nom. */
+  const participantOptions = persons.map((person) => ({
+    ...person,
+    label: person.fullName,
+  }));
 
   /* Le référentiel arrive déjà trié par famille : les regrouper ne demande
      donc qu'un passage, et l'ordre des `optgroup` est celui du référentiel du
@@ -383,17 +414,54 @@ export function ActivityPanel({
         <legend className="text-2xs font-semibold text-content-neutral-dark uppercase">
           Participants
         </legend>
-        <p className="text-xs text-content-neutral-base">
-          {
-            "Facultatif. Les personnes qui ont pris part à cette activité, parmi celles déjà référencées dans le domaine."
+        <Picker
+          searchLabel="Rechercher une personne"
+          placeholder="Un nom…"
+          note={
+            <p className="text-xs text-content-neutral-base">
+              {
+                "Facultatif. Les personnes qui ont pris part à cette activité, parmi celles déjà référencées dans le domaine."
+              }
+            </p>
           }
-        </p>
-
-        {persons.length > 0 ? (
-          <div className="flex flex-col gap-2 rounded-lg border border-content-neutral-normal bg-surface-neutral-pale px-4 py-3">
-            {persons.map((person) => (
+          options={participantOptions}
+          chosen={chosen}
+          onChoose={(personId) =>
+            setChosen((was) =>
+              was.includes(personId) ? was : [...was, personId],
+            )
+          }
+          renderRow={(person, enhanced) =>
+            enhanced ? (
+              <span className="flex flex-wrap items-center justify-between gap-3">
+                <span className="text-sm text-content-neutral-darkest">
+                  {person.fullName}
+                  {person.kind === "stakeholder" ? (
+                    <span className="text-xs text-content-neutral-base">
+                      {" · côté entité"}
+                    </span>
+                  ) : null}
+                </span>
+                {/* Le champ porte le **même nom** que la case du repli : le
+                    contrat de `readActivityForm` ne bouge pas. */}
+                <input
+                  type="hidden"
+                  name="participantIds"
+                  value={person.id}
+                />
+                <Button
+                  type="button"
+                  variant="tertiary"
+                  onClick={() =>
+                    setChosen((was) => was.filter((kept) => kept !== person.id))
+                  }
+                >
+                  Retirer
+                  <span className="sr-only">{` ${person.fullName} des participants`}</span>
+                </Button>
+              </span>
+            ) : (
               <label
-                key={person.id}
                 htmlFor={`activite-participant-${person.id}`}
                 className="flex items-center gap-2 text-sm text-content-neutral-darkest"
               >
@@ -420,13 +488,22 @@ export function ActivityPanel({
                   </span>
                 ) : null}
               </label>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-content-neutral-dark">
-            Aucune personne référencée dans ce domaine.
-          </p>
-        )}
+            )
+          }
+          emptyOptions={
+            <p className="text-sm text-content-neutral-dark">
+              Aucune personne référencée dans ce domaine.
+            </p>
+          }
+          noMatch="Aucune personne ne correspond à cette recherche."
+          countLabel={(shown, total) =>
+            shown < total
+              ? `${shown} personnes proposées sur ${total} qui correspondent.`
+              : total === 1
+                ? "1 personne correspond."
+                : `${total} personnes correspondent.`
+          }
+        />
 
         {errors.participantIds ? (
           <p

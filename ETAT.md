@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 28/08/2026, après la reprise d'ergonomie de la page projet, livrée
+**Dernière mise à jour :** 29/08/2026, après la refonte de la sélection d'une personne, livrée
 hors ticket. Dernier balayage : découpage de C7. **Le fichier dépasse les 250 lignes de la
-règle 5 — 318 au 28/08/2026** ; le balayage appartient à la session de découpage de C8.
+règle 5 — 335 au 29/08/2026** ; le balayage appartient à la session de découpage de C8.
 **Chantier en cours :** **C7 — Finitions**, dix tickets, découpés dans `tickets-C7.md`. **Dernier
 chantier du POC** — `docs/05` §5 n'en a pas de huitième.
 **Ticket suivant :** **T7.3 — Administration : l'écran devient multi-référentiel, et les quatre
@@ -91,6 +91,14 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   n'est plus lue), les **use cases en grille**, et les gestes d'ajout en **boutons d'en-tête**.
   Ni migration ni journal ; 6 tests neufs, deux neutralisations. **La barre d'ancres a été refusée**
   — la page reste sans repère de position, dette au journal technique.
+- **La sélection d'une personne devient une recherche — hors ticket, 29/08/2026.** L'équipe du
+  formulaire de projet et les participants du panneau d'activité cessent de rendre le référentiel
+  entier : `Picker` (socle, neuf) et une règle pure dans `lib/forms/picker.ts`. **Amélioration
+  progressive mesurée, pas affirmée** — le `<form>` servi de `/projets/nouveau` est identique avant
+  et après, 21 042 octets contre 21 042, et le panneau d'activité n'a qu'une ligne d'écart. Un
+  interdit de fiche de T5bis.7 levé sur demande, D32 tenue. Ni migration, ni requête, ni action, ni
+  droit ; 21 tests neufs, cinq neutralisations, et **une couverture annoncée qui n'existait pas** —
+  le `team:` forgé hors domaine — écrite plutôt qu'affirmée.
 - **Page projet — reprise d'ergonomie, direction B, hors ticket, 28/08/2026.** Huit gestes tirés du
   canevas de maquettes qui a porté le diagnostic (douze frictions) et trois directions : **la fiche
   d'identité passe à droite, tout le récit à gauche**. L'en-tête perd sa carte pour un `PageHeader`
@@ -135,9 +143,13 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   métiers, sur les sept énumérées. T7.2 a posé leurs **filtres**, pas leurs colonnes : son
   « Attendu » ne les nommait pas. Aucun ticket de C7 n'ouvre cet écran, T7.9 se l'interdit.
   → **C8.**
-- **Le clic de `/equipe` n'a jamais été parcouru au navigateur.** Celui de l'**adresse** est lu dans
-  le HTML servi ; celui du **clic** ne l'est pas. Les cinq propriétés en attente sont celles de
-  `DrawerHost`, éprouvées par TD.2 sur les deux autres pages hôtes. → **T7.7.**
+- **Deux comportements n'ont jamais été parcourus au navigateur.** Le **clic** de `/equipe` —
+  l'adresse est lue dans le HTML servi, le clic non ; les cinq propriétés en attente sont celles de
+  `DrawerHost`, éprouvées par TD.2 sur les deux autres pages hôtes. Et, depuis le 29/08, le **mode
+  enrichi de `Picker`** : son repli est lu dans le HTML servi, son mode enrichi n'est éprouvé que
+  par une **sonde de rendu serveur**. Restent à faire au clavier — la bascule au montage, `↓`/`↑`,
+  `Entrée` qui retient sans soumettre, `Échap` qui ferme la liste **sans** fermer le tiroir, le clic
+  extérieur, « Retirer ». → **T7.7.**
 - **La coquille de navigation reste focalisable derrière le voile, sans JavaScript.** La page porte
   `inert`, la barre latérale vit dans le layout, et **l'obstacle technique a disparu en TD.2** : ce
   qui reste est un parcours clavier à faire. → **T7.7.**
@@ -265,6 +277,11 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   l'humain fournit les adresses.**
 - **Les filtres ne survivent pas à un aller-retour par la navigation principale.** `docs/06` §9 les
   veut conservés ; le retour navigateur les restitue, un clic sur « Projets » repart à zéro.
+  → **si l'usage le réclame.**
+- **Le référentiel des personnes reste servi en entier dans les deux formulaires.** `Picker` en
+  replie l'**affichage**, pas le poids : le rapprochement se fait en mémoire sur ce qui est déjà
+  dans la page, ce qui rend la suggestion instantanée et évite d'inventer la première route API du
+  dépôt. Au-delà de quelques centaines de personnes, c'est la page qu'il faudra traiter.
   → **si l'usage le réclame.**
 - **La liste transverse n'est ni paginée ni plafonnée.** `docs/06` §4 la projette « à quinze puis
   cinquante projets », ce qu'une page rend sans effort. Au-delà, un plafond avant une pagination.

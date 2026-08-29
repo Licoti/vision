@@ -30,6 +30,22 @@
  * ne porte pas : aucun niveau de compétence, aucun rapprochement avec les
  * métiers déclarés du projet — D44 pose que les deux peuvent diverger.
  *
+ * **On y cherche une personne au lieu de parcourir le référentiel** (29/08/2026,
+ * hors ticket, à la demande). C'est la recherche par liste de D32, et c'est
+ * l'interdit de la fiche de T5bis.7 — « aucun filtre ni recherche dans le
+ * formulaire de projet » — qui tombe, sur demande humaine ; l'écart est au
+ * journal technique. Ce que la phrase ci-dessus affirme du fonctionnement sans
+ * JavaScript **reste vrai au caractère près** : le HTML servi porte toujours la
+ * liste entière, une ligne et un `select` par personne du domaine. `Picker`
+ * (`components/ui/picker.tsx`) ne remplace cet affichage qu'**au montage**, par
+ * un champ de recherche et les seules personnes retenues — et les deux modes
+ * passent par la même fonction de ligne, pour qu'un repli ne soit pas une
+ * seconde écriture qui divergera.
+ *
+ * **Rien du contrat de saisie ne bouge.** Une personne non retenue n'a
+ * simplement pas de champ `team:<uuid>` dans le `FormData`, ce que
+ * `readProjectForm` et `syncMembers` traitent déjà comme un retrait.
+ *
  * Le filet des contrôles est plus sombre que celui des blocs, pour la raison
  * mesurée en T2.3 et reprise en T2.5 : la bordure d'un champ est la limite d'un
  * composant d'interface, elle se mesure à 3:1, et aucun jeton `border-*` du
@@ -37,7 +53,7 @@
  */
 
 import Link from "next/link";
-import { useActionState, useId } from "react";
+import { useActionState, useId, useState } from "react";
 
 import { AvailabilityDot } from "@/components/team/availability-dot";
 import { ACTION_LINK_SM } from "@/components/ui/action-link";
@@ -48,6 +64,7 @@ import {
   FormAlert,
   FormField,
 } from "@/components/ui/form-field";
+import { Picker } from "@/components/ui/picker";
 
 import {
   EMPTY_PROJECT_VALUES,
@@ -68,6 +85,19 @@ type ProjectFormOption = { id: string; label: string };
 
 const BLOCK =
   "flex flex-col gap-3 rounded-lg border border-content-neutral-normal bg-surface-neutral-pale px-4 py-4";
+
+/**
+ * Le rôle qu'affiche une ligne au premier rendu.
+ *
+ * Dans le repli, c'est la saisie, et « pas dans l'équipe » à défaut. Avec le
+ * champ de recherche, une ligne n'existe que si la personne est retenue : une
+ * personne qu'on vient de désigner n'a encore aucun rôle saisi, et le sien est
+ * « Membre » — le moins des deux, jamais le droit d'écrire (D9).
+ */
+function roleOf(saved: string | undefined, enhanced: boolean): string {
+  if (saved && saved !== "none") return saved;
+  return enhanced ? "member" : "none";
+}
 
 export function ProjectForm({
   action,
@@ -107,6 +137,49 @@ export function ProjectForm({
      valeurs d'origine au premier rendu. */
   const values = state.values;
   const errors = state.errors;
+
+  /* Qui est retenu, et rien d'autre : le **rôle** reste dans son `select`, non
+     contrôlé, exactement comme avant. Une soumission refusée ne remet pas cet
+     état à zéro et n'a pas à le faire — le DOM porte déjà la dernière saisie,
+     et cet état porte les mêmes personnes qu'elle. */
+  const [chosen, setChosen] = useState<readonly string[]>(() =>
+    Object.entries(initial.team)
+      .filter(([, role]) => role !== "none")
+      .map(([personId]) => personId),
+  );
+
+  /* Le libellé cherché est le nom, l'indice est le métier : taper « research »
+     doit trouver les personnes dont c'est le métier. */
+  const teamOptions = people.map((person) => ({
+    ...person,
+    label: person.fullName,
+    hint: person.jobLabel ?? undefined,
+  }));
+
+  /* Le choix du rôle, écrit une fois pour les deux modes : les trois valeurs
+     de D9 dans le repli, deux seulement quand le retrait est un bouton. */
+  const roleSelect = (person: ProjectFormPerson, enhanced: boolean) => (
+    <select
+      id={id(`team-${person.id}`)}
+      name={teamFieldName(person.id)}
+      defaultValue={roleOf(values.team[person.id], enhanced)}
+      aria-describedby={id(`team-${person.id}-profil`)}
+      className="rounded-lg border border-content-neutral-normal bg-surface-neutral-pale px-3 py-1.5 text-sm text-content-neutral-darkest"
+    >
+      {/* « Pas dans l'équipe » n'a de sens que dans le repli, où c'est le seul
+          moyen d'écarter quelqu'un. Là où le champ de recherche est là, le
+          retrait est un bouton, et une ligne présente est toujours une personne
+          retenue. */}
+      {(enhanced
+        ? TEAM_ROLES.filter((role) => role !== "none")
+        : TEAM_ROLES
+      ).map((role) => (
+        <option key={role} value={role}>
+          {TEAM_ROLE_LABEL[role]}
+        </option>
+      ))}
+    </select>
+  );
 
   return (
     <form action={submit} className="flex max-w-160 flex-col gap-6" noValidate>
@@ -296,73 +369,99 @@ export function ProjectForm({
         <legend className="text-2xs font-semibold text-content-neutral-dark uppercase">
           Équipe
         </legend>
-        <p className="text-xs text-content-neutral-base">
-          {"Un membre figure dans l'équipe. Un contributeur y figure et peut, en plus, saisir dans cet accompagnement."}
-        </p>
-
-        {people.length > 0 ? (
-          <div className={BLOCK}>
-            {people.map((person) => (
-              <div
-                key={person.id}
-                className="flex flex-wrap items-center justify-between gap-3"
-              >
-                {/* Le nom seul reste dans le `<label>` : c'est le nom
-                    accessible du `select`, et le lui allonger du métier et de
-                    la disponibilité ferait annoncer un profil là où l'on
-                    demande « quel rôle pour cette personne ? ». Le second rang
-                    est donc un frère, désigné par `aria-describedby` — il se
-                    lit à l'œil comme à l'assistance, sans se confondre avec le
-                    nom du contrôle. */}
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <label
-                    htmlFor={id(`team-${person.id}`)}
-                    className="text-sm text-content-neutral-darkest"
-                  >
-                    {person.fullName}
-                    {person.kind === "stakeholder" ? (
-                      <span className="text-xs text-content-neutral-dark">
-                        {" · côté entité"}
-                      </span>
-                    ) : null}
-                  </label>
-                  <span
-                    id={id(`team-${person.id}-profil`)}
-                    className="flex flex-wrap items-center gap-2 text-xs text-content-neutral-base"
-                  >
-                    {person.jobLabel ?? "Métier non renseigné"}
-                    {/* Un intervenant côté entité n'a pas de disponibilité :
-                        c'est une propriété du centre, et la ligne n'en invente
-                        aucune (arbitrage (d) de C5bis). */}
-                    {person.availability ? (
-                      <>
-                        <span aria-hidden="true">·</span>
-                        <AvailabilityDot availability={person.availability} />
-                      </>
-                    ) : null}
-                  </span>
-                </span>
-                <select
-                  id={id(`team-${person.id}`)}
-                  name={teamFieldName(person.id)}
-                  defaultValue={values.team[person.id] ?? "none"}
-                  aria-describedby={id(`team-${person.id}-profil`)}
-                  className="rounded-lg border border-content-neutral-normal bg-surface-neutral-pale px-3 py-1.5 text-sm text-content-neutral-darkest"
+        <Picker
+          searchLabel="Rechercher une personne"
+          placeholder="Un nom, un métier…"
+          note={
+            <p className="text-xs text-content-neutral-base">
+              {"Un membre figure dans l'équipe. Un contributeur y figure et peut, en plus, saisir dans cet accompagnement."}
+            </p>
+          }
+          options={teamOptions}
+          chosen={chosen}
+          onChoose={(personId) =>
+            setChosen((was) =>
+              was.includes(personId) ? was : [...was, personId],
+            )
+          }
+          renderRow={(person, enhanced) => (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Le nom seul reste dans le `<label>` : c'est le nom
+                  accessible du `select`, et le lui allonger du métier et de
+                  la disponibilité ferait annoncer un profil là où l'on
+                  demande « quel rôle pour cette personne ? ». Le second rang
+                  est donc un frère, désigné par `aria-describedby` — il se
+                  lit à l'œil comme à l'assistance, sans se confondre avec le
+                  nom du contrôle. */}
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <label
+                  htmlFor={id(`team-${person.id}`)}
+                  className="text-sm text-content-neutral-darkest"
                 >
-                  {TEAM_ROLES.map((role) => (
-                    <option key={role} value={role}>
-                      {TEAM_ROLE_LABEL[role]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-content-neutral-dark">
-            {"Aucune personne référencée dans ce domaine. Une personne se crée dans Équipe, et nulle part ailleurs."}
-          </p>
-        )}
+                  {person.fullName}
+                  {person.kind === "stakeholder" ? (
+                    <span className="text-xs text-content-neutral-dark">
+                      {" · côté entité"}
+                    </span>
+                  ) : null}
+                </label>
+                <span
+                  id={id(`team-${person.id}-profil`)}
+                  className="flex flex-wrap items-center gap-2 text-xs text-content-neutral-base"
+                >
+                  {person.jobLabel ?? "Métier non renseigné"}
+                  {/* Un intervenant côté entité n'a pas de disponibilité :
+                      c'est une propriété du centre, et la ligne n'en invente
+                      aucune (arbitrage (d) de C5bis). */}
+                  {person.availability ? (
+                    <>
+                      <span aria-hidden="true">·</span>
+                      <AvailabilityDot availability={person.availability} />
+                    </>
+                  ) : null}
+                </span>
+              </span>
+              {/* Le rang du rôle : le `select` seul dans le repli — le
+                  balisage d'avant, au caractère près —, le `select` et le
+                  retrait côte à côte quand la recherche est là. */}
+              {enhanced ? (
+                <span className="flex flex-wrap items-center gap-3">
+                  {roleSelect(person, enhanced)}
+                  {/* Le nom accessible dit **qui** on retire : un formulaire
+                      d'équipe en porte autant que de membres, et « Retirer »
+                      seul ne les distinguerait pas. */}
+                  <Button
+                    type="button"
+                    variant="tertiary"
+                    onClick={() =>
+                      setChosen((was) =>
+                        was.filter((kept) => kept !== person.id),
+                      )
+                    }
+                  >
+                    Retirer
+                    <span className="sr-only">{` ${person.fullName} de l'équipe`}</span>
+                  </Button>
+                </span>
+              ) : (
+                roleSelect(person, enhanced)
+              )}
+            </div>
+          )}
+          emptyOptions={
+            <p className="text-sm text-content-neutral-dark">
+              {"Aucune personne référencée dans ce domaine. Une personne se crée dans Équipe, et nulle part ailleurs."}
+            </p>
+          }
+          noMatch="Aucune personne ne correspond à cette recherche."
+          countLabel={(shown, total) =>
+            shown < total
+              ? `${shown} personnes proposées sur ${total} qui correspondent.`
+              : total === 1
+                ? "1 personne correspond."
+                : `${total} personnes correspondent.`
+          }
+        />
 
         {/* Le seul reste du bloc d'ajout : une adresse. Elle ouvre le panneau
             de création d'`/equipe` au rendu serveur — même droit

@@ -4734,3 +4734,48 @@ Le droit s'éprouve par l'action : `saveProjectBudget` refuse toujours l'accompa
 vide, et la note de la fiche qui affirmait une stabilité que ses deux premiers champs démentent. Les
 mesures de contraste — trois couples neufs par la position, de 4,73:1 à 16,98:1 — et les écarts sont
 au journal technique.
+
+---
+
+## Hors ticket — la sélection d'une personne devient une recherche (29/08/2026)
+
+**Demande** — Ne plus afficher la liste complète des membres disponibles à l'ajout d'une personne ;
+un champ qui cherche et propose au fur et à mesure de la saisie, pour que l'écran tienne quand
+l'équipe grandit.
+
+**Périmètre** — Deux écrans, un composant partagé. `lib/forms/picker.ts` et son test (neufs),
+`components/ui/picker.tsx` (neuf), `components/projects/project-form.tsx`,
+`components/projects/activity-panel.tsx`, et un test d'action ajouté à
+`app/(app)/projets/actions.test.ts`.
+
+**Le parti** — Amélioration progressive. Le HTML servi reste celui d'avant — toutes les personnes,
+tous les contrôles, soumettables sans JavaScript —, et `Picker` ne le remplace par le champ de
+recherche et les seules personnes retenues qu'**au montage**. Les deux modes passent par la même
+fonction de ligne. Le rapprochement se fait en mémoire sur la liste déjà servie : pas de route API,
+pas d'aller-retour, suggestion à la frappe.
+
+**Ce qui a été mesuré**
+
+- **Le repli, dans le HTML servi.** Le `<form>` entier de `/projets/nouveau` est identique avant et
+  après, **21 042 octets contre 21 042**, captures prises par `git stash` de part et d'autre. Deux
+  écarts d'imbrication trouvés par cette mesure ont été refermés. Le panneau d'activité garde une
+  ligne d'écart, assumée : son cadre prend le rythme du socle.
+- **Quatre neutralisations** sur les 20 tests neufs de `matchOptions` — diacritiques, exclusion des
+  retenues, plafond, saisie vide — qui font tomber exactement leurs cas. Un test s'est révélé faux
+  à l'épreuve et a été récrit.
+- **Quatre contrastes**, de 4,98:1 à 17,87:1, tous au-dessus de leur seuil. Aucun substitut inventé.
+- **Le droit par l'action** : le test qui manquait — un `team:` forgé sur une personne étrangère au
+  domaine — a été écrit plutôt qu'affirmé, avec étape témoin et décompte de `project_members` avant
+  et après ; neutraliser `checkReferences` le fait tomber, seul.
+
+**Un défaut trouvé à la relecture** — l'écouteur clavier, posé dans un `useEffect(…, [])`, ne
+s'attachait jamais : au premier commit, le champ n'existe pas encore. Corrigé en `[mounted]`. Le
+dépôt n'a aucun moyen d'éprouver un composant client ; c'est la lecture qui l'a trouvé.
+
+**Ni migration, ni schéma, ni requête, ni action, ni droit.** Le contrat des deux formulaires est
+intact : `team:<uuid>` et `participantIds` inchangés, une personne non retenue n'a pas de champ, et
+`syncMembers` comme `readActivityForm` traitaient déjà ce cas.
+
+**1 254 tests** (1 233 + 21), `tsc` et `npm run lint` verts. **Les écrans n'ont pas été parcourus
+au navigateur** : le mode enrichi n'est éprouvé que par une sonde de rendu serveur, et le clavier
+reste à faire.
