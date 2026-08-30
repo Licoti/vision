@@ -2,13 +2,12 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 30/08/2026, après T7.4. Dernier balayage : découpage de C7. **Le fichier
-dépasse les 250 lignes de la règle 5 — 453 au 30/08/2026** ; le balayage appartient à la session de
+**Dernière mise à jour :** 30/08/2026, après T7.5. Dernier balayage : découpage de C7. **Le fichier
+dépasse les 250 lignes de la règle 5 — 490 au 30/08/2026** ; le balayage appartient à la session de
 découpage de C8.
 **Chantier en cours :** **C7 — Finitions**, dix tickets, découpés dans `tickets-C7.md`. **Dernier
 chantier du POC** — `docs/05` §5 n'en a pas de huitième.
-**Ticket suivant :** **T7.5 — La coquille : la carte de la personne courante, et la barre d'ancres**
-(plus les trois commentaires que la sortie du SSO rend faux).
+**Ticket suivant :** **T7.6 — Petits écrans.**
 
 ---
 
@@ -25,7 +24,7 @@ chantier du POC** — `docs/05` §5 n'en a pas de huitième.
 | TD — Dette technique et couche de présentation | TD.1 → TD.6 | **terminé** |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
-| C7 — Finitions | T7.1 → T7.10 | **en cours** — T7.1 → T7.4 livrés |
+| C7 — Finitions | T7.1 → T7.10 | **en cours** — T7.1 → T7.5 livrés |
 | C8 — après le POC | **à découper** | à faire |
 
 ---
@@ -171,6 +170,21 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   journal ; **81 tests neufs** (1 321 → 1 402), neuf neutralisations et **neuf chutes isolées** — dont trois
   cascades trouvées et corrigées avant d'être crues. Le contrat des décomptes **mesuré en SQL hors de
   la lecture du ticket**, et les quatre états vides **nommés comme non vus rendus**.
+- **T7.5 — la coquille : la carte de la personne courante, et la barre d'ancres, le 30/08/2026.**
+  Les **deux** blocs que T1.6 avait écartés sont désormais rendus, et la barre d'ancres retrouve son
+  appelant après **dix jours**. Ce que ces dix jours ont appris tient dans le geste : `subnav.tsx`
+  portait **quatre ancres en dur**, et **trois de ses quatre cibles ont changé de statut sans qu'une
+  ligne du composant bouge** — la liste se construit donc dans `page.tsx`, depuis `hasActivity`, la
+  variable même qui décide du bloc « Démarrage ». **La sonde a été mise en défaut avant le code, et
+  c'est elle qui était fausse** : elle a répondu « aucune barre » sur les cinq accompagnements, le
+  motif cherchant une apostrophe que React sert en `&#x27;` — cinq faux négatifs concordants ne
+  valent pas une confirmation. Contrat vérifié ensuite ancre par ancre, la quatrième **vue rendue**
+  par neutralisation de `hasActivity`, et l'`id` de « Ressources » retiré fait tomber **son ancre
+  seule**. La carte n'a **ni fond ni pastille**, et les deux refus sont mesurés (1,03:1 pour le
+  voile de la maquette, 1,92:1 pour l'avatar) ; ses deux couples de texte donnent 13,65:1 et 7,82:1.
+  **Cinq énoncés faux corrigés là où la fiche en nommait trois**, dont un **servi dans le HTML** —
+  écart d'une ligne à « commentaires seuls », assumé. Ni migration, ni requête, ni action, ni droit ;
+  **aucun test neuf, et c'est le régime des reprises de rendu** — 1 402 tests, inchangés.
 - **Le journal de la fiche accompagnement est de nouveau replié — hors ticket, 29/08/2026.** Demande
   de l'humain : c'est une partie secondaire, dont le détail n'a pas à se lire au premier niveau. Le
   `<details>` retiré le 28/08 est rétabli dans la forme de T6.3 — `SectionHeader as="summary"` et sa
@@ -225,13 +239,6 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 - **La coquille de navigation reste focalisable derrière le voile, sans JavaScript.** La page porte
   `inert`, la barre latérale vit dans le layout, et **l'obstacle technique a disparu en TD.2** : ce
   qui reste est un parcours clavier à faire. → **T7.7.**
-- **La barre d'ancres de la page projet n'est pas rendue.** `subnav.tsx` est sans appelant, ses `id`
-  de section et son `scroll-mt-19` restent posés et inertes depuis le 20/08/2026, et la question de
-  l'entrée active — que seul le défilement désigne — se reposera telle quelle. **Elle a désormais
-  trois cibles de moins** : `projets-lies` a disparu du rendu, `demarrage` n'y est que sur un projet
-  sans activité, et `budget` est tombé avec la `Section` du budget le 28/08. Une barre d'ancres se
-  construit donc à partir de ce qui est rendu, jamais d'une liste figée — et ce qui reste à viser
-  est **quatre blocs sur les cinq de `docs/06` §5**. → **T7.5.**
 - **La liste close de `docs/06` §5 porte trois écarts, tous du 28/08/2026, hors ticket et à la
   demande.** « Projets liés » n'est plus rendu ; « Démarrage » ne l'est que sur un accompagnement
   sans activité ; et **« Budget » a cessé d'être un bloc** pour devenir un rang de la fiche
@@ -263,8 +270,6 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   noir sur blanc hors du panneau de suppression — « nulle part ailleurs, et surtout pas sur un écran
   de lecture », la mesure d'activité de D39. Rouvrir demanderait de trancher **quel fait un
   accompagnement peut porter en tête**, ce qu'aucun document ne dit. → **arbitrage humain.**
-- **La carte de la personne courante manque à la barre latérale.** Second bloc écarté par T1.6 ; le
-  premier, l'entrée Administration, a été livré le 21/08/2026. → **T7.5.**
 - **Les quatre états vides de T7.4 n'ont pas été vus rendus.** Statuts, types d'activité, outils,
   pistes : la base de développement porte des lignes dans **les neuf** référentiels, et aucun chemin
   n'y mène sans supprimer de la donnée. Leurs textes sont écrits et leur code est celui de T7.3, lu
@@ -284,14 +289,16 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   `parsePersonForm` efface la disponibilité — le `CHECK` l'exige — mais rien d'équivalent n'existe
   pour `person_skills` : les liaisons restent affichées et **illisibles en écriture**. Aucune donnée
   perdue. → **T7.9.**
-- **Deux libellés vivent hors de `lib/format.ts`** : `PERSON_KIND_LABEL` (`lib/forms/person.ts`) —
+- **Quatre libellés vivent hors de `lib/format.ts`** : `PERSON_KIND_LABEL` (`lib/forms/person.ts`) —
   un déplacement **plus un vocabulaire à trancher**, T5bis.7 ayant refermé la duplication et pas les
-  mots — et `BUDGET_UNIT_LABEL` (`components/projects/budget.tsx`), hors périmètre de T7.1.
-  `AVAILABILITY_LABEL` reste dans `components/team/availability-dot.tsx` par la même raison, et il en
-  est le troisième cas. **T7.3 puis T7.4 n'en ont ajouté aucun quatrième, et T7.4 en a refermé un** :
-  `REFERENTIAL_NOUN` est allé dans `lib/format.ts`, et `FAMILY_LABEL` a **quitté**
-  `components/projects/activity-panel.tsx` pour y devenir `formatActivityFamily` — un déplacement,
-  aucun libellé changé. → **T7.9.**
+  mots —, `BUDGET_UNIT_LABEL` (`components/projects/budget.tsx`), hors périmètre de T7.1,
+  `AVAILABILITY_LABEL` (`components/team/availability-dot.tsx`) par la même raison, et depuis T7.5
+  `ROLE_LABEL` (`components/shell/current-person.tsx`). **Le quatrième n'est pas une duplication** :
+  `/dev/session` porte les deux mêmes rôles **en minuscules**, parce qu'il les glisse dans une
+  phrase, quand la carte les pose seuls — ce sont deux libellés, et les replier demande de trancher
+  lequel gagne. T7.4 en avait refermé un : `REFERENTIAL_NOUN` est allé dans `lib/format.ts`, et
+  `FAMILY_LABEL` a **quitté** `components/projects/activity-panel.tsx` pour y devenir
+  `formatActivityFamily`. → **T7.9.**
 - **Une piste de démarrage ne mène pas à l'activité qu'elle suggère.** `starters` ne porte
   **volontairement aucun `activity_type_id`** — une colonne sans lecteur est celle qu'on relit un jour
   sans savoir pourquoi (T5.2). Le geste coûte une colonne, une migration et trois lignes. → **T7.10.**
@@ -310,6 +317,11 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   juste avant serait effacée par l'instruction suivante — il n'y a pas de ligne à écrire, il y a une
   disparition à admettre. Les six `event_target_type` restent une liste fermée sans migration
   (arbitrage (b) de C6, (d) de C7). → **C8.**
+- **`lib/auth/session.ts:10` promet encore que « C7 change de source d'identité ».** Cinquième
+  énoncé de la famille que la sortie du SSO a rendu faux ; T7.5 en a corrigé quatre, tous dans son
+  périmètre — les trois de la fiche, plus `provider.ts:47`. Celui-ci est hors périmètre (règle 3).
+  La ligne 4 du même fichier **cite** D37 et reste juste à ce titre. → **au prochain ticket qui
+  ouvre `lib/auth/session.ts`, sinon C8 avec le SSO.**
 - **L'en-tête de `schema.ts` dit « les 26 tables métier », elles sont 30.** Cinquième chiffre faux
   d'une même famille — `scoped.ts`, la fiche de C6 deux fois, et `drawers/project.tsx` (« les six
   panneaux » pour huit, **retiré** par T6.5). Le geste est de retirer. → **T7.10, qui l'ouvre.**
@@ -379,8 +391,12 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   ligne de répartition** — `surface-neutral-lightest` sur le fond de carte, **1,05:1**, prévue au
   plan de la reprise et **retirée sur mesure**. Le plus franc des `surface-neutral-*` plafonne à
   2,22:1, sous 3:1. **Tous les couples de texte passent 4,5:1.** Le manque ne coûtait qu'un contour
-  de carte ; il coûte désormais **un état d'interaction**, ce qui est une autre affaire. T7.7 le
-  mesure sans le refermer. → **design system, sinon C8.**
+  de carte ; il coûte désormais **un état d'interaction**, ce qui est une autre affaire.
+  **T7.5 l'a rencontré une cinquième fois sur le fond primaire de la barre latérale et n'a rien
+  posé** — le voile de la maquette y mesure 1,03:1, et le seul fond perceptible est celui de
+  l'entrée de navigation courante : la carte de la personne courante se détache par l'espace, et la
+  position n'entre donc pas au décompte. T7.7 le mesure sans le refermer.
+  → **design system, sinon C8.**
 - **Le design system a huit manques, et aucun n'a été inventé.** Trois élévations et deux gradients
   nommés sans valeur ; aucun jeton de bordure de contrôle, de bordure d'erreur, d'interlettrage, de
   voile au-delà de 40 %, de séparateur, de mouvement (`--duration-drawer`, `--easing-drawer` sont

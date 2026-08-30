@@ -1,11 +1,18 @@
 /**
  * Le fournisseur d'identité — d'où vient la personne courante.
  *
- * **C'est le seul fichier que C7 réécrit.** Le stub lit un cookie ; Entra ID
- * lira un jeton, et appellera le même `loadCurrentSession`. Le contexte, les
- * droits, les écrans et les tests ne bougeront pas. C'est tout l'objet de la
- * séparation entre ce module et `session.ts` : D37 demande la forme
- * définitive dès C1, pas la source définitive.
+ * **C'est le seul fichier que le SSO réécrira, et il n'a plus d'échéance
+ * nommée** : Entra ID est sorti de C7 le 27/08/2026, faute d'inscription
+ * d'application — écart à D37, consigné au journal technique. La phrase disait
+ * « le seul fichier que C7 réécrit » ; le chantier passe sans lui, et la
+ * corriger est l'objet de T7.5, un commentaire faux valant une ligne de code
+ * fausse.
+ *
+ * Le stub lit un cookie ; Entra ID lira un jeton, et appellera le même
+ * `loadCurrentSession`. Le contexte, les droits, les écrans et les tests ne
+ * bougeront pas. C'est tout l'objet de la séparation entre ce module et
+ * `session.ts` : D37 demande la forme définitive dès C1, pas la source
+ * définitive.
  *
  * Interdits du ticket T1.4 respectés : aucun appel à Entra ID, aucune page de
  * connexion. Le cookie n'authentifie personne — il désigne, en développement,
@@ -17,7 +24,7 @@ import { cache } from "react";
 
 import { loadCurrentSession, type Session } from "./session";
 
-/** Le cookie du stub. Il disparaîtra avec lui en C7. */
+/** Le cookie du stub. Il disparaîtra avec lui, le jour où le SSO arrivera. */
 export const SESSION_COOKIE = "vision_person";
 
 /**
@@ -37,7 +44,8 @@ export const getSession = cache(async (): Promise<Session | null> => {
   // Tolérance propre au stub, et qui doit rester ici : un cookie peut
   // survivre à un ré-amorçage de la base et pointer une personne disparue.
   // Le contexte, lui, refuse net une identité inéligible — c'est la
-  // sécurité de C7. Le repli est un confort de développement, pas une règle.
+  // sécurité qu'apportera le SSO. Le repli est un confort de développement,
+  // pas une règle.
   return loadCurrentSession(null);
 });
 

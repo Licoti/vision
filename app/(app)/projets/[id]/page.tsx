@@ -15,8 +15,9 @@
  *     valeur au stade où le produit se démontre, et ses cinq requêtes se payaient
  *     à chaque affichage. **C'est un écart à `docs/06` §5** — dont la liste de
  *     blocs de référence est close —, consigné au journal technique. Rien n'est
- *     supprimé : le composant reste sans appelant, comme `subnav.tsx` depuis le
- *     21/08, et le bloc revient d'une dizaine de lignes.
+ *     supprimé : le composant reste sans appelant — et il en est désormais le
+ *     seul, `subnav.tsx` ayant retrouvé le sien en T7.5 —, et le bloc revient
+ *     d'une dizaine de lignes.
  *   - **« Démarrage » n'est rendu que sur un accompagnement sans activité.** Il
  *     dit ce qu'on **peut** faire, et la question ne se pose plus une fois
  *     l'accompagnement ouvert. Le référentiel, lui, reste lu et son panneau reste
@@ -33,7 +34,8 @@
  *
  *   1. l'en-tête devient une **carte**, statut, période et rang sur une ligne,
  *      le geste principal en bouton primaire et « Archiver » sous un menu ;
- *   2. une **barre d'ancres collante** annonce les quatre blocs qui en portent ;
+ *   2. une **barre d'ancres collante** annonce les blocs qui en portent —
+ *      quatre alors, trois ou quatre depuis T7.5, selon ce que la page rend ;
  *   3. le corps passe à **deux colonnes** — le récit à gauche, les deux blocs
  *      chiffrés dans un rail de 380 px à droite ;
  *   4. la roadmap devient **une liste à plat filtrée par pastilles**, ses cinq
@@ -143,6 +145,7 @@ import { Resources } from "@/components/projects/resources";
 import { Journal } from "@/components/projects/journal";
 import { Starters } from "@/components/projects/starters";
 import { Roadmap } from "@/components/projects/roadmap";
+import { Subnav, type SubnavEntry } from "@/components/projects/subnav";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
 import { ActionMenu, MENU_ITEM_DANGER } from "@/components/ui/action-menu";
 import { Button, buttonClass } from "@/components/ui/button";
@@ -318,6 +321,30 @@ export default async function ProjectPage({
      adossé à cette propriété se casserait le jour où elle changerait. */
   const hasActivity = roadmap.some((group) => group.activities.length > 0);
 
+  /* **Les ancres se construisent ici, et depuis ce que la page rend** (T7.5).
+     Le composant n'en connaît aucune liste : `subnav.tsx` en portait quatre en
+     dur, et trois de ses cibles ont disparu pendant ses dix jours sans appelant
+     — « Projets liés » a quitté le rendu, « Budget » a cessé d'être une
+     `Section`, « Démarrage » s'est fait conditionnel. Une ancre qui ne vise
+     rien ne se voit pas à l'œil.
+
+     **`hasActivity` est la même variable qui décide du bloc**, dix lignes plus
+     bas : la barre ne peut donc pas viser « Démarrage » quand il n'est pas
+     rendu, et la propriété se lit dans le code plutôt que de se maintenir à la
+     main. Les trois autres blocs se rendent toujours — leur état vide est un
+     écran à part entière (règle 5), pas une absence.
+
+     **L'ordre est celui du DOM de la colonne de gauche**, qui est aussi son
+     ordre de lecture. La fiche d'identité et le journal n'ont pas d'`id` : on
+     ne fabrique pas d'ancre vers un bloc qui n'en porte pas, et `journal.tsx`
+     est hors du périmètre de ce ticket. */
+  const anchors: SubnavEntry[] = [
+    { href: "#activites", label: "Activités" },
+    ...(hasActivity ? [] : [{ href: "#demarrage", label: "Démarrage" }]),
+    { href: "#ressources", label: "Ressources" },
+    { href: "#indicateurs", label: "Indicateurs" },
+  ];
+
   /* La roadmap et les pistes sont **déjà lues** pour l'écran : la résolution
      les reçoit plutôt que de les relire. C'est `loadProjectDrawerContext` qui
      paie une lecture, et seulement quand le clic ouvre un panneau qui en a
@@ -470,13 +497,17 @@ export default async function ProjectPage({
           />
 
 
-        {/* **La barre d'ancres a été retirée le 21/08/2026**, à la demande.
-            Elle vivait ici depuis la veille, d'après la maquette `project-v2`.
-            Elle ne laisse aucune dette : `components/projects/subnav.tsx` reste
-            en place, sans appelant, et revient d'une ligne. Les `id` des
-            sections restent posés — un ancrage qui ne coûte rien et qu'aucune
-            barre ne vise plus, `scroll-mt-19` compris, que le commentaire de
-            `Section` annonce déjà inerte en l'absence d'ancre. */}
+        {/* **La barre d'ancres revient au rendu** (T7.5). Retirée le
+            21/08/2026 au lendemain de sa pose, elle a laissé dix jours durant
+            les `id` de section et le `scroll-mt-19` de `Section` posés et
+            inertes : ils retrouvent ici leur emploi.
+
+            Elle vient après l'en-tête et avant le corps — c'est le sommaire de
+            ce qui suit, pas un onglet : aucun bloc n'est masqué, tout reste sur
+            une seule page (D30). Ses entrées sont calculées plus haut, depuis
+            les blocs réellement rendus. */}
+        <Subnav entries={anchors} />
+
         {/* **Deux colonnes, et l'inverse de celles du 20/08/2026**
             (28/08/2026, direction B) : le récit et tout ce qu'il produit à
             gauche, la référence stable à droite. Le rail passe de 380 à 320 px
@@ -591,7 +622,9 @@ export default async function ProjectPage({
 
                 **Il ne laisse aucune dette, et revient d'une dizaine de
                 lignes** — le geste de la barre d'ancres, retirée le
-                21/08/2026. `components/projects/related.tsx` reste en place
+                21/08/2026 et rendue de nouveau par T7.5, qui l'a payée d'une
+                dizaine de lignes comme annoncé.
+                `components/projects/related.tsx` reste en place
                 sans appelant, `listRelatedProjects` et `listDeclaredLinks`
                 restent entières et testées, le panneau `?lien=` reste résolu et
                 les trois actions d'écriture gardent leurs portes. **Le masquage

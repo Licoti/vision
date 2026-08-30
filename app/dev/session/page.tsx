@@ -2,7 +2,8 @@
  * Le sélecteur de personne courante — outil de développement, pas un écran du
  * produit. Il n'existe qu'en développement : en production la route rend 404.
  *
- * Il tient le rôle que le SSO tiendra en C7 : désigner qui l'on est. Et il
+ * Il tient le rôle que le SSO tiendra — sans échéance depuis que celui-ci est
+ * sorti de C7, le 27/08/2026 : désigner qui l'on est. Et il
  * rend le critère de validation de T1.4 observable — basculer de personne
  * change les droits affichés, parce que ce sont les droits du contexte, lus
  * tels quels, jamais recalculés ici.
@@ -77,9 +78,9 @@ export default async function DevSessionPage() {
           Contexte de session
         </h1>
         <p className="text-sm leading-200 text-content-neutral-dark">
-          L&apos;authentification est un stub jusqu&apos;en C7. La personne
-          courante se désigne ici ; le contexte qu&apos;elle alimente a déjà sa
-          forme définitive.
+          L&apos;authentification est un stub sans échéance : le SSO est sorti
+          de C7. La personne courante se désigne ici ; le contexte qu&apos;elle
+          alimente a déjà sa forme définitive.
         </p>
       </header>
 

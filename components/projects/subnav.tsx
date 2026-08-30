@@ -1,12 +1,22 @@
 /**
  * La barre de sous-navigation de la page d'un accompagnement (20/08/2026),
- * d'après `docs/design/maquettes/blocs/project-v2`.
+ * d'après `docs/design/maquettes/blocs/project-v2`. **Retirée le 21/08/2026,
+ * rendue de nouveau par T7.5** — elle a passé dix jours sans appelant, ses `id`
+ * de section et le `scroll-mt-19` de `Section` restant posés et inertes.
  *
- * **Quatre ancres, et rien d'autre.** La page est devenue longue — le récit,
- * les pistes, trois blocs annoncés, deux blocs de rail — et la maquette y
- * répond par une barre collante qui saute d'un bloc à l'autre. Ce sont des
- * liens de fragment : ils se copient, se partagent, s'ouvrent dans un onglet,
- * et fonctionnent sans une ligne de JavaScript.
+ * La page est longue — le récit, les pistes, les blocs de référence — et la
+ * maquette y répond par une barre collante qui saute d'un bloc à l'autre. Ce
+ * sont des liens de fragment : ils se copient, se partagent, s'ouvrent dans un
+ * onglet, et fonctionnent sans une ligne de JavaScript.
+ *
+ * **Elle ne connaît aucune liste d'ancres, et c'est la leçon des dix jours
+ * d'absence.** Elle en portait quatre en dur ; trois cibles ont disparu depuis
+ * sans qu'une ligne d'ici bouge — « Projets liés » a quitté le rendu, « Budget »
+ * a cessé d'être une `Section` pour devenir un rang de la fiche d'identité, et
+ * « Démarrage » ne se rend plus que sur un accompagnement sans activité. Une
+ * ancre qui ne vise rien ne se voit pas à l'œil. C'est donc **la page** qui
+ * construit les entrées, depuis les variables mêmes qui décident de ses blocs,
+ * et ce composant ne fait que les rendre.
  *
  * **Aucune entrée n'est marquée « active », et c'est délibéré.** La maquette en
  * colore une, mais l'entrée courante d'une barre d'ancres est celle que le

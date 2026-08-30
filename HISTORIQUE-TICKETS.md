@@ -5095,3 +5095,113 @@ quel.
 développement porte des lignes dans les neuf référentiels, et aucun chemin n'y mène sans supprimer de
 la donnée. Leurs textes sont écrits, leur code est celui de T7.3 lu dans le HTML servi la veille — la
 lecture manque, et le point garde sa destination.
+
+## T7.5 — La coquille : la carte de la personne courante, et la barre d'ancres — 30/08/2026
+
+**Deux blocs dessinés dans les maquettes, retirés du rendu, et promis depuis.** T1.6 avait écarté
+deux blocs de la barre latérale ; le premier, l'entrée « Administration », est arrivé le 21/08/2026
+avec l'écran qui lui donnait un sens. **Le second arrive ici, et l'interdit de T1.6 tombe entier.**
+Le 21/08/2026 avait par ailleurs suspendu la barre d'ancres de la page projet au lendemain de sa
+pose, en laissant ses `id` de section et le `scroll-mt-19` de `Section` posés et inertes : ils
+retrouvent leur emploi après **dix jours**.
+
+### La carte : trois faits, aucun recalcul, aucun geste
+
+Elle porte le nom de la personne, son rôle et son domaine, lus **tels quels** dans le contexte de
+session et descendus en props par la coquille — c'est la règle de `MainNav`, « il reçoit, il ne lit
+pas ». Le métier n'y figure pas, et pour une raison qui se dit en une ligne : le contexte n'en porte
+que l'identifiant (`SessionPerson.jobId`), et l'écrire demanderait de lire le référentiel, donc de
+recalculer ce que la fiche demande de rendre tel quel.
+
+**Aucun sélecteur de personne, aucune écriture, aucun composant client.** `/dev/session` reste le
+seul endroit où l'on bascule d'identité ; lui prendre ce rôle ferait de la coquille un outil de
+développement, le SSO étant hors chantier. `MainNav` reste le seul composant client de la coquille.
+
+**Elle se rend sans session établie**, et c'est le cas que la fiche demandait de vérifier : la
+coquille enveloppe des écrans qui n'en ont pas. La branche a été éprouvée par neutralisation
+réversible — `session` forcée à `null` — et lue dans le HTML servi : « Aucune personne courante », sa
+raison, et l'entrée d'administration absente. Un état vide est un écran à part entière (règle 5), pas
+une disparition.
+
+**Aucun fond, aucun filet, et c'est mesuré.** La maquette pose la carte sur un voile blanc à 8 % ; le
+dépôt n'a pas ce jeton, ses cinq surfaces à opacité étant des voiles **noirs** — 1,03:1 sur ce fond,
+invisible. Le seul fond perceptible sans jeton neuf, `surface-primary-normal` (1,44:1), est celui de
+l'entrée de navigation **courante**. Le précédent du 29/08/2026 tranche : un fond mesuré à 1,05:1 a
+été retiré pour cette raison. Le pied se détache par l'espace. **La pastille d'initiales de la
+maquette n'a pas été reprise** non plus — `Avatar` est `aria-hidden`, redondant avec le nom, et sa
+teinte `center` mesure 1,92:1 sur ce fond.
+
+**Aucun titre**, et c'est délibéré : un `h2` en pied de barre entrerait dans la hiérarchie de titres
+de **chaque** écran du produit, que l'audit d'accessibilité vérifie (`docs/06` §11). Le contexte est
+donné à la voix par une mention hors écran — « Personne courante : » —, qui ne coûte pas un niveau de
+titre.
+
+### La barre d'ancres : une liste qui se construit, jamais une liste figée
+
+`subnav.tsx` en portait **quatre en dur**. Pendant ses dix jours sans appelant, **trois de ses quatre
+cibles ont changé de statut sans qu'une ligne du composant bouge** : `projets-lies` a quitté le
+rendu, `budget` a cessé d'être une `Section` pour devenir un rang de la fiche d'identité,
+`demarrage` est devenu conditionnel. La rétablir telle quelle aurait servi deux ancres mortes sur
+quatre — et **une ancre qui ne vise rien ne se voit pas à l'œil** : elle ne change pas d'aspect, et
+le clic ne fait simplement rien.
+
+Les entrées se construisent donc dans `page.tsx`, et **`hasActivity` y est la variable même qui
+décide du bloc « Démarrage »** dix lignes plus bas : la barre ne peut plus diverger du rendu sans
+qu'on le fasse exprès. Trois ancres sur un accompagnement peuplé, quatre sur un accompagnement sans
+activité. Le journal et la fiche d'identité n'ont pas d'`id` : on ne fabrique pas d'ancre vers un
+bloc qui n'en porte pas, et `journal.tsx` est hors périmètre.
+
+**Aucune entrée n'est marquée active**, et la question se repose telle quelle : l'entrée courante
+d'une barre d'ancres est celle que le défilement désigne, et la calculer demanderait un observateur
+d'intersection, donc un composant client, pour une information décorative. L'écart reste consigné.
+
+### La conséquence de la sortie du SSO : quatre énoncés faux, dont un servi
+
+La fiche en nommait trois — l'en-tête de `lib/auth/provider.ts`, celui de `SESSION_COOKIE`, celui
+d'`app/dev/session/page.tsx`. Il y en avait **quatre** : `provider.ts:47` promettait « la sécurité de
+C7 », même fichier et périmètre explicitement ouvert aux commentaires.
+
+**Et un cinquième n'est pas un commentaire.** `app/dev/session/page.tsx` affiche
+« L'authentification est un stub jusqu'en C7 » **dans le HTML servi**. La fiche borne ce fichier à
+ses commentaires ; son propre argument — « un commentaire faux vaut une ligne de code fausse » —
+vaut davantage pour une phrase que l'utilisateur lit. Corrigée, écart assumé et consigné.
+
+`lib/auth/session.ts:10` porte la même promesse et **reste en l'état** : le fichier n'est pas au
+périmètre (règle 3). Point ouvert.
+
+### Vérification
+
+**Le critère se lit dans le HTML servi, et la sonde a été mise en défaut avant le code.** Le contrôle
+— *chaque ancre vise-t-elle un `id` présent dans le document ?* — a d'abord répondu « aucune barre
+d'ancres » sur les cinq accompagnements. La barre était rendue : le motif cherchait
+`aria-label="Sections de l'accompagnement"` quand React sert `&#x27;`. **Cinq faux négatifs
+concordants ne valent pas une confirmation.** Motif corrigé, contrat vérifié sur les cinq
+accompagnements : trois ancres, `#activites` `#ressources` `#indicateurs`, **chacune visant un `id`
+du document**.
+
+**La quatrième ancre a été vue rendue.** Aucun des cinq accompagnements de la base de développement
+n'est sans activité ; `hasActivity` a donc été forcée à `false` — neutralisation réversible — et la
+barre a rendu **quatre** ancres, `#demarrage` compris, avec son `id` servi. La branche n'est pas
+affirmée, elle est lue.
+
+**Mise en défaut.** L'`id` de `Section` retiré de « Ressources » fait tomber **l'ancre `#ressources`
+et elle seule** ; `#activites` et `#indicateurs` restent valides, et la barre est rigoureusement
+identique à l'œil. C'est le défaut que ce ticket devait exclure, et le seul contrôle qui le détecte.
+Rétabli.
+
+**Le contexte gouverne la carte, et c'est mesuré par le changement.** Deux identités servies par
+cookie : « Camille Roux · Responsable de domaine · Groupe Meridian », puis « Awa Diallo · Membre ·
+Groupe Meridian ». Le nom **et** le rôle suivent la session.
+
+**Contraste.** Les deux couples sont neufs par la position, donc mesurés : `content-neutral-pale` sur
+`surface-primary-base`, **13,65:1** ; `surface-primary-soft` — le jeton des entrées non courantes —
+sur le même fond, **7,82:1**.
+
+**Le droit ne s'éprouve pas ici, et il faut le dire plutôt que le passer sous silence** : le ticket
+n'ajoute ni action serveur, ni point d'entrée HTTP, ni condition de droit. La carte n'expose que ce
+que la session porte déjà, et la barre d'ancres est du lien de fragment. Il n'y avait rien à frapper
+en `text/plain`.
+
+**Aucun test neuf, et c'est délibéré** : le diff ne déplace que du rendu et des commentaires. Ni
+migration, ni dépendance, ni requête. **1 402 tests, inchangés**, `tsc` et `eslint --max-warnings=0`
+au vert.

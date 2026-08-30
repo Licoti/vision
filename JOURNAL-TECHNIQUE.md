@@ -8176,3 +8176,78 @@ d'un statut, d'un type, d'un outil ou d'une piste sans supprimer de la donnée. 
 exactement le code de ceux de T7.3, lus dans le HTML servi le 30/08/2026, et leurs quatre textes sont
 écrits. Ce qui manque est la **lecture** — « un état vide qu'on n'a pas vu rendu n'a pas été
 vérifié », la règle que T7.8 pose. Le point est ouvert dans `ETAT.md` à sa destination.
+
+**T7.5 — la sonde a été mise en défaut avant le code, et c'est elle qui était fausse.** Le contrôle
+central du ticket — *chaque ancre vise-t-elle un `id` présent dans le document ?* — a d'abord
+répondu « aucune barre d'ancres » sur les cinq accompagnements de la base de développement. La barre
+était rendue : le motif cherchait `aria-label="Sections de l'accompagnement"`, quand React sert
+`aria-label="Sections de l&#x27;accompagnement"`. **Une sonde qui répond « absent » répond aussi bien
+quand c'est elle qui ne sait pas lire**, et cinq faux négatifs concordants ne valent pas une
+confirmation. Le motif corrigé, les trois ancres sont apparues et le contrat s'est vérifié. La
+discipline 2 s'applique à l'outil de mesure avant de s'appliquer au code.
+
+**T7.5 — la fiche du ticket est périmée sur le budget, et c'est `ETAT.md` qui a tranché.** Elle écrit
+que « les entrées suivent les blocs réellement rendus de la page : le bloc "Budget" de T7.1 en fait
+désormais partie ». Le budget a **cessé d'être une `Section`** le 28/08/2026, hors ticket et à la
+demande, pour devenir un rang de la fiche d'identité — son `id` est tombé avec elle. Le point ouvert
+d'`ETAT.md` disait déjà le contraire de la fiche, chiffres à l'appui : « trois cibles de moins ». Une
+fiche de découpage vieillit de tout ce qui se fait hors ticket entre son écriture et son
+exécution ; c'est `ETAT.md` qui porte l'état, et c'est lui qu'on suit.
+
+**T7.5 — la barre ne porte aucune liste d'ancres, et c'est la conclusion de ses dix jours
+d'absence.** `subnav.tsx` en portait quatre en dur au 20/08/2026. Entre sa mise à l'écart et son
+retour, **trois de ses quatre cibles ont changé de statut** sans qu'une ligne du composant bouge :
+`projets-lies` a quitté le rendu, `budget` a cessé d'exister comme section, `demarrage` est devenu
+conditionnel. Le rétablir tel quel aurait servi deux ancres mortes sur quatre, et **une ancre qui ne
+vise rien ne se voit pas à l'œil** — ni au survol, ni au clic, qui ne fait simplement rien. Les
+entrées se construisent donc dans `page.tsx`, à partir de `hasActivity`, **la variable même qui
+décide du bloc « Démarrage »** dix lignes plus bas : la barre ne peut plus diverger du rendu sans
+qu'on le fasse exprès.
+
+**T7.5 — la carte de la personne courante n'a ni fond ni filet, et c'est une mesure.** La maquette
+(`docs/design/maquettes/vision.html`) la pose sur `rgba(255,255,255,.08)`. Le dépôt n'a pas ce
+jeton : ses cinq surfaces à opacité sont des voiles **noirs** (`tokens.css` §2.5), qui sur le fond de
+la barre latérale assombrissent au lieu d'éclaircir et mesurent **1,03:1**. Les deux autres candidats
+sont pires ou ambigus : `surface-primary-normal` est le seul perceptible (**1,44:1**) mais c'est le
+fond de l'entrée de navigation **courante** — la carte se serait lue comme une entrée sélectionnée —,
+et `surface-primary-dark` retombe à 1,15:1. Le précédent tranche : une surface de survol mesurée à
+1,05:1 a été **retirée sur mesure** le 29/08/2026, et les interdits communs de C7 refusent qu'un
+neuvième manque du design system s'invente. Le pied se détache donc par l'espace. **C'est le même
+manque que le point ouvert sur les cartes qui ne se détachent d'aucun fond** — il ne gagne pas une
+cinquième position, parce qu'aucun fond n'a été posé.
+
+**T7.5 — la pastille d'initiales de la maquette n'a pas été reprise.** `Avatar` est `aria-hidden` et
+n'ajoute rien à un nom écrit en toutes lettres à côté de lui ; sa teinte `center`
+(`surface-primary-light`) mesure **1,92:1** sur le fond de la barre — une forme qu'on devine —, et
+elle porte `persons.kind`, que son propre en-tête oblige l'appelant à redire en toutes lettres. Trois
+faits étaient demandés, trois faits sont rendus.
+
+**T7.5 — un quatrième libellé vit hors de `lib/format.ts`, et le périmètre l'imposait.**
+`ROLE_LABEL` est écrit dans `components/shell/current-person.tsx` : « Responsable de domaine » et
+« Membre », en tête de phrase. `/dev/session` porte les mêmes rôles **en minuscules**, parce qu'il
+les glisse dans une phrase. Ce sont deux libellés et non une duplication à replier — mais le lieu où
+ils devraient se rejoindre, `lib/format.ts`, est hors du périmètre de la fiche. Le point ouvert
+d'`ETAT.md` passe de trois cas à quatre.
+
+**T7.5 — une phrase servie a été corrigée sous une consigne de « commentaires seuls », et c'est un
+écart assumé.** La fiche borne `app/dev/session/page.tsx` à ses commentaires. Or sa ligne 80 affiche
+« L'authentification est un stub jusqu'en C7 » — **dans le HTML servi**, donc lue par qui ouvre la
+page, et fausse exactement comme les trois commentaires que le ticket existe pour corriger.
+L'argument de la fiche est qu'« un commentaire faux vaut une ligne de code fausse » ; une phrase
+fausse **affichée** vaut davantage. Corrigée, et vérifiée dans le HTML servi. Un quatrième
+commentaire a été corrigé au passage, `lib/auth/provider.ts:47` (« c'est la sécurité de C7 ») —
+même fichier, périmètre explicitement ouvert à ses commentaires.
+
+**T7.5 — `lib/auth/session.ts` promet encore C7, et il est hors périmètre.** Son en-tête écrit « C7
+change de source d'identité sans toucher d'une ligne aux droits » : la phrase est fausse depuis le
+27/08/2026 au même titre que les quatre corrigées. La ligne 4 du même fichier, elle, **cite** D37 —
+« le SSO est reporté en C7 » — et reste juste en tant que citation d'une décision. Le fichier n'est
+pas au périmètre de la fiche ; le point est ouvert dans `ETAT.md` plutôt que corrigé au passage
+(règle 3).
+
+**T7.5 — aucun test neuf, et c'est le régime des reprises de rendu.** Le diff ne déplace que du
+rendu et des commentaires : aucune requête, aucune action, aucun droit, aucune migration. Les 1 402
+tests de T7.4 passent **inchangés**. Ce que des tests n'auraient pas attrapé, deux neutralisations
+réversibles l'ont montré dans le HTML servi : `hasActivity` forcée à `false` fait apparaître la
+quatrième ancre **et** son `id`, et retirer l'`id` de `Section` sur « Ressources » fait tomber
+**cette ancre seule**, les deux autres restant valides.

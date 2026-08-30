@@ -13,9 +13,11 @@
  * de React, si bien que la page qu'elle enveloppe la relit sans second
  * aller-retour.
  *
- * **La carte de la personne courante reste absente**, et volontairement : c'est
- * l'autre bloc que T1.6 avait écarté, et il n'est du périmètre d'aucun ticket
- * en cours (règle 3). Ce qui lui manquait n'est plus un droit, c'est un ticket.
+ * **La carte de la personne courante est arrivée** (T7.5), et l'interdit de T1.6
+ * tombe entier : c'était l'autre des deux blocs qu'il avait écartés, et ce qui
+ * lui manquait n'était pas un droit mais un ticket. Elle ne lit rien elle-même
+ * — la session se lit ici, une fois, et descend en props, comme le droit de
+ * `MainNav`.
  *
  * **Cette lecture ne protège rien** : `/administration` rend 404 à qui
  * n'administre pas, et ses cinq actions redérivent le droit sur ce qu'elles
@@ -27,6 +29,7 @@
 
 import Link from "next/link";
 
+import { CurrentPerson } from "@/components/shell/current-person";
 import { MainNav } from "@/components/shell/main-nav";
 import { buttonClass } from "@/components/ui/button";
 import { getSession } from "@/lib/auth/provider";
@@ -67,6 +70,21 @@ export default async function AppLayout({
           Vision
         </Link>
         <MainNav canManageDomain={session?.can.manageDomain ?? false} />
+
+        {/* Le pied de la barre. `null` sans session : la carte dit l'absence
+            plutôt que de disparaître (règle 5), la coquille enveloppant des
+            écrans qui n'ont pas de session établie. */}
+        <CurrentPerson
+          person={
+            session
+              ? {
+                  fullName: session.person.fullName,
+                  role: session.role,
+                  domainName: session.domain.name,
+                }
+              : null
+          }
+        />
       </aside>
 
       <main id="contenu" className="min-w-0 max-w-310 flex-1 px-10 pt-9 pb-18">
