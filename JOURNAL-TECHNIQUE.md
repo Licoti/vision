@@ -8047,3 +8047,57 @@ qui replie, donc l'état replié est bien celui qui est servi et non un état po
 `<details>` sur la page, et le `<ol>` des événements **présent dans le document** malgré le repli.
 C'est la propriété qui distingue `<details>` d'un menu, et celle qui rend le critère lisible sans
 navigateur.
+
+**T7.3 — Drizzle perd la qualification de table dans la position de sélection, et c'est silencieux
+à la compilation.** Les quatre décomptes d'opposition sont des sous-requêtes scalaires corrélées :
+elles citent la ligne du `select` extérieur (`… where person_skills.skill_id = skills.id`). Écrites
+avec des interpolations nues — `${personSkills.skillId} = ${skills.id}` —, elles rendent en SQL
+`"skill_id" = "id"` : **Drizzle ne qualifie pas les colonnes interpolées telles quelles à l'intérieur
+d'un `database.select({...})`**, alors qu'il les qualifie parfaitement dans un `where`. PostgreSQL
+refuse alors la requête pour ambiguïté — `column reference "id" is ambiguous` —, donc un **500**, et
+non un mauvais nombre. La parade est d'écrire toute condition par un constructeur : `eq(a, b)`,
+`isNull(x)`, `filter(table)` gardent leur qualification. C'est écrit en tête de
+`lib/queries/referentials.ts`, parce que c'est le genre de piège qu'on ne retrouve qu'en le
+retrouvant. Diagnostiqué par une sonde qui imprimait le SQL rendu, supprimée depuis.
+
+**T7.3 — la colonne de l'échelle de maîtrise a annoncé « 15 personnes » dans un centre qui en compte
+dix, et c'est le HTML servi qui l'a dit.** Le décompte qui s'oppose à l'archivage d'un niveau porte
+sur `person_skills` : ce sont des **déclarations**, et une personne en porte plusieurs au même
+niveau. Rangé dans le champ `persons` de `ReferentialUsage` — mutualisé avec les métiers et les
+compétences, où il compte bien des personnes —, il se rendait par `formatPersons`. La base de
+développement a tranché : rang « Avancé », **15 déclarations, 9 personnes distinctes, 10 personnes
+vivantes dans le domaine**. Aucun test ne pouvait le voir : ils vérifiaient que le nombre valait
+bien 3, et il valait bien 3. **Ce qui était faux n'était pas le nombre mais le mot.** Corrigé par un
+champ `declarations` à lui, un `formatDeclarations` et un en-tête « Déclarations » ; le compilateur a
+ensuite désigné les six points d'appel. La leçon est celle de la discipline 1, littéralement : un
+critère qui se lit dans le HTML servi trouve ce qu'un test qui affirme le contraire ne trouvera
+jamais.
+
+**T7.3 — deux fichiers de plus que le périmètre annoncé, tous deux arbitrés avant écriture.**
+`lib/drawers/types.ts` d'abord, sans quoi la demande de panneau ne pouvait pas porter son
+référentiel — l'écran serait resté mono-référentiel côté clic. `lib/format.ts` ensuite, arbitrage
+rendu par l'humain : `REFERENTIAL_NOUN` y rejoint `formatStarterKind` et `formatResourceType` plutôt
+que d'ouvrir une **troisième** table de libellés hors de ce fichier, ce qu'`ETAT.md` suit déjà comme
+une dette (→ T7.9). La clause « nulle part ailleurs » de `formatActivities` y a été **élargie d'un
+cran, pas levée** : un décompte qui dit ce qui s'oppose à un geste sur un écran de gestion n'est pas
+la mesure d'activité que D39 interdit — c'est le rôle que `formatProducts` tient à côté depuis le
+21/08/2026. Ce qui reste interdit est inchangé.
+
+**T7.3 — l'échelle de maîtrise ne saisit pas sa `position`, et c'est un écart d'une phrase à la
+fiche.** Celle-ci donne « libellé, `position`, archivage, rétablissement » aux quatre référentiels.
+Or `skill_levels.position` **n'a aucun lecteur** : les quatre lectures du dépôt ordonnent l'échelle
+par `rank` (`lib/queries/team.ts:442`, `lib/drawers/team.tsx:271`), quand `jobs`, `approaches` et
+`skills` sont ordonnés par `position` dans onze requêtes. La saisir aurait posé le champ que
+l'arbitrage (i) du chantier refuse deux fois — la leçon de T5.2. L'écran affiche donc une colonne
+« Ordre » qui montre, pour chaque référentiel, **la clé qui le trie réellement** : `position` pour
+trois, `rang` pour l'échelle. Arbitrage rendu par l'humain avant écriture.
+
+**T7.3 — `ActionMenu` rend le rétablissement inatteignable sans JavaScript, et ce n'était pas neuf.**
+Le `<form action={restoreJob.bind(…)}>` vit dans les enfants d'`ActionMenu`, composant client qui ne
+les monte qu'à l'ouverture : il est dans la charge Flight, pas dans le DOM servi. C'est exactement la
+dette déjà consignée pour la roadmap — « le menu décide de son ouverture, seule exception arbitrée à
+D30 » —, elle s'étend aux cinq référentiels sans que T7.3 l'aggrave ni la referme. Le geste a donc été
+éprouvé en frappant la référence serveur directement, en `text/plain`. **Les deux frappes rendent
+200** — celle du membre ordinaire comme celle du responsable —, et seul le décompte en base les
+sépare : le membre ne rétablit rien, le responsable rétablit. Quatrième « 200 muet » du dépôt, et le
+premier qu'une étape témoin accompagnait dès la première mesure.

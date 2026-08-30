@@ -30,7 +30,23 @@ import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { resolveDomainId } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
 import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
-import { domains, entities, persons, products } from "@/lib/db/schema";
+import {
+  activities,
+  activityTypes,
+  approaches,
+  domains,
+  entities,
+  jobs,
+  personSkills,
+  persons,
+  products,
+  projectApproaches,
+  projectJobs,
+  projects,
+  projectStatuses,
+  skillLevels,
+  skills,
+} from "@/lib/db/schema";
 
 /** Qui la requête prétend être. Chaque test la pose avant d'appeler l'action. */
 let currentPerson: string | null = null;
@@ -47,11 +63,27 @@ vi.mock("next/headers", () => ({
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
 const {
+  archiveApproach,
   archiveEntity,
+  archiveJob,
+  archiveSkill,
+  archiveSkillLevel,
+  createApproach,
   createEntity,
+  createJob,
+  createSkill,
+  createSkillLevel,
   deleteEntity,
+  restoreApproach,
   restoreEntity,
+  restoreJob,
+  restoreSkill,
+  restoreSkillLevel,
+  updateApproach,
   updateEntity,
+  updateJob,
+  updateSkill,
+  updateSkillLevel,
 } = await import("./actions");
 
 const suffix = Math.random().toString(36).slice(2, 10);
@@ -83,15 +115,55 @@ type Fixture = {
   freeEntityId: string;
   /** Archivée : corrigeable seulement après rétablissement. */
   archivedEntityId: string;
+
+  /* Les quatre référentiels simples de T7.3. Quatre lignes chacun, et
+     chacune n'a qu'un rôle : ce qui s'oppose, ce qui s'archive, ce qui se
+     rétablit, ce qui se renomme. Les faire se croiser rendrait chaque test
+     dépendant de l'ordre du fichier. */
+  /** Un accompagnement vivant et une personne vivante le portent. */
+  loadedJobId: string;
+  freeJobId: string;
+  archivedJobId: string;
+  renamedJobId: string;
+
+  /** Une activité vivante la porte. */
+  loadedApproachId: string;
+  freeApproachId: string;
+  archivedApproachId: string;
+  renamedApproachId: string;
+
+  /** Une personne vivante la déclare. */
+  loadedSkillId: string;
+  freeSkillId: string;
+  archivedSkillId: string;
+  renamedSkillId: string;
+
+  /** Une déclaration le cite. */
+  loadedLevelId: string;
+  freeLevelId: string;
+  archivedLevelId: string;
+  renamedLevelId: string;
 };
 
 let f: Fixture;
+
+/**
+ * Le domaine, retenu **dès sa création** et hors de la fixture.
+ *
+ * C'est le point ouvert d'`ETAT.md`, refermé ici parce que ce ticket ouvre le
+ * fichier : un `beforeAll` qui échoue **après** avoir créé son domaine le
+ * laissait en place, et le domaine orphelin faisait tomber le fichier suivant —
+ * `resolveDomainId` rendant le premier domaine actif par nom. La forme est celle
+ * d'`equipe/actions.test.ts` (28/08/2026).
+ */
+let domainId: string | null = null;
 
 beforeAll(async () => {
   const domain = await superAdmin.createDomain({
     name: `__0__test__admin__${suffix}`,
     competenceCenterName: `Centre ${suffix}`,
   });
+  domainId = domain.id;
   const scope = forDomain({ domainId: domain.id });
 
   /* **Le domaine courant n'est pas choisi, il est trouvé** : `resolveDomainId`
@@ -141,6 +213,90 @@ beforeAll(async () => {
   });
   await scope.archive(products, onRanged.id);
 
+  /* --------------------------------------------------------------------
+     Les quatre référentiels simples, et ce qui les retient.
+     -------------------------------------------------------------------- */
+
+  const job = (name: string) =>
+    scope.insert(jobs, { label: `${name} métier ${suffix}` });
+  const jobRows = {
+    loaded: await job("Chargé"),
+    free: await job("Libre"),
+    renamed: await job("Renommé"),
+    archived: await job("Rangé"),
+  };
+  await scope.archive(jobs, jobRows.archived.id);
+
+  const approach = (name: string) =>
+    scope.insert(approaches, { label: `${name} approche ${suffix}` });
+  const approachRows = {
+    loaded: await approach("Chargée"),
+    free: await approach("Libre"),
+    renamed: await approach("Renommée"),
+    archived: await approach("Rangée"),
+  };
+  await scope.archive(approaches, approachRows.archived.id);
+
+  const skill = (name: string) =>
+    scope.insert(skills, { label: `${name} compétence ${suffix}` });
+  const skillRows = {
+    loaded: await skill("Chargée"),
+    free: await skill("Libre"),
+    renamed: await skill("Renommée"),
+    archived: await skill("Rangée"),
+  };
+  await scope.archive(skills, skillRows.archived.id);
+
+  const level = async (name: string, rank: number) =>
+    scope.insert(skillLevels, { label: `${name} niveau ${suffix}`, rank });
+  const loadedLevel = await level("Chargé", 1);
+  const freeLevel = await level("Libre", 2);
+  const renamedLevel = await level("Renommé", 3);
+  const archivedLevel = await level("Rangé", 4);
+  await scope.archive(skillLevels, archivedLevel.id);
+
+  /* Le décor minimal : un produit, un statut, un type — puis un accompagnement
+     vivant et une activité vivante, qui sont ce qui **s'oppose**. */
+  const status = await scope.insert(projectStatuses, {
+    label: `En cours ${suffix}`,
+    nature: "active",
+  });
+  const type = await scope.insert(activityTypes, {
+    label: `Atelier ${suffix}`,
+    family: "design",
+  });
+  const product = await scope.insert(products, {
+    name: `Produit porteur ${suffix}`,
+    entityId: free.id,
+  });
+  const project = await scope.insert(projects, {
+    name: `Accompagnement ${suffix}`,
+    productId: product.id,
+    statusId: status.id,
+  });
+  await scope.insert(projectJobs, {
+    projectId: project.id,
+    jobId: jobRows.loaded.id,
+  });
+  await scope.insert(activities, {
+    projectId: project.id,
+    activityTypeId: type.id,
+    approachId: approachRows.loaded.id,
+    isUnscheduled: true,
+  });
+
+  const holder = await scope.insert(persons, {
+    fullName: `Porteuse ${suffix}`,
+    source: "manual",
+    kind: "center",
+    jobId: jobRows.loaded.id,
+  });
+  await scope.insert(personSkills, {
+    personId: holder.id,
+    skillId: skillRows.loaded.id,
+    levelId: loadedLevel.id,
+  });
+
   f = {
     domainId: domain.id,
     scope,
@@ -150,15 +306,51 @@ beforeAll(async () => {
     rangedEntityId: ranged.id,
     freeEntityId: free.id,
     archivedEntityId: archived.id,
+
+    loadedJobId: jobRows.loaded.id,
+    freeJobId: jobRows.free.id,
+    archivedJobId: jobRows.archived.id,
+    renamedJobId: jobRows.renamed.id,
+
+    loadedApproachId: approachRows.loaded.id,
+    freeApproachId: approachRows.free.id,
+    archivedApproachId: approachRows.archived.id,
+    renamedApproachId: approachRows.renamed.id,
+
+    loadedSkillId: skillRows.loaded.id,
+    freeSkillId: skillRows.free.id,
+    archivedSkillId: skillRows.archived.id,
+    renamedSkillId: skillRows.renamed.id,
+
+    loadedLevelId: loadedLevel.id,
+    freeLevelId: freeLevel.id,
+    archivedLevelId: archivedLevel.id,
+    renamedLevelId: renamedLevel.id,
   };
 }, 180_000);
 
 afterAll(async () => {
-  if (!f?.domainId) return;
-  for (const table of [products, entities, persons]) {
-    await db.delete(table).where(eq(table.domainId, f.domainId));
+  if (!domainId) return;
+  /* Enfants d'abord, parents ensuite : les clés `restrict` refusent l'inverse. */
+  for (const table of [
+    personSkills,
+    activities,
+    projectApproaches,
+    projectJobs,
+    projects,
+    products,
+    persons,
+    activityTypes,
+    projectStatuses,
+    skillLevels,
+    skills,
+    approaches,
+    jobs,
+    entities,
+  ]) {
+    await db.delete(table).where(eq(table.domainId, domainId));
   }
-  await db.delete(domains).where(eq(domains.id, f.domainId));
+  await db.delete(domains).where(eq(domains.id, domainId));
 });
 
 /** La ligne telle qu'elle est en base, sans passer par une lecture d'écran. */
@@ -519,5 +711,402 @@ describe("deleteEntity — ce que le geste écrit", () => {
 
     expect(state.ok).toBe(true);
     expect(await entityRow(doomed.id)).toBeUndefined();
+  });
+});
+
+/* ==========================================================================
+   Les quatre référentiels simples — T7.3
+
+   **Le droit s'éprouve par l'action, jamais par l'écran.** `/administration`
+   rend 404 à qui n'administre pas, et cela ne prouve rien : une action serveur
+   vit à côté de la route, pas derrière elle. Chacune des seize est donc
+   interrogée sous l'identité d'un membre ordinaire, **décompte en base à
+   l'appui** — et chacune reçoit son **étape témoin** : la même charge, sous
+   l'identité du responsable, doit écrire. Sans elle, un test ne prouverait que
+   l'inertie de la charge.
+   ========================================================================== */
+
+/** Le nombre de lignes vivantes ou rangées d'une table, dans ce domaine. */
+async function rowCount(
+  table:
+    | typeof jobs
+    | typeof approaches
+    | typeof skills
+    | typeof skillLevels,
+): Promise<number> {
+  const rows = await db
+    .select()
+    .from(table)
+    .where(eq(table.domainId, f.domainId));
+  return rows.length;
+}
+
+/** La ligne telle qu'elle est en base, sans passer par une lecture d'écran. */
+async function rowOf(
+  table:
+    | typeof jobs
+    | typeof approaches
+    | typeof skills
+    | typeof skillLevels,
+  id: string,
+) {
+  const rows = await db.select().from(table).where(eq(table.id, id));
+  return rows[0];
+}
+
+/** La saisie d'un référentiel ordonné par `position`. */
+function positionForm(label: string, position = "50"): FormData {
+  const data = new FormData();
+  data.append("label", label);
+  data.append("position", position);
+  return data;
+}
+
+/** La saisie de l'échelle de maîtrise. */
+function rankForm(label: string, rank = "7"): FormData {
+  const data = new FormData();
+  data.append("label", label);
+  data.append("rank", rank);
+  return data;
+}
+
+const EMPTY_REFERENTIAL = {
+  values: { label: "", position: "", rank: "" },
+  errors: {},
+};
+
+/* --------------------------------------------------------------------------
+   Le droit, sur les seize points d'entrée
+   -------------------------------------------------------------------------- */
+
+describe("le droit — les seize actions sous une identité sans manageDomain", () => {
+  test("aucune des quatre créations n'écrit une ligne", async () => {
+    const targets = [
+      [jobs, createJob, positionForm(`Forgé métier ${suffix}`)],
+      [approaches, createApproach, positionForm(`Forgée approche ${suffix}`)],
+      [skills, createSkill, positionForm(`Forgée compétence ${suffix}`)],
+      [skillLevels, createSkillLevel, rankForm(`Forgé niveau ${suffix}`)],
+    ] as const;
+
+    for (const [table, create, form] of targets) {
+      currentPerson = f.outsiderId;
+      const before = await rowCount(table);
+
+      const state = await create(EMPTY_REFERENTIAL, form);
+
+      expect(state.ok).toBeUndefined();
+      expect(state.message).toContain("responsable de domaine");
+      /* La saisie revient telle quelle : Vision ne jette jamais en silence ce
+         qui a été tapé, y compris quand ce qu'elle refuse n'est pas la saisie. */
+      expect(state.values.label).toContain("Forgé");
+      expect(await rowCount(table)).toBe(before);
+
+      /* L'étape témoin : la **même** charge, sous l'identité du responsable,
+         écrit. Sans elle, rien ne dirait que c'est le droit qui a refusé. */
+      currentPerson = f.managerId;
+      const witness = await create(EMPTY_REFERENTIAL, form);
+      expect(witness.ok).toBe(true);
+      expect(await rowCount(table)).toBe(before + 1);
+    }
+  });
+
+  test("aucune des quatre corrections ne renomme une ligne", async () => {
+    const targets = [
+      [jobs, updateJob, f.renamedJobId, positionForm(`Volé métier ${suffix}`)],
+      [
+        approaches,
+        updateApproach,
+        f.renamedApproachId,
+        positionForm(`Volée approche ${suffix}`),
+      ],
+      [
+        skills,
+        updateSkill,
+        f.renamedSkillId,
+        positionForm(`Volée compétence ${suffix}`),
+      ],
+      [
+        skillLevels,
+        updateSkillLevel,
+        f.renamedLevelId,
+        rankForm(`Volé niveau ${suffix}`),
+      ],
+    ] as const;
+
+    for (const [table, update, id, form] of targets) {
+      currentPerson = f.outsiderId;
+      const before = (await rowOf(table, id))?.label;
+
+      const state = await update(id, EMPTY_REFERENTIAL, form);
+
+      expect(state.ok).toBeUndefined();
+      expect(state.message).toContain("responsable de domaine");
+      expect((await rowOf(table, id))?.label).toBe(before);
+
+      currentPerson = f.managerId;
+      const witness = await update(id, EMPTY_REFERENTIAL, form);
+      expect(witness.ok).toBe(true);
+      expect((await rowOf(table, id))?.label).not.toBe(before);
+    }
+  });
+
+  test("aucun des quatre archivages ne range une ligne", async () => {
+    const targets = [
+      [jobs, archiveJob, f.freeJobId],
+      [approaches, archiveApproach, f.freeApproachId],
+      [skills, archiveSkill, f.freeSkillId],
+      [skillLevels, archiveSkillLevel, f.freeLevelId],
+    ] as const;
+
+    for (const [table, archive, id] of targets) {
+      currentPerson = f.outsiderId;
+
+      const state = await archive(id, ...confirm());
+
+      expect(state.ok).toBeUndefined();
+      expect(state.message).toContain("responsable de domaine");
+      expect((await rowOf(table, id))?.archivedAt).toBeNull();
+
+      currentPerson = f.managerId;
+      const witness = await archive(id, ...confirm());
+      expect(witness.ok).toBe(true);
+      expect((await rowOf(table, id))?.archivedAt).toBeInstanceOf(Date);
+    }
+  });
+
+  test("aucun des quatre rétablissements ne sort une ligne du rangement", async () => {
+    /* Les quatre lignes viennent d'être archivées par le test précédent : c'est
+       exactement l'état sur lequel le rétablissement s'exerce. */
+    const targets = [
+      [jobs, restoreJob, f.freeJobId],
+      [approaches, restoreApproach, f.freeApproachId],
+      [skills, restoreSkill, f.freeSkillId],
+      [skillLevels, restoreSkillLevel, f.freeLevelId],
+    ] as const;
+
+    for (const [table, restore, id] of targets) {
+      currentPerson = f.outsiderId;
+
+      await restore(id);
+
+      /* Un refus est **muet** — la forme de `restoreProduct` : ce geste n'a
+         aucune saisie à rendre. Seule la base tranche. */
+      expect((await rowOf(table, id))?.archivedAt).toBeInstanceOf(Date);
+
+      currentPerson = f.managerId;
+      await restore(id);
+      expect((await rowOf(table, id))?.archivedAt).toBeNull();
+    }
+  });
+});
+
+/* --------------------------------------------------------------------------
+   Ce que l'archivage refuse — quatre décomptes, quatre refus
+   -------------------------------------------------------------------------- */
+
+describe("l'archivage refuse ce qu'une donnée vivante référence encore", () => {
+  test("un métier qu'un accompagnement vivant déclare n'est pas rangé", async () => {
+    currentPerson = f.managerId;
+
+    const state = await archiveJob(f.loadedJobId, ...confirm());
+
+    expect(state.ok).toBeUndefined();
+    expect(state.message).toContain("déclare encore ce métier");
+    expect((await rowOf(jobs, f.loadedJobId))?.archivedAt).toBeNull();
+  });
+
+  test("une approche qu'une activité vivante porte n'est pas rangée", async () => {
+    currentPerson = f.managerId;
+
+    const state = await archiveApproach(f.loadedApproachId, ...confirm());
+
+    expect(state.ok).toBeUndefined();
+    expect(state.message).toContain("cette approche");
+    expect(
+      (await rowOf(approaches, f.loadedApproachId))?.archivedAt,
+    ).toBeNull();
+  });
+
+  test("une compétence qu'une personne vivante déclare n'est pas rangée", async () => {
+    currentPerson = f.managerId;
+
+    const state = await archiveSkill(f.loadedSkillId, ...confirm());
+
+    expect(state.ok).toBeUndefined();
+    expect(state.message).toContain("cette compétence");
+    expect((await rowOf(skills, f.loadedSkillId))?.archivedAt).toBeNull();
+  });
+
+  test("un niveau qu'une déclaration cite n'est pas rangé", async () => {
+    currentPerson = f.managerId;
+
+    const state = await archiveSkillLevel(f.loadedLevelId, ...confirm());
+
+    expect(state.ok).toBeUndefined();
+    expect(state.message).toContain("compétence déclarée cite encore ce niveau");
+    expect((await rowOf(skillLevels, f.loadedLevelId))?.archivedAt).toBeNull();
+  });
+
+  test("le refus vient de la base, jamais de l'écran", async () => {
+    /* Le métier chargé est aussi porté par une personne vivante. Une fois
+       l'accompagnement détaché, c'est **elle** qui s'y oppose — et le refus
+       change de phrase sans changer d'issue. */
+    currentPerson = f.managerId;
+    await db
+      .delete(projectJobs)
+      .where(eq(projectJobs.jobId, f.loadedJobId));
+
+    const state = await archiveJob(f.loadedJobId, ...confirm());
+
+    expect(state.ok).toBeUndefined();
+    expect(state.message).toContain("porte encore ce métier");
+    expect((await rowOf(jobs, f.loadedJobId))?.archivedAt).toBeNull();
+  });
+});
+
+/* --------------------------------------------------------------------------
+   Ce que la saisie refuse
+   -------------------------------------------------------------------------- */
+
+describe("la saisie d'un référentiel — ce qu'elle écrit et ce qu'elle refuse", () => {
+  test("le responsable crée un métier, position comprise", async () => {
+    currentPerson = f.managerId;
+
+    const state = await createJob(
+      EMPTY_REFERENTIAL,
+      positionForm(`Neuf métier ${suffix}`, "42,5"),
+    );
+
+    expect(state.ok).toBe(true);
+    const created = (
+      await db
+        .select()
+        .from(jobs)
+        .where(eq(jobs.label, `Neuf métier ${suffix}`))
+    )[0];
+    expect(created?.domainId).toBe(f.domainId);
+    expect(created?.archivedAt).toBeNull();
+    /* La virgule française est rendue à PostgreSQL en point. */
+    expect(created?.position).toBe("42.50");
+  });
+
+  test("le responsable crée un niveau, rang compris", async () => {
+    currentPerson = f.managerId;
+
+    const state = await createSkillLevel(
+      EMPTY_REFERENTIAL,
+      rankForm(`Neuf niveau ${suffix}`, "9"),
+    );
+
+    expect(state.ok).toBe(true);
+    const created = (
+      await db
+        .select()
+        .from(skillLevels)
+        .where(eq(skillLevels.label, `Neuf niveau ${suffix}`))
+    )[0];
+    expect(created?.rank).toBe(9);
+    /* `position` garde son défaut : l'échelle ne la saisit pas, et rien ne la
+       lit — c'est `rank` qui l'ordonne. */
+    expect(created?.position).toBe("0.00");
+  });
+
+  test("un libellé déjà pris est refusé, et le refus nomme la jumelle", async () => {
+    currentPerson = f.managerId;
+    const before = await rowCount(skills);
+
+    const twin = (await rowOf(skills, f.loadedSkillId))?.label ?? "";
+    const state = await createSkill(EMPTY_REFERENTIAL, positionForm(twin));
+
+    expect(state.ok).toBeUndefined();
+    expect(state.errors.label).toContain(twin);
+    expect(await rowCount(skills)).toBe(before);
+  });
+
+  test("la casse et l'accent ne suffisent pas à en faire un autre", async () => {
+    currentPerson = f.managerId;
+    const before = await rowCount(approaches);
+
+    const twin = (await rowOf(approaches, f.loadedApproachId))?.label ?? "";
+    const state = await createApproach(
+      EMPTY_REFERENTIAL,
+      positionForm(twin.toLocaleUpperCase("fr-FR")),
+    );
+
+    expect(state.ok).toBeUndefined();
+    expect(state.errors.label).toBeDefined();
+    expect(await rowCount(approaches)).toBe(before);
+  });
+
+  test("un libellé pris par une ligne **archivée** propose de la rétablir", async () => {
+    /* C'est le point ouvert d'`ETAT.md` : l'amorçage rapproche par clé
+       naturelle, un renommage recrée sous l'ancien nom. Le refus doit envoyer
+       vers le geste juste, et la liste montre la ligne rangée. */
+    currentPerson = f.managerId;
+    const before = await rowCount(jobs);
+
+    const twin = (await rowOf(jobs, f.archivedJobId))?.label ?? "";
+    const state = await createJob(EMPTY_REFERENTIAL, positionForm(twin));
+
+    expect(state.ok).toBeUndefined();
+    expect(state.errors.label).toContain("Rétablissez-la");
+    expect(await rowCount(jobs)).toBe(before);
+  });
+
+  test("se renommer soi-même n'est pas un doublon", async () => {
+    currentPerson = f.managerId;
+
+    const current = (await rowOf(skills, f.renamedSkillId))?.label ?? "";
+    const state = await updateSkill(
+      f.renamedSkillId,
+      EMPTY_REFERENTIAL,
+      positionForm(current, "12"),
+    );
+
+    expect(state.ok).toBe(true);
+    expect((await rowOf(skills, f.renamedSkillId))?.position).toBe("12.00");
+  });
+
+  test("une ligne archivée ne reçoit plus de correction", async () => {
+    currentPerson = f.managerId;
+    const before = (await rowOf(approaches, f.archivedApproachId))?.label;
+
+    const state = await updateApproach(
+      f.archivedApproachId,
+      EMPTY_REFERENTIAL,
+      positionForm(`Corrigée malgré tout ${suffix}`),
+    );
+
+    expect(state.ok).toBeUndefined();
+    expect(state.message).toContain("Rétablissez-la");
+    expect((await rowOf(approaches, f.archivedApproachId))?.label).toBe(before);
+  });
+
+  test("un libellé vide est refusé sur le champ, un rang absent aussi", async () => {
+    currentPerson = f.managerId;
+    const before = await rowCount(skillLevels);
+
+    const empty = await createSkillLevel(EMPTY_REFERENTIAL, rankForm("   "));
+    expect(empty.errors.label).toBe("Le libellé est obligatoire.");
+
+    const noRank = new FormData();
+    noRank.append("label", `Sans rang ${suffix}`);
+    const missing = await createSkillLevel(EMPTY_REFERENTIAL, noRank);
+    expect(missing.errors.rank).toBe("Le rang est obligatoire.");
+
+    expect(await rowCount(skillLevels)).toBe(before);
+  });
+
+  test("une ligne d'un autre domaine n'existe pas, elle ne manque pas", async () => {
+    currentPerson = f.managerId;
+
+    const state = await updateJob(
+      "00000000-0000-4000-8000-000000000000",
+      EMPTY_REFERENTIAL,
+      positionForm(`Hors domaine ${suffix}`),
+    );
+
+    expect(state.ok).toBeUndefined();
+    expect(state.message).toBe("Cette ligne n'existe plus dans ce domaine.");
   });
 });

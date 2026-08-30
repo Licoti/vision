@@ -4926,3 +4926,89 @@ serveur**, et les cinq lectures sont ouvertes à tout le domaine (D9).
 que les deux pages de destination affichaient déjà ces nombres. `/produits` n'affiche **aucun
 compteur** — l'asymétrie est ouverte dans `ETAT.md`. Les mesures de contraste, la mesure des
 hauteurs et les deux frictions laissées ouvertes sont au journal technique.
+
+---
+
+## T7.3 — Administration : l'écran devient multi-référentiel, et les quatre référentiels simples — 30/08/2026
+
+**Ce que le ticket a fait.** L'écran livré hors ticket le 21/08/2026 gérait **un** référentiel sur
+neuf ; il en gère **cinq** — entités, métiers, approches, compétences, échelle de maîtrise. D25 est
+tenue à moitié, T7.4 la tiendra entière. `docs/06` §2 pose *six écrans, dont deux formulaires et un
+panneau — c'est le plancher*, et l'arbitrage (f) du chantier en tire la conséquence : **neuf
+référentiels ne font pas neuf routes**. Une clé `referentiel` choisit la table, `entite` cède la
+place à `ligne`, générique, et **aucune adresse servie depuis le 21/08 ne casse** — l'absence de clé
+vaut « entités », et une valeur inconnue y retombe.
+
+**Trois arbitrages rendus par l'humain avant écriture.** (1) `lib/format.ts` s'ouvre, hors périmètre,
+pour y poser `REFERENTIAL_NOUN` plutôt qu'ouvrir une troisième table de libellés ailleurs. (2)
+L'échelle de maîtrise saisit `label` + `rank` et **non** `position`, qui n'a aucun lecteur — écart
+d'une phrase à la fiche. (3) Les quatre référentiels refusent un libellé déjà pris, à l'identique des
+entités.
+
+**La lecture est générique, l'écriture ne l'est pas**, et c'est la fiche à la lettre.
+`listReferentialForAdmin` est paramétrée par la table ; les **seize** actions neuves nomment chacune
+la leur. Ce qui se partage entre elles est la **lecture** — la porte `openReferentialRow`, le doublon,
+le décompte —, jamais l'écriture : une lecture ne pose ni domaine, ni acteur, ni estampille. Le
+décompte d'opposition est **recompté par l'action** et pas seulement annoncé par le panneau
+(arbitrage (j)).
+
+**Un seul rendu de liste pour cinq référentiels**, piloté par une table `USAGE_SOURCES` qui dit,
+référentiel par référentiel, ce qui s'oppose à son rangement : produits pour l'entité, projets et
+personnes pour le métier, projets et activités pour l'approche, personnes pour la compétence,
+déclarations pour le niveau. Les entités sont **coulées dans la forme commune par l'écran**, sans que
+`lib/queries/entities.ts` bouge — elles restent la seule table à porter deux décomptes, parce
+qu'elles sont la seule qui se supprime (arbitrage (g)). Leur colonne rend son texte visible **à
+l'identique** : `formatProducts` toujours affiché, suffixe « · n archivés », entrée « Modifier le
+nom », entrée « Supprimer ».
+
+### Deux défauts trouvés par les disciplines, aucun par les tests
+
+**Le premier était un 500.** Les quatre décomptes sont des sous-requêtes corrélées ; écrites en
+interpolations nues, elles perdaient leur qualification de table **dans la position de sélection de
+Drizzle** et rendaient `"skill_id" = "id"` — ambigu, donc refusé par PostgreSQL. `tsc` ne voyait
+rien. Corrigé en écrivant toute condition par `eq` / `isNull` / `filter`, qui gardent la leur.
+
+**Le second était un mot faux, et le HTML servi l'a dit.** La colonne de l'échelle annonçait
+« 15 personnes » sur le rang « Avancé » d'un centre qui compte **dix** personnes vivantes : le
+décompte porte sur `person_skills`, ce sont des **déclarations**, et une personne en porte plusieurs
+au même niveau (15 déclarations, 9 personnes distinctes). Aucun test ne pouvait le voir — ils
+vérifiaient que le nombre valait 3, et il valait 3. Ce qui était faux n'était pas le nombre, c'était
+le mot. `ReferentialUsage` a reçu un champ `declarations` à lui, `lib/format.ts` un
+`formatDeclarations`, et le compilateur a désigné les six points d'appel.
+
+### Les quatre disciplines
+
+**Le critère se lit dans le HTML servi.** Les cinq adresses rendues, `aria-current` sur la bonne
+entrée ; `?referentiel=nimportequoi` → le HTML des entités ; les colonnes propres à chaque
+référentiel (« Ordre » et `position` pour trois, « Rang » et `rank` pour l'échelle) ; le panneau de
+métier portant `ligne-libelle` + `ligne-position`, celui de niveau `ligne-libelle` + `ligne-rang` —
+**l'arbitrage 2 se lit donc dans le document servi**. `ligne=nouvelle` et `ligne=<uuid>` ouvrent,
+`ligne=abc` et un UUID inconnu n'ouvrent rien, deux clés ensemble n'ouvrent rien. Une ligne a été
+**archivée pour être lue** : elle reste dans la liste, à sa place d'ordre, « Archivé en août 2026 »
+au masculin, et « Rétablir ce métier » à la place de « Modifier le libellé ». Les **cinq états
+vides** ont été lus sur un domaine sonde vide, créé et supprimé pour cela — aucun des cinq
+référentiels de la base de développement ne peut être vidé sans enfreindre la règle 4.
+
+**Le droit s'éprouve par l'action.** Les seize actions sont interrogées sous une identité sans
+`manageDomain`, **décompte en base à l'appui et étape témoin obligatoire** : la même charge, sous
+l'identité du responsable, doit écrire. En HTTP, le formulaire du panneau a été **rejoué sans
+JavaScript** : le membre ordinaire rend 404 et n'archive rien, le responsable rend 200 et archive.
+Le rétablissement, lui, rend **200 dans les deux cas** — seul le décompte en base les sépare, et
+c'est le rappel d'`ETAT.md` pris en flagrant délit.
+
+**Les tests se mettent en défaut, six fois.** Retirer le `notFound()` de la page ne fait tomber
+**aucun** test de droit — ils interrogent les actions, pas l'écran. Neutraliser chacun des quatre
+refus d'archivage fait tomber ses seuls cas : 1 pour l'approche, 1 pour la compétence, 1 pour le
+niveau, **2 pour le métier**, qui a deux natures de référence et donc deux cas. Neutraliser le refus
+de doublon fait tomber ses trois cas et rien d'autre ; neutraliser la borne du `smallint` en fait
+tomber un.
+
+**Le contraste se mesure — et il n'y avait rien à mesurer.** La barre de référentiel reprend le
+couple de jetons des chips d'entité de `/produits`, **caractère pour caractère** : aucun couple neuf
+par la position. Le panneau ne porte aucun jeton de couleur en propre — il n'emploie que `Panel`,
+`FormField`, `CONTROL` et `borderOf`. **Aucun neuvième manque du design system n'a été inventé.**
+
+**Ni migration, ni ligne de journal** (arbitrages (a) et (d)) ; **64 tests neufs**, 1 321 au total.
+Deux fichiers de plus que le périmètre annoncé, tous deux arbitrés avant écriture et consignés au
+journal technique. Le point ouvert sur les fixtures d'action est **refermé pour ce fichier** :
+`administration/actions.test.ts` retient son `domainId` dès la création du domaine.

@@ -6,6 +6,7 @@
  * rien à devenir « du 30 juin 2026 ».
  */
 
+import type { Referential } from "@/lib/navigation";
 import type { IndicatorDirection } from "@/lib/queries/indicators";
 import type { ResourceType } from "@/lib/queries/resources";
 import type { StarterKind } from "@/lib/queries/starters";
@@ -359,10 +360,19 @@ export function formatPersons(count: number): string {
  * (28/08/2026). Ils disent ce qu'un geste **efface**, là où `formatProducts` dit
  * ce qui s'y oppose — et c'est la seule chose qui aide à décider.
  *
- * **Ils ne s'affichent nulle part ailleurs, et surtout pas sur un écran de
- * lecture.** Un nombre d'activités posé à côté d'un accompagnement serait la
- * mesure d'activité que D39 interdit ; ici, il est le contenu d'une mise en
- * garde, lue une fois, avant un geste irréversible.
+ * **Ils ne s'affichent sur aucun écran de lecture.** Un nombre d'activités posé
+ * à côté d'un accompagnement serait la mesure d'activité que D39 interdit ;
+ * ici, il est le contenu d'une mise en garde, lue une fois, avant un geste
+ * irréversible.
+ *
+ * **La clause s'élargit en T7.3, et d'un seul cran** : un décompte qui dit ce
+ * qui **s'oppose à un geste** sur l'écran de gestion des référentiels n'est pas
+ * une mesure d'activité — c'est le rôle que `formatProducts` tient à côté depuis
+ * le 21/08/2026, et il se lit dans son commentaire. « 3 projets · 12 activités »
+ * en face d'une approche ne qualifie pas l'approche : il dit pourquoi
+ * l'archivage sera refusé. Ce qui reste interdit est inchangé — ce nombre ne
+ * paraît toujours ni sur une page de produit, ni sur une page d'accompagnement,
+ * ni dans une ligne de liste qui décrit un objet plutôt qu'un empêchement.
  *
  * Zéro s'écrit en toutes lettres, la règle des cinq fonctions voisines — et pour
  * une raison de plus ici : « 0 activité » se lirait comme un manque, quand la
@@ -453,6 +463,96 @@ const RESOURCE_TYPES: Record<ResourceType, string> = {
   figma: "Figma",
   sharepoint: "SharePoint",
   link: "Lien",
+};
+
+/**
+ * « 15 compétences déclarées » · « 1 compétence déclarée ».
+ *
+ * Le décompte d'un **niveau de maîtrise** sur l'écran d'administration, et il
+ * dit ce qui s'oppose à son rangement. **Il ne compte pas des personnes**, et le
+ * mot est là pour cela : une personne déclare plusieurs compétences, souvent au
+ * même niveau — sur la base de développement, le rang « Avancé » porte quinze
+ * déclarations pour neuf personnes, dans un centre qui en compte dix. Employer
+ * `formatPersons` y faisait dire « 15 personnes » à un écran qui n'en connaît
+ * que dix : mesuré dans le HTML servi le 30/08/2026, et corrigé par ce mot-ci.
+ *
+ * Zéro ne s'écrit pas : ce décompte n'est rendu que lorsqu'il s'oppose à
+ * quelque chose, et « Aucune référence » dit l'absence pour les quatre sources
+ * à la fois.
+ */
+export function formatDeclarations(count: number): string {
+  return `${count} compétence${count > 1 ? "s" : ""} déclarée${
+    count > 1 ? "s" : ""
+  }`;
+}
+
+/**
+ * Le nom des cinq référentiels que l'écran d'administration gère (T7.3).
+ *
+ * **Cinq formes et non un mot**, parce que le français décline : « Ajouter un
+ * métier », « Archiver ce métier », « Options du métier Untel », « Archivé en
+ * août 2026 ». Composer ces phrases à partir d'un seul nom demanderait de
+ * décider du genre et de l'élision à l'endroit où la phrase se rend, c'est-à-dire
+ * à cinq endroits — et `docs/06` §2 veut un écran sommaire, pas un moteur
+ * d'accord.
+ *
+ * **Elles vivent ici**, avec les libellés d'énuméré voisins, plutôt que dans
+ * l'écran qui les rend : `ETAT.md` porte depuis le 25/08/2026 un point ouvert
+ * sur les libellés qui vivent hors de ce fichier, et en poser une troisième
+ * table ailleurs irait à rebours de ce qu'il annonce (→ T7.9).
+ *
+ * `plural` ouvre une phrase — il porte donc sa majuscule ; les quatre autres la
+ * continuent.
+ */
+export type ReferentialNoun = {
+  /** « Métiers » — le titre de la liste et l'entrée de la barre. */
+  plural: string;
+  /** « un métier » — le geste qui remplit un état vide. */
+  indefinite: string;
+  /** « ce métier » — le geste qui vise la ligne. */
+  demonstrative: string;
+  /** « du métier » — la contraction, qui n'est pas la même pour les cinq. */
+  of: string;
+  /** « Archivé » / « Archivée » — l'accord, que seule la table connaît. */
+  archived: string;
+};
+
+export const REFERENTIAL_NOUN: Record<Referential, ReferentialNoun> = {
+  entites: {
+    plural: "Entités",
+    indefinite: "une entité",
+    demonstrative: "cette entité",
+    of: "de l'entité",
+    archived: "Archivée",
+  },
+  metiers: {
+    plural: "Métiers",
+    indefinite: "un métier",
+    demonstrative: "ce métier",
+    of: "du métier",
+    archived: "Archivé",
+  },
+  approches: {
+    plural: "Approches",
+    indefinite: "une approche",
+    demonstrative: "cette approche",
+    of: "de l'approche",
+    archived: "Archivée",
+  },
+  competences: {
+    plural: "Compétences",
+    indefinite: "une compétence",
+    demonstrative: "cette compétence",
+    of: "de la compétence",
+    archived: "Archivée",
+  },
+  niveaux: {
+    plural: "Échelle de maîtrise",
+    indefinite: "un niveau",
+    demonstrative: "ce niveau",
+    of: "du niveau",
+    archived: "Archivé",
+  },
 };
 
 export function formatResourceType(type: ResourceType): string {

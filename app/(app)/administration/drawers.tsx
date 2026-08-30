@@ -12,9 +12,11 @@
  *
  * **Elle ne fait confiance à aucun de ses arguments.** La demande traverse la
  * frontière du client, donc elle est réécrivable, donc elle ne prouve rien : le
- * `kind` est rétréci avant tout usage, la session est relue, le droit est
- * redérivé, et l'entité est retrouvée dans le domaine courant à partir de ce
- * qui a été **reçu**.
+ * `kind` est rétréci avant tout usage, **le `referential` aussi depuis T7.3** —
+ * c'est une seconde valeur venue du client, et sans ce filtre elle descendrait
+ * jusqu'à un `switch` qui ne l'attend pas —, la session est relue, le droit est
+ * redérivé, et la ligne est retrouvée dans le domaine courant à partir de ce qui
+ * a été **reçu**.
  *
  * **C'est un point d'entrée HTTP à part entière**, pas un détail de rendu : il
  * s'éprouve comme une action — requête capturée puis rejouée à la main, sous une
@@ -34,10 +36,10 @@ import {
 export async function loadAdminDrawer(
   received: DrawerRequest,
 ): Promise<DrawerContent | null> {
-  /* La demande est rétrécie avant d'être employée : `kind` peut valoir n'importe
-     quoi. `archive` passe ce filtre depuis les quatre pages — c'est
-     `resolveAdminDrawer` qui la refuse, en vérifiant le droit puis la forme de
-     l'UUID avant toute lecture. */
+  /* La demande est rétrécie avant d'être employée : `kind` et `referential`
+     peuvent valoir n'importe quoi. `archive` passe ce filtre depuis les quatre
+     pages — c'est `resolveAdminDrawer` qui la refuse, en vérifiant le droit puis
+     la forme de l'UUID avant toute lecture. */
   const request = asAdminRequest(received);
   if (!request) return null;
 

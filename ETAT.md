@@ -2,13 +2,13 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 29/08/2026, après la reprise d'ergonomie de la vue d'ensemble, livrée
-hors ticket. Dernier balayage : découpage de C7. **Le fichier dépasse les 250 lignes de la
-règle 5 — 398 au 29/08/2026** ; le balayage appartient à la session de découpage de C8.
+**Dernière mise à jour :** 30/08/2026, après T7.3. Dernier balayage : découpage de C7. **Le fichier
+dépasse les 250 lignes de la règle 5 — 442 au 30/08/2026** ; le balayage appartient à la session de
+découpage de C8.
 **Chantier en cours :** **C7 — Finitions**, dix tickets, découpés dans `tickets-C7.md`. **Dernier
 chantier du POC** — `docs/05` §5 n'en a pas de huitième.
-**Ticket suivant :** **T7.3 — Administration : l'écran devient multi-référentiel, et les quatre
-référentiels simples** (D25, `docs/06` §2).
+**Ticket suivant :** **T7.4 — Administration : les quatre référentiels porteurs de logique**
+(statuts de projet, types d'activité, outils, pistes de démarrage — `docs/04` §1).
 
 ---
 
@@ -25,7 +25,7 @@ référentiels simples** (D25, `docs/06` §2).
 | TD — Dette technique et couche de présentation | TD.1 → TD.6 | **terminé** |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
-| C7 — Finitions | T7.1 → T7.10 | **en cours** — T7.1, T7.2 livrés |
+| C7 — Finitions | T7.1 → T7.10 | **en cours** — T7.1 → T7.3 livrés |
 | C8 — après le POC | **à découper** | à faire |
 
 ---
@@ -145,6 +145,19 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   lecture nominative rétablie en fait tomber quatre, tous de `readAdoptionForm`), et **le droit
   éprouvé par un POST forgé** portant les deux champs supprimés : la ligne écrite ne porte que sa
   référence. 1 257 tests.
+- **T7.3 — l'administration devient multi-référentielle, le 30/08/2026.** L'écran passe **d'un
+  référentiel sur neuf à cinq** : une clé `referentiel` choisit la table, `entite` cède la place à
+  `ligne`, et **aucune adresse servie depuis le 21/08 ne casse** — l'absence de clé vaut « entités »,
+  et une valeur inconnue y retombe. La lecture est générique et l'écriture ne l'est pas : **une
+  requête paramétrée par la table, seize actions qui nomment la leur**. Le décompte d'opposition est
+  **recompté par l'action**, jamais seulement annoncé. Deux défauts trouvés par les disciplines et
+  non par les tests : les sous-requêtes corrélées **perdaient leur qualification de table** dans la
+  position de sélection de Drizzle — un 500, pas un mauvais nombre —, et la colonne de l'échelle
+  **disait « 15 personnes » là où le centre en compte dix**, le décompte étant des déclarations ; le
+  second a été **lu dans le HTML servi**, et il a coûté un champ de plus à `ReferentialUsage`. Ni
+  migration ni journal (arbitrages (a) et (d)) ; **64 tests neufs**, six neutralisations, et le droit
+  frappé en HTTP sans JavaScript — dont un rétablissement refusé qui rend **200**, comme celui qui
+  réussit.
 - **Le journal de la fiche accompagnement est de nouveau replié — hors ticket, 29/08/2026.** Demande
   de l'humain : c'est une partie secondaire, dont le détail n'a pas à se lire au premier niveau. Le
   `<details>` retiré le 28/08 est rétabli dans la forme de T6.3 — `SectionHeader as="summary"` et sa
@@ -257,7 +270,8 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   un déplacement **plus un vocabulaire à trancher**, T5bis.7 ayant refermé la duplication et pas les
   mots — et `BUDGET_UNIT_LABEL` (`components/projects/budget.tsx`), hors périmètre de T7.1.
   `AVAILABILITY_LABEL` reste dans `components/team/availability-dot.tsx` par la même raison, et il en
-  est le troisième cas. → **T7.9.**
+  est le troisième cas. **T7.3 n'en a pas ajouté un quatrième** : `REFERENTIAL_NOUN` est allé dans
+  `lib/format.ts`, au prix d'un fichier de plus que son périmètre. → **T7.9.**
 - **Une piste de démarrage ne mène pas à l'activité qu'elle suggère.** `starters` ne porte
   **volontairement aucun `activity_type_id`** — une colonne sans lecteur est celle qu'on relit un jour
   sans savoir pourquoi (T5.2). Le geste coûte une colonne, une migration et trois lignes. → **T7.10.**
@@ -279,11 +293,11 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 - **L'en-tête de `schema.ts` dit « les 26 tables métier », elles sont 30.** Cinquième chiffre faux
   d'une même famille — `scoped.ts`, la fiche de C6 deux fois, et `drawers/project.tsx` (« les six
   panneaux » pour huit, **retiré** par T6.5). Le geste est de retirer. → **T7.10, qui l'ouvre.**
-- **Trois fichiers de tests d'action nettoient encore sur `if (!f?.domainId) return`** — un
+- **Deux fichiers de tests d'action nettoient encore sur `if (!f?.domainId) return`** — un
   `beforeAll` qui échoue après avoir créé son domaine le laisse en place, et fait tomber le fichier
-  suivant. Restent `projets/`, `produits/` et `administration/actions.test.ts` ; le quatrième,
-  `equipe/actions.test.ts` (28/08), retient son `domainId` **dès la création du domaine**, hors de la
-  fixture — c'est la forme à reprendre. → **au prochain.**
+  suivant. Restent `projets/` et `produits/` ; `equipe/actions.test.ts` (28/08) et
+  `administration/actions.test.ts` (T7.3) retiennent leur `domainId` **dès la création du domaine**,
+  hors de la fixture — c'est la forme à reprendre. → **au prochain.**
 - **`uiLayerSeal` ne scelle ni `components/shell/` ni `components/overview/`, et la destination
   « au prochain qui l'ouvre » a échoué.** Le dossier a été ouvert le 29/08/2026 par la reprise de la
   vue d'ensemble — trois fichiers touchés, un supprimé — et **le sceau n'a pas été posé** : la
@@ -293,6 +307,12 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 - **Les deux use cases de la fixture n'ont aucun persona rattaché.** `scripts/seed.ts` n'en sème
   aucun. Le rattachement est facultatif et le lien a été éprouvé par sonde scopée : ce qui manque est
   un **jeu d'essai**. → **au prochain ticket qui sème des personae.**
+- **`sameReferentialLabel` et `sameEntityLabel` disent la même règle deux fois**, et l'entité est
+  aussi la seule des cinq lignes de référentiel dont le formulaire **ne saisit pas** sa `position` —
+  `entities.position` n'ayant aucun lecteur, quand celle des trois autres en a onze. L'écran porte
+  donc deux formes de formulaire là où il n'a qu'une liste. Les replier demande d'ouvrir
+  `lib/forms/entity.ts`, que le périmètre de T7.3 n'ouvrait pas. → **au prochain ticket qui ouvre
+  `lib/forms/entity.ts`.**
 - **Les props d'icône de `Button` n'ont toujours aucun appelant.** Elles enfreignent l'en-tête de
   `button.tsx` — objet même de la demande, **éprouvées par sonde**. Le rang `tertiary` a trouvé le
   sien le 21/08 (le kebab de roadmap) ; l'icône attend encore. → **au prochain ticket qui pose un

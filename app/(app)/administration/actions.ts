@@ -1,13 +1,23 @@
 "use server";
 
 /**
- * Les écritures de la page **Administration** — le référentiel des entités
- * (21/08/2026).
+ * Les écritures de la page **Administration** — les référentiels du domaine
+ * (21/08/2026 pour les entités, T7.3 pour les quatre suivants).
  *
- * Cinq gestes sur un objet : créer une entité, corriger son libellé,
- * l'archiver, la rétablir, la supprimer. Sans eux, `entities` reste ce qu'elle
- * était depuis T1.2 — une table qu'un script seul alimente, et qu'un renommage
- * fait doubler (point ouvert d'`ETAT.md`).
+ * Cinq gestes sur l'entité : la créer, corriger son libellé, l'archiver, la
+ * rétablir, la supprimer. Puis **quatre gestes sur chacun des quatre
+ * référentiels simples** — métiers, approches, compétences, échelle de
+ * maîtrise —, la suppression en moins (arbitrage (g) de `tickets-C7.md`). Sans
+ * eux, ces tables restent ce qu'elles étaient depuis T1.2 : des tables qu'un
+ * script seul alimente, et qu'un renommage fait doubler (point ouvert
+ * d'`ETAT.md`).
+ *
+ * **Une fonction d'écriture par table, et c'est la fiche de T7.3.** Seize
+ * fonctions se ressemblent ; une seule, paramétrée par la table, aurait fait de
+ * la couche scopée un endroit où le domaine se **déduit** plutôt qu'il ne se
+ * pose, et rendu `assertPreconditions` illisible. Ce qui se partage ici est
+ * **la lecture** — la porte, le doublon, le décompte —, jamais l'écriture : une
+ * lecture ne pose rien.
  *
  * **Le droit est `session.can.manageDomain`, seul.** `docs/02` §Rôle donne au
  * responsable de domaine la gestion « des référentiels et des membres », et
@@ -60,17 +70,48 @@ import { revalidatePath } from "next/cache";
 import type { ConfirmState } from "@/components/ui/confirm-panel";
 import { requireSession } from "@/lib/auth/provider";
 import type { Session } from "@/lib/auth/session";
-import { entities, products } from "@/lib/db/schema";
-import { IntegrityError, type Row } from "@/lib/db/scoped";
-import { formatProducts } from "@/lib/format";
+import {
+  approaches,
+  entities,
+  jobs,
+  products,
+  skillLevels,
+  skills,
+} from "@/lib/db/schema";
+import {
+  IntegrityError,
+  type ArchivableTable,
+  type Row,
+} from "@/lib/db/scoped";
+import {
+  formatActivities,
+  formatDeclarations,
+  formatPersons,
+  formatProducts,
+  formatProjects,
+} from "@/lib/format";
 import {
   parseEntityForm,
   readEntityForm,
   sameEntityLabel,
   type EntityFormState,
 } from "@/lib/forms/entity";
-import { ROUTES } from "@/lib/navigation";
+import {
+  ORDERED_BY_POSITION,
+  ORDERED_BY_RANK,
+  parseReferentialForm,
+  readReferentialForm,
+  sameReferentialLabel,
+  type ReferentialFormState,
+} from "@/lib/forms/referential";
+import { ROUTES, type Referential } from "@/lib/navigation";
 import { listEntityLabels } from "@/lib/queries/entities";
+import {
+  countReferentialUsage,
+  listReferentialLabels,
+  type ReferentialUsage,
+  type SimpleReferentialTable,
+} from "@/lib/queries/referentials";
 
 /** Le refus que les cinq points d'entrée partagent, quand il vient du droit. */
 const RESERVED =
@@ -352,4 +393,597 @@ export async function deleteEntity(
 
   revalidate();
   return { ok: true };
+}
+
+/* ==========================================================================
+   Les quatre référentiels simples — T7.3
+
+   Métiers, approches, compétences, échelle de maîtrise. Même forme que les
+   entités, la suppression en moins : ils s'archivent et se rétablissent
+   (arbitrage (g) de `tickets-C7.md`), et `DeletableTable` ne les nomme pas.
+   ========================================================================== */
+
+/** Le refus que les seize points d'entrée partagent, quand il vient du droit. */
+const RESERVED_REFERENTIAL =
+  "La gestion des référentiels est réservée au responsable de domaine.";
+
+/** Le refus que les douze gestes ciblés partagent, quand la ligne a disparu. */
+const GONE_REFERENTIAL = "Cette ligne n'existe plus dans ce domaine.";
+
+/** Le refus d'une correction sur une ligne rangée — le geste juste est ailleurs. */
+const ARCHIVED_REFERENTIAL =
+  "Cette ligne est archivée : elle ne reçoit plus de correction. Rétablissez-la d'abord.";
+
+/**
+ * Un refus qui n'appartient à aucun champ, pour les huit formulaires.
+ *
+ * La saisie revient telle quelle : Vision ne jette jamais en silence ce qui a
+ * été tapé, y compris quand ce qu'elle refuse n'est pas la saisie.
+ */
+function referentialRefusal(
+  formData: FormData,
+  message: string,
+): ReferentialFormState {
+  return { values: readReferentialForm(formData), errors: {}, message };
+}
+
+/**
+ * La porte des douze gestes ciblés : le droit, puis la ligne **reçue**.
+ *
+ * **Générique, et elle peut l'être** : elle ne pose rien — ni domaine, ni
+ * acteur, ni colonne. Elle lit. C'est l'écriture que la fiche refuse
+ * d'indirecter, et l'écriture est plus bas, table par table.
+ *
+ * Elle ne refuse pas une ligne archivée, à la différence d'`openPerson` : un des
+ * gestes qu'elle sert — rétablir — ne s'exerce que sur une ligne rangée. C'est
+ * donc chaque geste qui dit ce que l'archivage lui interdit, et le contrôle
+ * porte sur la ligne **lue**, jamais sur ce que l'écran affichait.
+ */
+async function openReferentialRow<T extends ArchivableTable>(
+  session: Session,
+  table: T,
+  rowId: string,
+): Promise<{ row: Row<T> } | { message: string }> {
+  if (!session.can.manageDomain) return { message: RESERVED_REFERENTIAL };
+
+  /* `find` est scopée : une ligne d'un autre domaine n'existe pas, elle ne
+     « manque » pas. L'écran ne distingue pas les deux, et c'est voulu. */
+  const row = await session.db.find(table, rowId);
+  if (!row) return { message: GONE_REFERENTIAL };
+
+  return { row };
+}
+
+/**
+ * Le libellé est-il déjà pris dans ce référentiel ?
+ *
+ * **Aucune de ces tables ne porte de contrainte d'unicité**, et `schema.ts` dit
+ * pourquoi pour l'échelle : « une contrainte non demandée contraindrait l'écran
+ * de gestion dû à C7 ». L'écran est là, et il choisit de refuser le doublon —
+ * mais dans l'action, où le refus se dit en français et se nuance, plutôt qu'en
+ * base, où il rendrait un 500.
+ *
+ * **Les lignes archivées comptent**, et c'est le cœur du geste : le point ouvert
+ * d'`ETAT.md` décrit exactement une seconde ligne créée sous un nom que la
+ * première portait déjà. Le refus propose alors de rétablir, et il le propose en
+ * toutes lettres — faute de quoi il enverrait chercher une ligne que la liste
+ * montre pourtant. Jumeau de `duplicateOf`, sur les entités.
+ */
+async function duplicateReferentialOf(
+  session: Session,
+  table: SimpleReferentialTable,
+  label: string,
+  exceptId?: string,
+): Promise<string | null> {
+  const existing = await listReferentialLabels(session.db, table, {
+    ...(exceptId ? { exceptId } : {}),
+  });
+  const twin = existing.find((row) => sameReferentialLabel(row.label, label));
+  if (!twin) return null;
+
+  if (twin.archivedAt) {
+    return `Une ligne archivée porte déjà ce libellé : « ${twin.label} ». Rétablissez-la plutôt que d'en créer une seconde.`;
+  }
+  return `Une ligne porte déjà ce libellé : « ${twin.label} ».`;
+}
+
+/**
+ * Les écrans que l'écriture d'un référentiel change.
+ *
+ * `/administration` toujours ; le reste selon ce que le libellé qualifie — un
+ * métier se lit sur la liste transverse et sur l'Équipe, une approche sur la
+ * liste transverse et sur la répartition de la vue d'ensemble (T7.2), une
+ * compétence et un niveau sur l'Équipe seule. **Aucune page de détail** :
+ * `revalidatePath` invalide une route, et les routes dynamiques se
+ * rafraîchissent d'elles-mêmes — c'est la règle que `revalidate` tient déjà
+ * au-dessus.
+ */
+function revalidateReferential(referential: Referential): void {
+  revalidatePath(ROUTES.admin);
+
+  switch (referential) {
+    case "metiers":
+      revalidatePath(ROUTES.projects);
+      revalidatePath(ROUTES.team);
+      return;
+    case "approches":
+      revalidatePath(ROUTES.projects);
+      revalidatePath(ROUTES.overview);
+      return;
+    case "competences":
+    case "niveaux":
+      revalidatePath(ROUTES.team);
+      return;
+    case "entites":
+      revalidatePath(ROUTES.products);
+      return;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Ce qui s'oppose au rangement, référentiel par référentiel
+
+   Quatre fonctions et non une, parce que ce sont quatre phrases et non une
+   phrase à trous : la règle du dépôt depuis T5.1, où le singulier de
+   `refusalOfLivingProjects` avait vécu trois tickets avant d'être lu. Chacune
+   rend `null` quand rien ne s'oppose — c'est ce `null` que l'archivage attend.
+   -------------------------------------------------------------------------- */
+
+function refusalOfJobUsage(usage: ReferentialUsage): string | null {
+  if (usage.projects > 1) {
+    return `${formatProjects(usage.projects)} vivants déclarent encore ce métier. Retirez-le de leur fiche ou archivez-les d'abord : ranger le métier les laisserait dans la liste sans leur filtre.`;
+  }
+  if (usage.projects === 1) {
+    return `${formatProjects(1)} vivant déclare encore ce métier. Retirez-le de sa fiche ou archivez-le d'abord : ranger le métier le laisserait dans la liste sans son filtre.`;
+  }
+  if (usage.persons > 1) {
+    return `${formatPersons(usage.persons)} portent encore ce métier. Donnez-leur un autre métier ou archivez-les d'abord : ranger le métier laisserait leur fiche sans filtre.`;
+  }
+  if (usage.persons === 1) {
+    return `${formatPersons(1)} porte encore ce métier. Donnez-lui un autre métier ou archivez-la d'abord : ranger le métier laisserait sa fiche sans filtre.`;
+  }
+  return null;
+}
+
+function refusalOfApproachUsage(usage: ReferentialUsage): string | null {
+  if (usage.projects > 1) {
+    return `${formatProjects(usage.projects)} vivants déclarent encore cette approche. Retirez-la de leur fiche ou archivez-les d'abord : ranger l'approche les laisserait dans la liste sans leur filtre.`;
+  }
+  if (usage.projects === 1) {
+    return `${formatProjects(1)} vivant déclare encore cette approche. Retirez-la de sa fiche ou archivez-le d'abord : ranger l'approche le laisserait dans la liste sans son filtre.`;
+  }
+  if (usage.activities > 1) {
+    return `${formatActivities(usage.activities)} vivantes portent encore cette approche. Corrigez-les ou archivez-les d'abord : ranger l'approche les laisserait sur la roadmap sans leur manière.`;
+  }
+  if (usage.activities === 1) {
+    return `${formatActivities(1)} vivante porte encore cette approche. Corrigez-la ou archivez-la d'abord : ranger l'approche la laisserait sur la roadmap sans sa manière.`;
+  }
+  return null;
+}
+
+function refusalOfSkillUsage(usage: ReferentialUsage): string | null {
+  if (usage.persons > 1) {
+    return `${formatPersons(usage.persons)} déclarent encore cette compétence. Retirez-la de leur fiche ou archivez-les d'abord : ranger la compétence la laisserait sur leur radar sans qu'on puisse la reprendre.`;
+  }
+  if (usage.persons === 1) {
+    return `${formatPersons(1)} déclare encore cette compétence. Retirez-la de sa fiche ou archivez-la d'abord : ranger la compétence la laisserait sur son radar sans qu'on puisse la reprendre.`;
+  }
+  return null;
+}
+
+function refusalOfLevelUsage(usage: ReferentialUsage): string | null {
+  /* **Des déclarations, jamais des personnes** : une personne en porte
+     plusieurs au même niveau, et c'est chaque ligne de `person_skills` qui
+     retient le rang (`restrict`). */
+  if (usage.declarations > 1) {
+    return `${formatDeclarations(usage.declarations)} citent encore ce niveau. Changez leur niveau ou archivez les personnes qui les portent : ranger le niveau laisserait leur radar sans graduation.`;
+  }
+  if (usage.declarations === 1) {
+    return `${formatDeclarations(1)} cite encore ce niveau. Changez son niveau ou archivez la personne qui la porte : ranger le niveau laisserait son radar sans graduation.`;
+  }
+  return null;
+}
+
+/* --------------------------------------------------------------------------
+   Métiers — `jobs`
+   -------------------------------------------------------------------------- */
+
+export async function createJob(
+  _previous: ReferentialFormState,
+  formData: FormData,
+): Promise<ReferentialFormState> {
+  const session = await requireSession();
+  if (!session.can.manageDomain) {
+    return referentialRefusal(formData, RESERVED_REFERENTIAL);
+  }
+
+  const { values, errors, input } = parseReferentialForm(
+    formData,
+    ORDERED_BY_POSITION,
+  );
+  if (!input) return { values, errors };
+
+  const duplicate = await duplicateReferentialOf(session, jobs, input.label);
+  if (duplicate) return { values, errors: { label: duplicate } };
+
+  await session.db.insert(jobs, {
+    label: input.label,
+    ...(input.position === undefined ? {} : { position: input.position }),
+  });
+
+  revalidateReferential("metiers");
+  return { values, errors: {}, ok: true };
+}
+
+export async function updateJob(
+  jobId: string,
+  _previous: ReferentialFormState,
+  formData: FormData,
+): Promise<ReferentialFormState> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, jobs, jobId);
+  if ("message" in gate) return referentialRefusal(formData, gate.message);
+  if (gate.row.archivedAt !== null) {
+    return referentialRefusal(formData, ARCHIVED_REFERENTIAL);
+  }
+
+  const { values, errors, input } = parseReferentialForm(formData, ORDERED_BY_POSITION);
+  if (!input) return { values, errors };
+
+  const duplicate = await duplicateReferentialOf(
+    session,
+    jobs,
+    input.label,
+    jobId,
+  );
+  if (duplicate) return { values, errors: { label: duplicate } };
+
+  const updated = await session.db.update(jobs, jobId, {
+    label: input.label,
+    ...(input.position === undefined ? {} : { position: input.position }),
+  });
+  if (!updated) return referentialRefusal(formData, GONE_REFERENTIAL);
+
+  revalidateReferential("metiers");
+  return { values, errors: {}, ok: true };
+}
+
+export async function archiveJob(
+  jobId: string,
+  _previous: ConfirmState,
+  _formData: FormData,
+): Promise<ConfirmState> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, jobs, jobId);
+  if ("message" in gate) return { message: gate.message };
+  if (gate.row.archivedAt !== null) return {};
+
+  /* **Le décompte est refait ici**, et c'est lui qui protège : le panneau
+     l'annonce, l'écran retire l'entrée de menu, et ni l'un ni l'autre n'a jamais
+     tenu un point d'entrée HTTP (arbitrage (j) de `tickets-C7.md`). */
+  const usage = await countReferentialUsage(session.db, "metiers", jobId);
+  const refusal = refusalOfJobUsage(usage);
+  if (refusal) return { message: refusal };
+
+  await session.db.archive(jobs, jobId);
+
+  revalidateReferential("metiers");
+  return { ok: true };
+}
+
+export async function restoreJob(jobId: string): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, jobs, jobId);
+  if ("message" in gate) return;
+
+  await session.db.restore(jobs, jobId);
+
+  revalidateReferential("metiers");
+}
+
+/* --------------------------------------------------------------------------
+   Approches — `approaches`
+   -------------------------------------------------------------------------- */
+
+export async function createApproach(
+  _previous: ReferentialFormState,
+  formData: FormData,
+): Promise<ReferentialFormState> {
+  const session = await requireSession();
+  if (!session.can.manageDomain) {
+    return referentialRefusal(formData, RESERVED_REFERENTIAL);
+  }
+
+  const { values, errors, input } = parseReferentialForm(
+    formData,
+    ORDERED_BY_POSITION,
+  );
+  if (!input) return { values, errors };
+
+  const duplicate = await duplicateReferentialOf(
+    session,
+    approaches,
+    input.label,
+  );
+  if (duplicate) return { values, errors: { label: duplicate } };
+
+  await session.db.insert(approaches, {
+    label: input.label,
+    ...(input.position === undefined ? {} : { position: input.position }),
+  });
+
+  revalidateReferential("approches");
+  return { values, errors: {}, ok: true };
+}
+
+export async function updateApproach(
+  approachId: string,
+  _previous: ReferentialFormState,
+  formData: FormData,
+): Promise<ReferentialFormState> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, approaches, approachId);
+  if ("message" in gate) return referentialRefusal(formData, gate.message);
+  if (gate.row.archivedAt !== null) {
+    return referentialRefusal(formData, ARCHIVED_REFERENTIAL);
+  }
+
+  const { values, errors, input } = parseReferentialForm(
+    formData,
+    ORDERED_BY_POSITION,
+  );
+  if (!input) return { values, errors };
+
+  const duplicate = await duplicateReferentialOf(
+    session,
+    approaches,
+    input.label,
+    approachId,
+  );
+  if (duplicate) return { values, errors: { label: duplicate } };
+
+  const updated = await session.db.update(approaches, approachId, {
+    label: input.label,
+    ...(input.position === undefined ? {} : { position: input.position }),
+  });
+  if (!updated) return referentialRefusal(formData, GONE_REFERENTIAL);
+
+  revalidateReferential("approches");
+  return { values, errors: {}, ok: true };
+}
+
+export async function archiveApproach(
+  approachId: string,
+  _previous: ConfirmState,
+  _formData: FormData,
+): Promise<ConfirmState> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, approaches, approachId);
+  if ("message" in gate) return { message: gate.message };
+  if (gate.row.archivedAt !== null) return {};
+
+  const usage = await countReferentialUsage(
+    session.db,
+    "approches",
+    approachId,
+  );
+  const refusal = refusalOfApproachUsage(usage);
+  if (refusal) return { message: refusal };
+
+  await session.db.archive(approaches, approachId);
+
+  revalidateReferential("approches");
+  return { ok: true };
+}
+
+export async function restoreApproach(approachId: string): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, approaches, approachId);
+  if ("message" in gate) return;
+
+  await session.db.restore(approaches, approachId);
+
+  revalidateReferential("approches");
+}
+
+/* --------------------------------------------------------------------------
+   Compétences — `skills`
+   -------------------------------------------------------------------------- */
+
+export async function createSkill(
+  _previous: ReferentialFormState,
+  formData: FormData,
+): Promise<ReferentialFormState> {
+  const session = await requireSession();
+  if (!session.can.manageDomain) {
+    return referentialRefusal(formData, RESERVED_REFERENTIAL);
+  }
+
+  const { values, errors, input } = parseReferentialForm(formData, ORDERED_BY_POSITION);
+  if (!input) return { values, errors };
+
+  const duplicate = await duplicateReferentialOf(session, skills, input.label);
+  if (duplicate) return { values, errors: { label: duplicate } };
+
+  await session.db.insert(skills, {
+    label: input.label,
+    ...(input.position === undefined ? {} : { position: input.position }),
+  });
+
+  revalidateReferential("competences");
+  return { values, errors: {}, ok: true };
+}
+
+export async function updateSkill(
+  skillId: string,
+  _previous: ReferentialFormState,
+  formData: FormData,
+): Promise<ReferentialFormState> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, skills, skillId);
+  if ("message" in gate) return referentialRefusal(formData, gate.message);
+  if (gate.row.archivedAt !== null) {
+    return referentialRefusal(formData, ARCHIVED_REFERENTIAL);
+  }
+
+  const { values, errors, input } = parseReferentialForm(formData, ORDERED_BY_POSITION);
+  if (!input) return { values, errors };
+
+  const duplicate = await duplicateReferentialOf(
+    session,
+    skills,
+    input.label,
+    skillId,
+  );
+  if (duplicate) return { values, errors: { label: duplicate } };
+
+  const updated = await session.db.update(skills, skillId, {
+    label: input.label,
+    ...(input.position === undefined ? {} : { position: input.position }),
+  });
+  if (!updated) return referentialRefusal(formData, GONE_REFERENTIAL);
+
+  revalidateReferential("competences");
+  return { values, errors: {}, ok: true };
+}
+
+export async function archiveSkill(
+  skillId: string,
+  _previous: ConfirmState,
+  _formData: FormData,
+): Promise<ConfirmState> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, skills, skillId);
+  if ("message" in gate) return { message: gate.message };
+  if (gate.row.archivedAt !== null) return {};
+
+  const usage = await countReferentialUsage(session.db, "competences", skillId);
+  const refusal = refusalOfSkillUsage(usage);
+  if (refusal) return { message: refusal };
+
+  await session.db.archive(skills, skillId);
+
+  revalidateReferential("competences");
+  return { ok: true };
+}
+
+export async function restoreSkill(skillId: string): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, skills, skillId);
+  if ("message" in gate) return;
+
+  await session.db.restore(skills, skillId);
+
+  revalidateReferential("competences");
+}
+
+/* --------------------------------------------------------------------------
+   Échelle de maîtrise — `skill_levels`
+
+   Le seul des quatre qui saisisse un `rank` plutôt qu'une `position` : c'est
+   `rank` qui ordonne l'échelle dans les quatre lectures qui la servent, et
+   `skill_levels.position` n'a aucun lecteur.
+   -------------------------------------------------------------------------- */
+
+export async function createSkillLevel(
+  _previous: ReferentialFormState,
+  formData: FormData,
+): Promise<ReferentialFormState> {
+  const session = await requireSession();
+  if (!session.can.manageDomain) {
+    return referentialRefusal(formData, RESERVED_REFERENTIAL);
+  }
+
+  const { values, errors, input } = parseReferentialForm(formData, ORDERED_BY_RANK);
+  if (!input || input.rank === undefined) return { values, errors };
+
+  const duplicate = await duplicateReferentialOf(
+    session,
+    skillLevels,
+    input.label,
+  );
+  if (duplicate) return { values, errors: { label: duplicate } };
+
+  await session.db.insert(skillLevels, {
+    label: input.label,
+    rank: input.rank,
+  });
+
+  revalidateReferential("niveaux");
+  return { values, errors: {}, ok: true };
+}
+
+export async function updateSkillLevel(
+  levelId: string,
+  _previous: ReferentialFormState,
+  formData: FormData,
+): Promise<ReferentialFormState> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, skillLevels, levelId);
+  if ("message" in gate) return referentialRefusal(formData, gate.message);
+  if (gate.row.archivedAt !== null) {
+    return referentialRefusal(formData, ARCHIVED_REFERENTIAL);
+  }
+
+  const { values, errors, input } = parseReferentialForm(formData, ORDERED_BY_RANK);
+  if (!input || input.rank === undefined) return { values, errors };
+
+  const duplicate = await duplicateReferentialOf(
+    session,
+    skillLevels,
+    input.label,
+    levelId,
+  );
+  if (duplicate) return { values, errors: { label: duplicate } };
+
+  const updated = await session.db.update(skillLevels, levelId, {
+    label: input.label,
+    rank: input.rank,
+  });
+  if (!updated) return referentialRefusal(formData, GONE_REFERENTIAL);
+
+  revalidateReferential("niveaux");
+  return { values, errors: {}, ok: true };
+}
+
+export async function archiveSkillLevel(
+  levelId: string,
+  _previous: ConfirmState,
+  _formData: FormData,
+): Promise<ConfirmState> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, skillLevels, levelId);
+  if ("message" in gate) return { message: gate.message };
+  if (gate.row.archivedAt !== null) return {};
+
+  const usage = await countReferentialUsage(session.db, "niveaux", levelId);
+  const refusal = refusalOfLevelUsage(usage);
+  if (refusal) return { message: refusal };
+
+  await session.db.archive(skillLevels, levelId);
+
+  revalidateReferential("niveaux");
+  return { ok: true };
+}
+
+export async function restoreSkillLevel(levelId: string): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, skillLevels, levelId);
+  if ("message" in gate) return;
+
+  await session.db.restore(skillLevels, levelId);
+
+  revalidateReferential("niveaux");
 }

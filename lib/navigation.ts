@@ -391,30 +391,92 @@ export const SKILL_PANEL_PARAM = "maitrise";
 export const STARTER_PANEL_PARAM = "piste";
 
 /**
- * Le panneau de **saisie d'une entité**, sur la page Administration
- * (21/08/2026) — la première clé d'ouverture de cet écran.
+ * Le **référentiel affiché** par la page Administration (T7.3) — la clé qui
+ * fait d'un écran unique un écran multi-référentiel.
+ *
+ * **Neuf référentiels ne font pas neuf routes** : `docs/06` §2 pose *six
+ * écrans, dont deux formulaires et un panneau — c'est le plancher*, et
+ * l'arbitrage (f) de `tickets-C7.md` en tire la conséquence. Une clé choisit la
+ * table ; **absente, elle vaut « entités »**, si bien qu'aucun lien servi
+ * depuis le 21/08/2026 ne casse.
+ *
+ * **C'est un sélecteur, pas une clé d'ouverture.** Elle ne décide d'aucun
+ * panneau : elle restreint ce que la page rend, comme `de` et `a` sur la page
+ * produit et comme les filtres de la liste transverse. Elle reste donc **hors
+ * du décompte d'exclusivité** de l'écran, et hors d'`ADMIN_PANEL_PARAMS` — ce
+ * qui est aussi ce qui la laisse survivre au nettoyage d'URL que `DrawerHost`
+ * fait au montage (TD.2).
+ */
+export const REFERENTIAL_PARAM = "referentiel";
+
+/**
+ * Les cinq référentiels que l'écran gère, dans l'ordre de sa barre.
+ *
+ * **Cinq sur neuf**, et c'est l'état de T7.3 : les quatre porteurs de logique —
+ * statuts de projet, types d'activité, outils, pistes de démarrage — rejoignent
+ * cette liste en T7.4. Elle est **close** et sert de rétrécissement : une valeur
+ * d'URL qui n'y figure pas n'existe pas.
+ *
+ * **L'ordre est celui de la barre de choix, et il n'est pas neutre** : les
+ * entités d'abord — c'est le seul référentiel que `docs/06` §2 nomme dans son
+ * arbre —, puis ce qui qualifie un accompagnement, puis ce qui qualifie une
+ * personne. Le **nom** de chacun vit dans `REFERENTIAL_NOUN`
+ * (`lib/format.ts`) : ce module ne dépend de rien, et un libellé écrit ici
+ * aurait été le second à dire la même chose.
+ */
+export const REFERENTIALS = [
+  "entites",
+  "metiers",
+  "approches",
+  "competences",
+  "niveaux",
+] as const;
+
+export type Referential = (typeof REFERENTIALS)[number];
+
+/** Celui que l'absence de clé désigne — et celui sur lequel toute valeur
+ *  inconnue retombe. */
+export const DEFAULT_REFERENTIAL: Referential = "entites";
+
+/**
+ * La valeur d'URL, rétrécie sur la liste close.
+ *
+ * **La forme se vérifie avant la base, partout** : une valeur fantaisiste ne
+ * cherche pas une table qui n'existe pas, elle retombe sur les entités — comme
+ * un identifiant fantaisiste n'ouvre aucun panneau. Rendre 404 serait dire
+ * qu'il y a quelque chose derrière une valeur qu'on n'a pas écrite.
+ */
+export function asReferential(value: string | undefined): Referential {
+  return (REFERENTIALS as readonly string[]).includes(value ?? "")
+    ? (value as Referential)
+    : DEFAULT_REFERENTIAL;
+}
+
+/**
+ * Le panneau de **saisie d'une ligne de référentiel**, sur la page
+ * Administration — `entite` jusqu'au 29/08/2026, `ligne` depuis T7.3.
+ *
+ * **Le renommage est le sujet du ticket, pas un « pendant que j'y suis »**
+ * (règle 3) : neuf clés de formulaire auraient fait neuf fois la même chose, et
+ * une clé par table est exactement ce que la page produit a évité en réemployant
+ * `indicateur` sur deux écrans. C'est `referentiel` qui dit **de quelle table**
+ * la ligne est ; cette clé-ci dit seulement **laquelle**.
  *
  * **Deux valeurs d'ouverture**, la forme de `persona` et de `profil` :
- * `nouvelle` ouvre le panneau vide, un identifiant d'entité l'ouvre sur le
- * libellé à corriger, et toute autre valeur n'ouvre rien — un UUID ne peut pas
- * valoir `nouvelle`. Créer et corriger portent ici sur deux lignes distinctes :
- * la valeur doit donc désigner.
- *
- * **`entite` est déjà le filtre de `/produits`**, et ce n'est pas un conflit :
- * ce sont deux pages, jamais la même URL — la règle qui laisse `indicateur`
- * vivre sur la page produit et sur la page projet, et `archiver` sur trois
- * pages. Ce qui interdirait le réemploi serait deux sens sur un **même** écran,
- * comme `competence` l'a interdit à la page Équipe en T5bis.6.
+ * `nouvelle` ouvre le panneau vide, un identifiant l'ouvre sur la ligne à
+ * corriger, et toute autre valeur n'ouvre rien — un UUID ne peut pas valoir
+ * `nouvelle`. Créer et corriger portent ici sur deux lignes distinctes : la
+ * valeur doit donc désigner.
  *
  * **Une seule clé pour lire et pour écrire**, à rebours de la paire
  * `persona`/`fiche` : l'écran entier ne s'ouvre qu'à `manageDomain`, il n'y a
- * donc pas deux droits à séparer. Une entité n'a rien à donner à lire que sa
- * ligne de liste ne dise déjà.
+ * donc pas deux droits à séparer. Une ligne de référentiel est un libellé et un
+ * ordre — elle n'a rien à donner à lire que sa ligne de liste ne dise déjà.
  */
-export const ENTITY_FORM_PARAM = "entite";
+export const REFERENTIAL_ROW_PARAM = "ligne";
 
 /** La valeur qui ouvre le panneau vide. Un identifiant ouvre la correction. */
-export const ENTITY_FORM_NEW = "nouvelle";
+export const REFERENTIAL_ROW_NEW = "nouvelle";
 
 /**
  * Le panneau de **confirmation de suppression** (21/08/2026), sur trois pages
@@ -562,6 +624,25 @@ export const PROJECT_FILTER_PARAM = {
  * formulaires ne figurent pas dans `MAIN_NAV` — un formulaire n'est pas une
  * destination de navigation.
  */
+/**
+ * L'adresse de la page Administration, référentiel et clé de panneau ensemble.
+ *
+ * Le référentiel s'omet quand il est celui par défaut : `/administration?ligne=…`
+ * et `/administration?referentiel=entites&ligne=…` désignent la même chose, et
+ * la première est celle que l'écran sert.
+ */
+function adminWith(
+  referential: Referential,
+  key: string,
+  value: string,
+): string {
+  const selector =
+    referential === DEFAULT_REFERENTIAL
+      ? ""
+      : `${REFERENTIAL_PARAM}=${referential}&`;
+  return `/administration?${selector}${key}=${value}`;
+}
+
 export const ROUTES = {
   overview: "/",
   products: "/produits",
@@ -917,41 +998,61 @@ export const ROUTES = {
   teamSkillEdit: (personSkillId: string) =>
     `/equipe?${SKILL_PANEL_PARAM}=${personSkillId}`,
   /**
-   * L'écran **Administration** — le référentiel des entités (21/08/2026).
+   * L'écran **Administration** — les référentiels du domaine (21/08/2026, porté
+   * de un à cinq référentiels par T7.3).
    *
-   * L'entrée promise par `docs/06` §8 et l'écran promis par D25, avancé de C7
-   * sur un seul référentiel. **Il n'a pas de page de détail** : une entité est
-   * un libellé, elle n'a rien à montrer qu'une ligne de liste ne dise. Les
-   * quatre fonctions ci-dessous n'en sont donc pas — c'est la même adresse,
-   * avec un paramètre.
+   * L'entrée promise par `docs/06` §8 et l'écran promis par D25. **Il n'a pas de
+   * page de détail** : une ligne de référentiel est un libellé et un ordre, elle
+   * n'a rien à montrer qu'une ligne de liste ne dise. Les cinq fonctions
+   * ci-dessous n'en sont donc pas — c'est la même adresse, avec des paramètres.
+   *
+   * Cette entrée-ci reste une **chaîne** et non une fonction : elle sert
+   * `MAIN_NAV`, qui décrit une destination, et `revalidatePath`, qui invalide
+   * une route et non une vue. Le référentiel se choisit par `adminReferential`.
    */
   admin: "/administration",
   /**
+   * La page Administration, sur un référentiel donné (T7.3).
+   *
+   * **Les entités ne portent pas la clé** : elles sont la valeur par défaut, et
+   * l'omission est ce qui laisse intacte toute adresse servie avant T7.3.
+   */
+  adminReferential: (referential: Referential) =>
+    referential === DEFAULT_REFERENTIAL
+      ? "/administration"
+      : `/administration?${REFERENTIAL_PARAM}=${referential}`,
+  /**
    * La page Administration, panneau de saisie ouvert sur le vide. Même
    * mécanique que les treize adresses d'ouverture qui précèdent : un paramètre,
-   * pas un écran de plus, et la fermeture reste `admin`.
+   * pas un écran de plus, et la fermeture reste `adminReferential`.
    */
-  adminEntityNew: `/administration?${ENTITY_FORM_PARAM}=${ENTITY_FORM_NEW}`,
+  adminRowNew: (referential: Referential) =>
+    adminWith(referential, REFERENTIAL_ROW_PARAM, REFERENTIAL_ROW_NEW),
   /**
-   * Le même panneau, ouvert sur une entité à corriger : la valeur porte le cas,
+   * Le même panneau, ouvert sur une ligne à corriger : la valeur porte le cas,
    * et c'est la seule différence avec l'entrée ci-dessus.
    */
-  adminEntityEdit: (entityId: string) =>
-    `/administration?${ENTITY_FORM_PARAM}=${entityId}`,
+  adminRowEdit: (referential: Referential, rowId: string) =>
+    adminWith(referential, REFERENTIAL_ROW_PARAM, rowId),
   /**
    * La page Administration, panneau de **confirmation d'archivage** ouvert sur
-   * une entité — quatrième page à reprendre le couple `ConfirmPanel` +
+   * une ligne — quatrième page à reprendre le couple `ConfirmPanel` +
    * `ARCHIVE_PANEL_PARAM`.
    *
    * **La valeur porte l'identifiant**, comme `teamPersonArchive` et à la
    * différence de `productArchive` : cet écran n'a pas d'objet de page.
    */
-  adminEntityArchive: (entityId: string) =>
-    `/administration?${ARCHIVE_PANEL_PARAM}=${entityId}`,
+  adminRowArchive: (referential: Referential, rowId: string) =>
+    adminWith(referential, ARCHIVE_PANEL_PARAM, rowId),
   /**
    * La page Administration, panneau de **confirmation de suppression** ouvert
    * sur une entité. Une clé distincte de la précédente : ranger et effacer ne
    * sont pas deux formes du même geste.
+   *
+   * **Elle ne prend pas de référentiel, et ce n'est pas un oubli** : la
+   * suppression reste bornée aux entités (arbitrage (g) de `tickets-C7.md`), les
+   * huit autres référentiels s'archivent. Le type dit donc ce que la décision
+   * dit — `DeletableTable` fait de même dans `lib/db/scoped.ts`.
    */
   adminEntityDelete: (entityId: string) =>
     `/administration?${DELETE_PANEL_PARAM}=${entityId}`,

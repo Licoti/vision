@@ -25,6 +25,8 @@
 
 import type { ReactNode } from "react";
 
+import { REFERENTIALS, type Referential } from "@/lib/navigation";
+
 /**
  * Les neuf panneaux de la page produit.
  *
@@ -126,26 +128,36 @@ export type TeamDrawerRequest =
   | { kind: "delete"; id: string };
 
 /**
- * Les trois panneaux de la page **Administration** (21/08/2026).
+ * Les trois panneaux de la page **Administration** (21/08/2026, rendus
+ * multi-référentiels par T7.3).
  *
  * **Une écriture et deux confirmations**, et aucune lecture : cet écran ne
  * s'ouvre qu'à `manageDomain`, si bien qu'il n'a pas la paire « une clé pour
  * lire, une clé pour écrire » que les pages produit et Équipe tiennent chacune.
- * Une entité est un libellé : elle n'a rien à détailler qu'une ligne de liste
- * ne dise déjà.
+ * Une ligne de référentiel est un libellé et un ordre : elle n'a rien à
+ * détailler qu'une ligne de liste ne dise déjà.
  *
- * `id` est facultatif sur `entity` — la valeur porte le cas dans l'URL,
+ * **`referential` double le rôle que `kind` tient ailleurs**, et c'est la forme
+ * qu'impose l'arbitrage (f) de `tickets-C7.md` : un écran, une clé qui choisit
+ * la table. Cinq `kind` — un par référentiel — auraient dit la même chose en
+ * cinq fois, et T7.4 en aurait ajouté quatre. Le champ **traverse la frontière
+ * du client comme le reste** : il ne prouve rien, et `asAdminRequest` le
+ * rétrécit sur `REFERENTIALS` avant qu'il n'atteigne un `switch`.
+ *
+ * `id` est facultatif sur `row` — la valeur porte le cas dans l'URL,
  * `nouvelle` contre un identifiant, et son absence dit « créer ». Il est requis
- * sur les deux confirmations, qui désignent **une entité** et non l'objet de la
+ * sur les deux confirmations, qui désignent **une ligne** et non l'objet de la
  * page : `/administration` n'en a pas.
  *
  * **`delete` n'est pas une variante d'`archive`**, et le type le dit comme
  * l'URL : l'un range et se défait, l'autre efface et ne se défait pas. Les
  * confondre en une clé aurait mis l'écart à la règle 4 derrière un booléen.
+ * **Il ne porte aucun référentiel**, et c'est l'arbitrage (g) écrit dans le
+ * type : la suppression reste bornée aux entités.
  */
 export type AdminDrawerRequest =
-  | { kind: "entity"; id?: string | undefined }
-  | { kind: "archive"; id: string }
+  | { kind: "row"; referential: Referential; id?: string | undefined }
+  | { kind: "archive"; referential: Referential; id: string }
   | { kind: "delete"; id: string };
 
 export type DrawerRequest =
@@ -235,7 +247,7 @@ const TEAM_KINDS = [
   "delete",
 ] as const;
 
-const ADMIN_KINDS = ["entity", "archive", "delete"] as const;
+const ADMIN_KINDS = ["row", "archive", "delete"] as const;
 
 export function asProductRequest(
   request: DrawerRequest,
@@ -277,18 +289,36 @@ export function asTeamRequest(
 }
 
 /**
- * Le quatrième jumeau, pour la page Administration (21/08/2026).
+ * Le quatrième jumeau, pour la page Administration (21/08/2026) — **le seul qui
+ * rétrécisse deux champs** depuis T7.3.
  *
  * `archive` reste la clé commune aux quatre pages, et ce rétrécissement ne la
  * distingue donc pas : une demande `{ kind: "archive" }` forgée depuis la page
  * produit — qui n'y porte aucun identifiant — passe ce filtre. C'est
  * `resolveAdminDrawer` qui la refuse, en vérifiant la forme de l'UUID avant
  * toute lecture, puis le droit avant toute chose.
+ *
+ * **`referential` se rétrécit ici, et pas plus loin.** C'est une valeur venue du
+ * client, au même titre que `kind` : sans ce filtre, une demande
+ * `{ kind: "row", referential: "utilisateurs" }` descendrait jusqu'à un `switch`
+ * qui ne l'attend pas. Le `kind` `delete` n'en porte pas — la suppression est
+ * bornée aux entités —, et c'est pourquoi la condition ne vaut que pour les deux
+ * autres.
  */
 export function asAdminRequest(
   request: DrawerRequest,
 ): AdminDrawerRequest | null {
-  return (ADMIN_KINDS as readonly string[]).includes(request.kind)
-    ? (request as AdminDrawerRequest)
-    : null;
+  if (!(ADMIN_KINDS as readonly string[]).includes(request.kind)) return null;
+
+  if (request.kind === "row" || request.kind === "archive") {
+    const referential = (request as { referential?: unknown }).referential;
+    if (
+      typeof referential !== "string" ||
+      !(REFERENTIALS as readonly string[]).includes(referential)
+    ) {
+      return null;
+    }
+  }
+
+  return request as AdminDrawerRequest;
 }
