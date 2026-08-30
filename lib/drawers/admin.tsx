@@ -1,6 +1,6 @@
 /**
  * La résolution des trois panneaux de la page **Administration** (21/08/2026,
- * rendus multi-référentiels par T7.3).
+ * rendus multi-référentiels par T7.3, portés à neuf référentiels par T7.4).
  *
  * **Deux chemins, une seule résolution.** L'URL reste une adresse valide —
  * coller `?referentiel=metiers&ligne=<identifiant>` ouvre encore le panneau, au
@@ -30,28 +30,41 @@
  */
 
 import { eq } from "drizzle-orm";
+import type { ReactNode } from "react";
 
+import { ActivityTypePanel } from "@/components/admin/activity-type-panel";
 import { ReferentialPanel } from "@/components/admin/referential-panel";
 import { EntityPanel } from "@/components/admin/entity-panel";
+import { StarterPanel } from "@/components/admin/starter-panel";
+import { StatusPanel } from "@/components/admin/status-panel";
+import { ToolPanel } from "@/components/admin/tool-panel";
 import { ConfirmPanel } from "@/components/ui/confirm-panel";
 import type { Session } from "@/lib/auth/session";
 import {
+  activityTypes,
   approaches,
   entities,
   jobs,
   products,
+  projectStatuses,
   skillLevels,
   skills,
+  starters,
+  tools,
 } from "@/lib/db/schema";
 import type { AdminDrawerRequest, DrawerContent } from "@/lib/drawers/types";
 import { formatProducts, REFERENTIAL_NOUN } from "@/lib/format";
+import { toActivityTypeFormValues } from "@/lib/forms/activity-type";
 import { toEntityFormValues } from "@/lib/forms/entity";
+import { toProjectStatusFormValues } from "@/lib/forms/project-status";
 import {
   ORDERED_BY_POSITION,
   ORDERED_BY_RANK,
   toReferentialFormValues,
   type ReferentialShape,
 } from "@/lib/forms/referential";
+import { toStarterFormValues } from "@/lib/forms/starter";
+import { toToolFormValues } from "@/lib/forms/tool";
 import {
   ARCHIVE_PANEL_PARAM,
   DELETE_PANEL_PARAM,
@@ -60,81 +73,142 @@ import {
   type Referential,
 } from "@/lib/navigation";
 import {
+  listResultToolOptions,
+  type ResultToolOption,
+} from "@/lib/queries/activities";
+import {
   countReferentialUsage,
   isUnused,
+  type ManagedReferential,
+  type ManagedReferentialRow,
   type ReferentialUsage,
-  type SimpleReferential,
 } from "@/lib/queries/referentials";
 import { isUuid } from "@/lib/uuid";
 
 import {
+  archiveActivityType,
   archiveApproach,
   archiveEntity,
   archiveJob,
+  archiveProjectStatus,
   archiveSkill,
   archiveSkillLevel,
+  archiveStarter,
+  archiveTool,
+  createActivityType,
   createApproach,
   createEntity,
   createJob,
+  createProjectStatus,
   createSkill,
   createSkillLevel,
+  createStarter,
+  createTool,
   deleteEntity,
+  updateActivityType,
   updateApproach,
   updateEntity,
   updateJob,
+  updateProjectStatus,
   updateSkill,
   updateSkillLevel,
+  updateStarter,
+  updateTool,
 } from "@/app/(app)/administration/actions";
 
 /**
- * Ce que chaque référentiel simple donne au panneau : sa table, ses deux
- * actions d'écriture, la forme de son formulaire et la phrase qui explique ce
- * que son libellé qualifie.
+ * Ce que chaque référentiel donne au panneau : sa table, son geste d'archivage,
+ * et la façon de nommer une de ses lignes.
  *
- * **Ce n'est pas une indirection d'écriture.** Les huit actions restent nommées
- * une à une, chacune liée à sa table côté serveur ; cette table-ci ne fait que
- * les **choisir** à partir d'une valeur déjà rétrécie. Ce que la fiche de T7.3
- * refuse est de faire écrire une fonction générique, pas de rendre un panneau.
+ * **Ce n'est pas une indirection d'écriture.** Les trente-deux actions restent
+ * nommées une à une, chacune liée à sa table côté serveur ; cette table-ci ne
+ * fait que les **choisir** à partir d'une valeur déjà rétrécie. Ce que la fiche
+ * de T7.3 refuse est de faire écrire une fonction générique, pas de rendre un
+ * panneau.
+ *
+ * **`find` est une fonction et non une table, et le compilateur l'exige.**
+ * `session.db.find(table, id)` sur une **union** de huit tables ne rend pas
+ * l'union des huit lignes : il rend leurs colonnes **communes**, c'est-à-dire
+ * `id`, `archived_at` et les estampilles. Cela suffisait tant que les quatre
+ * tables de T7.3 portaient toutes un `label` ; `tools` ne le porte pas, et le
+ * type s'est effondré. Une lecture par table rend au contraire une union qui se
+ * rétrécit par un `in` — donc sans un seul `as`.
+ */
+const MANAGED = {
+  metiers: {
+    find: (session: Session, id: string) => session.db.find(jobs, id),
+    archive: archiveJob,
+  },
+  approches: {
+    find: (session: Session, id: string) => session.db.find(approaches, id),
+    archive: archiveApproach,
+  },
+  competences: {
+    find: (session: Session, id: string) => session.db.find(skills, id),
+    archive: archiveSkill,
+  },
+  niveaux: {
+    find: (session: Session, id: string) => session.db.find(skillLevels, id),
+    archive: archiveSkillLevel,
+  },
+  statuts: {
+    find: (session: Session, id: string) => session.db.find(projectStatuses, id),
+    archive: archiveProjectStatus,
+  },
+  types: {
+    find: (session: Session, id: string) => session.db.find(activityTypes, id),
+    archive: archiveActivityType,
+  },
+  outils: {
+    find: (session: Session, id: string) => session.db.find(tools, id),
+    archive: archiveTool,
+  },
+  pistes: {
+    find: (session: Session, id: string) => session.db.find(starters, id),
+    archive: archiveStarter,
+  },
+} as const satisfies Record<ManagedReferential, { [k: string]: unknown }>;
+
+/**
+ * Ce que les quatre référentiels **simples** donnent en plus au panneau commun :
+ * la forme de leur formulaire, et la phrase qui explique ce que leur libellé
+ * qualifie.
+ *
+ * Ils sont quatre et non huit, et c'est le sujet de T7.4 : un statut, un type
+ * d'activité, un outil et une piste portent de la logique, donc des champs que
+ * `ReferentialPanel` ne connaît pas. Chacun a son panneau.
  */
 const SIMPLE = {
   metiers: {
-    table: jobs,
     create: createJob,
     update: updateJob,
-    archive: archiveJob,
     shape: ORDERED_BY_POSITION,
     labelNote:
       "Le métier tel qu'il se nomme dans le centre. Il qualifie une personne, et il filtre la liste transverse des accompagnements.",
   },
   approches: {
-    table: approaches,
     create: createApproach,
     update: updateApproach,
-    archive: archiveApproach,
     shape: ORDERED_BY_POSITION,
     labelNote:
       "La manière d'accompagner : Research, Design Thinking, Audit UX… Elle qualifie un accompagnement et chacune de ses activités.",
   },
   competences: {
-    table: skills,
     create: createSkill,
     update: updateSkill,
-    archive: archiveSkill,
     shape: ORDERED_BY_POSITION,
     labelNote:
       "Ce qu'une personne du centre sait faire. Une compétence n'est pas un métier : on en porte plusieurs, chacune à son niveau.",
   },
   niveaux: {
-    table: skillLevels,
     create: createSkillLevel,
     update: updateSkillLevel,
-    archive: archiveSkillLevel,
     shape: ORDERED_BY_RANK,
     labelNote:
       "Le nom du niveau, tel que le centre le dit. Un domaine renomme « Avancé » sans renommer son rang.",
   },
 } as const satisfies Record<
-  SimpleReferential,
+  "metiers" | "approches" | "competences" | "niveaux",
   { shape: ReferentialShape; labelNote: string; [k: string]: unknown }
 >;
 
@@ -152,13 +226,13 @@ export async function resolveAdminDrawer(
     case "row":
       return request.referential === "entites"
         ? entityForm(session, request.id)
-        : simpleForm(session, request.referential, request.id);
+        : managedForm(session, request.referential, request.id);
 
     /* ------------------------------------------------------------------ */
     case "archive":
       return request.referential === "entites"
         ? entityArchive(session, request.id)
-        : simpleArchive(session, request.referential, request.id);
+        : managedArchive(session, request.referential, request.id);
 
     /* ------------------------------------------------------------------ */
     case "delete":
@@ -323,15 +397,175 @@ async function entityDelete(
 }
 
 /* ==========================================================================
-   Les quatre référentiels simples — T7.3
+   Les huit référentiels qui ne se suppriment pas — T7.3 et T7.4
    ========================================================================== */
 
-async function simpleForm(
+/**
+ * Le corps du formulaire, référentiel par référentiel.
+ *
+ * **Cinq panneaux et non un**, et c'est le geste central de T7.4 : quatre
+ * référentiels portent une logique — une `nature`, une `family`, un genre —, et
+ * étendre `ReferentialPanel` d'un champ conditionnel par colonne en aurait fait
+ * une forme qu'on ne peut plus relire dans aucun de ses états. Le `switch`
+ * ci-dessous **choisit** un panneau ; il n'en paramètre aucun.
+ *
+ * `row` est `undefined` à la création. Chaque branche lie alors l'action de
+ * création, et pré-remplit sinon — l'identifiant sort de la saisie, **et ce
+ * n'est pas un verrou** : Next sérialise les arguments liés dans un champ
+ * `$ACTION_…`, réécrivable. Le verrou est dans l'action.
+ */
+function managedFormBody(
+  referential: ManagedReferential,
+  row: ManagedReferentialRow | undefined,
+  toolOptions: ResultToolOption[],
+): ReactNode {
+  const noun = REFERENTIAL_NOUN[referential];
+
+  switch (referential) {
+    case "metiers":
+    case "approches":
+    case "competences":
+    case "niveaux": {
+      const kind = SIMPLE[referential];
+      if (!row) {
+        return (
+          <ReferentialPanel
+            action={kind.create}
+            shape={kind.shape}
+            labelNote={kind.labelNote}
+            submitLabel={`Ajouter ${noun.indefinite}`}
+          />
+        );
+      }
+      /* `"label" in row` retrouve la table sans `as` : la ligne vient du même
+         référentiel que le `switch`, et cette branche est donc inatteignable —
+         mais c'est le compilateur qui l'établit, et non un commentaire. */
+      if (!("label" in row)) return null;
+      return (
+        <ReferentialPanel
+          action={kind.update.bind(null, row.id)}
+          shape={kind.shape}
+          labelNote={kind.labelNote}
+          submitLabel="Enregistrer les modifications"
+          initial={toReferentialFormValues(row)}
+        />
+      );
+    }
+
+    case "statuts":
+      if (!row) {
+        return (
+          <StatusPanel
+            action={createProjectStatus}
+            submitLabel={`Ajouter ${noun.indefinite}`}
+          />
+        );
+      }
+      if (!("nature" in row)) return null;
+      return (
+        <StatusPanel
+          action={updateProjectStatus.bind(null, row.id)}
+          submitLabel="Enregistrer les modifications"
+          initial={toProjectStatusFormValues(row)}
+        />
+      );
+
+    case "types":
+      if (!row) {
+        return (
+          <ActivityTypePanel
+            action={createActivityType}
+            tools={toolOptions}
+            submitLabel={`Ajouter ${noun.indefinite}`}
+          />
+        );
+      }
+      if (!("family" in row)) return null;
+      return (
+        <ActivityTypePanel
+          action={updateActivityType.bind(null, row.id)}
+          tools={toolOptions}
+          submitLabel="Enregistrer les modifications"
+          initial={toActivityTypeFormValues(row)}
+        />
+      );
+
+    case "outils":
+      if (!row) {
+        return (
+          <ToolPanel
+            action={createTool}
+            submitLabel={`Ajouter ${noun.indefinite}`}
+          />
+        );
+      }
+      if (!("name" in row)) return null;
+      return (
+        <ToolPanel
+          action={updateTool.bind(null, row.id)}
+          submitLabel="Enregistrer les modifications"
+          initial={toToolFormValues(row)}
+        />
+      );
+
+    case "pistes":
+      if (!row) {
+        return (
+          <StarterPanel
+            action={createStarter}
+            tools={toolOptions}
+            submitLabel={`Ajouter ${noun.indefinite}`}
+          />
+        );
+      }
+      if (!("summary" in row)) return null;
+      return (
+        <StarterPanel
+          action={updateStarter.bind(null, row.id)}
+          tools={toolOptions}
+          submitLabel="Enregistrer les modifications"
+          initial={toStarterFormValues(row)}
+        />
+      );
+  }
+}
+
+/**
+ * Les outils du domaine — **lus seulement pour les deux référentiels qui en
+ * choisissent un**.
+ *
+ * `listResultToolOptions` porte déjà exactement la règle attendue, `keepToolId`
+ * compris : l'outil déjà porté par la ligne qu'on corrige reste dans la liste
+ * même archivé, et n'apparaît nulle part ailleurs. Son nom dit « Result » parce
+ * que le panneau de résultat a été son premier appelant (T4.4) ; il en a trois
+ * depuis T7.4, et le renommer aurait ouvert `lib/queries/activities.ts`, hors du
+ * périmètre du ticket.
+ *
+ * Les six autres référentiels n'appellent rien : une requête qu'aucun champ ne
+ * lit est une requête de trop.
+ */
+async function toolOptionsFor(
   session: Session,
-  referential: SimpleReferential,
+  referential: ManagedReferential,
+  keepToolId: string | null,
+): Promise<ResultToolOption[]> {
+  if (referential !== "types" && referential !== "pistes") return [];
+  return listResultToolOptions(session.db, keepToolId ? { keepToolId } : {});
+}
+
+/** L'outil déjà porté par la ligne, quel que soit le nom de sa colonne. */
+function heldToolOf(row: ManagedReferentialRow): string | null {
+  if ("defaultToolId" in row) return row.defaultToolId;
+  if ("toolId" in row) return row.toolId;
+  return null;
+}
+
+async function managedForm(
+  session: Session,
+  referential: ManagedReferential,
   id: string | undefined,
 ): Promise<DrawerContent | null> {
-  const kind = SIMPLE[referential];
+  const kind = MANAGED[referential];
   const noun = REFERENTIAL_NOUN[referential];
 
   if (id === undefined) {
@@ -339,20 +573,17 @@ async function simpleForm(
       titleId: "panneau-ligne-titre",
       title: `Ajouter ${noun.indefinite}`,
       subtitles: ["Référentiel du domaine"],
-      body: (
-        <ReferentialPanel
-          action={kind.create}
-          shape={kind.shape}
-          labelNote={kind.labelNote}
-          submitLabel={`Ajouter ${noun.indefinite}`}
-        />
+      body: managedFormBody(
+        referential,
+        undefined,
+        await toolOptionsFor(session, referential, null),
       ),
     };
   }
 
   if (!isUuid(id)) return null;
 
-  const row = await session.db.find(kind.table, id);
+  const row: ManagedReferentialRow | undefined = await kind.find(session, id);
   /* Une ligne archivée ne se corrige pas : le geste juste est de la rétablir,
      et l'action le refuse de son côté. */
   if (!row || row.archivedAt !== null) return null;
@@ -360,30 +591,38 @@ async function simpleForm(
   return {
     titleId: "panneau-ligne-titre",
     title: `Modifier ${noun.demonstrative}`,
-    subtitles: [row.label],
-    body: (
-      <ReferentialPanel
-        action={kind.update.bind(null, row.id)}
-        shape={kind.shape}
-        labelNote={kind.labelNote}
-        submitLabel="Enregistrer les modifications"
-        initial={toReferentialFormValues(row)}
-      />
+    subtitles: [nameOf(row)],
+    body: managedFormBody(
+      referential,
+      row,
+      await toolOptionsFor(session, referential, heldToolOf(row)),
     ),
   };
 }
 
-async function simpleArchive(
+/**
+ * Le libellé d'une ligne, quel que soit le nom de sa colonne.
+ *
+ * **`tools` est la seule des neuf tables à nommer la sienne `name`**, et c'est
+ * la seule raison d'être de cette fonction. Elle rétrécit par un `in`, comme le
+ * corps du formulaire : aucun `as`, et le jour où une dixième table entrerait,
+ * le compilateur redemanderait la question.
+ */
+function nameOf(row: ManagedReferentialRow): string {
+  return "name" in row ? row.name : row.label;
+}
+
+async function managedArchive(
   session: Session,
-  referential: SimpleReferential,
+  referential: ManagedReferential,
   id: string,
 ): Promise<DrawerContent | null> {
   if (!isUuid(id)) return null;
 
-  const kind = SIMPLE[referential];
+  const kind = MANAGED[referential];
   const noun = REFERENTIAL_NOUN[referential];
 
-  const row = await session.db.find(kind.table, id);
+  const row: ManagedReferentialRow | undefined = await kind.find(session, id);
   if (!row || row.archivedAt !== null) return null;
 
   const usage = await countReferentialUsage(session.db, referential, row.id);
@@ -391,7 +630,7 @@ async function simpleArchive(
   return {
     titleId: "panneau-confirmation-titre",
     title: `Archiver ${noun.demonstrative}`,
-    subtitles: [row.label],
+    subtitles: [nameOf(row)],
     body: (
       <ConfirmPanel
         action={kind.archive.bind(null, row.id)}
@@ -405,7 +644,8 @@ async function simpleArchive(
           </p>
           <p>
             Ce qui la référence déjà garde son libellé : c&apos;est la mémoire de
-            l&apos;accompagnement, elle ne se perd pas.
+            l&apos;accompagnement, elle ne se perd pas — aucune rétroaction, ni
+            sur une roadmap, ni sur un résultat déjà saisi.
           </p>
           {isUnused(usage) ? (
             <p>Le geste se défait : une ligne archivée se rétablit.</p>
@@ -460,6 +700,24 @@ function announceUsage(usage: ReferentialUsage): string {
       usage.declarations > 1
         ? `${usage.declarations} compétences déclarées le citent`
         : "1 compétence déclarée le cite",
+    );
+  }
+  /* Les deux sources d'un **outil** (T7.4). Elles ne sont pas des barrières de
+     base — les quatre clés qui pointent `tools` sont `set null` — mais ce que
+     l'archivage rendrait muet : la carte d'une piste perdrait son adresse, et
+     la carte de roadmap le nom de son espace de travail. */
+  if (usage.activityTypes > 0) {
+    parts.push(
+      usage.activityTypes > 1
+        ? `${usage.activityTypes} types d'activité le nomment par défaut`
+        : "1 type d'activité le nomme par défaut",
+    );
+  }
+  if (usage.starters > 0) {
+    parts.push(
+      usage.starters > 1
+        ? `${usage.starters} pistes de démarrage y renvoient`
+        : "1 piste de démarrage y renvoie",
     );
   }
 

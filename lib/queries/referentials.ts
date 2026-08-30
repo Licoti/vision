@@ -1,6 +1,8 @@
 /**
- * Les lectures de l'écran **Administration**, pour les quatre référentiels
- * simples : métiers, approches, compétences, échelle de maîtrise (T7.3).
+ * Les lectures de l'écran **Administration**, pour les huit référentiels qu'il
+ * gère hors des entités : métiers, approches, compétences, échelle de maîtrise
+ * (T7.3), puis statuts de projet, types d'activité, outils et pistes de
+ * démarrage (T7.4).
  *
  * **La lecture est générique, l'écriture ne l'est pas.** Une fonction de lecture
  * paramétrée par la table, mais une fonction d'écriture par table — c'est la
@@ -38,15 +40,25 @@
  * posée par l'en-tête de `joinedRead`, dont l'oubli serait une fuite de domaine
  * que rien d'autre ne rattraperait.
  *
+ * **Quatre référentiels portent de la logique, et la lecture le rend.** Un
+ * statut sans sa `nature`, un type sans sa `family` sont des libellés dont on ne
+ * sait pas ce qu'ils commandent — or `docs/04` §1 pose exactement l'inverse :
+ * *les libellés changent, la logique non*. `logic` remonte donc cette valeur
+ * d'énuméré jusqu'à l'écran, qui la nomme. Ce n'est **pas** un indice calculé
+ * (D39) : c'est une colonne saisie, rendue telle quelle.
+ *
  * Ce module n'importe pas `db` : il reçoit un `ScopedDb` déjà lié au domaine
  * courant. Règle 1.
  */
 
 import { and, asc, eq, isNull, sql, type SQL } from "drizzle-orm";
 
-import type { ScopedDb, ScopedTable } from "@/lib/db/scoped";
+import type { PgColumn } from "drizzle-orm/pg-core";
+
+import type { Row, ScopedDb, ScopedTable } from "@/lib/db/scoped";
 import {
   activities,
+  activityTypes,
   approaches,
   jobs,
   personSkills,
@@ -54,21 +66,66 @@ import {
   projectApproaches,
   projectJobs,
   projects,
+  projectStatuses,
   skillLevels,
   skills,
+  starters,
+  toolKind,
+  tools,
 } from "@/lib/db/schema";
 import type { Referential } from "@/lib/navigation";
+import type { ActivityFamily } from "@/lib/queries/activities";
+import type { ProjectStatusNature } from "@/lib/queries/projects";
+import type { StarterKind } from "@/lib/queries/starters";
 
-/** Les quatre référentiels que ce module lit. Les entités ont le leur. */
-export type SimpleReferential = Exclude<Referential, "entites">;
+/**
+ * Le genre d'un outil raccordé.
+ *
+ * Il vit ici plutôt que dans un module d'outils qui n'existe pas : `tools` n'a
+ * pas de lecture à elle, et c'est cet écran qui la gère. La règle du dossier —
+ * chaque module de requête exporte les types d'énuméré qu'il sert — est celle
+ * de `ProjectStatusNature`, d'`ActivityFamily` et de `StarterKind`.
+ */
+export type ToolKind = (typeof toolKind.enumValues)[number];
 
-/** Les quatre tables, et rien d'autre. Une union nominative, comme
- *  `DeletableTable` : ce qui les rassemble est une décision, pas une forme. */
-export type SimpleReferentialTable =
+/** Les huit référentiels que ce module lit. Les entités ont le leur. */
+export type ManagedReferential = Exclude<Referential, "entites">;
+
+/** Les huit tables, et rien d'autre. Une union nominative, comme
+ *  `DeletableTable` : ce qui les rassemble est une décision, pas une forme.
+ *
+ *  **Le mot « simple » est tombé en T7.4** : il était juste tant que les quatre
+ *  tables partageaient un libellé et un ordre ; une piste de démarrage porte six
+ *  champs, et un nom qui ment coûte plus cher qu'un renommage. */
+export type ManagedReferentialTable =
   | typeof jobs
   | typeof approaches
   | typeof skills
-  | typeof skillLevels;
+  | typeof skillLevels
+  | typeof projectStatuses
+  | typeof activityTypes
+  | typeof tools
+  | typeof starters;
+
+/**
+ * Une ligne de l'une de ces huit tables, telle que `find` la rend.
+ *
+ * **Écrite en union, et non en `Row<ManagedReferentialTable>`** : les deux
+ * disent la même chose au compilateur, mais celle-ci se **rétrécit** par un
+ * `in`. C'est ce qui permet au résolveur de panneau de retrouver la table d'une
+ * ligne — `"nature" in row` ne peut désigner qu'un statut — sans écrire un seul
+ * `as`. Un `as` tiendrait aujourd'hui et mentirait le jour où une neuvième table
+ * entrerait.
+ */
+export type ManagedReferentialRow =
+  | Row<typeof jobs>
+  | Row<typeof approaches>
+  | Row<typeof skills>
+  | Row<typeof skillLevels>
+  | Row<typeof projectStatuses>
+  | Row<typeof activityTypes>
+  | Row<typeof tools>
+  | Row<typeof starters>;
 
 /**
  * Ce qui référence une ligne de référentiel, **par nature**.
@@ -93,6 +150,24 @@ export type ReferentialUsage = {
   /** Activités vivantes qui la portent. */
   activities: number;
   /**
+   * Types d'activité vivants qui nomment la ligne comme outil par défaut — les
+   * outils seuls (T7.4).
+   */
+  activityTypes: number;
+  /**
+   * Pistes de démarrage vivantes qui renvoient vers la ligne — les outils
+   * seuls (T7.4).
+   *
+   * **C'est le décompte qui porte l'arbitrage.** Aucune des quatre clés
+   * étrangères de `tools` n'est `restrict` : rien en base ne retient un outil.
+   * Ce qui s'y oppose est donc une décision, et elle se lit dans
+   * `lib/queries/starters.ts` — la jointure y porte `isNull(tools.archivedAt)`,
+   * si bien qu'archiver l'outil ferait perdre à la piste son lien profond **en
+   * silence**. Un résultat, lui, porte son propre `external_url` : il ne perd
+   * rien, et il ne compte pas ici.
+   */
+  starters: number;
+  /**
    * Déclarations de compétence qui citent la ligne — l'échelle de maîtrise
    * seule.
    *
@@ -116,6 +191,8 @@ export const NO_USAGE: ReferentialUsage = {
   projects: 0,
   persons: 0,
   activities: 0,
+  activityTypes: 0,
+  starters: 0,
   declarations: 0,
 };
 
@@ -126,6 +203,8 @@ export function isUnused(usage: ReferentialUsage): boolean {
     usage.projects === 0 &&
     usage.persons === 0 &&
     usage.activities === 0 &&
+    usage.activityTypes === 0 &&
+    usage.starters === 0 &&
     usage.declarations === 0
   );
 }
@@ -141,15 +220,43 @@ export function isUnused(usage: ReferentialUsage): boolean {
  */
 export type AdminReferentialRow = {
   id: string;
+  /** Le libellé de la ligne — **`tools.name` pour les outils**, qui est la
+   *  seule des neuf tables à ne pas nommer sa colonne `label`. */
   label: string;
-  /** L'ordre saisi. Nul là où il n'a pas de lecteur. */
+  /** L'ordre saisi. Nul là où il n'a pas de lecteur — et `tools` n'a pas la
+   *  colonne : ni au schéma, ni dans `docs/04` §2. */
   position: string | null;
-  /** Le rang de l'échelle de maîtrise. Nul pour les quatre autres référentiels. */
+  /** Le rang de l'échelle de maîtrise. Nul pour les sept autres référentiels. */
   rank: number | null;
+  /**
+   * La logique que la ligne porte, quand elle en porte une (T7.4).
+   *
+   * Nulle pour les quatre référentiels de T7.3, qui ne portent qu'un libellé et
+   * un ordre. Elle remonte **la valeur d'énuméré**, jamais son libellé français :
+   * traduire est le rôle de `lib/format.ts`, et une requête qui rendrait déjà des
+   * mots aurait posé une seconde autorité sur le vocabulaire.
+   */
+  logic: ReferentialLogic | null;
   /** Nul tant que la ligne est en service. Les archivées sont **rendues**. */
   archivedAt: Date | null;
   usage: ReferentialUsage;
 };
+
+/**
+ * Ce qu'un référentiel porte en plus de son libellé, et que le domaine ne
+ * renomme pas.
+ *
+ * **Une union discriminée, jamais une chaîne** : le variant dit quelle table de
+ * libellés l'écran doit lire, et le compilateur refuse d'appliquer
+ * `formatToolKind` à une famille d'activité. C'est aussi ce qui la rend
+ * constructible **sans cast** — chaque `case` de la lecture sélectionne sa
+ * colonne d'énuméré, déjà typée par Drizzle, et la range dans son variant.
+ */
+export type ReferentialLogic =
+  | { kind: "nature"; value: ProjectStatusNature }
+  | { kind: "family"; value: ActivityFamily }
+  | { kind: "toolKind"; value: ToolKind }
+  | { kind: "starterKind"; value: StarterKind };
 
 /* ==========================================================================
    Les quatre décomptes, un par référentiel
@@ -167,12 +274,14 @@ export type AdminReferentialRow = {
  * c'est voulu — ce sont des colonnes, pas des requêtes.
  */
 function usageOf(
-  referential: SimpleReferential,
+  referential: ManagedReferential,
   filter: (table: ScopedTable) => SQL,
 ): {
   projects: SQL<number>;
   persons: SQL<number>;
   activities: SQL<number>;
+  activityTypes: SQL<number>;
+  starters: SQL<number>;
   declarations: SQL<number>;
 } {
   const zero = sql<number>`0::int`;
@@ -203,6 +312,8 @@ function usageOf(
             and ${isNull(persons.archivedAt)}
         )`,
         activities: zero,
+        activityTypes: zero,
+        starters: zero,
         declarations: zero,
       };
 
@@ -226,6 +337,8 @@ function usageOf(
             and ${filter(activities)}
             and ${isNull(activities.archivedAt)}
         )`,
+        activityTypes: zero,
+        starters: zero,
         declarations: zero,
       };
 
@@ -246,6 +359,8 @@ function usageOf(
             and ${isNull(persons.archivedAt)}
         )`,
         activities: zero,
+        activityTypes: zero,
+        starters: zero,
         declarations: zero,
       };
 
@@ -254,6 +369,8 @@ function usageOf(
         projects: zero,
         persons: zero,
         activities: zero,
+        activityTypes: zero,
+        starters: zero,
         /* Le même décompte sur l'autre clé — et il compte cette fois des
            **déclarations** : une personne peut porter plusieurs compétences au
            même niveau. Ce qui s'oppose au rangement est l'existence de la
@@ -269,6 +386,92 @@ function usageOf(
             and ${isNull(persons.archivedAt)}
         )`,
       };
+
+    /* ------------------------------------------------------------------
+       T7.4 — les quatre référentiels porteurs de logique
+       ------------------------------------------------------------------ */
+
+    case "statuts":
+      return {
+        /* `projects.status_id` est `not null` et `restrict` : c'est la clé la
+           plus tenue des huit, et la base refuserait elle-même l'effacement.
+           Le décompte, lui, sert le **rangement**, que rien en base ne
+           retient — ranger un statut que des accompagnements vivants portent
+           les laisserait dans la liste sans leur filtre. */
+        projects: sql<number>`(
+          select count(*)::int
+          from ${projects}
+          where ${eq(projects.statusId, projectStatuses.id)}
+            and ${filter(projects)}
+            and ${isNull(projects.archivedAt)}
+        )`,
+        persons: zero,
+        activities: zero,
+        activityTypes: zero,
+        starters: zero,
+        declarations: zero,
+      };
+
+    case "types":
+      return {
+        projects: zero,
+        persons: zero,
+        /* D16 — `activities.activity_type_id` est obligatoire. Une activité
+           archivée ne s'y oppose pas : elle a déjà quitté la roadmap. */
+        activities: sql<number>`(
+          select count(*)::int
+          from ${activities}
+          where ${eq(activities.activityTypeId, activityTypes.id)}
+            and ${filter(activities)}
+            and ${isNull(activities.archivedAt)}
+        )`,
+        activityTypes: zero,
+        starters: zero,
+        declarations: zero,
+      };
+
+    case "outils":
+      return {
+        projects: zero,
+        persons: zero,
+        activities: zero,
+        /* **Deux sources, et aucune n'est une barrière de base** : les quatre
+           clés étrangères qui pointent `tools` sont `set null`. Ce qui s'oppose
+           au rangement est donc une décision, et elle porte sur les deux lignes
+           de **référentiel** que l'archivage laisserait muettes — le type qui
+           nomme l'outil par défaut, la piste qui y renvoie. Les résultats et les
+           budgets ne comptent pas : chacun porte son propre `external_url` et ne
+           perd rien. */
+        activityTypes: sql<number>`(
+          select count(*)::int
+          from ${activityTypes}
+          where ${eq(activityTypes.defaultToolId, tools.id)}
+            and ${filter(activityTypes)}
+            and ${isNull(activityTypes.archivedAt)}
+        )`,
+        starters: sql<number>`(
+          select count(*)::int
+          from ${starters}
+          where ${eq(starters.toolId, tools.id)}
+            and ${filter(starters)}
+            and ${isNull(starters.archivedAt)}
+        )`,
+        declarations: zero,
+      };
+
+    case "pistes":
+      /* **Rien ne référence `starters`**, et le dire est le geste juste : une
+         piste s'archive toujours, et l'écran n'a aucun décompte à rendre en
+         face d'elle. Inventer une opposition symétrique aux sept autres serait
+         le garde-fou de confort que la règle 3 interdit. */
+      return {
+        projects: zero,
+        persons: zero,
+        activities: zero,
+        activityTypes: zero,
+        starters: zero,
+        declarations: zero,
+      };
   }
 }
 
@@ -276,16 +479,26 @@ function usageOf(
    Les trois lectures
    ========================================================================== */
 
-/** Les colonnes plates du `select` remontées dans la forme de l'écran. */
+/**
+ * Les colonnes plates du `select` remontées dans la forme de l'écran.
+ *
+ * `logic` n'y est pas une colonne : elle est **rangée avant** d'arriver ici,
+ * par le `.map()` du `case` qui l'a sélectionnée. C'est ce qui la construit sans
+ * cast — la colonne d'énuméré est typée par Drizzle, et le variant se referme
+ * sur elle.
+ */
 type FlatRow = {
   id: string;
   label: string;
   position: string | null;
   rank: number | null;
+  logic?: ReferentialLogic | null;
   archivedAt: Date | null;
   projects: number;
   persons: number;
   activities: number;
+  activityTypes: number;
+  starters: number;
   declarations: number;
 };
 
@@ -295,12 +508,15 @@ function toRows(rows: FlatRow[]): AdminReferentialRow[] {
     label: row.label,
     position: row.position,
     rank: row.rank,
+    logic: row.logic ?? null,
     archivedAt: row.archivedAt,
     usage: {
       products: 0,
       projects: row.projects,
       persons: row.persons,
       activities: row.activities,
+      activityTypes: row.activityTypes,
+      starters: row.starters,
       declarations: row.declarations,
     },
   }));
@@ -317,7 +533,7 @@ function toRows(rows: FlatRow[]): AdminReferentialRow[] {
  */
 export function listReferentialForAdmin(
   scope: ScopedDb,
-  referential: SimpleReferential,
+  referential: ManagedReferential,
 ): Promise<AdminReferentialRow[]> {
   return scope.joinedRead(async (database, { filter }) => {
     const usage = usageOf(referential, filter);
@@ -395,6 +611,114 @@ export function listReferentialForAdmin(
             .where(filter(skillLevels))
             .orderBy(asc(skillLevels.rank), asc(skillLevels.label)),
         );
+
+      /* ----------------------------------------------------------------
+         T7.4 — les quatre référentiels porteurs de logique
+
+         Chacun `.map()` sa colonne d'énuméré dans son variant **avant**
+         `toRows` : la valeur arrive typée de Drizzle, le variant se referme
+         dessus, et aucun cast n'est écrit.
+         ---------------------------------------------------------------- */
+
+      case "statuts": {
+        const rows = await database
+          .select({
+            id: projectStatuses.id,
+            label: projectStatuses.label,
+            position: projectStatuses.position,
+            rank: noRank,
+            nature: projectStatuses.nature,
+            archivedAt: projectStatuses.archivedAt,
+            ...usage,
+          })
+          .from(projectStatuses)
+          .where(filter(projectStatuses))
+          .orderBy(asc(projectStatuses.position), asc(projectStatuses.label));
+
+        return toRows(
+          rows.map(({ nature, ...rest }) => ({
+            ...rest,
+            logic: { kind: "nature" as const, value: nature },
+          })),
+        );
+      }
+
+      case "types": {
+        const rows = await database
+          .select({
+            id: activityTypes.id,
+            label: activityTypes.label,
+            position: activityTypes.position,
+            rank: noRank,
+            family: activityTypes.family,
+            archivedAt: activityTypes.archivedAt,
+            ...usage,
+          })
+          .from(activityTypes)
+          .where(filter(activityTypes))
+          .orderBy(asc(activityTypes.position), asc(activityTypes.label));
+
+        return toRows(
+          rows.map(({ family, ...rest }) => ({
+            ...rest,
+            logic: { kind: "family" as const, value: family },
+          })),
+        );
+      }
+
+      case "outils": {
+        const rows = await database
+          .select({
+            /* **`name`, et non `label`** : `tools` est la seule des neuf tables
+               à nommer ainsi sa colonne. L'alias la coule dans la forme commune
+               ici, une fois, plutôt qu'à chaque endroit qui rend une ligne. */
+            id: tools.id,
+            label: tools.name,
+            /* `tools` **n'a pas de `position`** — ni au schéma, ni dans
+               `docs/04` §2 —, et T7.4 n'a pas de migration à dépenser pour lui
+               en donner une (arbitrage (a) de `tickets-C7.md`). L'alphabet est
+               alors le seul ordre qui ne varie pas d'un affichage à l'autre,
+               comme pour `listResultToolOptions`. */
+            position: noPosition,
+            rank: noRank,
+            kind: tools.kind,
+            archivedAt: tools.archivedAt,
+            ...usage,
+          })
+          .from(tools)
+          .where(filter(tools))
+          .orderBy(asc(tools.name));
+
+        return toRows(
+          rows.map(({ kind, ...rest }) => ({
+            ...rest,
+            logic: { kind: "toolKind" as const, value: kind },
+          })),
+        );
+      }
+
+      case "pistes": {
+        const rows = await database
+          .select({
+            id: starters.id,
+            label: starters.label,
+            position: starters.position,
+            rank: noRank,
+            kind: starters.kind,
+            archivedAt: starters.archivedAt,
+            ...usage,
+          })
+          .from(starters)
+          .where(filter(starters))
+          .orderBy(asc(starters.position), asc(starters.label));
+
+        return toRows(
+          rows.map(({ kind, ...rest }) => ({
+            ...rest,
+            logic: { kind: "starterKind" as const, value: kind },
+          })),
+        );
+      }
     }
   });
 }
@@ -413,7 +737,7 @@ export function listReferentialForAdmin(
  */
 export async function countReferentialUsage(
   scope: ScopedDb,
-  referential: SimpleReferential,
+  referential: ManagedReferential,
   rowId: string,
 ): Promise<ReferentialUsage> {
   return scope.joinedRead(async (database, { filter }) => {
@@ -433,6 +757,8 @@ export async function countReferentialUsage(
       projects: found.projects,
       persons: found.persons,
       activities: found.activities,
+      activityTypes: found.activityTypes,
+      starters: found.starters,
       declarations: found.declarations,
     };
   });
@@ -454,17 +780,24 @@ export async function countReferentialUsage(
  * l'appelant est une action, qui nomme déjà sa table en littéral, et lui faire
  * traduire un identifiant de référentiel serait exactement l'indirection que la
  * fiche refuse côté écriture.
+ *
+ * **La colonne de libellé aussi, depuis T7.4**, et pour une raison qu'on ne peut
+ * pas deviner : `tools` nomme la sienne `name`. La déduire demanderait de
+ * reconnaître la table ici, c'est-à-dire de refaire l'indirection à un cran plus
+ * bas ; l'appelant, lui, écrit déjà `tools` en toutes lettres, et écrire
+ * `tools.name` à côté ne lui coûte rien.
  */
 export function listReferentialLabels(
   scope: ScopedDb,
-  table: SimpleReferentialTable,
+  table: ManagedReferentialTable,
+  labelColumn: PgColumn,
   options: { exceptId?: string | undefined } = {},
 ): Promise<{ id: string; label: string; archivedAt: Date | null }[]> {
   return scope.joinedRead(async (database, { filter }) => {
     return database
       .select({
         id: table.id,
-        label: table.label,
+        label: labelColumn,
         archivedAt: table.archivedAt,
       })
       .from(table)
@@ -481,13 +814,17 @@ export function listReferentialLabels(
  * La table de chaque référentiel — **pour la lecture seulement**.
  *
  * Elle sert le `from` de `countReferentialUsage`, où la table n'a rien à poser :
- * ni domaine, ni acteur, ni estampille. Les seize écritures de T7.3 ne
- * l'emploient pas — chacune nomme sa table en littéral, et c'est le prix connu
- * de la règle 1.
+ * ni domaine, ni acteur, ni estampille. Les **trente-deux** écritures de T7.3 et
+ * T7.4 ne l'emploient pas — chacune nomme sa table en littéral, et c'est le prix
+ * connu de la règle 1.
  */
 const TABLE_OF = {
   metiers: jobs,
   approches: approaches,
   competences: skills,
   niveaux: skillLevels,
-} as const satisfies Record<SimpleReferential, SimpleReferentialTable>;
+  statuts: projectStatuses,
+  types: activityTypes,
+  outils: tools,
+  pistes: starters,
+} as const satisfies Record<ManagedReferential, ManagedReferentialTable>;

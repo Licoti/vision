@@ -5012,3 +5012,86 @@ par la position. Le panneau ne porte aucun jeton de couleur en propre — il n'e
 Deux fichiers de plus que le périmètre annoncé, tous deux arbitrés avant écriture et consignés au
 journal technique. Le point ouvert sur les fixtures d'action est **refermé pour ce fichier** :
 `administration/actions.test.ts` retient son `domainId` dès la création du domaine.
+
+## T7.4 — Administration : les quatre référentiels porteurs de logique — 30/08/2026
+
+**Ce que le ticket a fait.** L'écran passe de **cinq référentiels sur neuf à neuf sur neuf** :
+statuts de projet, types d'activité, outils, pistes de démarrage rejoignent les cinq de T7.3. **D25
+est tenue entière** — « un écran sommaire de gestion des référentiels existe, en C7 » —, et les neuf
+référentiels du domaine ont un point d'entrée. Aucune clé d'URL neuve, aucune route neuve : la clé
+`referentiel` de T7.3 prend quatre valeurs de plus, et `ROUTES` ne bouge pas d'une fonction.
+
+**Ce qui sépare ces quatre-là des précédents tient en un mot : la logique.** `docs/04` §1 pose que
+*les libellés changent, la logique non*. Un statut porte une `nature`, un type une `family`, un outil
+et une piste un genre — et ces valeurs se choisissent dans leur énuméré, jamais ailleurs. Le
+rétrécissement se fait dans `lib/forms/`, **avant** que l'action écrive : une `nature` forgée à
+`archived` (D42) revient sur le champ et n'atteint pas la base. C'est aussi ce qui a écarté
+définitivement l'idée d'un panneau générique — étendre `ReferentialShape` d'un drapeau par colonne
+aurait fait de `ReferentialPanel` une forme qu'on ne peut plus relire dans aucun de ses états, la
+« phrase à trous » que le dépôt refuse depuis T5.1. Quatre modules de formulaire neufs, quatre
+panneaux neufs, et le socle de T7.3 **inchangé** : il continue de servir ses huit gestes, et exporte
+désormais ce qui est vraiment commun — `referentialField`, `validatePosition`, `toPositionValue`.
+
+**Quatre arbitrages rendus avant écriture.** (1) Ce qui s'oppose à l'archivage d'un **outil** : les
+types d'activité vivants et les pistes vivantes qui le nomment. (2) La logique se rend dans la liste
+en **seconde ligne sous le libellé** — `StatusPill` pour la nature, texte discret pour les trois
+autres —, sans colonne de plus ni jeton neuf. (3) `FAMILY_LABEL` quitte un composant client pour
+`lib/format.ts`, déplacement et non copie. (4) « Sans `lib/navigation.ts` » se lit « aucune clé
+d'URL neuve » : le fichier s'ouvre pour la seule liste close.
+
+**Deux écarts au tableau de la fiche, imposés par le schéma.** `tools` **n'a pas de `position`** — ni
+au schéma ni dans `docs/04` §2 — et lui en donner une aurait été la seconde migration que
+l'arbitrage (a) interdit : sa liste s'ordonne par nom, et sa colonne d'ordre n'est pas rendue. Et
+`tools` nomme son libellé **`name`**, seule des neuf tables : la colonne se passe en argument plutôt
+que de se déduire.
+
+**Un type qui s'effondre, et la sortie n'a pas été un `as`.** `session.db.find` sur une **union** de
+huit tables ne rend pas l'union de leurs lignes mais leurs colonnes communes — `id`, `archived_at`,
+les estampilles. Le `SIMPLE` de T7.3 y survivait parce que ses quatre tables portaient toutes un
+`label` ; `tools` ne le porte pas. Chaque entrée de `MANAGED` porte donc une **fonction de lecture**,
+dont l'union des retours *est* l'union des lignes, et le résolveur retrouve la table par un `in` —
+`"nature" in row` ne peut désigner qu'un statut. Le compilateur redemandera la question le jour où
+une dixième table entrera.
+
+**Trente-sept actions sur l'écran, et le droit éprouvé sur les seize neuves.** Chacune frappée sous
+une identité sans `manageDomain`, **décompte en base avant et après**, et **étape témoin** — la même
+charge, sous l'identité du responsable, écrit. Retirer le `notFound()` de la page ne fait tomber
+**aucun** test de droit : ils éprouvent l'action, jamais l'écran.
+
+**81 tests neufs — 1 321 à 1 402. Cinq neutralisations côté lecture, quatre côté action, neuf chutes
+isolées.** Les quatre filtres
+d'archivage et le `filter()` de la sous-requête des pistes font tomber chacun leur seul cas ; les
+trois refus d'archivage et le rétrécissement de `nature` de même. **Trois cascades ont été trouvées
+et corrigées avant d'être crues** : les tests de non-rétroaction visaient la même ligne que les refus,
+si bien qu'une neutralisation en faisait tomber trois. La fixture porte désormais des lignes dédiées.
+
+**Le contrat des décomptes, mesuré et non affirmé.** Les cinq outils de la base de développement ont
+été comptés **en SQL, hors de la lecture du ticket** : `Ergonome` 1 type et 1 piste, `Everyone` 1 et
+1, `Portail analytics` 0 et 1, les deux autres à zéro — et c'est mot pour mot ce que la colonne rend.
+Le panneau d'archivage d'`Ergonome` annonce « 1 type d'activité le nomme par défaut, et 1 piste de
+démarrage y renvoie », et l'action le refuse pour la même raison, recomptée.
+
+**Le HTML servi, référentiel par référentiel.** Les quatre listes avec leurs colonnes — `outils` sans
+colonne d'ordre, `pistes` sans colonne d'usage, une colonne qui dirait toujours « Aucune référence »
+n'en étant pas une —, la seconde ligne de logique sur chaque ligne, une piste **archivée rendue**
+(« Archivée en août 2026 », sonde réversible retirée depuis), les quatre panneaux de création dont
+chaque `<select>` ne porte que son énuméré — **`archived` absent**, `sync_mode` absent, aucune adresse
+sur une piste, aucun type d'activité —, et les quatre panneaux de correction avec leur `selected`,
+leur `checked` et leur outil retenu. Le repli tient : `?referentiel=inconnu` rend les entités,
+`?entite=nouvelle` n'ouvre rien de neuf.
+
+**Contraste mesuré.** Aucun couple neuf par la position : `StatusPill` porte son propre fond et ses
+quatre couples sont mesurés depuis TD.3, et la seconde ligne de logique emploie
+`content-neutral-base` sur `surface-neutral-pale` — le couple que « Aucune référence » sert déjà dans
+la même cellule. Mesuré tout de même : **4,98:1**.
+
+**Ni migration, ni dépendance, ni ligne de journal**, comme l'annonçaient les arbitrages (a), (b) et
+(d). **Aucun appel sortant vers un outil** : `base_url` est validée sur sa forme par `isWebUrl` —
+cinquième réemploi, jamais une sixième copie — et jamais sondée (D15). Le contrôle n'est pas
+décoratif : `starter-detail.tsx` rend cette adresse dans un `ExternalLink`, qui pose le `href` tel
+quel.
+
+**Ce qui n'a pas été vu rendu est nommé comme tel** : les quatre états vides. La base de
+développement porte des lignes dans les neuf référentiels, et aucun chemin n'y mène sans supprimer de
+la donnée. Leurs textes sont écrits, leur code est celui de T7.3 lu dans le HTML servi la veille — la
+lecture manque, et le point garde sa destination.

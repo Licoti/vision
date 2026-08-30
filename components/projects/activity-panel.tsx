@@ -82,6 +82,7 @@ import { Button } from "@/components/ui/button";
 import { borderOf, CONTROL, FormField } from "@/components/ui/form-field";
 import { Panel } from "@/components/ui/panel";
 import { Picker } from "@/components/ui/picker";
+import { formatActivityFamily } from "@/lib/format";
 import {
   EMPTY_ACTIVITY_VALUES,
   type ActivityFormState,
@@ -94,20 +95,11 @@ import type {
   ApproachOption,
 } from "@/lib/queries/activities";
 
-/**
- * Les six familles de `docs/03` §2, dans l'ordre de l'énuméré du schéma.
- *
- * La famille est un **regroupement d'affichage** et rien d'autre : elle donne
- * au choix du type un axe de lecture, elle n'impose aucune méthodologie.
- */
-const FAMILY_LABEL: Record<ActivityFamily, string> = {
-  framing: "Cadrage",
-  research: "Recherche",
-  design: "Conception",
-  evaluation: "Évaluation",
-  measurement: "Mesure",
-  transfer: "Transmission",
-};
+/* Les six libellés de famille vivaient ici jusqu'à T7.4, qui en a eu besoin
+   côté serveur pour la liste d'administration : ils sont partis dans
+   `lib/format.ts`, avec les libellés d'énuméré voisins. Un déplacement, pas une
+   copie — aucun libellé ne change, et l'`optgroup` ci-dessous lit la même
+   chose. */
 
 export function ActivityPanel({
   action,
@@ -163,7 +155,7 @@ export function ActivityPanel({
 
   /* Le référentiel arrive déjà trié par famille : les regrouper ne demande
      donc qu'un passage, et l'ordre des `optgroup` est celui du référentiel du
-     domaine, pas celui de cette table de libellés. */
+     domaine, pas celui de la table de libellés qui les nomme. */
   const families = activityTypes.reduce<
     { family: ActivityFamily; types: ActivityTypeOption[] }[]
   >((groups, type) => {
@@ -205,7 +197,10 @@ export function ActivityPanel({
           >
             <option value="">Choisir un type</option>
             {families.map((group) => (
-              <optgroup key={group.family} label={FAMILY_LABEL[group.family]}>
+              <optgroup
+                key={group.family}
+                label={formatActivityFamily(group.family)}
+              >
                 {group.types.map((type) => (
                   <option key={type.id} value={type.id}>
                     {type.label}

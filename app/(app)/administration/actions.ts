@@ -2,22 +2,35 @@
 
 /**
  * Les écritures de la page **Administration** — les référentiels du domaine
- * (21/08/2026 pour les entités, T7.3 pour les quatre suivants).
+ * (21/08/2026 pour les entités, T7.3 pour les quatre suivants, T7.4 pour les
+ * quatre derniers).
  *
  * Cinq gestes sur l'entité : la créer, corriger son libellé, l'archiver, la
- * rétablir, la supprimer. Puis **quatre gestes sur chacun des quatre
- * référentiels simples** — métiers, approches, compétences, échelle de
- * maîtrise —, la suppression en moins (arbitrage (g) de `tickets-C7.md`). Sans
- * eux, ces tables restent ce qu'elles étaient depuis T1.2 : des tables qu'un
- * script seul alimente, et qu'un renommage fait doubler (point ouvert
- * d'`ETAT.md`).
+ * rétablir, la supprimer. Puis **quatre gestes sur chacun des huit autres
+ * référentiels** — métiers, approches, compétences, échelle de maîtrise,
+ * statuts de projet, types d'activité, outils, pistes de démarrage —, la
+ * suppression en moins (arbitrage (g) de `tickets-C7.md`). Sans eux, ces tables
+ * restent ce qu'elles étaient depuis T1.2 : des tables qu'un script seul
+ * alimente, et qu'un renommage fait doubler (point ouvert d'`ETAT.md`).
  *
- * **Une fonction d'écriture par table, et c'est la fiche de T7.3.** Seize
+ * **Une fonction d'écriture par table, et c'est la fiche de T7.3.** Trente-deux
  * fonctions se ressemblent ; une seule, paramétrée par la table, aurait fait de
  * la couche scopée un endroit où le domaine se **déduit** plutôt qu'il ne se
  * pose, et rendu `assertPreconditions` illisible. Ce qui se partage ici est
  * **la lecture** — la porte, le doublon, le décompte —, jamais l'écriture : une
  * lecture ne pose rien.
+ *
+ * **Les quatre référentiels de T7.4 portent de la logique**, et c'est tout ce
+ * qui les distingue en écriture : la `nature` d'un statut et la `family` d'un
+ * type sont **rétrécies sur leur énuméré** par `lib/forms/`, jamais affirmées
+ * par un `as`. `docs/04` §1 — *les libellés changent, la logique non* — se tient
+ * donc à l'entrée, et non par une confiance dans le `<select>` servi.
+ *
+ * **Aucune rétroaction, jamais** (arbitrage (j) de `tickets-C7.md`) : basculer
+ * `produces_result` ne retire aucun résultat déjà saisi, changer une `nature` ne
+ * recalcule aucune roadmap, renommer un libellé ne touche aucune ligne qui le
+ * référence. Ce qui se **refuse** est l'archivage d'une ligne qu'une donnée
+ * vivante référence encore.
  *
  * **Le droit est `session.can.manageDomain`, seul.** `docs/02` §Rôle donne au
  * responsable de domaine la gestion « des référentiels et des membres », et
@@ -65,18 +78,23 @@
  */
 
 import { eq } from "drizzle-orm";
+import type { PgColumn } from "drizzle-orm/pg-core";
 import { revalidatePath } from "next/cache";
 
 import type { ConfirmState } from "@/components/ui/confirm-panel";
 import { requireSession } from "@/lib/auth/provider";
 import type { Session } from "@/lib/auth/session";
 import {
+  activityTypes,
   approaches,
   entities,
   jobs,
   products,
+  projectStatuses,
   skillLevels,
   skills,
+  starters,
+  tools,
 } from "@/lib/db/schema";
 import {
   IntegrityError,
@@ -85,10 +103,12 @@ import {
 } from "@/lib/db/scoped";
 import {
   formatActivities,
+  formatActivityTypes,
   formatDeclarations,
   formatPersons,
   formatProducts,
   formatProjects,
+  formatStarters,
 } from "@/lib/format";
 import {
   parseEntityForm,
@@ -97,6 +117,16 @@ import {
   type EntityFormState,
 } from "@/lib/forms/entity";
 import {
+  parseActivityTypeForm,
+  readActivityTypeForm,
+  type ActivityTypeFormState,
+} from "@/lib/forms/activity-type";
+import {
+  parseProjectStatusForm,
+  readProjectStatusForm,
+  type ProjectStatusFormState,
+} from "@/lib/forms/project-status";
+import {
   ORDERED_BY_POSITION,
   ORDERED_BY_RANK,
   parseReferentialForm,
@@ -104,13 +134,23 @@ import {
   sameReferentialLabel,
   type ReferentialFormState,
 } from "@/lib/forms/referential";
+import {
+  parseStarterForm,
+  readStarterForm,
+  type StarterFormState,
+} from "@/lib/forms/starter";
+import {
+  parseToolForm,
+  readToolForm,
+  type ToolFormState,
+} from "@/lib/forms/tool";
 import { ROUTES, type Referential } from "@/lib/navigation";
 import { listEntityLabels } from "@/lib/queries/entities";
 import {
   countReferentialUsage,
   listReferentialLabels,
+  type ManagedReferentialTable,
   type ReferentialUsage,
-  type SimpleReferentialTable,
 } from "@/lib/queries/referentials";
 
 /** Le refus que les cinq points d'entrée partagent, quand il vient du droit. */
@@ -403,11 +443,13 @@ export async function deleteEntity(
    (arbitrage (g) de `tickets-C7.md`), et `DeletableTable` ne les nomme pas.
    ========================================================================== */
 
-/** Le refus que les seize points d'entrée partagent, quand il vient du droit. */
+/** Le refus que les trente-deux points d'entrée partagent, quand il vient du
+ *  droit. */
 const RESERVED_REFERENTIAL =
   "La gestion des référentiels est réservée au responsable de domaine.";
 
-/** Le refus que les douze gestes ciblés partagent, quand la ligne a disparu. */
+/** Le refus que les vingt-quatre gestes ciblés partagent, quand la ligne a
+ *  disparu. */
 const GONE_REFERENTIAL = "Cette ligne n'existe plus dans ce domaine.";
 
 /** Le refus d'une correction sur une ligne rangée — le geste juste est ailleurs. */
@@ -415,7 +457,11 @@ const ARCHIVED_REFERENTIAL =
   "Cette ligne est archivée : elle ne reçoit plus de correction. Rétablissez-la d'abord.";
 
 /**
- * Un refus qui n'appartient à aucun champ, pour les huit formulaires.
+ * Un refus qui n'appartient à aucun champ, pour les huit formulaires de T7.3.
+ *
+ * Les quatre référentiels de T7.4 ont chacun le leur, plus bas : leurs états ne
+ * portent pas les mêmes champs, et un refus doit rendre **la** saisie qui a été
+ * faite, pas une saisie voisine.
  *
  * La saisie revient telle quelle : Vision ne jette jamais en silence ce qui a
  * été tapé, y compris quand ce qu'elle refuse n'est pas la saisie.
@@ -428,7 +474,7 @@ function referentialRefusal(
 }
 
 /**
- * La porte des douze gestes ciblés : le droit, puis la ligne **reçue**.
+ * La porte des vingt-quatre gestes ciblés : le droit, puis la ligne **reçue**.
  *
  * **Générique, et elle peut l'être** : elle ne pose rien — ni domaine, ni
  * acteur, ni colonne. Elle lit. C'est l'écriture que la fiche refuse
@@ -471,11 +517,19 @@ async function openReferentialRow<T extends ArchivableTable>(
  */
 async function duplicateReferentialOf(
   session: Session,
-  table: SimpleReferentialTable,
+  table: ManagedReferentialTable,
+  /**
+   * La colonne qui porte le libellé — **`tools.name` pour les outils**, seule
+   * des neuf tables à ne pas la nommer `label`. Elle se passe plutôt qu'elle ne
+   * se déduit : l'appelant écrit déjà sa table en toutes lettres, et la deviner
+   * ici serait refaire l'indirection d'écriture que la fiche refuse, un cran
+   * plus bas.
+   */
+  labelColumn: PgColumn,
   label: string,
   exceptId?: string,
 ): Promise<string | null> {
-  const existing = await listReferentialLabels(session.db, table, {
+  const existing = await listReferentialLabels(session.db, table, labelColumn, {
     ...(exceptId ? { exceptId } : {}),
   });
   const twin = existing.find((row) => sameReferentialLabel(row.label, label));
@@ -493,10 +547,17 @@ async function duplicateReferentialOf(
  * `/administration` toujours ; le reste selon ce que le libellé qualifie — un
  * métier se lit sur la liste transverse et sur l'Équipe, une approche sur la
  * liste transverse et sur la répartition de la vue d'ensemble (T7.2), une
- * compétence et un niveau sur l'Équipe seule. **Aucune page de détail** :
- * `revalidatePath` invalide une route, et les routes dynamiques se
- * rafraîchissent d'elles-mêmes — c'est la règle que `revalidate` tient déjà
- * au-dessus.
+ * compétence et un niveau sur l'Équipe seule, un **statut** sur la liste
+ * transverse et sur la répartition. **Aucune page de détail** : `revalidatePath`
+ * invalide une route, et les routes dynamiques se rafraîchissent d'elles-mêmes —
+ * c'est la règle que `revalidate` tient déjà au-dessus.
+ *
+ * **Trois des quatre référentiels de T7.4 n'ont que `/administration`**, et ce
+ * n'est pas un oubli : le libellé d'un type d'activité se lit sur la page d'un
+ * accompagnement et sur la frise d'un produit, le nom d'un outil sur une carte
+ * de roadmap, une piste dans le bloc « Démarrage » — **quatre routes
+ * dynamiques**, qui se rafraîchissent seules. Ajouter un `revalidatePath` sur
+ * l'une d'elles demanderait un identifiant que ces gestes n'ont pas.
  */
 function revalidateReferential(referential: Referential): void {
   revalidatePath(ROUTES.admin);
@@ -516,6 +577,18 @@ function revalidateReferential(referential: Referential): void {
       return;
     case "entites":
       revalidatePath(ROUTES.products);
+      return;
+    case "statuts":
+      /* Le filtre et la colonne de statut de la liste transverse, et la
+         répartition par statut de la vue d'ensemble (T6.7) : un libellé corrigé
+         s'y lit aussitôt. La `nature`, elle, n'y change rien — c'est le libellé
+         qui est rendu. */
+      revalidatePath(ROUTES.projects);
+      revalidatePath(ROUTES.overview);
+      return;
+    case "types":
+    case "outils":
+    case "pistes":
       return;
   }
 }
@@ -603,7 +676,12 @@ export async function createJob(
   );
   if (!input) return { values, errors };
 
-  const duplicate = await duplicateReferentialOf(session, jobs, input.label);
+  const duplicate = await duplicateReferentialOf(
+    session,
+    jobs,
+    jobs.label,
+    input.label,
+  );
   if (duplicate) return { values, errors: { label: duplicate } };
 
   await session.db.insert(jobs, {
@@ -634,6 +712,7 @@ export async function updateJob(
   const duplicate = await duplicateReferentialOf(
     session,
     jobs,
+    jobs.label,
     input.label,
     jobId,
   );
@@ -706,6 +785,7 @@ export async function createApproach(
   const duplicate = await duplicateReferentialOf(
     session,
     approaches,
+    approaches.label,
     input.label,
   );
   if (duplicate) return { values, errors: { label: duplicate } };
@@ -741,6 +821,7 @@ export async function updateApproach(
   const duplicate = await duplicateReferentialOf(
     session,
     approaches,
+    approaches.label,
     input.label,
     approachId,
   );
@@ -808,7 +889,12 @@ export async function createSkill(
   const { values, errors, input } = parseReferentialForm(formData, ORDERED_BY_POSITION);
   if (!input) return { values, errors };
 
-  const duplicate = await duplicateReferentialOf(session, skills, input.label);
+  const duplicate = await duplicateReferentialOf(
+    session,
+    skills,
+    skills.label,
+    input.label,
+  );
   if (duplicate) return { values, errors: { label: duplicate } };
 
   await session.db.insert(skills, {
@@ -839,6 +925,7 @@ export async function updateSkill(
   const duplicate = await duplicateReferentialOf(
     session,
     skills,
+    skills.label,
     input.label,
     skillId,
   );
@@ -909,6 +996,7 @@ export async function createSkillLevel(
   const duplicate = await duplicateReferentialOf(
     session,
     skillLevels,
+    skillLevels.label,
     input.label,
   );
   if (duplicate) return { values, errors: { label: duplicate } };
@@ -941,6 +1029,7 @@ export async function updateSkillLevel(
   const duplicate = await duplicateReferentialOf(
     session,
     skillLevels,
+    skillLevels.label,
     input.label,
     levelId,
   );
@@ -986,4 +1075,577 @@ export async function restoreSkillLevel(levelId: string): Promise<void> {
   await session.db.restore(skillLevels, levelId);
 
   revalidateReferential("niveaux");
+}
+
+/* ==========================================================================
+   Les quatre référentiels porteurs de logique — T7.4
+
+   Statuts de projet, types d'activité, outils, pistes de démarrage. Même forme
+   que les huit précédents — créer, corriger, archiver, rétablir —, la
+   suppression en moins (arbitrage (g) de `tickets-C7.md`), et un état de
+   formulaire par table : leurs champs ne sont pas les mêmes, et un refus doit
+   rendre **la** saisie qui a été faite.
+
+   **Ce qui change de T7.3 tient en un mot : la logique.** `docs/04` §1 pose que
+   *les libellés changent, la logique non* — la `nature` d'un statut, la `family`
+   d'un type, le genre d'un outil ou d'une piste se choisissent dans leur
+   énuméré, et `lib/forms/` les y rétrécit **avant** que l'action écrive. Une
+   valeur forgée n'atteint jamais la base.
+
+   **Aucune rétroaction** (arbitrage (j)) : rien ici ne touche une ligne qui
+   référence le référentiel corrigé.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Ce qui s'oppose au rangement, référentiel par référentiel
+
+   Trois fonctions pour quatre référentiels, et le compte n'est pas une erreur :
+   **rien ne référence `starters`**. Une piste s'archive donc toujours, et lui
+   inventer une opposition symétrique serait le garde-fou de confort que la
+   règle 3 interdit.
+   -------------------------------------------------------------------------- */
+
+function refusalOfStatusUsage(usage: ReferentialUsage): string | null {
+  if (usage.projects > 1) {
+    return `${formatProjects(usage.projects)} vivants portent encore ce statut. Donnez-leur un autre statut ou archivez-les d'abord : ranger le statut les laisserait dans la liste sans leur filtre.`;
+  }
+  if (usage.projects === 1) {
+    return `${formatProjects(1)} vivant porte encore ce statut. Donnez-lui un autre statut ou archivez-le d'abord : ranger le statut le laisserait dans la liste sans son filtre.`;
+  }
+  return null;
+}
+
+function refusalOfActivityTypeUsage(usage: ReferentialUsage): string | null {
+  if (usage.activities > 1) {
+    return `${formatActivities(usage.activities)} vivantes portent encore ce type. Corrigez-les ou archivez-les d'abord : ranger le type les laisserait sur la roadmap sans qu'on puisse le reprendre.`;
+  }
+  if (usage.activities === 1) {
+    return `${formatActivities(1)} vivante porte encore ce type. Corrigez-la ou archivez-la d'abord : ranger le type la laisserait sur la roadmap sans qu'on puisse le reprendre.`;
+  }
+  return null;
+}
+
+/**
+ * Ce qui s'oppose au rangement d'un **outil**, et c'est un arbitrage.
+ *
+ * **Aucune des quatre clés étrangères qui pointent `tools` n'est `restrict`** :
+ * rien en base ne retient un outil, et il fallait donc décider. Ce qui compte
+ * est ce que l'archivage rendrait **muet** : `listStarters` joint `tools` sur
+ * les seules lignes vivantes, si bien qu'une piste rangerait son lien profond
+ * avec l'outil — la carte se lirait encore, sans mener nulle part. Le type
+ * d'activité perd de même l'outil que la carte de roadmap nomme.
+ *
+ * **Les résultats et les budgets ne comptent pas** : chacun porte son propre
+ * `external_url`, et ne perd rien. Les compter aurait rendu un outil quasi
+ * inarchivable dès le premier audit reporté.
+ *
+ * Les deux sources se disent **ensemble** quand les deux s'opposent : une seule
+ * phrase, deux moitiés — la règle du dépôt depuis T5.1, qui refuse la phrase à
+ * trous mais pas la phrase composée d'énoncés entiers.
+ */
+function refusalOfToolUsage(usage: ReferentialUsage): string | null {
+  const parts: string[] = [];
+
+  if (usage.activityTypes > 1) {
+    parts.push(
+      `${formatActivityTypes(usage.activityTypes)} le nomment comme outil par défaut`,
+    );
+  } else if (usage.activityTypes === 1) {
+    parts.push(`${formatActivityTypes(1)} le nomme comme outil par défaut`);
+  }
+
+  if (usage.starters > 1) {
+    parts.push(`${formatStarters(usage.starters)} y renvoient`);
+  } else if (usage.starters === 1) {
+    parts.push(`${formatStarters(1)} y renvoie`);
+  }
+
+  if (parts.length === 0) return null;
+
+  return `${parts.join(", et ")}. Corrigez-les ou archivez-les d'abord : ranger l'outil leur retirerait son adresse sans rien dire.`;
+}
+
+/* --------------------------------------------------------------------------
+   Statuts de projet — `project_statuses`
+
+   Le seul des quatre dont la clé entrante est `not null` et `restrict` : un
+   accompagnement a toujours un statut, et la base refuserait elle-même
+   l'effacement. Ce que le décompte protège est donc le **rangement**, que rien
+   en base ne retient.
+   -------------------------------------------------------------------------- */
+
+/** Un refus qui n'appartient à aucun champ, pour les deux formulaires de statut. */
+function statusRefusal(
+  formData: FormData,
+  message: string,
+): ProjectStatusFormState {
+  return { values: readProjectStatusForm(formData), errors: {}, message };
+}
+
+export async function createProjectStatus(
+  _previous: ProjectStatusFormState,
+  formData: FormData,
+): Promise<ProjectStatusFormState> {
+  const session = await requireSession();
+  if (!session.can.manageDomain) {
+    return statusRefusal(formData, RESERVED_REFERENTIAL);
+  }
+
+  const { values, errors, input } = parseProjectStatusForm(formData);
+  if (!input) return { values, errors };
+
+  const duplicate = await duplicateReferentialOf(
+    session,
+    projectStatuses,
+    projectStatuses.label,
+    input.label,
+  );
+  if (duplicate) return { values, errors: { label: duplicate } };
+
+  await session.db.insert(projectStatuses, {
+    label: input.label,
+    position: input.position,
+    nature: input.nature,
+  });
+
+  revalidateReferential("statuts");
+  return { values, errors: {}, ok: true };
+}
+
+export async function updateProjectStatus(
+  statusId: string,
+  _previous: ProjectStatusFormState,
+  formData: FormData,
+): Promise<ProjectStatusFormState> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, projectStatuses, statusId);
+  if ("message" in gate) return statusRefusal(formData, gate.message);
+  if (gate.row.archivedAt !== null) {
+    return statusRefusal(formData, ARCHIVED_REFERENTIAL);
+  }
+
+  const { values, errors, input } = parseProjectStatusForm(formData);
+  if (!input) return { values, errors };
+
+  const duplicate = await duplicateReferentialOf(
+    session,
+    projectStatuses,
+    projectStatuses.label,
+    input.label,
+    statusId,
+  );
+  if (duplicate) return { values, errors: { label: duplicate } };
+
+  /* **Aucune rétroaction** (arbitrage (j)) : les accompagnements qui portent ce
+     statut ne sont pas touchés — ni leur `status_id`, ni leur roadmap, ni leur
+     `last_activity_at`. Changer la `nature` change ce que les écrans lisent de
+     ce statut, jamais ce que les lignes portent. */
+  const updated = await session.db.update(projectStatuses, statusId, {
+    label: input.label,
+    position: input.position,
+    nature: input.nature,
+  });
+  if (!updated) return statusRefusal(formData, GONE_REFERENTIAL);
+
+  revalidateReferential("statuts");
+  return { values, errors: {}, ok: true };
+}
+
+export async function archiveProjectStatus(
+  statusId: string,
+  _previous: ConfirmState,
+  _formData: FormData,
+): Promise<ConfirmState> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, projectStatuses, statusId);
+  if ("message" in gate) return { message: gate.message };
+  if (gate.row.archivedAt !== null) return {};
+
+  /* **Le décompte est refait ici**, et c'est lui qui protège : le panneau
+     l'annonce, l'écran retire l'entrée de menu, et ni l'un ni l'autre n'a jamais
+     tenu un point d'entrée HTTP (arbitrage (j)). */
+  const usage = await countReferentialUsage(session.db, "statuts", statusId);
+  const refusal = refusalOfStatusUsage(usage);
+  if (refusal) return { message: refusal };
+
+  await session.db.archive(projectStatuses, statusId);
+
+  revalidateReferential("statuts");
+  return { ok: true };
+}
+
+export async function restoreProjectStatus(statusId: string): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, projectStatuses, statusId);
+  if ("message" in gate) return;
+
+  await session.db.restore(projectStatuses, statusId);
+
+  revalidateReferential("statuts");
+}
+
+/* --------------------------------------------------------------------------
+   Types d'activité — `activity_types`
+
+   `default_tool_id` est confronté au domaine par `assertPreconditions`
+   (`lib/db/scoped.ts`), qui suit la configuration des clés étrangères : rien à
+   écrire ici, et surtout rien à réécrire — une garde qui ne vit que dans
+   l'appelant est une garde qu'un prochain appelant oubliera.
+   -------------------------------------------------------------------------- */
+
+function activityTypeRefusal(
+  formData: FormData,
+  message: string,
+): ActivityTypeFormState {
+  return { values: readActivityTypeForm(formData), errors: {}, message };
+}
+
+export async function createActivityType(
+  _previous: ActivityTypeFormState,
+  formData: FormData,
+): Promise<ActivityTypeFormState> {
+  const session = await requireSession();
+  if (!session.can.manageDomain) {
+    return activityTypeRefusal(formData, RESERVED_REFERENTIAL);
+  }
+
+  const { values, errors, input } = parseActivityTypeForm(formData);
+  if (!input) return { values, errors };
+
+  const duplicate = await duplicateReferentialOf(
+    session,
+    activityTypes,
+    activityTypes.label,
+    input.label,
+  );
+  if (duplicate) return { values, errors: { label: duplicate } };
+
+  await session.db.insert(activityTypes, {
+    label: input.label,
+    position: input.position,
+    family: input.family,
+    producesResult: input.producesResult,
+    defaultToolId: input.defaultToolId,
+  });
+
+  revalidateReferential("types");
+  return { values, errors: {}, ok: true };
+}
+
+export async function updateActivityType(
+  typeId: string,
+  _previous: ActivityTypeFormState,
+  formData: FormData,
+): Promise<ActivityTypeFormState> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, activityTypes, typeId);
+  if ("message" in gate) return activityTypeRefusal(formData, gate.message);
+  if (gate.row.archivedAt !== null) {
+    return activityTypeRefusal(formData, ARCHIVED_REFERENTIAL);
+  }
+
+  const { values, errors, input } = parseActivityTypeForm(formData);
+  if (!input) return { values, errors };
+
+  const duplicate = await duplicateReferentialOf(
+    session,
+    activityTypes,
+    activityTypes.label,
+    input.label,
+    typeId,
+  );
+  if (duplicate) return { values, errors: { label: duplicate } };
+
+  /* **Basculer `produces_result` ne retire aucun résultat déjà saisi**
+     (arbitrage (j)) : un résultat est un fait reporté d'un outil externe, avec
+     sa date et son lien — la mémoire de l'accompagnement, que la règle 4
+     protège. Ce que ce drapeau décide est ce que le **prochain** panneau
+     proposera. */
+  const updated = await session.db.update(activityTypes, typeId, {
+    label: input.label,
+    position: input.position,
+    family: input.family,
+    producesResult: input.producesResult,
+    defaultToolId: input.defaultToolId,
+  });
+  if (!updated) return activityTypeRefusal(formData, GONE_REFERENTIAL);
+
+  revalidateReferential("types");
+  return { values, errors: {}, ok: true };
+}
+
+export async function archiveActivityType(
+  typeId: string,
+  _previous: ConfirmState,
+  _formData: FormData,
+): Promise<ConfirmState> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, activityTypes, typeId);
+  if ("message" in gate) return { message: gate.message };
+  if (gate.row.archivedAt !== null) return {};
+
+  const usage = await countReferentialUsage(session.db, "types", typeId);
+  const refusal = refusalOfActivityTypeUsage(usage);
+  if (refusal) return { message: refusal };
+
+  await session.db.archive(activityTypes, typeId);
+
+  revalidateReferential("types");
+  return { ok: true };
+}
+
+export async function restoreActivityType(typeId: string): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, activityTypes, typeId);
+  if ("message" in gate) return;
+
+  await session.db.restore(activityTypes, typeId);
+
+  revalidateReferential("types");
+}
+
+/* --------------------------------------------------------------------------
+   Outils — `tools`
+
+   Le seul des neuf référentiels dont la colonne de libellé s'appelle `name`, et
+   le seul sans `position` : le schéma ne les porte pas, et T7.4 n'a pas de
+   migration à dépenser (arbitrage (a)).
+
+   **`sync_mode` et `api_config` ne sont pas écrits** (arbitrage (i)) : ils
+   gardent leurs valeurs par défaut — `manual` et vide —, réservées au
+   branchement futur (D15). Une colonne qu'on n'écrit pas garde sa valeur.
+
+   **Aucun appel sortant** : ni pour vérifier l'adresse, ni pour la sonder, ni
+   pour en deviner le nom. Vision renvoie vers l'outil, elle ne l'interroge pas.
+   -------------------------------------------------------------------------- */
+
+function toolRefusal(formData: FormData, message: string): ToolFormState {
+  return { values: readToolForm(formData), errors: {}, message };
+}
+
+export async function createTool(
+  _previous: ToolFormState,
+  formData: FormData,
+): Promise<ToolFormState> {
+  const session = await requireSession();
+  if (!session.can.manageDomain) {
+    return toolRefusal(formData, RESERVED_REFERENTIAL);
+  }
+
+  const { values, errors, input } = parseToolForm(formData);
+  if (!input) return { values, errors };
+
+  const duplicate = await duplicateReferentialOf(
+    session,
+    tools,
+    tools.name,
+    input.name,
+  );
+  if (duplicate) return { values, errors: { name: duplicate } };
+
+  await session.db.insert(tools, {
+    name: input.name,
+    kind: input.kind,
+    baseUrl: input.baseUrl,
+  });
+
+  revalidateReferential("outils");
+  return { values, errors: {}, ok: true };
+}
+
+export async function updateTool(
+  toolId: string,
+  _previous: ToolFormState,
+  formData: FormData,
+): Promise<ToolFormState> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, tools, toolId);
+  if ("message" in gate) return toolRefusal(formData, gate.message);
+  if (gate.row.archivedAt !== null) {
+    return toolRefusal(formData, ARCHIVED_REFERENTIAL);
+  }
+
+  const { values, errors, input } = parseToolForm(formData);
+  if (!input) return { values, errors };
+
+  const duplicate = await duplicateReferentialOf(
+    session,
+    tools,
+    tools.name,
+    input.name,
+    toolId,
+  );
+  if (duplicate) return { values, errors: { name: duplicate } };
+
+  const updated = await session.db.update(tools, toolId, {
+    name: input.name,
+    kind: input.kind,
+    baseUrl: input.baseUrl,
+  });
+  if (!updated) return toolRefusal(formData, GONE_REFERENTIAL);
+
+  revalidateReferential("outils");
+  return { values, errors: {}, ok: true };
+}
+
+export async function archiveTool(
+  toolId: string,
+  _previous: ConfirmState,
+  _formData: FormData,
+): Promise<ConfirmState> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, tools, toolId);
+  if ("message" in gate) return { message: gate.message };
+  if (gate.row.archivedAt !== null) return {};
+
+  const usage = await countReferentialUsage(session.db, "outils", toolId);
+  const refusal = refusalOfToolUsage(usage);
+  if (refusal) return { message: refusal };
+
+  await session.db.archive(tools, toolId);
+
+  revalidateReferential("outils");
+  return { ok: true };
+}
+
+export async function restoreTool(toolId: string): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, tools, toolId);
+  if ("message" in gate) return;
+
+  await session.db.restore(tools, toolId);
+
+  revalidateReferential("outils");
+}
+
+/* --------------------------------------------------------------------------
+   Pistes de démarrage — `starters`
+
+   **Le seul référentiel que rien ne référence**, et c'est ce qui fait de son
+   archivage un geste sans condition : `archiveStarter` n'a pas de décompte à
+   refaire, parce qu'il n'y a rien à compter. Lui inventer une opposition
+   symétrique aux sept autres serait un garde-fou de confort (règle 3).
+
+   **Aucune adresse écrite ici** : elle vit sur `tools.base_url`, et une seule
+   fois. **Aucun `activity_type_id`** : c'est T7.10, avec sa migration.
+   -------------------------------------------------------------------------- */
+
+function starterRefusal(formData: FormData, message: string): StarterFormState {
+  return { values: readStarterForm(formData), errors: {}, message };
+}
+
+export async function createStarter(
+  _previous: StarterFormState,
+  formData: FormData,
+): Promise<StarterFormState> {
+  const session = await requireSession();
+  if (!session.can.manageDomain) {
+    return starterRefusal(formData, RESERVED_REFERENTIAL);
+  }
+
+  const { values, errors, input } = parseStarterForm(formData);
+  if (!input) return { values, errors };
+
+  const duplicate = await duplicateReferentialOf(
+    session,
+    starters,
+    starters.label,
+    input.label,
+  );
+  if (duplicate) return { values, errors: { label: duplicate } };
+
+  await session.db.insert(starters, {
+    label: input.label,
+    summary: input.summary,
+    guidance: input.guidance,
+    kind: input.kind,
+    toolId: input.toolId,
+    position: input.position,
+  });
+
+  revalidateReferential("pistes");
+  return { values, errors: {}, ok: true };
+}
+
+export async function updateStarter(
+  starterId: string,
+  _previous: StarterFormState,
+  formData: FormData,
+): Promise<StarterFormState> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, starters, starterId);
+  if ("message" in gate) return starterRefusal(formData, gate.message);
+  if (gate.row.archivedAt !== null) {
+    return starterRefusal(formData, ARCHIVED_REFERENTIAL);
+  }
+
+  const { values, errors, input } = parseStarterForm(formData);
+  if (!input) return { values, errors };
+
+  const duplicate = await duplicateReferentialOf(
+    session,
+    starters,
+    starters.label,
+    input.label,
+    starterId,
+  );
+  if (duplicate) return { values, errors: { label: duplicate } };
+
+  const updated = await session.db.update(starters, starterId, {
+    label: input.label,
+    summary: input.summary,
+    guidance: input.guidance,
+    kind: input.kind,
+    toolId: input.toolId,
+    position: input.position,
+  });
+  if (!updated) return starterRefusal(formData, GONE_REFERENTIAL);
+
+  revalidateReferential("pistes");
+  return { values, errors: {}, ok: true };
+}
+
+/**
+ * Archiver une piste : elle quitte le bloc « Démarrage », rien n'est supprimé.
+ *
+ * **Aucun décompte, et c'est une propriété du schéma** : aucune table ne
+ * référence `starters`. Le geste ne peut donc rien laisser en plan, et le
+ * panneau de confirmation le dit — « le geste se défait ».
+ */
+export async function archiveStarter(
+  starterId: string,
+  _previous: ConfirmState,
+  _formData: FormData,
+): Promise<ConfirmState> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, starters, starterId);
+  if ("message" in gate) return { message: gate.message };
+  if (gate.row.archivedAt !== null) return {};
+
+  await session.db.archive(starters, starterId);
+
+  revalidateReferential("pistes");
+  return { ok: true };
+}
+
+export async function restoreStarter(starterId: string): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openReferentialRow(session, starters, starterId);
+  if ("message" in gate) return;
+
+  await session.db.restore(starters, starterId);
+
+  revalidateReferential("pistes");
 }

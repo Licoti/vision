@@ -1,5 +1,6 @@
 /**
- * Les tests de la lecture générique des quatre référentiels simples (T7.3).
+ * Les tests de la lecture générique des **huit** référentiels que gère l'écran
+ * d'administration hors des entités — quatre en T7.3, quatre en T7.4.
  *
  * Ils tournent sur la branche Neon dédiée — `vitest.config.mts` remappe
  * `DATABASE_URL` sur `TEST_DATABASE_URL` — et écrivent réellement : quatre
@@ -15,9 +16,17 @@
  * nombre écarte* : un accompagnement archivé, une personne archivée, une
  * activité archivée, une ligne d'un autre domaine. Un décompte qu'aucune ligne
  * forgée ne vise n'est pas éprouvé.
+ *
+ * **T7.4 ajoute deux sujets.** La **logique** que chaque ligne porte — la nature
+ * d'un statut, la famille d'un type, le genre d'un outil ou d'une piste —, qui
+ * doit remonter jusqu'à l'écran ; et l'**opposition d'un outil**, qui n'est
+ * retenue par aucune clé `restrict` et repose donc entièrement sur ce qui est
+ * écrit ici. Le cas d'étanchéité qui la vise est une **piste du domaine courant
+ * pointant l'outil d'un autre domaine** — une ligne que la base accepte, que
+ * `assertPreconditions` refuserait à l'écriture, et qu'il a donc fallu forger.
  */
 
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { db } from "@/lib/db/client";
@@ -38,6 +47,8 @@ import {
   projectStatuses,
   skillLevels,
   skills,
+  starters,
+  tools,
 } from "@/lib/db/schema";
 
 import { countReferentialUsage, listReferentialForAdmin } from "./referentials";
@@ -51,7 +62,9 @@ const teardownOrder = [
   projects,
   products,
   persons,
+  starters,
   activityTypes,
+  tools,
   projectStatuses,
   skillLevels,
   skills,
@@ -85,6 +98,28 @@ type Fixture = {
   /** Trois déclarations le citent — dont deux d'une même personne. */
   loadedLevelId: string;
   freeLevelId: string;
+
+  /* --- T7.4 -------------------------------------------------------------- */
+
+  /** Un accompagnement vivant et un rangé le portent : seul le vivant compte. */
+  loadedStatusId: string;
+  /** Rien ne le porte. */
+  freeStatusId: string;
+
+  /** Deux activités vivantes et une archivée le portent. */
+  loadedTypeId: string;
+  freeTypeId: string;
+
+  /** Un type vivant **et** une piste vivante le nomment. */
+  loadedToolId: string;
+  /** Un type archivé et une piste archivée seuls le nomment : rien ne s'oppose. */
+  rangedHoldersToolId: string;
+  /** Rien ne le nomme. */
+  freeToolId: string;
+
+  /** Rien ne référence une piste : les deux sont à zéro partout. */
+  toolStarterId: string;
+  methodStarterId: string;
 };
 
 const suffix = Math.random().toString(36).slice(2, 10);
@@ -142,14 +177,70 @@ async function seedDomain(label: string): Promise<Fixture> {
     name: `Produit ${label}`,
     entityId: entity.id,
   });
+  /* Les quatre référentiels de T7.4. Les positions et les libellés sont posés
+     comme ceux des quatre premiers : le tri se lit sur la liste rendue. */
   const status = await scope.insert(projectStatuses, {
-    label: `En cours ${label}`,
+    label: `A en cours ${label}`,
     nature: "active",
+    position: "10",
   });
+  const freeStatus = await scope.insert(projectStatuses, {
+    label: `B libre ${label}`,
+    nature: "paused",
+    position: "20",
+  });
+
+  /* Trois outils, et ce qui les sépare est **ce qui les nomme** : le premier
+     est nommé par un type et une piste vivants, le deuxième par un type et une
+     piste **archivés** — sans lui, le filtre sur `archived_at` des deux
+     sous-requêtes ne serait visé par rien —, le troisième par personne. */
+  const tool = (name: string) =>
+    scope.insert(tools, { name: `${name} ${label}`, kind: "audit" });
+  const loadedTool = await tool("A chargé");
+  const rangedHoldersTool = await tool("B tenu par rangés");
+  const freeTool = await tool("C libre");
+
   const type = await scope.insert(activityTypes, {
-    label: `Atelier ${label}`,
+    label: `A atelier ${label}`,
     family: "design",
+    position: "10",
+    defaultToolId: loadedTool.id,
   });
+  const freeType = await scope.insert(activityTypes, {
+    label: `B libre ${label}`,
+    family: "research",
+    position: "20",
+  });
+  const rangedType = await scope.insert(activityTypes, {
+    label: `C rangé ${label}`,
+    family: "evaluation",
+    position: "30",
+    defaultToolId: rangedHoldersTool.id,
+  });
+  await scope.archive(activityTypes, rangedType.id);
+
+  const toolStarter = await scope.insert(starters, {
+    label: `A vers un outil ${label}`,
+    summary: "Ouvrir la plateforme et lancer la campagne.",
+    kind: "tool",
+    toolId: loadedTool.id,
+    position: "10",
+  });
+  const methodStarter = await scope.insert(starters, {
+    label: `B méthode ${label}`,
+    summary: "Une manière de faire qu'aucun outil ne porte.",
+    guidance: "Le texte long du panneau.",
+    kind: "method",
+    position: "20",
+  });
+  const rangedStarter = await scope.insert(starters, {
+    label: `C rangée ${label}`,
+    summary: "Rangée dans la fixture.",
+    kind: "resource",
+    toolId: rangedHoldersTool.id,
+    position: "30",
+  });
+  await scope.archive(starters, rangedStarter.id);
 
   const project = async (name: string) =>
     scope.insert(projects, {
@@ -246,6 +337,16 @@ async function seedDomain(label: string): Promise<Fixture> {
     freeSkillId: freeSkill.id,
     loadedLevelId: loadedLevel.id,
     freeLevelId: freeLevel.id,
+
+    loadedStatusId: status.id,
+    freeStatusId: freeStatus.id,
+    loadedTypeId: type.id,
+    freeTypeId: freeType.id,
+    loadedToolId: loadedTool.id,
+    rangedHoldersToolId: rangedHoldersTool.id,
+    freeToolId: freeTool.id,
+    toolStarterId: toolStarter.id,
+    methodStarterId: methodStarter.id,
   };
 }
 
@@ -354,6 +455,8 @@ describe("le décompte des métiers", () => {
       projects: 0,
       persons: 0,
       activities: 0,
+      activityTypes: 0,
+      starters: 0,
       declarations: 0,
     });
   });
@@ -459,6 +562,8 @@ describe("countReferentialUsage", () => {
       projects: 0,
       persons: 0,
       activities: 0,
+      activityTypes: 0,
+      starters: 0,
       declarations: 0,
     });
   });
@@ -470,5 +575,233 @@ describe("countReferentialUsage", () => {
       "00000000-0000-4000-8000-000000000000",
     );
     expect(counted.persons).toBe(0);
+  });
+});
+
+/* ==========================================================================
+   T7.4 — les quatre référentiels porteurs de logique
+   ========================================================================== */
+
+describe("listReferentialForAdmin — les quatre référentiels de T7.4", () => {
+  test("les statuts viennent par position, et portent leur nature", async () => {
+    const rows = await listReferentialForAdmin(a.scope, "statuts");
+
+    expect(rows.map((row) => row.id)).toEqual([
+      a.loadedStatusId,
+      a.freeStatusId,
+    ]);
+    expect(rows.map((row) => row.logic)).toEqual([
+      { kind: "nature", value: "active" },
+      { kind: "nature", value: "paused" },
+    ]);
+  });
+
+  test("les types portent leur famille, archivé compris", async () => {
+    const rows = await listReferentialForAdmin(a.scope, "types");
+
+    /* Le troisième est archivé dans la fixture : il **reste listé**, cet écran
+       étant le seul de l'application à montrer ce qu'il a rangé. */
+    expect(rows).toHaveLength(3);
+    expect(rows.map((row) => row.logic)).toEqual([
+      { kind: "family", value: "design" },
+      { kind: "family", value: "research" },
+      { kind: "family", value: "evaluation" },
+    ]);
+    expect(rows[2]?.archivedAt).toBeInstanceOf(Date);
+  });
+
+  test("les outils viennent par nom, sans position — la colonne n'existe pas", async () => {
+    const rows = await listReferentialForAdmin(a.scope, "outils");
+
+    expect(rows.map((row) => row.id)).toEqual([
+      a.loadedToolId,
+      a.rangedHoldersToolId,
+      a.freeToolId,
+    ]);
+    /* Ni `position` ni `rank` : `tools` ne porte aucune des deux, et la lecture
+       les rend nulles plutôt que d'inventer un ordre que rien n'écrit. */
+    expect(rows.every((row) => row.position === null)).toBe(true);
+    expect(rows.every((row) => row.rank === null)).toBe(true);
+    expect(rows[0]?.logic).toEqual({ kind: "toolKind", value: "audit" });
+  });
+
+  test("un outil est nommé par sa colonne `name`, coulée en `label`", async () => {
+    const rows = await listReferentialForAdmin(a.scope, "outils");
+
+    /* La seule des neuf tables à ne pas nommer sa colonne `label` : l'alias de
+       la lecture est ce qui laisse la ligne d'écran avoir une seule forme. */
+    expect(rows[0]?.label).toBe("A chargé a");
+  });
+
+  test("les pistes viennent par position, et portent leur genre", async () => {
+    const rows = await listReferentialForAdmin(a.scope, "pistes");
+
+    expect(rows.map((row) => row.id.slice(0, 0).concat(row.label))).toEqual([
+      "A vers un outil a",
+      "B méthode a",
+      "C rangée a",
+    ]);
+    expect(rows.map((row) => row.logic)).toEqual([
+      { kind: "starterKind", value: "tool" },
+      { kind: "starterKind", value: "method" },
+      { kind: "starterKind", value: "resource" },
+    ]);
+  });
+
+  test("les quatre référentiels de T7.3 ne portent aucune logique", async () => {
+    for (const referential of [
+      "metiers",
+      "approches",
+      "competences",
+      "niveaux",
+    ] as const) {
+      const rows = await listReferentialForAdmin(a.scope, referential);
+      expect(rows.every((row) => row.logic === null)).toBe(true);
+    }
+  });
+
+  test("aucune ligne d'un autre domaine n'entre", async () => {
+    for (const referential of ["statuts", "types", "outils", "pistes"] as const) {
+      const rows = await listReferentialForAdmin(a.scope, referential);
+      const fromB = await listReferentialForAdmin(b.scope, referential);
+      const shared = rows.filter((row) =>
+        fromB.some((other) => other.id === row.id),
+      );
+      expect(shared).toEqual([]);
+    }
+  });
+});
+
+describe("le décompte des statuts", () => {
+  test("un accompagnement vivant s'y oppose, un accompagnement rangé non", async () => {
+    const rows = await listReferentialForAdmin(a.scope, "statuts");
+
+    /* La fixture porte deux accompagnements sur ce statut, dont un archivé :
+       sans le second, le filtre sur `archived_at` ne serait visé par rien. */
+    expect(rows.find((row) => row.id === a.loadedStatusId)?.usage.projects).toBe(
+      1,
+    );
+    expect(rows.find((row) => row.id === a.freeStatusId)?.usage.projects).toBe(
+      0,
+    );
+  });
+});
+
+describe("le décompte des types d'activité", () => {
+  test("une activité vivante s'y oppose, une activité archivée non", async () => {
+    const rows = await listReferentialForAdmin(a.scope, "types");
+
+    /* Trois activités portent ce type dans la fixture — une vivante, deux
+       archivées. Le décompte doit dire 1. */
+    expect(rows.find((row) => row.id === a.loadedTypeId)?.usage.activities).toBe(
+      1,
+    );
+    expect(rows.find((row) => row.id === a.freeTypeId)?.usage.activities).toBe(
+      0,
+    );
+  });
+});
+
+describe("le décompte des outils — l'arbitrage, éprouvé", () => {
+  test("un type vivant et une piste vivante s'y opposent", async () => {
+    const rows = await listReferentialForAdmin(a.scope, "outils");
+    const loaded = rows.find((row) => row.id === a.loadedToolId);
+
+    expect(loaded?.usage.activityTypes).toBe(1);
+    expect(loaded?.usage.starters).toBe(1);
+  });
+
+  test("un type archivé et une piste archivée ne s'opposent à rien", async () => {
+    const rows = await listReferentialForAdmin(a.scope, "outils");
+    const ranged = rows.find((row) => row.id === a.rangedHoldersToolId);
+
+    /* Les deux lignes qui le nomment existent, et sont rangées : c'est le seul
+       cas qui met en défaut les deux `isNull(archived_at)` de ce décompte. */
+    expect(ranged?.usage.activityTypes).toBe(0);
+    expect(ranged?.usage.starters).toBe(0);
+  });
+
+  test("un outil que rien ne nomme est à zéro partout", async () => {
+    const rows = await listReferentialForAdmin(a.scope, "outils");
+
+    expect(rows.find((row) => row.id === a.freeToolId)?.usage).toEqual({
+      products: 0,
+      projects: 0,
+      persons: 0,
+      activities: 0,
+      activityTypes: 0,
+      starters: 0,
+      declarations: 0,
+    });
+  });
+
+  test("**une piste forgée hors domaine ne compte rien**", async () => {
+    /* La ligne que la couche scopée refuserait d'écrire : une piste du domaine
+       `a` qui pointe l'outil libre du domaine `b`. Sans elle, le `filter()` de
+       la sous-requête des pistes ne serait visé par rien — le décompte serait
+       faux et tous les autres cas passeraient quand même. */
+    const forged = await a.scope.insert(starters, {
+      label: `Z forgée ${a.domainId.slice(0, 4)}`,
+      summary: "Elle pointe l'outil d'un autre domaine.",
+      kind: "tool",
+      position: "99",
+    });
+    await db
+      .update(starters)
+      .set({ toolId: b.freeToolId })
+      .where(eq(starters.id, forged.id));
+
+    const counted = await countReferentialUsage(
+      b.scope,
+      "outils",
+      b.freeToolId,
+    );
+    expect(counted.starters).toBe(0);
+
+    await db.delete(starters).where(eq(starters.id, forged.id));
+  });
+});
+
+describe("le décompte des pistes — rien ne les référence", () => {
+  test("les deux pistes vivantes sont à zéro partout", async () => {
+    const rows = await listReferentialForAdmin(a.scope, "pistes");
+
+    for (const id of [a.toolStarterId, a.methodStarterId]) {
+      expect(rows.find((row) => row.id === id)?.usage).toEqual({
+        products: 0,
+        projects: 0,
+        persons: 0,
+        activities: 0,
+        activityTypes: 0,
+        starters: 0,
+        declarations: 0,
+      });
+    }
+  });
+});
+
+describe("countReferentialUsage — les quatre référentiels de T7.4", () => {
+  test("il rend ce que la liste rend", async () => {
+    for (const [referential, id] of [
+      ["statuts", a.loadedStatusId],
+      ["types", a.loadedTypeId],
+      ["outils", a.loadedToolId],
+      ["pistes", a.toolStarterId],
+    ] as const) {
+      const rows = await listReferentialForAdmin(a.scope, referential);
+      const listed = rows.find((row) => row.id === id)?.usage;
+      const counted = await countReferentialUsage(a.scope, referential, id);
+      expect(counted).toEqual(listed);
+    }
+  });
+
+  test("une ligne d'un autre domaine ne compte rien", async () => {
+    /* Le décompte de `b` est non nul ; lu depuis `a`, la ligne n'existe pas. */
+    expect(
+      (await countReferentialUsage(b.scope, "outils", b.loadedToolId)).starters,
+    ).toBe(1);
+    expect(
+      (await countReferentialUsage(a.scope, "outils", b.loadedToolId)).starters,
+    ).toBe(0);
   });
 });

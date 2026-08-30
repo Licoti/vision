@@ -8101,3 +8101,78 @@ D30 » —, elle s'étend aux cinq référentiels sans que T7.3 l'aggrave ni la 
 200** — celle du membre ordinaire comme celle du responsable —, et seul le décompte en base les
 sépare : le membre ne rétablit rien, le responsable rétablit. Quatrième « 200 muet » du dépôt, et le
 premier qu'une étape témoin accompagnait dès la première mesure.
+
+**T7.4 — la fiche exclut `lib/navigation.ts` du périmètre, et le fichier a dû s'ouvrir.** Elle écrit
+« celui de T7.3, **sans `lib/navigation.ts`** : les deux clés existent, et une clé qui n'a rien à
+changer ne s'ouvre pas ». C'est vrai des **clés d'URL** — `referentiel` et `ligne` suffisent, aucune
+fonction de `ROUTES` ne s'ajoute — et faux du fichier : `REFERENTIALS` y vit, `asReferential` et
+`asAdminRequest` s'en servent pour rétrécir, et sans ses quatre valeurs `?referentiel=statuts`
+retombe sur les entités. Le commentaire écrit par T7.3 le disait déjà en toutes lettres — *les quatre
+porteurs de logique rejoignent cette liste en T7.4*. **Même cause pour `lib/format.ts`** :
+`REFERENTIAL_NOUN` est un `Record<Referential, …>` exhaustif à la compilation, il ne compile plus
+sans ses neuf entrées. Deux fichiers de plus que la lettre de la fiche, aucune clé de plus que son
+esprit. Arbitrage rendu avant écriture.
+
+**T7.4 — deux écarts au tableau de la fiche, imposés par le schéma et par l'interdit de migration.**
+Le tableau titre sa colonne « ce qui se saisit **en plus du libellé et de la position** ». Or `tools`
+n'a **pas de `position`** — ni au schéma (`lib/db/schema.ts:336`), ni dans `docs/04` §2, et
+`lib/queries/activities.ts:164` le disait depuis T4.4 : *`tools` ne porte pas de `position`, à la
+différence des types et des approches*. Lui en donner une aurait été la seconde migration que
+l'arbitrage (a) interdit. La liste des outils s'ordonne donc **par nom**, et sa colonne d'ordre n'est
+pas rendue — comme celle des entités, pour une raison différente : elles ont la colonne, personne ne
+la lit. Second écart, `tools` nomme son libellé **`name`**, seule des neuf tables de l'écran. La
+colonne se **passe en argument** à `listReferentialLabels` et à `duplicateReferentialOf` plutôt que
+de se déduire : la deviner aurait refait, un cran plus bas, l'indirection d'écriture que la fiche de
+T7.3 refuse.
+
+**T7.4 — `session.db.find` sur une union de tables ne rend pas l'union de leurs lignes.** Le `SIMPLE`
+de T7.3 portait la table de chaque référentiel, et `find(kind.table, id)` marchait — parce que les
+quatre tables portaient toutes un `label`. À huit tables, `tools` comprise, le type s'est
+**effondré sur les colonnes communes** : `id`, `archived_at` et les estampilles. Ce n'est pas une
+limite de Drizzle mais de l'inférence — `T` s'unifie sur l'union, et `Row<T>` ne se distribue pas. La
+sortie n'est pas un `as` : chaque entrée de `MANAGED` porte désormais une **fonction de lecture**
+(`find: (session, id) => session.db.find(jobs, id)`), dont l'union des retours **est** l'union des
+lignes. Le résolveur retrouve alors la table par un `in` — `"nature" in row` ne peut désigner qu'un
+statut —, et le compilateur redemandera la question le jour où une dixième table entrera. Un `as`
+aurait tenu ce jour-là et menti le lendemain.
+
+**T7.4 — ce qui s'oppose à l'archivage d'un outil est une décision, et rien en base ne la tient.**
+Les **quatre** clés étrangères qui pointent `tools` sont `set null` : `activity_types.default_tool_id`,
+`starters.tool_id`, `results.tool_id`, `budgets.tool_id`. Aucune ne retient un outil, à la différence
+des huit autres référentiels, dont l'archivage bute sur des `restrict`. Retenu (arbitrage (a) du
+plan, validé) : s'opposent les **types d'activité vivants** et les **pistes vivantes** qui le nomment
+— les deux lignes de *référentiel* que l'archivage rendrait muettes. `lib/queries/starters.ts:90`
+joint `tools` avec `isNull(tools.archivedAt)` : ranger l'outil fait perdre à la piste son lien
+profond **en silence**, et la carte se lit encore sans mener nulle part. Les résultats et les budgets
+ne comptent pas : chacun porte son propre `external_url` et ne perd rien — les compter aurait rendu
+un outil quasi inarchivable dès le premier audit reporté. La conséquence est que ce refus n'a **aucun
+filet** : il ne vit que dans `refusalOfToolUsage`, et sa seule garde est le test qui le vise.
+
+**T7.4 — `starters` n'est référencée par rien, et `archiveStarter` n'a donc pas de décompte.** C'est
+le seul des neuf référentiels dans ce cas. Écrire une opposition symétrique aux huit autres aurait
+été le garde-fou de confort que la règle 3 interdit ; le geste dit donc, en toutes lettres, qu'il n'a
+rien à compter. Le panneau de confirmation le rend tel quel — « le geste se défait ».
+
+**T7.4 — trois cascades de tests, corrigées avant d'être crues.** La première mise en défaut du refus
+d'archivage d'un statut a fait tomber **trois** tests au lieu d'un : le test de non-rétroaction et
+celui du décompte en base visaient la **même ligne** que le refus, si bien qu'une fois le statut
+rangé par la neutralisation, les gestes suivants étaient refusés pour une autre raison. Idem côté
+types, où le type chargé portait à la fois l'activité qui s'y oppose et l'outil par défaut qui tient
+l'opposition de l'outil. La fixture porte désormais des lignes **dédiées** — `retroStatus` et son
+accompagnement témoin, `toolHolderType`, `producesType` —, et les quatre neutralisations font tomber
+**un** test chacune. La discipline 2 dit « voir tomber exactement les tests attendus, **et rien
+d'autre** » : la seconde moitié de la phrase est celle qui a servi.
+
+**T7.4 — `FAMILY_LABEL` a quitté un composant client pour `lib/format.ts`.** La liste
+d'administration en avait besoin **côté serveur**, et les six libellés vivaient dans
+`components/projects/activity-panel.tsx`. Arbitrage (c) du plan, validé : un déplacement plutôt
+qu'une copie — `ETAT.md` suit déjà trois libellés hors de ce fichier comme une dette (→ T7.9), et en
+recopier six pour laisser les six autres là-bas aurait ajouté une divergence à un point qui décrit
+des déplacements à faire. Un fichier de plus que le périmètre, aucun libellé changé.
+
+**T7.4 — les quatre états vides n'ont pas été vus rendus, et ils sont nommés comme tels.** La base de
+développement porte des lignes dans **les neuf** référentiels : aucun chemin ne mène à l'état vide
+d'un statut, d'un type, d'un outil ou d'une piste sans supprimer de la donnée. Ils partagent
+exactement le code de ceux de T7.3, lus dans le HTML servi le 30/08/2026, et leurs quatre textes sont
+écrits. Ce qui manque est la **lecture** — « un état vide qu'on n'a pas vu rendu n'a pas été
+vérifié », la règle que T7.8 pose. Le point est ouvert dans `ETAT.md` à sa destination.

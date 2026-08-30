@@ -12,6 +12,16 @@
  * de T7.3 refuse de rendre générique, pas la lecture d'un `FormData` — celle-ci
  * ne pose aucun domaine, ne touche aucune table et ne décide d'aucun droit.
  *
+ * **Les quatre référentiels porteurs de logique n'entrent pas ici** (T7.4), et
+ * c'est la même règle appliquée à l'envers : ils n'ont pas cette forme. Une
+ * piste de démarrage porte six champs, un type d'activité une case et deux
+ * énumérés. Étendre `ReferentialShape` à douze drapeaux aurait fait de ce module
+ * et de son panneau la « phrase à trous » que le dépôt refuse depuis T5.1 — une
+ * forme qu'on ne peut plus relire dans aucun de ses états. Ils ont donc chacun
+ * leur module, et ils **réemploient** d'ici ce qui est vraiment commun :
+ * `referentialField`, `validatePosition`, `toPositionValue`,
+ * `sameReferentialLabel`.
+ *
  * **`lib/forms/entity.ts` reste à part**, et ce n'est pas une distraction : les
  * entités ne saisissent pas leur `position` — aucun écran ne la lit —, si bien
  * que leur formulaire n'a qu'un champ. Les replier ensemble aurait demandé
@@ -108,8 +118,14 @@ export function toReferentialFormValues(row: {
   };
 }
 
-/** Un champ, lu et rogné. Absent ou d'un type inattendu, il vaut « vide ». */
-function field(formData: FormData, name: string): string {
+/**
+ * Un champ, lu et rogné. Absent ou d'un type inattendu, il vaut « vide ».
+ *
+ * **Exportée en T7.4**, comme les deux règles d'ordre : les quatre modules des
+ * référentiels porteurs de logique lisent leurs champs de la même façon, et une
+ * cinquième copie de ces trois lignes n'aurait rien dit de plus.
+ */
+export function referentialField(formData: FormData, name: string): string {
   const value = formData.get(name);
   return typeof value === "string" ? value.trim() : "";
 }
@@ -123,9 +139,9 @@ function field(formData: FormData, name: string): string {
  */
 export function readReferentialForm(formData: FormData): ReferentialFormValues {
   return {
-    label: field(formData, "label"),
-    position: field(formData, "position"),
-    rank: field(formData, "rank"),
+    label: referentialField(formData, "label"),
+    position: referentialField(formData, "position"),
+    rank: referentialField(formData, "rank"),
   };
 }
 
@@ -150,6 +166,42 @@ const RANK_MAX = 32_767;
 /** « 12 », « 12.5 », « 12,5 » — et rien d'autre. */
 const NUMBER = /^\d+(?:[.,]\d{1,2})?$/;
 
+/**
+ * La règle de l'ordre, énoncée une fois pour les **sept** référentiels qui en
+ * portent un.
+ *
+ * **Exportée en T7.4**, où quatre modules de formulaire de plus en ont eu
+ * besoin — un statut, un type d'activité et une piste ont chacun leur
+ * `position`, dans un `numeric(10, 2)` identique. Une seconde écriture de ces
+ * trois refus aurait divergé le jour où l'un d'eux changerait, et c'est celle
+ * qu'on aurait oublié de corriger qui aurait laissé passer un 500.
+ *
+ * Elle rend `undefined` quand la valeur passe — la forme d'`isWebUrl`, à ceci
+ * près qu'elle porte aussi la phrase du refus : trois messages français ne se
+ * recopient pas mieux qu'un booléen.
+ */
+export function validatePosition(value: string): string | undefined {
+  if (!value) return "La position est obligatoire.";
+  if (!NUMBER.test(value)) {
+    return "La position est un nombre positif, avec deux décimales au plus.";
+  }
+  if (toNumber(value) > POSITION_MAX) {
+    return "La position ne peut pas dépasser 99 999 999,99.";
+  }
+  return undefined;
+}
+
+/**
+ * La saisie rendue à PostgreSQL : la virgule française devient un point.
+ *
+ * La colonne est un `numeric`, pas un texte localisé — et « 12,5 » y entrerait
+ * en erreur de syntaxe, donc en 500. Jumelle de `validatePosition`, exportée
+ * pour la même raison.
+ */
+export function toPositionValue(value: string): string {
+  return value.replace(",", ".");
+}
+
 export function validateReferentialForm(
   values: ReferentialFormValues,
   shape: ReferentialShape,
@@ -165,14 +217,8 @@ export function validateReferentialForm(
      portent — la règle de `lib/forms/vision.ts`. */
 
   if (shape.position) {
-    if (!values.position) {
-      errors.position = "La position est obligatoire.";
-    } else if (!NUMBER.test(values.position)) {
-      errors.position =
-        "La position est un nombre positif, avec deux décimales au plus.";
-    } else if (toNumber(values.position) > POSITION_MAX) {
-      errors.position = "La position ne peut pas dépasser 99 999 999,99.";
-    }
+    const refusal = validatePosition(values.position);
+    if (refusal) errors.position = refusal;
   }
 
   if (shape.rank) {
@@ -246,11 +292,7 @@ export function parseReferentialForm(
     errors,
     input: {
       label: values.label,
-      /* La virgule française est rendue à PostgreSQL en point : la colonne est
-         un `numeric`, pas un texte localisé. */
-      ...(shape.position
-        ? { position: values.position.replace(",", ".") }
-        : {}),
+      ...(shape.position ? { position: toPositionValue(values.position) } : {}),
       ...(shape.rank ? { rank: Number(values.rank) } : {}),
     },
   };

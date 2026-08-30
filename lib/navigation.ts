@@ -410,19 +410,31 @@ export const STARTER_PANEL_PARAM = "piste";
 export const REFERENTIAL_PARAM = "referentiel";
 
 /**
- * Les cinq référentiels que l'écran gère, dans l'ordre de sa barre.
+ * Les neuf référentiels du domaine, dans l'ordre de la barre de choix.
  *
- * **Cinq sur neuf**, et c'est l'état de T7.3 : les quatre porteurs de logique —
- * statuts de projet, types d'activité, outils, pistes de démarrage — rejoignent
- * cette liste en T7.4. Elle est **close** et sert de rétrécissement : une valeur
- * d'URL qui n'y figure pas n'existe pas.
+ * **Neuf sur neuf depuis T7.4** : les cinq que T7.3 a posés, puis les quatre
+ * **porteurs de logique** — statuts de projet, types d'activité, outils, pistes
+ * de démarrage. La liste est **close** et sert de rétrécissement : une valeur
+ * d'URL qui n'y figure pas n'existe pas, et `asAdminRequest` s'en sert pour
+ * refuser une demande venue du client.
  *
  * **L'ordre est celui de la barre de choix, et il n'est pas neutre** : les
  * entités d'abord — c'est le seul référentiel que `docs/06` §2 nomme dans son
  * arbre —, puis ce qui qualifie un accompagnement, puis ce qui qualifie une
- * personne. Le **nom** de chacun vit dans `REFERENTIAL_NOUN`
- * (`lib/format.ts`) : ce module ne dépend de rien, et un libellé écrit ici
- * aurait été le second à dire la même chose.
+ * personne, puis les quatre porteurs de logique dans l'ordre de la fiche de
+ * T7.4. **Les cinq premières ne bougent pas** : leur ordre a été posé par T7.3,
+ * et T7.4 n'a pas mandat de le rejouer.
+ *
+ * Le **nom** de chacun vit dans `REFERENTIAL_NOUN` (`lib/format.ts`) : ce module
+ * ne dépend de rien, et un libellé écrit ici aurait été le second à dire la même
+ * chose.
+ *
+ * **T7.4 ouvre ce fichier, et sa fiche disait l'inverse.** Elle borne son
+ * périmètre à « celui de T7.3, sans `lib/navigation.ts` : les deux clés
+ * existent » — ce qui est vrai des **clés d'URL**, et aucune ne s'ajoute. Mais
+ * la liste close vit ici, `asReferential` et `asAdminRequest` s'en servent, et
+ * sans ses quatre valeurs `?referentiel=statuts` retomberait sur les entités.
+ * L'écart est consigné dans `JOURNAL-TECHNIQUE.md`.
  */
 export const REFERENTIALS = [
   "entites",
@@ -430,6 +442,10 @@ export const REFERENTIALS = [
   "approches",
   "competences",
   "niveaux",
+  "statuts",
+  "types",
+  "outils",
+  "pistes",
 ] as const;
 
 export type Referential = (typeof REFERENTIALS)[number];

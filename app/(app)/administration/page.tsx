@@ -1,13 +1,13 @@
 /**
  * Administration — les référentiels du domaine (21/08/2026 sur les entités,
- * porté à cinq référentiels par T7.3).
+ * porté à cinq référentiels par T7.3, à neuf par T7.4).
  *
  * Elle répond à « comment adapter le vocabulaire du domaine ? » (`docs/06` §2).
  * C'est l'écran promis par **D25** — « un écran sommaire de gestion des
- * référentiels existe, en C7 » —, désormais tenu sur **cinq référentiels sur
- * neuf** : entités, métiers, approches, compétences, échelle de maîtrise. Les
- * quatre porteurs de logique — statuts, types d'activité, outils, pistes —
- * rejoignent cet écran en T7.4.
+ * référentiels existe, en C7 » —, désormais tenu sur **les neuf référentiels du
+ * domaine** : entités, métiers, approches, compétences, échelle de maîtrise,
+ * statuts de projet, types d'activité, outils, pistes de démarrage. La promesse
+ * est close.
  *
  * **Un seul écran, une clé qui choisit la table** (arbitrage (f) de
  * `tickets-C7.md`). `docs/06` §2 pose *six écrans, dont deux formulaires et un
@@ -25,20 +25,27 @@
  * chose derrière.
  *
  * **Ce n'est pas cette route qui protège**, et il faut le redire à chaque
- * écran : les vingt et une actions redérivent le droit sur ce qu'elles
- * reçoivent, et `loadAdminDrawer` le redérive de son côté. Une route retirée n'a
- * jamais protégé les points d'entrée HTTP qu'elle affichait.
+ * écran : les trente-sept actions redérivent le droit sur ce qu'elles reçoivent,
+ * et `loadAdminDrawer` le redérive de son côté. Une route retirée n'a jamais
+ * protégé les points d'entrée HTTP qu'elle affichait.
  *
  * **La liste montre les lignes archivées**, seule de l'application à le faire.
  * Un écran de gestion doit montrer ce qu'il a rangé : sans cela l'archivage
  * serait une disparition, et le rétablissement n'aurait aucun point d'entrée.
  *
  * **Aucun tri par usage, aucun classement.** Chaque référentiel se range dans
- * l'ordre que ses propres lecteurs emploient — `position` puis libellé pour
- * trois d'entre eux, `rank` puis libellé pour l'échelle, libellé seul pour les
- * entités. `docs/06` §10 proscrit le classement, et ranger un référentiel par
- * « nombre de projets » serait exactement cela. Le décompte est là pour dire ce
- * qui **s'oppose à un geste**, jamais pour qualifier.
+ * l'ordre que ses propres lecteurs emploient — `position` puis libellé pour six
+ * d'entre eux, `rank` puis libellé pour l'échelle, nom seul pour les entités et
+ * pour les outils, qui n'ont pas de `position` au schéma. `docs/06` §10 proscrit
+ * le classement, et ranger un référentiel par « nombre de projets » serait
+ * exactement cela. Le décompte est là pour dire ce qui **s'oppose à un geste**,
+ * jamais pour qualifier.
+ *
+ * **Quatre référentiels portent de la logique, et la ligne le dit** (T7.4) : la
+ * nature d'un statut, la famille d'un type, le genre d'un outil ou d'une piste
+ * se lisent sous le libellé. `docs/04` §1 pose que *les libellés changent, la
+ * logique non* — un écran qui ne rendrait que le libellé laisserait sans réponse
+ * la seule question qu'on s'y pose : qu'est-ce que cette ligne commande ?
  *
  * Aucune requête directe : tout passe par `session.db`, déjà scopé sur le
  * domaine courant. Règle 1.
@@ -59,13 +66,20 @@ import {
   adminRequestFromParams,
   resolveAdminDrawer,
 } from "@/lib/drawers/admin";
+import { StatusPill } from "@/components/ui/status-pill";
 import {
   formatActivities,
+  formatActivityFamily,
+  formatActivityTypes,
   formatDeclarations,
   formatMonth,
   formatPersons,
   formatProducts,
   formatProjects,
+  formatProjectStatusNature,
+  formatStarterKind,
+  formatStarters,
+  formatToolKind,
   REFERENTIAL_NOUN,
 } from "@/lib/format";
 import {
@@ -82,15 +96,20 @@ import { listEntitiesForAdmin } from "@/lib/queries/entities";
 import {
   listReferentialForAdmin,
   type AdminReferentialRow,
+  type ReferentialLogic,
   type ReferentialUsage,
 } from "@/lib/queries/referentials";
 
 import {
+  restoreActivityType,
   restoreApproach,
   restoreEntity,
   restoreJob,
+  restoreProjectStatus,
   restoreSkill,
   restoreSkillLevel,
+  restoreStarter,
+  restoreTool,
 } from "./actions";
 import { loadAdminDrawer } from "./drawers";
 
@@ -127,6 +146,13 @@ const USAGE_SOURCES: Record<
   approches: ["projects", "activities"],
   competences: ["persons"],
   niveaux: ["declarations"],
+  statuts: ["projects"],
+  types: ["activities"],
+  outils: ["activityTypes", "starters"],
+  /* **Rien ne référence `starters`**, et la liste vide le dit mieux qu'un zéro :
+     une colonne qui rendrait « Aucune référence » sur chaque ligne ne dirait
+     rien. Elle n'est donc pas rendue du tout — ni son en-tête, ni ses cellules. */
+  pistes: [],
 };
 
 /** L'en-tête de colonne — décoratif : la ligne dit elle-même ce qu'elle compte. */
@@ -135,13 +161,15 @@ const SOURCE_HEADING: Record<keyof ReferentialUsage, string> = {
   projects: "Projets",
   persons: "Personnes",
   activities: "Activités",
+  activityTypes: "Types",
+  starters: "Pistes",
   declarations: "Déclarations",
 };
 
 /**
  * Le rétablissement, référentiel par référentiel.
  *
- * Cinq actions et non une : chacune nomme sa table côté serveur, et c'est la
+ * Neuf actions et non une : chacune nomme sa table côté serveur, et c'est la
  * fiche de T7.3 — une indirection sur l'écriture ferait de la couche scopée un
  * endroit où le domaine se déduit. Ce que cette table choisit est **laquelle
  * lier**, jamais ce qu'elle écrit.
@@ -152,6 +180,34 @@ const RESTORE: Record<Referential, (rowId: string) => Promise<void>> = {
   approches: restoreApproach,
   competences: restoreSkill,
   niveaux: restoreSkillLevel,
+  statuts: restoreProjectStatus,
+  types: restoreActivityType,
+  outils: restoreTool,
+  pistes: restoreStarter,
+};
+
+/**
+ * L'intitulé de la colonne d'ordre — **`null` là où il n'y en a pas**.
+ *
+ * Deux référentiels n'en ont aucun, et pour deux raisons différentes : les
+ * entités portent bien une `position` mais **aucun écran ne la lit**, si bien
+ * que leur formulaire ne la saisit pas ; les outils **n'ont pas la colonne**, ni
+ * au schéma ni dans `docs/04` §2, et T7.4 n'avait pas de migration à dépenser
+ * (arbitrage (a) de `tickets-C7.md`). Les deux se rangent donc par nom.
+ *
+ * Cette table remplace les deux ternaires que T7.3 portait : au troisième
+ * référentiel sans ordre, la question ne se repose plus.
+ */
+const ORDER_HEADING: Record<Referential, string | null> = {
+  entites: null,
+  metiers: "Ordre",
+  approches: "Ordre",
+  competences: "Ordre",
+  niveaux: "Rang",
+  statuts: "Ordre",
+  types: "Ordre",
+  outils: null,
+  pistes: "Ordre",
 };
 
 /** Une valeur d'URL, réduite à la première quand Next en rend plusieurs. */
@@ -189,12 +245,17 @@ export default async function AdminPage({
           label: row.label,
           position: null,
           rank: null,
+          /* Une entité ne porte aucune logique : elle qualifie un produit, elle
+             ne commande rien au code. */
+          logic: null,
           archivedAt: row.archivedAt,
           usage: {
             products: row.liveProductCount,
             projects: 0,
             persons: 0,
             activities: 0,
+            activityTypes: 0,
+            starters: 0,
             declarations: 0,
           },
         }))
@@ -258,16 +319,18 @@ export default async function AdminPage({
           <List label={`${noun.plural} du domaine`}>
             <ListHeader>
               <span className={COLUMN.label}>Libellé</span>
-              {referential === "entites" ? null : (
+              {ORDER_HEADING[referential] ? (
                 <span className={COLUMN.order}>
-                  {referential === "niveaux" ? "Rang" : "Ordre"}
+                  {ORDER_HEADING[referential]}
                 </span>
-              )}
-              <span className={COLUMN.usage}>
-                {USAGE_SOURCES[referential]
-                  .map((source) => SOURCE_HEADING[source])
-                  .join(" · ")}
-              </span>
+              ) : null}
+              {USAGE_SOURCES[referential].length > 0 ? (
+                <span className={COLUMN.usage}>
+                  {USAGE_SOURCES[referential]
+                    .map((source) => SOURCE_HEADING[source])
+                    .join(" · ")}
+                </span>
+              ) : null}
               <span className={COLUMN.state}>État</span>
               <span className={COLUMN.actions} />
             </ListHeader>
@@ -292,38 +355,47 @@ export default async function AdminPage({
 
               return (
                 <ListRow key={row.id}>
+                  {/* La cellule passe en colonne pour porter la logique sous le
+                      libellé : c'est ce qui répond à « qu'est-ce que cette ligne
+                      commande ? » sans ajouter une sixième colonne vide sur cinq
+                      référentiels. */}
                   <span
-                    className={`${COLUMN.label} truncate font-semibold text-content-neutral-darkest`}
+                    className={`${COLUMN.label} flex min-w-0 flex-col gap-0.5`}
                   >
-                    {row.label}
+                    <span className="truncate font-semibold text-content-neutral-darkest">
+                      {row.label}
+                    </span>
+                    {row.logic ? <LogicCell logic={row.logic} /> : null}
                   </span>
 
-                  {referential === "entites" ? null : (
+                  {ORDER_HEADING[referential] ? (
                     <span className={COLUMN.order}>
                       <span className="sr-only">
-                        {referential === "niveaux" ? "Rang : " : "Ordre : "}
+                        {`${ORDER_HEADING[referential]} : `}
                       </span>
                       {referential === "niveaux" ? row.rank : row.position}
                     </span>
-                  )}
+                  ) : null}
 
-                  <span className={COLUMN.usage}>
-                    <span className="sr-only">
-                      {referential === "entites"
-                        ? "Produits rattachés : "
-                        : "Références : "}
+                  {USAGE_SOURCES[referential].length > 0 ? (
+                    <span className={COLUMN.usage}>
+                      <span className="sr-only">
+                        {referential === "entites"
+                          ? "Produits rattachés : "
+                          : "Références : "}
+                      </span>
+                      <UsageCell
+                        referential={referential}
+                        usage={row.usage}
+                        archivedProductCount={
+                          entityRow
+                            ? entityRow.totalProductCount -
+                              entityRow.liveProductCount
+                            : 0
+                        }
+                      />
                     </span>
-                    <UsageCell
-                      referential={referential}
-                      usage={row.usage}
-                      archivedProductCount={
-                        entityRow
-                          ? entityRow.totalProductCount -
-                            entityRow.liveProductCount
-                          : 0
-                      }
-                    />
-                  </span>
+                  ) : null}
 
                   <span className={COLUMN.state}>
                     <span className="sr-only">État : </span>
@@ -362,7 +434,7 @@ export default async function AdminPage({
                           role="menuitem"
                           className={MENU_ITEM}
                         >
-                          {referential === "entites"
+                          {referential === "entites" || referential === "outils"
                             ? "Modifier le nom"
                             : "Modifier le libellé"}
                         </DrawerLink>
@@ -517,9 +589,50 @@ function formatSource(source: keyof ReferentialUsage, count: number): string {
       return formatPersons(count);
     case "activities":
       return formatActivities(count);
+    case "activityTypes":
+      return formatActivityTypes(count);
+    case "starters":
+      return formatStarters(count);
     case "declarations":
       return formatDeclarations(count);
   }
+}
+
+/**
+ * La logique que la ligne porte, sous son libellé (T7.4).
+ *
+ * **La nature d'un statut prend la pastille**, et c'est un réemploi et non une
+ * couleur neuve : `StatusPill` est déjà la seule forme du statut d'un
+ * accompagnement, ses quatre couples de contraste sont mesurés (9,17 · 11,83 ·
+ * 6,52 · 6,42:1), et la voir ici relie l'écran de gestion à la roadmap qu'il
+ * commande. Les trois autres sont des étiquettes, pas des états : un texte
+ * discret suffit, et le couple qu'il emploie est déjà servi dans cette liste par
+ * la cellule « Aucune référence ».
+ *
+ * **Ce n'est pas un indice calculé** (D39) : c'est une colonne saisie, rendue en
+ * toutes lettres. Rien ne la classe, rien ne l'ordonne.
+ */
+function LogicCell({ logic }: { logic: ReferentialLogic }) {
+  if (logic.kind === "nature") {
+    return (
+      <span className="flex">
+        <StatusPill
+          nature={logic.value}
+          label={formatProjectStatusNature(logic.value)}
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span className="text-xs text-content-neutral-base">
+      {logic.kind === "family"
+        ? formatActivityFamily(logic.value)
+        : logic.kind === "toolKind"
+          ? formatToolKind(logic.value)
+          : formatStarterKind(logic.value)}
+    </span>
+  );
 }
 
 /**
@@ -535,6 +648,10 @@ const EMPTY_TITLE: Record<Referential, string> = {
   approches: "Aucune approche dans ce domaine",
   competences: "Aucune compétence dans ce domaine",
   niveaux: "Aucun niveau de maîtrise dans ce domaine",
+  statuts: "Aucun statut de projet dans ce domaine",
+  types: "Aucun type d'activité dans ce domaine",
+  outils: "Aucun outil raccordé à ce domaine",
+  pistes: "Aucune piste de démarrage dans ce domaine",
 };
 
 const EMPTY_DESCRIPTION: Record<Referential, string> = {
@@ -548,4 +665,12 @@ const EMPTY_DESCRIPTION: Record<Referential, string> = {
     "Les compétences disent ce qu'une personne du centre sait faire. Elles ne se confondent pas avec les métiers : on en porte plusieurs, chacune à son niveau.",
   niveaux:
     "L'échelle de maîtrise gradue les compétences déclarées. C'est le rang qui l'ordonne et que le radar de l'équipe lit ; le libellé, lui, se renomme librement.",
+  statuts:
+    "Les statuts disent où en est un accompagnement — En cadrage, En cours, En pause, Terminé. Tant qu'il n'y en a aucun, aucun accompagnement ne peut être créé : c'est la nature du statut qui dit au produit ce qui compte comme actif.",
+  types:
+    "Les types disent ce qu'est un fait d'accompagnement : un atelier, un audit, une campagne de tests. Ils sont groupés par famille, et ce sont eux qui décident si une activité terminée propose la saisie d'un résultat.",
+  outils:
+    "Les outils sont les plateformes externes que Vision raccorde : celle qui produit les audits, celle qui porte les analytics, celle qui tient le budget. Vision renvoie vers elles, elle ne les interroge pas.",
+  pistes:
+    "Les pistes de démarrage sont la boîte à outils proposée à qui ouvre un accompagnement sans activité. Ce sont des invitations, jamais des prescriptions : elles sont les mêmes sur tous les accompagnements.",
 };

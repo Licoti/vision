@@ -7,7 +7,10 @@
  */
 
 import type { Referential } from "@/lib/navigation";
+import type { ActivityFamily } from "@/lib/queries/activities";
 import type { IndicatorDirection } from "@/lib/queries/indicators";
+import type { ProjectStatusNature } from "@/lib/queries/projects";
+import type { ToolKind } from "@/lib/queries/referentials";
 import type { ResourceType } from "@/lib/queries/resources";
 import type { StarterKind } from "@/lib/queries/starters";
 
@@ -365,14 +368,17 @@ export function formatPersons(count: number): string {
  * ici, il est le contenu d'une mise en garde, lue une fois, avant un geste
  * irréversible.
  *
- * **La clause s'élargit en T7.3, et d'un seul cran** : un décompte qui dit ce
- * qui **s'oppose à un geste** sur l'écran de gestion des référentiels n'est pas
- * une mesure d'activité — c'est le rôle que `formatProducts` tient à côté depuis
- * le 21/08/2026, et il se lit dans son commentaire. « 3 projets · 12 activités »
- * en face d'une approche ne qualifie pas l'approche : il dit pourquoi
- * l'archivage sera refusé. Ce qui reste interdit est inchangé — ce nombre ne
- * paraît toujours ni sur une page de produit, ni sur une page d'accompagnement,
- * ni dans une ligne de liste qui décrit un objet plutôt qu'un empêchement.
+ * **La clause s'est élargie en T7.3, et d'un seul cran** : un décompte qui dit
+ * ce qui **s'oppose à un geste** sur l'écran de gestion des référentiels n'est
+ * pas une mesure d'activité — c'est le rôle que `formatProducts` tient à côté
+ * depuis le 21/08/2026, et il se lit dans son commentaire. « 3 projets ·
+ * 12 activités » en face d'une approche ne qualifie pas l'approche : il dit
+ * pourquoi l'archivage sera refusé. **T7.4 porte la clause de quatre
+ * référentiels à huit** sans la changer d'un mot : un type d'activité compte
+ * ses activités vivantes, un statut ses accompagnements vivants. Ce qui reste
+ * interdit est inchangé — ce nombre ne paraît toujours ni sur une page de
+ * produit, ni sur une page d'accompagnement, ni dans une ligne de liste qui
+ * décrit un objet plutôt qu'un empêchement.
  *
  * Zéro s'écrit en toutes lettres, la règle des cinq fonctions voisines — et pour
  * une raison de plus ici : « 0 activité » se lirait comme un manque, quand la
@@ -487,13 +493,41 @@ export function formatDeclarations(count: number): string {
 }
 
 /**
- * Le nom des cinq référentiels que l'écran d'administration gère (T7.3).
+ * « 3 types d'activité » · « 1 type d'activité ».
+ *
+ * Le premier des deux décomptes qui disent ce qui s'oppose au rangement d'un
+ * **outil** (T7.4) — un type d'activité qui le nomme par défaut. Comme le
+ * précédent, il n'est rendu que lorsqu'il s'oppose : zéro ne s'écrit pas, et
+ * « Aucune référence » dit l'absence pour toutes les sources à la fois.
+ *
+ * Le mot « type » seul serait ambigu sur un écran qui gère neuf référentiels :
+ * il en porte huit dont un s'appelle « types d'activité ».
+ */
+export function formatActivityTypes(count: number): string {
+  return `${count} type${count > 1 ? "s" : ""} d'activité`;
+}
+
+/**
+ * « 2 pistes de démarrage » · « 1 piste de démarrage ».
+ *
+ * Le second, et il dit la même chose de l'autre côté : une piste renvoie vers
+ * l'outil, et ranger l'outil lui retirerait son lien — `listStarters` joint
+ * `tools` sur les seules lignes vivantes, si bien que la carte se lirait encore
+ * sans mener nulle part.
+ */
+export function formatStarters(count: number): string {
+  return `${count} piste${count > 1 ? "s" : ""} de démarrage`;
+}
+
+/**
+ * Le nom des neuf référentiels que l'écran d'administration gère (T7.3 pour
+ * cinq, T7.4 pour les quatre porteurs de logique).
  *
  * **Cinq formes et non un mot**, parce que le français décline : « Ajouter un
  * métier », « Archiver ce métier », « Options du métier Untel », « Archivé en
  * août 2026 ». Composer ces phrases à partir d'un seul nom demanderait de
  * décider du genre et de l'élision à l'endroit où la phrase se rend, c'est-à-dire
- * à cinq endroits — et `docs/06` §2 veut un écran sommaire, pas un moteur
+ * à neuf endroits — et `docs/06` §2 veut un écran sommaire, pas un moteur
  * d'accord.
  *
  * **Elles vivent ici**, avec les libellés d'énuméré voisins, plutôt que dans
@@ -503,6 +537,11 @@ export function formatDeclarations(count: number): string {
  *
  * `plural` ouvre une phrase — il porte donc sa majuscule ; les quatre autres la
  * continuent.
+ *
+ * **`Record<Referential, …>` : le jour où la liste close s'allonge, ce fichier
+ * ne compile plus tant qu'il n'a pas son entrée.** C'est ce qui a fait entrer
+ * `lib/format.ts` dans le périmètre de T7.4 — une exhaustivité vérifiée par le
+ * compilateur ne se contourne pas, elle se remplit.
  */
 export type ReferentialNoun = {
   /** « Métiers » — le titre de la liste et l'entrée de la barre. */
@@ -553,6 +592,34 @@ export const REFERENTIAL_NOUN: Record<Referential, ReferentialNoun> = {
     of: "du niveau",
     archived: "Archivé",
   },
+  statuts: {
+    plural: "Statuts de projet",
+    indefinite: "un statut",
+    demonstrative: "ce statut",
+    of: "du statut",
+    archived: "Archivé",
+  },
+  types: {
+    plural: "Types d'activité",
+    indefinite: "un type d'activité",
+    demonstrative: "ce type",
+    of: "du type",
+    archived: "Archivé",
+  },
+  outils: {
+    plural: "Outils",
+    indefinite: "un outil",
+    demonstrative: "cet outil",
+    of: "de l'outil",
+    archived: "Archivé",
+  },
+  pistes: {
+    plural: "Pistes de démarrage",
+    indefinite: "une piste",
+    demonstrative: "cette piste",
+    of: "de la piste",
+    archived: "Archivée",
+  },
 };
 
 export function formatResourceType(type: ResourceType): string {
@@ -601,6 +668,84 @@ const STARTER_KINDS: Record<StarterKind, string> = {
 
 export function formatStarterKind(kind: StarterKind): string {
   return STARTER_KINDS[kind];
+}
+
+/**
+ * La **nature** d'un statut de projet : « Cadrage » · « En cours » · « En
+ * pause » · « Terminé ».
+ *
+ * **C'est la logique, pas le libellé** (`docs/04` §1) : un domaine renomme
+ * « En cours » en « Actif » sans que rien ne bouge, parce que la nature reste
+ * `active` — et c'est elle que la roadmap, la répartition de la vue d'ensemble
+ * et `StatusPill` lisent. Ces quatre mots sont le nom de la logique elle-même,
+ * et c'est pourquoi ils vivent ici et non dans le référentiel : le domaine ne
+ * les renomme pas.
+ *
+ * **D42 — la nature `archived` n'existe pas** : l'archivage est porté
+ * exclusivement par `archived_at`, et l'énuméré ne la porte donc pas. Le
+ * `Record` étant exhaustif à la compilation, elle ne peut pas non plus revenir
+ * par ici.
+ */
+const PROJECT_STATUS_NATURES: Record<ProjectStatusNature, string> = {
+  framing: "Cadrage",
+  active: "En cours",
+  paused: "En pause",
+  done: "Terminé",
+};
+
+export function formatProjectStatusNature(nature: ProjectStatusNature): string {
+  return PROJECT_STATUS_NATURES[nature];
+}
+
+/**
+ * Les six familles d'activité de `docs/03` §2, dans l'ordre de l'énuméré.
+ *
+ * La famille est un **regroupement d'affichage** et rien d'autre : elle donne au
+ * choix du type un axe de lecture, elle n'impose aucune méthodologie.
+ *
+ * **Elle vivait dans `components/projects/activity-panel.tsx` jusqu'à T7.4**,
+ * qui en a eu besoin côté serveur pour la liste d'administration. Le geste est
+ * un **déplacement, pas une copie** : `ETAT.md` porte depuis le 25/08/2026 un
+ * point ouvert sur les libellés qui vivent hors de ce fichier, et en recopier
+ * six ici pour laisser les six autres là-bas aurait ajouté une divergence à un
+ * point qui décrit déjà trois déplacements à faire. Aucun libellé ne change.
+ */
+const ACTIVITY_FAMILIES: Record<ActivityFamily, string> = {
+  framing: "Cadrage",
+  research: "Recherche",
+  design: "Conception",
+  evaluation: "Évaluation",
+  measurement: "Mesure",
+  transfer: "Transmission",
+};
+
+export function formatActivityFamily(family: ActivityFamily): string {
+  return ACTIVITY_FAMILIES[family];
+}
+
+/**
+ * Le genre d'un outil raccordé : « Audit » · « Analytics » · « Budget » ·
+ * « Autre » (T7.4).
+ *
+ * **Il ne classe pas les outils, il dit ce qu'ils produisent** : `budget` est
+ * l'outil de gestion vers lequel le bloc du budget renvoie (T7.1), `audit`
+ * celui qui produit un résultat (T4.4), `analytics` celui qui alimente un
+ * relevé d'indicateur. « Autre » n'est pas un défaut de saisie : c'est la
+ * valeur qui rend le raccordement d'un outil imprévu aussi peu coûteux qu'une
+ * ligne.
+ *
+ * `sync_mode` et `api_config` n'ont pas de libellé, et n'en auront pas tant
+ * qu'ils ne se saisiront pas — arbitrage (i) de `tickets-C7.md`.
+ */
+const TOOL_KINDS: Record<ToolKind, string> = {
+  audit: "Audit",
+  analytics: "Analytics",
+  budget: "Budget",
+  other: "Autre",
+};
+
+export function formatToolKind(kind: ToolKind): string {
+  return TOOL_KINDS[kind];
 }
 
 /**
