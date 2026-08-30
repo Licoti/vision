@@ -87,7 +87,15 @@ export default async function AppLayout({
         />
       </aside>
 
-      <main id="contenu" className="min-w-0 max-w-310 flex-1 px-10 pt-9 pb-18">
+      {/* La gouttière cède sous `md` (T7.6) : `px-10` prend 80 px des 375 d'un
+          téléphone, soit un cinquième de l'écran pour du vide, quand c'est la
+          largeur qui manque à tout ce que la page contient. Le cadre du bureau
+          revient dès que la barre latérale reprend sa colonne. C'est un point
+          d'arrêt de mise en page, hors de la clause 2 de `spacingScaleLock`. */}
+      <main
+        id="contenu"
+        className="min-w-0 max-w-310 flex-1 px-5 pt-6 pb-12 md:px-10 md:pt-9 md:pb-18"
+      >
         {children}
       </main>
     </div>

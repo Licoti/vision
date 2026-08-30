@@ -24,6 +24,13 @@
  * (`ETAT.md`). La maquette en pose une de 1 px ; l'écart est celui que
  * `block.tsx` consignait déjà.
  *
+ * **La gouttière cède sous `md`** (T7.6) : `px-7` prend 56 px des 375 d'un
+ * téléphone, et c'est ce qui faisait déborder la roadmap projet, dont la colonne
+ * de titre a un plancher de 220 px. `px-5 py-5` sous le palier, le cadre de la
+ * maquette au-dessus. **Le rythme intérieur ne bouge pas** : `gap-4` reste le pas
+ * de la carte de contenu à toute largeur — le ticket rend de la largeur, il ne
+ * redessine pas.
+ *
  * **`id` et `scroll-mt` vont ensemble**, et c'est la barre de sous-navigation
  * qui les demande (`components/projects/subnav.tsx`) : elle est collante, donc
  * une ancre qui viserait le haut exact de la carte la ferait passer dessous.
@@ -88,7 +95,7 @@ export function Section({
   return (
     <section
       {...(id ? { id } : {})}
-      className="flex scroll-mt-19 flex-col gap-4 rounded-2xl border border-surface-neutral-lighter bg-surface-neutral-pale px-7 py-6"
+      className="flex scroll-mt-19 flex-col gap-4 rounded-2xl border border-surface-neutral-lighter bg-surface-neutral-pale px-5 py-5 md:px-7 md:py-6"
     >
       {children}
     </section>

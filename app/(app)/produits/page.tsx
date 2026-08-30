@@ -45,17 +45,24 @@ export const metadata = {
 /** Les gabarits de colonne, tenus en un seul endroit pour que l'en-tête et
  *  les lignes ne puissent pas diverger.
  *
- *  **Toute ligne tient sur une ligne** : un nom de produit long se coupe
- *  (`truncate`) au lieu de passer à la ligne, et les colonnes courtes ne se
- *  replient pas (`whitespace-nowrap`). La hauteur de ligne devient constante,
- *  ce qui est ce qu'on demande à une liste qu'on balaie. « Accompagnements »
- *  reçoit la largeur nécessaire à « Aucun accompagnement » ; elle est prise
- *  sur la colonne « Produit », seule colonne élastique. */
+ *  **Dès `xl`, toute ligne tient sur une ligne** : un nom de produit long se
+ *  coupe (`truncate`) au lieu de passer à la ligne, et les colonnes courtes ne
+ *  se replient pas (`whitespace-nowrap`). La hauteur de ligne devient
+ *  constante, ce qui est ce qu'on demande à une liste qu'on balaie.
+ *  « Accompagnements » reçoit la largeur nécessaire à « Aucun accompagnement » ;
+ *  elle est prise sur la colonne « Produit », seule colonne élastique.
+ *
+ *  **Sous `xl`, la ligne se replie, et la phrase ci-dessus cesse de valoir**
+ *  (T7.6). Les trois colonnes fixes totalisent 512 px, gouttières comprises
+ *  560 : sous ce seuil elles étaient **rognées** par l'`overflow-hidden` de la
+ *  carte, pas rétrécies. Le nom prend alors sa propre ligne (`w-full`), les
+ *  trois autres se rangent à sa suite à la largeur de leur contenu. Aucune
+ *  valeur n'est inventée : les mêmes nombres passent derrière un palier. */
 const COLUMN = {
-  name: "min-w-0 flex-1 truncate",
-  entity: "w-40 flex-none truncate",
-  count: "w-52 flex-none whitespace-nowrap",
-  freshness: "w-36 flex-none text-right whitespace-nowrap",
+  name: "w-full min-w-0 truncate xl:w-auto xl:flex-1",
+  entity: "flex-none truncate xl:w-40",
+  count: "flex-none whitespace-nowrap xl:w-52",
+  freshness: "flex-none text-right whitespace-nowrap xl:w-36",
 } as const;
 
 export default async function ProductsPage({

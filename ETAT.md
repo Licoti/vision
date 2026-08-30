@@ -2,12 +2,12 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 30/08/2026, après T7.5. Dernier balayage : découpage de C7. **Le fichier
-dépasse les 250 lignes de la règle 5 — 490 au 30/08/2026** ; le balayage appartient à la session de
+**Dernière mise à jour :** 30/08/2026, après T7.6. Dernier balayage : découpage de C7. **Le fichier
+dépasse les 250 lignes de la règle 5 — 514 au 30/08/2026** ; le balayage appartient à la session de
 découpage de C8.
 **Chantier en cours :** **C7 — Finitions**, dix tickets, découpés dans `tickets-C7.md`. **Dernier
 chantier du POC** — `docs/05` §5 n'en a pas de huitième.
-**Ticket suivant :** **T7.6 — Petits écrans.**
+**Ticket suivant :** **T7.7 — Accessibilité : clavier, focus, contraste, titres.**
 
 ---
 
@@ -24,7 +24,7 @@ chantier du POC** — `docs/05` §5 n'en a pas de huitième.
 | TD — Dette technique et couche de présentation | TD.1 → TD.6 | **terminé** |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
-| C7 — Finitions | T7.1 → T7.10 | **en cours** — T7.1 → T7.5 livrés |
+| C7 — Finitions | T7.1 → T7.10 | **en cours** — T7.1 → T7.6 livrés |
 | C8 — après le POC | **à découper** | à faire |
 
 ---
@@ -185,6 +185,21 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   **Cinq énoncés faux corrigés là où la fiche en nommait trois**, dont un **servi dans le HTML** —
   écart d'une ligne à « commentaires seuls », assumé. Ni migration, ni requête, ni action, ni droit ;
   **aucun test neuf, et c'est le régime des reprises de rendu** — 1 402 tests, inchangés.
+- **T7.6 — petits écrans, le 30/08/2026.** Le produit n'avait jamais été mesuré hors du bureau, et
+  la mesure a nommé le défaut avant le code : **19 formes de page sur 31 en défaut à 375 px**, 6 à
+  768, aucune à 1440 — et sur `/administration`, **26 boutons « Options de… » de 270 à 382 px hors de
+  la carte qui les rogne**, c'est-à-dire *modifier*, *archiver* et *rétablir* présents dans le HTML
+  et inatteignables à l'écran. Les colonnes des quatre listes cèdent sous `xl`, les gouttières sous
+  `md`, la frise défile **dans son conteneur** (720 px de tracé dans 390) et deux planchers cessent
+  de s'imposer quand ils dépassent la place. **Le repli du socle n'atteignait pas `/equipe`** : un
+  `DrawerLink` en `flex` s'interpose entre `ListRow` et ses colonnes, si bien que la chaîne est
+  exportée (`LIST_ROW_FLEX`) plutôt que recopiée. **Trois fichiers du périmètre n'ont rien reçu** —
+  `page.tsx`, `panel.tsx`, `drawer.tsx` —, le tiroir rendant déjà 375 px dans une fenêtre de 375 ;
+  deux fichiers hors périmètre ont été touchés, la coquille et la frise. **Sonde mise en défaut par
+  remisage du ticket entier**, une neutralisation partielle ayant fait croire l'administration saine.
+  Le HTML servi est identique à toute largeur — **1 385 nœuds, aucune différence** —, et le dépôt ne
+  porte qu'**un seul** `hidden` responsive, sur un bandeau `aria-hidden`. Ni migration, ni requête,
+  ni action, ni droit ; **1 402 tests, inchangés**.
 - **Le journal de la fiche accompagnement est de nouveau replié — hors ticket, 29/08/2026.** Demande
   de l'humain : c'est une partie secondaire, dont le détail n'a pas à se lire au premier niveau. Le
   `<details>` retiré le 28/08 est rétabli dans la forme de T6.3 — `SectionHeader as="summary"` et sa
@@ -236,6 +251,12 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   par une **sonde de rendu serveur**. Restent à faire au clavier — la bascule au montage, `↓`/`↑`,
   `Entrée` qui retient sans soumettre, `Échap` qui ferme la liste **sans** fermer le tiroir, le clic
   extérieur, « Retirer ». → **T7.7.**
+- **La frise du produit défile désormais dans son conteneur, et ce conteneur n'est pas atteignable
+  au clavier.** T7.6 lui a donné `overflow-x-auto` — 720 px de tracé dans 390 à 768 px — sans
+  `tabindex="0"` ni `role`/`aria-label` : poser un attribut d'accessibilité est le geste de T7.7, pas
+  celui d'un ticket de mise en page, et les deux tickets se suivent. À la souris et au doigt le
+  défilement fonctionne ; **au clavier seul, la fin de l'axe est hors d'atteinte**. C'est le seul
+  conteneur défilant du dépôt. → **T7.7.**
 - **La coquille de navigation reste focalisable derrière le voile, sans JavaScript.** La page porte
   `inert`, la barre latérale vit dans le layout, et **l'obstacle technique a disparu en TD.2** : ce
   qui reste est un parcours clavier à faire. → **T7.7.**
@@ -418,10 +439,13 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   activités, étendue à `projet · type · période`, atténue sans éliminer : un renommage a laissé deux
   lignes en base de développement, l'ancienne orpheline — sans conséquence en production, où
   l'amorçage ne tourne pas. **Refermé pour les entités seules.** → **C8.**
-- **Deux gabarits de grille portent une dimension en dur, et c'est un arbitrage.**
-  `indicators.tsx:495` et `:585` disent à quelle largeur une carte cesse de tenir : un **point
-  d'arrêt de mise en page**, pas une valeur de thème (T1.6), hors de la clause 2 de
-  `spacingScaleLock`. T7.6 en posera d'autres. → **à reposer avec une grille au design system.**
+- **Les points d'arrêt de mise en page sont posés à la main, écran par écran, et c'est un
+  arbitrage.** Un point d'arrêt n'est pas une valeur de thème (T1.6) : il est hors de la clause 2 de
+  `spacingScaleLock`, et les deux gabarits de grille d'`indicators.tsx` le disaient déjà. **T7.6 a
+  fait passer le dépôt de 29 à 62 utilitaires responsives**, sur deux paliers seulement — `md` pour
+  les gouttières et les planchers, `xl` pour les colonnes de liste — mais chaque écran redit le sien,
+  et rien n'empêche un écran neuf d'en choisir un troisième.
+  → **à reposer avec une grille au design system.**
 - **La création d'un projet n'est pas atomique, et ne peut pas l'être.** `neon-http` n'a pas de
   transaction interactive — la couche n'a que `batch`. La parade est de tout confronter au domaine
   **avant** d'écrire et d'ordonner les ajouts avant les retraits (T3.6). Reste ouvert : une écriture

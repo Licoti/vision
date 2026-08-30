@@ -58,13 +58,17 @@ export const metadata = {
 };
 
 /** Les gabarits de colonne, tenus en un seul endroit pour que l'en-tête et
- *  les lignes ne puissent pas diverger. */
+ *  les lignes ne puissent pas diverger.
+ *
+ *  **Sous `xl`, la ligne se replie** (T7.6) : les trois colonnes fixes font
+ *  336 px, gouttières comprises 400, et elles étaient rognées avant de se
+ *  rétrécir. Le nom prend sa ligne, le reste suit. */
 const COLUMN = {
-  name: "min-w-0 flex-[1.4]",
-  product: "min-w-0 flex-1",
-  status: "w-28 flex-none",
-  team: "w-28 flex-none",
-  freshness: "w-28 flex-none text-right",
+  name: "w-full min-w-0 xl:w-auto xl:flex-[1.4]",
+  product: "min-w-0 xl:flex-1",
+  status: "flex-none xl:w-28",
+  team: "flex-none xl:w-28",
+  freshness: "flex-none text-right xl:w-28",
 } as const;
 
 /**

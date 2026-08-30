@@ -118,13 +118,21 @@ export const metadata = {
 };
 
 /** Les gabarits de colonne, tenus en un seul endroit pour que l'en-tête et
- *  les lignes ne puissent pas diverger. */
+ *  les lignes ne puissent pas diverger.
+ *
+ *  **C'est la liste la plus large du dépôt, et c'est elle qui a nommé le
+ *  défaut** (T7.6) : ses quatre colonnes fixes font 592 px, gouttières comprises
+ *  656, si bien qu'en dessous de ≈ 1 184 px la carte en rognait la fin. Le
+ *  libellé tombait à zéro et **le menu « … » disparaissait de l'écran en restant
+ *  dans le HTML** — modifier, archiver et rétablir devenaient inatteignables.
+ *  Sous `xl`, la ligne se replie ; l'`usage` reste rétrécissable, sa phrase
+ *  étant la seule de la ligne qui puisse s'allonger. */
 const COLUMN = {
-  label: "min-w-0 flex-1",
-  order: "w-24 flex-none",
-  usage: "w-72 flex-none",
-  state: "w-40 flex-none",
-  actions: "w-12 flex-none",
+  label: "w-full min-w-0 xl:w-auto xl:flex-1",
+  order: "flex-none xl:w-24",
+  usage: "min-w-0 xl:w-72 xl:flex-none",
+  state: "flex-none xl:w-40",
+  actions: "flex-none xl:w-12",
 } as const;
 
 /**

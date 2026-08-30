@@ -509,7 +509,11 @@ function RoadmapEntry({
         className={`h-2 w-2 flex-none rounded-full ${GROUP_TONE[groupKey]}`}
       />
 
-      <div className="min-w-55 flex-1">
+      {/* Le plancher de 220 px ne vaut qu'à partir de `md` (T7.6) : sous lui,
+          il dépassait à lui seul la largeur utile d'un téléphone, et le `li`
+          avait beau être `flex-wrap`, un enfant plus large que sa ligne
+          déborde au lieu de se replier. */}
+      <div className="min-w-0 flex-1 md:min-w-55">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <span className="text-md font-semibold text-content-neutral-darkest">
             {activity.typeLabel}

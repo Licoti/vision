@@ -8251,3 +8251,49 @@ tests de T7.4 passent **inchangés**. Ce que des tests n'auraient pas attrapé, 
 réversibles l'ont montré dans le HTML servi : `hasActivity` forcée à `false` fait apparaître la
 quatrième ancre **et** son `id`, et retirer l'`id` de `Section` sur « Ressources » fait tomber
 **cette ancre seule**, les deux autres restant valides.
+
+**T7.6 — une ligne n'est pas toujours son propre conteneur flex, et le repli posé sur le socle peut
+ne jamais l'atteindre.** `ListRow` a reçu `flex-wrap … xl:flex-nowrap` ; trois listes sur quatre ont
+cédé, `/equipe` non. Ses quatre colonnes ne sont pas filles de `ListRow` — un `DrawerLink` en `flex`
+les enveloppe, et c'est *lui* que le navigateur lit comme conteneur. **Un composant de socle ne
+gouverne que ses enfants directs**, et rien dans sa signature ne dit qu'un appelant s'est interposé.
+Découvert par la mesure alors que tout le reste était vert, jamais par la lecture. La chaîne est
+désormais exportée (`LIST_ROW_FLEX`) plutôt que recopiée, la leçon d'`ACTION_LINK` en TD.1.
+
+**T7.6 — le serveur de développement fait varier son propre rendu entre deux requêtes identiques.**
+Une comparaison d'empreintes entre une requête mobile et une requête bureau a conclu « diffère » sur
+les cinq écrans testés. C'était faux : deux `curl` **strictement identiques** sur `/administration`
+donnent déjà deux empreintes différentes. Le bruit vit dans les `<script>` injectés par Turbopack.
+La comparaison n'a de sens qu'après normalisation — scripts et gabarits retirés, classes et texte
+conservés et triés —, et elle donne alors 1 385 nœuds sans une différence. **Une empreinte qui
+diffère ne prouve rien tant que le bruit de fond n'a pas été mesuré.**
+
+**T7.6 — une sonde de débordement rapporte des faux positifs par construction, et il faut les nommer
+avant de les écarter.** La première version en a rapporté 180 pages. Deux causes, aucune réelle :
+`sr-only` clippe à 1 px, donc tout contenu masqué déclenche `scrollWidth > clientWidth` ; et un
+enfant de conteneur `overflow-x-auto` garde un `getBoundingClientRect()` qui sort de la fenêtre alors
+qu'il est correctement clippé et défilable. La sonde retenue ignore ces deux cas et cherche le
+défaut que la fiche nomme — **un geste dont un ancêtre rogneur non défilant coupe une partie**.
+
+**T7.6 — neutraliser une règle ne vaut mise en défaut que si l'on neutralise la règle entière.**
+Retirer le seul `LIST_ROW_FLEX` n'a fait tomber que trois écrans : l'autre moitié du mécanisme vit
+dans les gabarits de colonne des quatre pages, qui sous `xl` ne portent plus de largeur fixe. Une
+mise en défaut partielle aurait fait croire l'`/administration` saine alors qu'elle était le pire
+cas du dépôt. Le ticket entier a donc été remisé et le produit d'avant mesuré : 25 pages en défaut,
+**dont aucune à 1440 px** — c'est ce dernier chiffre qui prouve que la sonde mesure un défaut de
+petit écran et non un faux positif permanent.
+
+**T7.6 — écart au périmètre, dans les deux sens.** Deux fichiers touchés hors de la liste de la
+fiche : `app/(app)/layout.tsx`, dont la gouttière `px-10` prenait un cinquième d'un écran de 375, et
+`components/products/roadmap.tsx`, où vit la frise que l'« Attendu » nomme explicitement — la fiche
+ne listait que `components/projects/roadmap.tsx`. À l'inverse, trois fichiers du périmètre annoncé
+n'ont **rien reçu** : `components/ui/page.tsx`, `panel.tsx` et `drawer.tsx`. Mesuré plutôt que
+supposé — le tiroir rend 375 px dans une fenêtre de 375 grâce au `max-w-full` posé en T3.2, et aucun
+de ses gestes n'en sort. **Un périmètre annoncé est une hypothèse sur l'emplacement du défaut, pas
+une liste de fichiers à modifier.**
+
+**T7.6 — le décompte de la fiche était périmé.** « Seize utilitaires responsives dans tout le
+dépôt » a été mesuré à la session de découpage de C7 ; cinq tickets ont livré depuis, et le dépôt en
+portait **29** à l'ouverture de celui-ci. Il en porte 62. L'écart ne change rien au constat — ils
+sont toujours arrivés par hasard —, mais un chiffre cité dans une fiche vieillit entre le découpage
+et le ticket.

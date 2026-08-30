@@ -288,88 +288,105 @@ function Timeline({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="relative">
-        {/* Les filets verticaux, alignés sur les graduations — posés sur la
+      {/* **La frise défile chez elle** (T7.6), et c'est le seul endroit du dépôt
+          qui le fasse. Ce bloc n'est pas une liste qu'on replie : c'est un axe,
+          et un axe rétréci ne dit plus rien — mesuré à 768 px, les graduations
+          se chevauchaient (« sept.24mars25 ») et les bandes étaient réduites à
+          des éclats de quelques pixels contre le bord droit. Replier n'a pas de
+          sens sur une position ; on rend donc la largeur qu'il lui faut et on la
+          fait défiler **dans son conteneur**, plutôt que de laisser la page
+          entière partir de travers.
+
+          720 px = les 264 de la colonne d'identité, plus 432 de tracé. La ligne
+          de rattrapage reste dehors : elle se lit sans l'axe.
+
+          Sans `tabindex` ni `role` : un conteneur défilant devrait être
+          atteignable au clavier, et c'est un attribut d'accessibilité — donc
+          T7.7, qui pose les attributs, et non ce ticket, qui pose la mise en
+          page. Le point est consigné pour elle. */}
+      <div className="overflow-x-auto">
+        <div className="relative min-w-180">
+          {/* Les filets verticaux, alignés sur les graduations — posés sur la
             seule zone de tracé, jamais sous la colonne des libellés. Ils sont
             décoratifs : la position se lit sur les graduations écrites. */}
-        <div
-          aria-hidden="true"
-          className={`pointer-events-none absolute inset-y-0 right-0 ${AXIS_LEFT}`}
-        >
-          {ticks.map((tick) => (
-            <div
-              key={tick.month}
-              className="absolute inset-y-0 w-px bg-surface-neutral-lightest"
-              style={{ left: `${tick.left}%` }}
-            />
-          ))}
-        </div>
-
-        {/* ---- L'en-tête d'axe : son filet, ses graduations ---- */}
-        <div className="flex gap-6">
-          <div className={`${IDENTITY_WIDTH} flex-none`} />
-          <div className="relative h-9 min-w-0 flex-1">
-            <div className="absolute inset-x-0 bottom-5 h-px bg-surface-neutral-lighter" />
+          <div
+            aria-hidden="true"
+            className={`pointer-events-none absolute inset-y-0 right-0 ${AXIS_LEFT}`}
+          >
             {ticks.map((tick) => (
-              <span
+              <div
                 key={tick.month}
-                className={`absolute bottom-0 whitespace-nowrap text-xs text-content-neutral-base ${TICK_ANCHOR[tick.anchor]}`}
+                className="absolute inset-y-0 w-px bg-surface-neutral-lightest"
                 style={{ left: `${tick.left}%` }}
-              >
-                {formatMonthTick(tick.month)}
-              </span>
+              />
             ))}
           </div>
-        </div>
 
-        {/* ---- Une ligne par accompagnement de la fenêtre ----
+          {/* ---- L'en-tête d'axe : son filet, ses graduations ---- */}
+          <div className="flex gap-6">
+            <div className={`${IDENTITY_WIDTH} flex-none`} />
+            <div className="relative h-9 min-w-0 flex-1">
+              <div className="absolute inset-x-0 bottom-5 h-px bg-surface-neutral-lighter" />
+              {ticks.map((tick) => (
+                <span
+                  key={tick.month}
+                  className={`absolute bottom-0 whitespace-nowrap text-xs text-content-neutral-base ${TICK_ANCHOR[tick.anchor]}`}
+                  style={{ left: `${tick.left}%` }}
+                >
+                  {formatMonthTick(tick.month)}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* ---- Une ligne par accompagnement de la fenêtre ----
 
             Chaque ligne **mène à sa page projet** — la règle de descente de
             `docs/06` §7 —, et la maquette n'y change rien : elle ne pose qu'un
             `title` sur la barre, mais une règle de navigation prime sur un
             dessin. Le contour de focus est celui de tout le produit
             (`*:focus-visible`, `app/globals.css`). */}
-        {bands.map((band) => {
-          const placement = periodPlacement(band.left, band.width);
+          {bands.map((band) => {
+            const placement = periodPlacement(band.left, band.width);
 
-          return (
-            <Link
-              key={band.project.id}
-              href={ROUTES.project(band.project.id)}
-              className="flex items-center gap-6 border-t border-surface-neutral-lighter py-4"
-            >
-              <div className={`${IDENTITY_WIDTH} flex-none`}>
-                <ProjectIdentity project={band.project} />
-              </div>
+            return (
+              <Link
+                key={band.project.id}
+                href={ROUTES.project(band.project.id)}
+                className="flex items-center gap-6 border-t border-surface-neutral-lighter py-4"
+              >
+                <div className={`${IDENTITY_WIDTH} flex-none`}>
+                  <ProjectIdentity project={band.project} />
+                </div>
 
-              {/* **La période est écrite ici depuis le 28/08/2026**, au départ
+                {/* **La période est écrite ici depuis le 28/08/2026**, au départ
                   de la barre : c'est ce qui a permis de rendre 88 px à la
                   colonne de gauche, et c'est l'endroit où le temps se lit. La
                   zone n'est donc plus `aria-hidden` — seule la barre l'est,
                   elle qui reste **décorative** : le statut est écrit dans la
                   pastille, la période juste au-dessus d'elle, et la couleur ne
                   porte jamais seule (`docs/06` §11). */}
-              <div className="relative h-9 min-w-0 flex-1">
-                <span
-                  className={`absolute top-0 whitespace-nowrap text-xs text-content-neutral-base ${placement.anchor}`}
-                  style={{ left: placement.left }}
-                >
-                  {formatPeriodShort(
-                    band.project.startedOn,
-                    band.project.expectedEndOn,
-                  )}
-                </span>
-                <div
-                  aria-hidden="true"
-                  className={`absolute top-6 h-2 rounded-full ${BAND_BG[band.project.statusNature]}`}
-                  style={{ left: `${band.left}%`, width: `${band.width}%` }}
-                />
-              </div>
-            </Link>
-          );
-        })}
+                <div className="relative h-9 min-w-0 flex-1">
+                  <span
+                    className={`absolute top-0 whitespace-nowrap text-xs text-content-neutral-base ${placement.anchor}`}
+                    style={{ left: placement.left }}
+                  >
+                    {formatPeriodShort(
+                      band.project.startedOn,
+                      band.project.expectedEndOn,
+                    )}
+                  </span>
+                  <div
+                    aria-hidden="true"
+                    className={`absolute top-6 h-2 rounded-full ${BAND_BG[band.project.statusNature]}`}
+                    style={{ left: `${band.left}%`, width: `${band.width}%` }}
+                  />
+                </div>
+              </Link>
+            );
+          })}
 
-        {/* ---- Les repères : une activité porteuse d'un résultat ----
+          {/* ---- Les repères : une activité porteuse d'un résultat ----
 
             Sur leur propre ligne, comme dans le croquis de `docs/03` §7 : ce
             sont les « activités marquantes positionnées sur l'axe ». Une
@@ -380,39 +397,40 @@ function Timeline({
             L'intitulé est porté deux fois — `title` pour le survol, `sr-only`
             pour l'assistance, un `title` seul n'étant pas exposé de façon
             fiable sur un élément sans contenu. */}
-        {SHOW_MILESTONES && marks.length > 0 ? (
-          <div className="flex items-center gap-6 border-t border-surface-neutral-lighter py-4">
-            <div
-              className={`${IDENTITY_WIDTH} flex-none text-xs text-content-neutral-base`}
-            >
-              Activités porteuses d&apos;un résultat
-            </div>
-            <div className="relative h-4 min-w-0 flex-1">
+          {SHOW_MILESTONES && marks.length > 0 ? (
+            <div className="flex items-center gap-6 border-t border-surface-neutral-lighter py-4">
               <div
-                aria-hidden="true"
-                className="absolute inset-x-0 top-1/2 h-px bg-surface-neutral-lighter"
-              />
-              {marks.map((milestone) => (
-                <span
-                  key={milestone.id}
-                  title={milestoneTitle(milestone)}
-                  className="absolute top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-surface-secondary-dark"
-                  style={{
-                    left: `${monthMark(window, milestone.measuredOn)}%`,
-                  }}
-                >
-                  <span className="sr-only">{milestoneTitle(milestone)}</span>
-                </span>
-              ))}
+                className={`${IDENTITY_WIDTH} flex-none text-xs text-content-neutral-base`}
+              >
+                Activités porteuses d&apos;un résultat
+              </div>
+              <div className="relative h-4 min-w-0 flex-1">
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-x-0 top-1/2 h-px bg-surface-neutral-lighter"
+                />
+                {marks.map((milestone) => (
+                  <span
+                    key={milestone.id}
+                    title={milestoneTitle(milestone)}
+                    className="absolute top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-surface-secondary-dark"
+                    style={{
+                      left: `${monthMark(window, milestone.measuredOn)}%`,
+                    }}
+                  >
+                    <span className="sr-only">{milestoneTitle(milestone)}</span>
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        {bands.length === 0 ? (
-          <BlockNote className="border-t border-surface-neutral-lighter py-6 text-center">
-            Aucun accompagnement sur cette période.
-          </BlockNote>
-        ) : null}
+          {bands.length === 0 ? (
+            <BlockNote className="border-t border-surface-neutral-lighter py-6 text-center">
+              Aucun accompagnement sur cette période.
+            </BlockNote>
+          ) : null}
+        </div>
       </div>
 
       {hidden > 0 ? (

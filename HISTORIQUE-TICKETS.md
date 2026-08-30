@@ -5205,3 +5205,116 @@ en `text/plain`.
 **Aucun test neuf, et c'est délibéré** : le diff ne déplace que du rendu et des commentaires. Ni
 migration, ni dépendance, ni requête. **1 402 tests, inchangés**, `tsc` et `eslint --max-warnings=0`
 au vert.
+
+---
+
+## T7.6 — Petits écrans — 30/08/2026
+
+**Objectif** — `docs/06` §11 : *conception pour le bureau, lisible sur tablette et mobile sans être
+optimisée pour eux. Aucune fonctionnalité réservée à un format.*
+
+### Ce que l'application faisait, mesuré avant d'être décrit
+
+Le produit d'avant ce ticket a été **mesuré au navigateur** sur les trois largeurs, et non supposé.
+À 375 px, **dix-neuf formes de page sur trente et une étaient en défaut**, dont onze où la page
+entière défilait latéralement — `/produits` poussait le document à **559 px dans une fenêtre de
+375**. À 768 px, six restaient en défaut.
+
+Le pire n'était pas le défilement, et c'est ce que la mesure a appris : sur `/administration`, **les
+vingt-six boutons « Options de… » se tenaient de 270 à 382 px hors de la carte qui les rogne**. La
+liste porte `overflow-hidden` pour son rayon ; les colonnes fixes du référentiel « métiers » font
+592 px, gouttières comprises 656, et ce qui dépassait n'était **pas rétréci mais coupé**. *Modifier*,
+*archiver* et *rétablir* étaient présents dans le HTML et **inatteignables à l'écran** — exactement
+la « fonctionnalité réservée à un format » que le document refuse. À 768 px aussi, où la barre
+latérale reprend ses 248 px et où le contenu ne gagne rien.
+
+### Le geste : replier, jamais retirer
+
+**Les colonnes cèdent sous `xl`.** Les quatre listes — produits, projets, équipe, administration —
+gardent leurs gabarits au pixel près au-dessus du palier ; en dessous, la ligne se replie et chaque
+colonne prend sa place à la suite. **Aucune valeur n'est inventée : les mêmes nombres passent
+derrière un palier.** `xl` et non `md`, et c'est mesuré : à 768 px la barre latérale reprend sa
+colonne, si bien que le contenu utile n'a que 440 px — les quatre listes ne tiennent réellement qu'à
+partir de `xl`.
+
+**Le bandeau de colonnes se masque, et c'est le seul élément qui disparaisse.** Il est
+`aria-hidden="true"` depuis T2.2, les lignes portant leurs propres `sr-only` : un bandeau de colonnes
+n'a aucun sens en face de lignes repliées. **Rien d'interactif ne disparaît nulle part**, et c'est
+tout le critère du ticket.
+
+**La frise défile chez elle**, et c'est le seul conteneur défilant du dépôt. Un axe rétréci ne dit
+plus rien : mesuré à 768 px, ses graduations se chevauchaient (« sept.24mars25 ») et les bandes se
+réduisaient à des éclats contre le bord droit. **Replier n'a pas de sens sur une position** — on lui
+rend donc les 720 px qu'il lui faut (264 d'identité, 432 de tracé) et on le fait défiler dans son
+conteneur plutôt que d'emporter la page.
+
+**Les gouttières cèdent sous `md`** — `Section`, `Block`, et la zone de contenu de la coquille. Sur
+un téléphone, les 80 px de `px-10` prennent un cinquième de l'écran pour du vide, quand c'est la
+largeur qui manque à tout ce que la page contient. **Le rythme intérieur ne bouge pas** : `gap-4`
+reste le pas de la carte de contenu à toute largeur. Le ticket rend de la largeur, il ne redessine
+pas.
+
+**Deux planchers cessent de s'imposer quand ils dépassent la place.** Le `min-w-55` de la roadmap
+projet ne vaut qu'à partir de `md` — un enfant plus large que sa ligne déborde au lieu de se replier,
+`flex-wrap` ou non. Et la grille d'indicateurs passe de `minmax(300px,1fr)` à
+`minmax(min(300px,100%),1fr)` : aucun palier n'est nécessaire, la grille se mesure elle-même.
+
+### Le piège : une ligne n'est pas toujours son propre conteneur flex
+
+Le repli posé sur `ListRow` n'atteignait pas `/equipe`, et la mesure l'a montré quand tout le reste
+était vert. **Ses quatre colonnes ne sont pas filles de `ListRow`** : un `DrawerLink` en `flex` sans
+repli les enveloppe, et c'est *lui* le conteneur que le navigateur lit. À 375 px la ligne faisait
+395 px dans une carte de 333, et la dernière colonne était rognée.
+
+La chaîne de repli est donc **exportée** — `LIST_ROW_FLEX`, dans `components/ui/list.tsx` — et
+employée aux deux endroits. La recopier les aurait fait diverger au premier changement, ce
+qu'`ACTION_LINK` a déjà coûté une fois (TD.1).
+
+### Ce que le ticket n'a pas eu à changer, et pourquoi c'est un résultat
+
+`components/ui/page.tsx`, `panel.tsx` et `drawer.tsx` étaient au périmètre annoncé et **n'ont reçu
+aucune ligne**. Ce n'est pas un oubli, c'est une mesure : le tiroir porte `w-110 max-w-full` depuis
+T3.2, et les trois panneaux mesurés — créer une personne, créer un métier, créer une activité —
+rendent **375 px dans une fenêtre de 375**, c'est-à-dire la largeur pleine que l'« Attendu »
+demandait, avec **zéro geste hors du panneau** sur 7, 5 et 11 gestes. `PageHeader` était déjà
+`flex-wrap`. Une modification aurait été un changement sans défaut à corriger.
+
+### Vérification
+
+**Le critère se lit dans le HTML servi.** Le balisage de cinq écrans a été comparé entre une requête
+mobile (`Sec-CH-Viewport-Width: 375`, UA iPhone) et une requête bureau (1440, UA macOS) :
+**1 385 nœuds — classes et texte —, aucune différence**. Une première comparaison par empreinte avait
+conclu « diffère » sur les cinq : c'était faux, **le serveur de développement fait varier son propre
+rendu entre deux requêtes identiques**, ce qui a été établi avant d'en conclure quoi que ce soit.
+
+**Aucun geste n'est retiré, et cela se lit statiquement** : le dépôt entier ne porte **qu'un seul**
+utilitaire `hidden` responsive, sur le bandeau `aria-hidden` de `ListHeader`. Aucun élément
+interactif n'en porte.
+
+**La mise en page se mesure au navigateur, et c'est la seule discipline de ce ticket qui ne se lit
+pas dans le HTML.** Une sonde CDP a parcouru l'application — 31 formes de page découvertes par
+exploration des liens, panneaux compris — sur 375, 768 et 1440 px, en cherchant trois défauts : la
+page qui défile latéralement, un élément dont le bord droit sort de la fenêtre sans ancêtre
+défilant, et **un geste rendu inatteignable** parce qu'un ancêtre `overflow-hidden` le rogne.
+Résultat : **0 défaut sur 93 mesures**.
+
+**La sonde a été mise en défaut avant d'être crue**, et deux fois. Neutraliser le seul
+`LIST_ROW_FLEX` n'a fait tomber que les listes — insuffisant, la moitié du mécanisme vivant dans les
+gabarits de colonne. Le ticket entier a donc été remisé (`git stash`) et le produit d'avant mesuré :
+**25 pages en défaut, 19 à 375 px et 6 à 768 px, aucune à 1440 px**. Ce dernier point est ce qui
+donne sa valeur à la sonde — elle ne se déclenche pas sur le bureau, elle mesure donc bien un défaut
+de petit écran et non un faux positif permanent. Les gestes perdus qu'elle a nommés sont ceux que la
+fiche annonçait, boutons d'`ActionMenu` de l'administration compris.
+
+**Deux faux positifs ont été écartés après examen, pas par commodité** : `sr-only` déclenche
+`scrollWidth > clientWidth` par construction — son clip fait 1 px —, et un enfant de conteneur
+défilant garde un `getBoundingClientRect()` hors fenêtre alors qu'il est correctement clippé. La
+première sonde rapportait 180 pages en défaut, presque toutes pour ces deux raisons.
+
+**Ni migration, ni requête, ni action, ni droit** — le diff ne déplace que du rendu et des
+commentaires. **1 402 tests, inchangés**, `tsc`, `eslint --max-warnings=0` et `next build` au vert.
+
+**Écart au périmètre, assumé et déclaré** : `app/(app)/layout.tsx` et `components/products/roadmap.tsx`
+ne figuraient pas dans la liste de fichiers de la fiche, alors que l'« Attendu » nomme la frise —
+qui vit dans le second — et que la gouttière de la coquille vit dans le premier. Trois fichiers du
+périmètre annoncé n'ont en revanche rien reçu. Consigné au `JOURNAL-TECHNIQUE.md`.

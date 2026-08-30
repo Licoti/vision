@@ -21,6 +21,11 @@
  * (`ETAT.md`). Les maquettes en posent une ; l'écart est celui que `roadmap.tsx`
  * consignait déjà, il ne fait que changer de fichier.
  *
+ * **La gouttière cède sous `md`** (T7.6), comme celle de `Section` et pour la
+ * même raison : sur un téléphone, 24 px de chaque côté sont pris sur une largeur
+ * utile de 335, et les blocs de la page produit portent une frise et une grille
+ * de cartes qui n'ont rien de trop.
+ *
  * **Le composant ne connaît aucun droit.** L'action arrive en `ReactNode`, déjà
  * décidée par l'appelant — la règle de `PageHeader` et de `SectionHeader`.
  */
@@ -50,7 +55,7 @@ export function Block({
 }) {
   return (
     <section
-      className={`flex flex-col gap-5 rounded-3xl border p-6 ${TONE[tone]}`}
+      className={`flex flex-col gap-5 rounded-3xl border p-5 md:p-6 ${TONE[tone]}`}
     >
       {children}
     </section>

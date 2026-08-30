@@ -76,7 +76,12 @@ import { Button, buttonClass } from "@/components/ui/button";
 import { DrawerHost, DrawerLink } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { borderOf, CONTROL, CONTROL_TEXT } from "@/components/ui/form-field";
-import { List, ListHeader, ListRow } from "@/components/ui/list";
+import {
+  LIST_ROW_FLEX,
+  List,
+  ListHeader,
+  ListRow,
+} from "@/components/ui/list";
 import { Page, PageHeader } from "@/components/ui/page";
 import { Tag } from "@/components/ui/tag";
 import { loadTeamDrawer } from "./drawers";
@@ -112,12 +117,17 @@ export const metadata = {
 };
 
 /** Les gabarits de colonne, tenus en un seul endroit pour que l'en-tête et
- *  les lignes ne puissent pas diverger. */
+ *  les lignes ne puissent pas diverger.
+ *
+ *  **Sous `xl`, la ligne se replie** (T7.6). La personne et ses compétences
+ *  prennent chacune leur ligne : ce sont les deux seules colonnes dont le
+ *  contenu est une liste, et les serrer côte à côte sur un téléphone les rendait
+ *  illisibles l'une comme l'autre. */
 const COLUMN = {
-  person: "min-w-0 flex-[1.2]",
-  job: "min-w-0 flex-1",
-  availability: "w-52 flex-none",
-  skills: "min-w-0 flex-[1.6]",
+  person: "w-full min-w-0 xl:w-auto xl:flex-[1.2]",
+  job: "min-w-0 xl:flex-1",
+  availability: "flex-none xl:w-52",
+  skills: "w-full min-w-0 xl:w-auto xl:flex-[1.6]",
 } as const;
 
 /**
@@ -454,7 +464,13 @@ export default async function TeamPage({
                     value: row.id,
                   })}
                   request={{ kind: "personDetail", id: row.id }}
-                  className="flex min-w-0 flex-1 items-center gap-4"
+                  /* **C'est ce lien, et non la `ListRow`, qui est le conteneur
+                     flex de la ligne** : le repli doit donc se poser ici aussi,
+                     sans quoi la dernière colonne sort de la carte et s'y fait
+                     rogner (T7.6). `LIST_ROW_FLEX` est la chaîne de
+                     `components/ui/list.tsx`, pour que les deux ne divergent
+                     pas. */
+                  className={`${LIST_ROW_FLEX} min-w-0 flex-1`}
                 >
                   <span className={`${COLUMN.person} flex items-center gap-2`}>
                     <Avatar name={row.fullName} tone={row.kind} />

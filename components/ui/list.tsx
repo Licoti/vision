@@ -11,6 +11,24 @@
  * descente `Produit › Projet › Activité` ne comporte aucune rupture
  * (docs/06 §7).
  *
+ * **Sous `xl`, la ligne se replie** (T7.6). Les colonnes fixes des quatre
+ * listes totalisent de 256 à 656 px de largeur incompressible : sous ce seuil,
+ * un `flex` sans repli ne rétrécit pas, il **déborde** — et comme la carte porte
+ * `overflow-hidden` pour son rayon, les dernières colonnes étaient **rognées et
+ * non repliées**. Sur `/administration`, la colonne rognée était `actions`,
+ * c'est-à-dire le menu qui porte *modifier*, *archiver* et *rétablir* : un geste
+ * présent dans le HTML et inatteignable à l'écran, ce que `docs/06` §11 refuse.
+ *
+ * Le repli le corrige sans rien retirer — chaque colonne prend sa place sur une
+ * ligne suivante. Le **bandeau**, lui, se masque : il est `aria-hidden` depuis
+ * T2.2, les lignes portant leurs propres `sr-only`, et un bandeau de colonnes
+ * n'a aucun sens en face de lignes repliées. **Rien d'interactif ne disparaît**,
+ * et c'est le seul critère du ticket.
+ *
+ * `xl` et non `md` : à 768 px la barre latérale reprend ses 248 px, si bien que
+ * le contenu n'y gagne rien. Le palier est celui au-dessus duquel les quatre
+ * listes tiennent réellement — mesuré, pas supposé.
+ *
  * **`flush` retire la carte, jamais les lignes** (17/08/2026) : une liste posée
  * dans un `Block` de la page produit n'a pas à porter sa propre surface, son
  * filet et son rayon — une carte dans une carte est le défaut visuel que la
@@ -57,12 +75,27 @@ export function ListHeader({ children }: { children: ReactNode }) {
   return (
     <div
       aria-hidden="true"
-      className="flex gap-4 bg-surface-neutral-lightest px-5 py-3 text-2xs font-semibold text-content-neutral-base uppercase"
+      className="hidden gap-4 bg-surface-neutral-lightest px-5 py-3 text-2xs font-semibold text-content-neutral-base uppercase xl:flex"
     >
       {children}
     </div>
   );
 }
+
+/**
+ * Le rythme de repli d'une ligne, **exporté parce qu'une ligne n'est pas
+ * toujours son propre conteneur flex** (T7.6).
+ *
+ * Sur `/equipe`, les quatre colonnes ne sont pas filles de `ListRow` : un lien
+ * de panneau les enveloppe, et c'est *lui* le conteneur flex que le navigateur
+ * lit. Le repli posé ici ne les atteignait donc pas — mesuré à 375 px, la ligne
+ * faisait 395 px dans une carte de 333 et **la dernière colonne était rognée**
+ * par l'`overflow-hidden` du rayon. Poser la chaîne à deux endroits l'aurait
+ * fait diverger au premier changement, ce qu'`ACTION_LINK` a déjà coûté une
+ * fois (TD.1) : on l'exporte.
+ */
+export const LIST_ROW_FLEX =
+  "flex flex-wrap items-center gap-x-4 gap-y-2 xl:flex-nowrap";
 
 /** Une ligne. Avec `href`, la ligne entière est la cible du clic. */
 export function ListRow({
@@ -76,7 +109,7 @@ export function ListRow({
   children: ReactNode;
 }) {
   const shared = [
-    "flex items-center gap-4 border-t border-surface-neutral-lighter py-4 text-sm text-content-neutral-dark",
+    `${LIST_ROW_FLEX} border-t border-surface-neutral-lighter py-4 text-sm text-content-neutral-dark`,
     flush ? "" : "px-5",
   ]
     .filter(Boolean)

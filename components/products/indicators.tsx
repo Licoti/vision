@@ -531,8 +531,13 @@ export function Indicators({
           }
         />
 
+        {/* `min(300px,100%)` et non `300px` (T7.6) : une piste de 300 px dans un
+            conteneur qui en fait 255 ne rétrécit pas, elle déborde — et la carte
+            sortait de l'écran sur un téléphone. Le minimum cesse de s'imposer
+            quand il dépasse la place ; aucun palier n'est nécessaire, la grille
+            se mesure elle-même. */}
         {others.length > 0 ? (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(300px,100%),1fr))] gap-4">
             {others.map((indicator) => (
               <IndicatorCard
                 key={indicator.id}
