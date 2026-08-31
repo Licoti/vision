@@ -8394,3 +8394,280 @@ qu'une note absente.
 
 **Pour T7.7** : le `<summary>` du repli est un point d'arrêt clavier neuf sur la vue d'ensemble, et
 le seul de cet écran. Il porte le `*:focus-visible` global, sans style propre.
+
+---
+
+## Équipe — reprise d'ergonomie, direction B, hors ticket (31/08/2026)
+
+Sept gestes sur `/equipe`, demandés par l'humain après un canevas de maquettes qui a porté un
+diagnostic d'écran — **dix-sept frictions, toutes lues dans leur fichier à leur ligne** — et trois
+directions comparées côte à côte. La direction B a été retenue : *la question à gauche, les
+personnes à droite.* **Explicitement dispensé de ticket**, comme les quatre reprises du 28 et du
+29/08. **La fiche en panneau est hors périmètre par consigne** : elle n'a pas reçu un caractère.
+
+`/equipe` était le dernier écran du POC jamais repris, et **le seul écran majeur conçu sans maquette
+de référence** — `docs/design/maquettes/vision.html` ne connaît que quatre entrées de navigation et
+l'ignore, `docs/06` §2 ne compte que six écrans, sans lui.
+
+### Ce qui a changé
+
+1. **Les cinq filtres passent dans un rail collant de 320 px** (`xl:sticky xl:top-9 xl:w-80`), la
+   forme retenue sur la vue d'ensemble le 29/08. `xl:items-start` sur la rangée est la **condition
+   technique** et non un réglage : un élément flex étiré sur toute la hauteur n'a rien à faire
+   glisser.
+2. **Les onze cases à cocher deviennent des pastilles**, et la chaîne est **extraite**
+   (ci-dessous). Puis, à la demande, **la case disparaît de la vue** et la pastille devient le
+   contrôle — la forme de la maquette —, avant de prendre un calibre serré (sections suivantes).
+3. **`PageHeader.facts` trouve son appelant**, après trois jours sans aucun dans le dépôt. Elle
+   porte deux `count` scopés sur `persons` — la taille du domaine, qui ne bouge pas avec les
+   filtres. Le compteur qui bouge est resté au-dessus de la liste, avec son `aria-live`.
+4. **La ligne de synthèse cesse de répéter l'état des contrôles.** Elle énumérait « Métier :
+   UX Research » quand le `select` l'affichait déjà ; c'est le rail qui le dit maintenant.
+5. **Le métier descend sous le nom**, avec « côté entité » — **la formulation exacte de
+   `PersonDetailHeader`**, si bien que la ligne et la fiche qualifient une personne de la même
+   façon. Il gagne `content-neutral-dark` : « côté entité » était la mention la plus faible de la
+   ligne alors qu'elle décide de trois choses.
+6. **La colonne des compétences se borne à deux étiquettes, puis « +N ».**
+7. **Un chevron annonce que la ligne ouvre un panneau**, et non un écran.
+
+### L'extraction était écrite d'avance, et par le fichier qu'elle vide
+
+`components/projects/project-form.tsx` portait `CHIP` sous un commentaire qui posait sa propre
+condition de sortie : *« C'est la quatrième écriture d'une pastille dans le dépôt […]. Aucune des
+trois n'est une case à cocher ; l'extraction se fera le jour où deux le seront. »* Le rail est la
+seconde. `CHECKBOX_CHIP` et `CHECKBOX_CHIP_INPUT` vivent donc dans `components/ui/checkbox-chip.ts`,
+sur le patron d'`ACTION_LINK` — **une constante et non un composant** : les deux appelants ne
+partagent ni `name`, ni `id`, ni `aria-describedby`.
+
+**L'effet sur le formulaire de projet a été mesuré, pas affirmé.** Le `<form>` servi de
+`/projets/nouveau` est **identique à l'octet près** avant et après : 28 043 octets contre 28 043,
+même `sha1` (`33fcf37c8e03`). Les seuls écarts de la page entière sont trois empreintes de chunk
+Turbopack et un `__next_r` par requête — aucun n'est du balisage.
+
+**Aucun couple de couleurs n'est neuf par la position**, et c'est ce qui a décidé de la forme du
+rail : les quatre mesures de la pastille sont prises sur `surface-neutral-pale`, et `Section` porte
+exactement ce fond. Un rail posé nu sur le fond de page en aurait créé quatre. Les quatre valeurs
+du 29/08 ont été **recalculées** et se retrouvent au centième : 17,87:1 · 3,88:1 · 15,14:1 ·
+13,65:1. La pastille mesure **47 px de haut**, lue au pixel dans le rendu (bords de filet à 534 et
+580, gouttière de 9 px jusqu'à la suivante) ; elle passera à 39 dans le geste suivant.
+
+### La pastille du rail perd sa case, et le rail y gagne 110 px
+
+Second geste du même jour, demandé sur la maquette : **les pastilles du rail n'ont pas de case
+visible.** `FILTER_CHIP` est une **seconde constante et non un drapeau sur la première**, et la
+divergence est voulue : dans un formulaire de saisie, une case visible dit « ceci est un contrôle de
+ce formulaire » ; dans un rail de filtres, elle n'a rien à distinguer, et onze cases alignées y sont
+du bruit. **Le formulaire de projet ne bouge donc pas d'un caractère.**
+
+**La case n'est pas retirée, elle est masquée** (`sr-only`) : c'est toujours elle qui porte l'état,
+qui part dans la requête, qui s'annonce à la voix, et qui déclenche `:has(:checked)`. `sr-only` et
+non `hidden` — ce dernier l'aurait sortie de l'arbre d'accessibilité **et** de l'ordre de
+tabulation, c'est-à-dire aurait retiré le filtre au clavier.
+
+**Trois conséquences, et aucune n'est cosmétique.**
+
+**1. La pastille devient le contrôle, donc son filet doit se voir.** La maquette le pose en
+`greyscale-250` : **mesuré à 1,65:1**, sous le seuil de 3:1 de WCAG 1.4.11 — un contour qu'on
+devine. Il reste `content-neutral-normal`, **3,88:1**. C'est le seul écart à la maquette, et il est
+mesuré. Les deux autres valeurs que la maquette pose pour l'état coché — fond `#f5f9ff`, texte
+`#1c1a50` — **sont exactement** `surface-primary-lightest` et `content-primary-dark` : rien à
+arbitrer.
+
+**2. Le focus change de porteur, et l'anneau a été vu peint.** L'anneau global de `globals.css` se
+serait peint sur la boîte d'un pixel de la case masquée, donc nulle part. Il est repris par la
+pastille en `has-[:focus-visible]:`, avec les **mêmes jetons** que la règle globale.
+**Vérifié dans la feuille servie puis dans le rendu**, et pas déduit : la règle compile
+(`outline-style: var(--tw-outline-style)` — enregistré `solid` par `@property` — et
+`outline-width: var(--number-2)`), et une sonde à feuille inlinée, focus programmatique, rend un
+anneau **creux** de `#196de3` : deux lignes pleines à 196 px en haut, deux en bas, 2 à 8 px sur les
+flancs, **55 px de haut** — les 47 de la pastille plus 2 de décalage et 2 d'épaisseur de chaque
+côté. Le premier jet de la sonde ne prouvait rien et a été refait : la feuille ne se chargeait pas
+depuis `file://` vers `http://localhost`, et la page rendue était **sans style**.
+
+**3. L'état coché perd son porteur non chromatique le plus franc.** La case cochée le portait. Il
+reste le passage de graisse **400 → 600** — la valeur de la maquette, et non le `500` de la pastille
+de saisie, choisi justement parce qu'il doit désormais porter seul ce que la case portait. Le fond,
+le filet et la couleur du texte le redoublent. **C'est plus faible qu'une case visible**, et c'est
+dit : une coche paraissant dans la pastille rendrait la différence entière, au prix d'un emplacement
+réservé sur les onze.
+
+**Le geste a un effet que personne n'attendait, et il est mesuré.** Sans leur case, les pastilles
+s'emboîtent deux par rang bien plus souvent : le rail tombe de **988 à 878 px**. La colonne de liste
+en fait 891. **Le rail cesse donc de porter la hauteur de la page** — le coût le plus visible de la
+direction B, celui que le canevas annonçait en toutes lettres, disparaît sans que la direction
+change. La pastille, elle, mesure toujours **47 px** (filets à 644 et 690 dans le rendu) : le
+rythme n'a pas bougé, seule la case est partie.
+
+### La pastille du rail prend un calibre serré, et 44 px se révèle n'être écrit nulle part
+
+Quatrième geste, demandé — et **il a commencé par une correction d'énoncé**. Deux commentaires du
+dépôt, écrits le jour même, disaient « le plancher de 44 px que T7.6 a imposé au reste du produit ».
+**C'était faux sur les deux moitiés** : T7.6 portait sur des colonnes rognées et ne dit rien des
+cibles, et le chiffre n'apparaît ni dans `docs/06` §11 — qui demande « navigation clavier complète,
+focus visible, contrastes conformes » et rien sur la taille des cibles — ni dans aucune fiche de
+ticket. Il vient de `project-form.tsx`, qui le nomme honnêtement pour ce qu'il est : *« le confort
+visé pour une cible »*. 44×44 est **WCAG 2.5.5, niveau AAA** ; le seuil **AA** est 2.5.8, à
+24×24 px. Les deux commentaires sont récrits.
+
+Sans cette vérification, la demande se serait heurtée à une règle inventée. Avec elle, elle est
+simplement légitime : `filterChipClass({ size })` prend la forme de `buttonClass({ variant })` —
+une fonction, parce qu'une constante par combinaison les multiplierait —, et `xs` rend **39 px**,
+mesurés au filet dans le rendu. **La cible ne se rétrécit que verticalement** : une pastille fait de
+100 à 250 px de large, et reste à plus d'une fois et demie le seuil AA sur son petit côté.
+
+**La taille du texte ne bouge pas**, ici comme sur la puce : `text-sm` vaut 14 px, et le nom d'une
+compétence est ce qu'on lit pour choisir. Seul le rembourrage cède — `px-4 py-3` devient
+`px-3 py-2`.
+
+**Le rail tombe de 878 à 814 px**, la colonne de liste en fait 859 : l'écart que la disparition des
+cases avait ouvert se creuse. Ce qui portait la hauteur de la page au premier jet — le rail — en est
+maintenant à **45 px de moins** que ce qu'il filtre.
+
+### La puce de liste prend un second calibre, et le retrait rejoint les contrôles qu'il vide
+
+Troisième et dernier geste du jour, demandé.
+
+**`Tag` reçoit `xs`, sur le patron de `SIZE` dans `avatar.tsx`** — un objet nommé, une
+interpolation, le type dans les clés. Le calibre serré rogne le rythme vertical (`py-1` → `py-0.5`)
+et l'horizontal (`px-3` → `px-2`) : **la puce passe de 27 à 23 px**, mesuré au filet dans le rendu.
+La ligne à deux rangs de puces tombe de **88 à 84 px**, et la liste de **891 à 859**.
+
+**La taille du texte ne bouge pas, et c'est la seule chose qui ne se négociait pas.** `text-xs` vaut
+12 px ; « Intermédiaire » posé à côté d'une compétence est de l'information, pas un intitulé de
+rubrique. `text-2xs` aurait rendu 10 px — la taille des surtitres en capitales. Le couple de
+couleurs est donc inchangé, mesuré à 6,84:1, et **aucun couple n'est neuf par la position**.
+
+**Le calibre par défaut ne bouge pour personne, et c'est mesuré et non déduit.** `sm` porte les
+valeurs d'origine, et le calibre est interpolé **à la place exacte qu'occupaient `px-3 py-1`** — un
+suffixe aurait réordonné l'attribut `class` des neuf appelants antérieurs. Les trois puces
+d'approche servies sur une page d'accompagnement sont **identiques à l'octet près** avant et après.
+
+**Le retrait des filtres quitte l'en-tête des résultats pour le pied du rail.** Il vivait à l'autre
+bout de l'écran des contrôles qu'il vide : c'était la friction n° 4, refermée à moitié seulement —
+la ligne de synthèse avait cessé de répéter l'état des filtres, mais le geste qui les défait était
+resté avec elle. **Un lien et jamais un `<button type="reset">`** : celui-ci rétablirait les valeurs
+*par défaut* du formulaire, c'est-à-dire les filtres déjà appliqués — il ne ferait rien de visible.
+Ce qui remet à zéro est une adresse, `ROUTES.team` nue, et elle fonctionne sans JavaScript comme le
+reste du rail. **Il ne paraît que s'il a de quoi retirer** : un geste inerte posé en permanence sous
+le bouton d'envoi apprend à ne plus le lire. `ACTION_LINK_SM` est la constante du socle pour ce
+rang, et son commentaire nomme mot pour mot cet emploi — « Retirer tous les filtres ».
+
+**Éprouvé par l'URL** : trois filtres cumulés rendent « Aucune personne », l'adresse nue rend
+« 10 personnes », et le lien n'est servi que sur la première — zéro occurrence sans filtre, une
+avec.
+
+### Ce que la mesure a trouvé et que le code n'aurait pas dit
+
+**Le chevron était sous le seuil.** Écrit d'abord en `content-neutral-light`, il donnait
+**2,22:1** sur le fond de la ligne — un chevron qu'on devine, quand il est justement ce qu'il faut
+savoir voir (WCAG 1.4.11, 3:1 pour un composant). `content-neutral-base` le rétablit à **4,98:1**,
+et c'est le couple que « +N » porte déjà deux colonnes plus tôt : aucun jeton neuf. Le tiret de la
+colonne « Disponibilité » reste en `content-neutral-light` — lui ne porte rien, l'absence étant
+déjà écrite en toutes lettres par « côté entité ».
+
+**Deux défauts ne se voyaient qu'au rendu, et le HTML servi ne pouvait pas les dire.**
+(1) « +3 » posé en frère dans la boîte `flex-wrap` **partait seul sur un troisième rang** dès que
+les deux étiquettes remplissaient le premier — un nombre orphelin sous les valeurs qu'il complète.
+Il voyage désormais dans le même conteneur que la dernière étiquette. (2) Sous `xl`, la ligne se met
+en rangs et le chevron **tombait seul sur un cinquième rang**, glyphe sans objet ; il se masque,
+comme le bandeau de colonnes de `components/ui/list.tsx` et pour la même raison. Ce sont les
+**deuxième et troisième `hidden` responsives du dépôt**, tous trois sur du décor `aria-hidden` :
+rien d'interactif ne disparaît, le seul critère de T7.6.
+
+### Le résultat, mesuré au pixel
+
+Hauteurs de ligne servies à 1 440 px, lues dans les captures par détection des filets de
+séparation :
+
+| | avant | après |
+|---|---|---|
+| amplitude | **61 → 163 px** | **72 → 84 px** |
+| rapport | 2,67× | 1,17× |
+| hauteurs distinctes | cinq | trois, dont **huit lignes sur dix à 84** |
+| hauteur de la liste | 1 154 px | **859 px** (−295) |
+
+*(Les chiffres d'après sont ceux de l'écran achevé, calibre `xs` compris. Avant lui, la même mesure
+donnait 72 → 88 et une liste de 891 px.)*
+
+C'est la friction n° 6 du diagnostic, et elle se referme : la comparaison ligne à ligne que
+`components/ui/list.tsx` invoque en ouverture redevient possible.
+
+**Le coût de la direction était visible et annoncé, puis il est tombé** : le rail mesurait 988 px
+contre 891 à la colonne de liste, et portait donc la hauteur de la page. Les pastilles sans case
+l'ont ramené à **878** — la liste redevient la plus haute. Ce qui reste du coût est la largeur : la
+colonne des compétences est passée de ~380 à ~288 px, et c'est elle qui impose la borne à deux
+étiquettes.
+
+**Sonde mise en défaut avant d'être crue** : `LIST_SKILLS_SHOWN` porté à 99 fait tomber « +N » de
+8 à 0 et monter les étiquettes servies de 18 à 35 — **et rien d'autre ne bouge** : chevrons,
+pastilles du rail et lignes restent aux mêmes décomptes.
+
+**Le débordement à 375 px n'est pas une régression** : la capture d'avant le diff déborde
+identiquement, et jusque dans la barre de navigation, que ce diff ne touche pas. C'est un artefact
+de Chrome sans émulation mobile, pas un défaut de la page.
+
+### Un écart, et il touche un interdit écrit
+
+**« +3 » est un décompte de compétences sur une ligne, et `tickets-C5bis.md` T5bis.2 l'interdit
+noir sur blanc** : *« Aucun décompte de compétences sur une ligne, aucun niveau agrégé, aucun tri
+autre que le nom (garde-fous 2 et 3). »*
+
+Ce que l'interdit visait est un nombre qui **qualifie** une personne — un total présenté comme la
+mesure d'un profil. « +3 » est une marque de troncature, la parenté du « Voir plus » de la vue
+d'ensemble : il dit qu'il y a une suite et où la lire, pas ce que vaut quelqu'un. Mais il reste un
+nombre posé sur une ligne, et deux lignes voisines portant « +3 » et « +1 » se comparent —
+c'est-à-dire exactement le geste que le garde-fou 2 existe pour empêcher.
+
+**L'écart est donc réel et il n'est pas tranché ici.** Il a été rendu visible sur les planches du
+canevas et la direction a été retenue avec lui. Le remplaçant, s'il est refusé, coûte une ligne :
+une marque non chiffrée — « … » ou « et plus » — qui dit la suite sans la compter. Point ouvert
+dans `ETAT.md`.
+
+**Le commentaire de la colonne a été récrit plutôt que laissé faux** : il promettait « le profil
+entier », et la ligne en montre le début. Ce qui reste tenu, et c'est le garde-fou lui-même : ce ne
+sont **jamais les compétences qui ont filtré** — la seconde lecture de `listTeam` ignore les
+filtres, la requête rend le profil dans son ordre, et la ligne en prend la tête.
+
+### Ce que la reprise ne referme pas
+
+- **Le rail ne se détache d'aucun fond**, et c'est le manque du design system, pas ce diff : filet
+  `surface-neutral-lighter` à **1,18:1** sur le fond de page, surface à **1,03:1**. C'est la
+  propriété de **toutes** les `Section` du produit. Aucun jeton ne s'invente (règle 2, et le dépôt
+  en compte déjà huit qu'il n'a pas inventés).
+- **Les filtres ne survivent toujours pas à un aller-retour par la navigation principale**
+  (`docs/06` §9). Nommé au canevas comme hors d'atteinte, et il l'est resté.
+- **La troisième pastille de disponibilité n'est toujours jamais rendue.** Trouvé pendant le
+  diagnostic : « Indisponible » demande **trois** accompagnements vivants (`lib/availability.ts`),
+  et la fixture n'en donne au plus **un** par personne — deux accompagnements en cours, six
+  personnes entre eux. Le commentaire de `scripts/seed.ts` promet pourtant « les trois valeurs
+  représentées, sans quoi la pastille n'aurait que deux de ses trois couleurs à montrer » : la
+  phrase datait de l'époque où la disponibilité se **semait**, avant qu'elle ne se déduise le
+  28/08. C'est une fixture à compléter, pas un défaut de rendu — hors périmètre d'une reprise
+  d'ergonomie.
+
+### Un test intermittent, rencontré et non expliqué
+
+**`lib/queries/activities.test.ts` › « sans exception, un type archivé n'est proposé à personne » a
+échoué une fois sur six exécutions de la suite**, le 31/08/2026, pendant cette reprise. Il passe
+seul (55/55), et la suite entière repasse à **1 405/1 405** au tour suivant, serveur de
+développement arrêté.
+
+**Ce que le diff ne peut pas atteindre** : ce fichier importe `lib/db/client`, `lib/db/scoped`,
+`lib/db/schema` et `./activities`, et rien d'autre. La reprise ne touche que du rendu —
+`app/(app)/equipe/page.tsx`, `components/projects/project-form.tsx`, `components/ui/tag.tsx` et un
+fichier de constantes neuf. Aucun n'est joignable depuis ce test.
+
+**L'explication évidente ne tient pas, et elle a été vérifiée avant d'être écrite.** L'hypothèse
+était une ligne restée archivée par une exécution interrompue — le test voisin « l'exception ne
+retient que celui-là » archive `liveTypeId` et le rétablit dans un `finally`, ce qu'un processus tué
+sauterait. Mais le `beforeAll` du fichier **crée un domaine neuf**, et les lectures sont scopées :
+l'état d'un domaine orphelin n'atteint pas celui-ci. **La cause reste inconnue**, et elle est
+consignée comme telle plutôt que devinée. Le point voisin déjà ouvert dans `ETAT.md` — deux fichiers
+de tests d'action qui nettoient sur `if (!f?.domainId) return` — décrit une fragilité de la même
+famille, sur d'autres fichiers.
+
+**Ni migration, ni action, ni droit, ni dépendance.** Deux lectures de plus, toutes deux des `count`
+scopés. **Aucun test neuf, et c'est le régime des reprises de rendu** (T7.5) : le contrat de la
+liste est inchangé, et les 1 405 tests existants le prouvent. Le conjonctif a été éprouvé par
+l'URL — `?competence=<UX Research>` rend 4 lignes, `?competence=<Accessibilité>` en rend 3, les deux
+ensemble en rendent **1**, et une compétence hors domaine n'en filtre aucune.

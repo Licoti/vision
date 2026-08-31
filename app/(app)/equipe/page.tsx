@@ -16,13 +16,63 @@
  * **Les compétences se cumulent : l'une *et* l'autre.** Le conjonctif est la
  * question qui fonde le chantier ; un `or` y répondrait à côté.
  *
+ * ---
+ *
+ * **Reprise d'ergonomie du 31/08/2026 — direction B, « la question à gauche,
+ * les personnes à droite ».** Retenue par l'humain sur un canevas de maquettes
+ * qui portait un diagnostic de dix-sept frictions et trois directions. Ce que
+ * la direction change, et pourquoi :
+ *
+ * 1. **Les cinq filtres passent dans un rail collant de 320 px**, la forme
+ *    retenue sur la vue d'ensemble le 29/08. Ils occupaient jusqu'ici 138 px en
+ *    tête d'écran, **avant la première personne**, et ne se repliaient jamais :
+ *    sur huit personnes, le filtre prenait plus de hauteur que ce qu'il
+ *    filtrait. Dans un rail, rien ne se replie et rien ne se cherche.
+ * 2. **Les onze cases à cocher deviennent des pastilles** —
+ *    `FILTER_CHIP`, la variante sans case de la pastille extraite du
+ *    formulaire de projet — lequel avait posé la condition de sa propre
+ *    extraction. Les cases natives mesuraient 16 px de côté ; elles sont
+ *    désormais masquées, et c'est la pastille — 39 px de haut au calibre `xs`,
+ *    de 100 à 250 de large — qui est le contrôle.
+ * 3. **Le décompte du domaine monte en ligne de faits.** `PageHeader.facts`
+ *    attendait un appelant depuis le 28/08. Elle porte ce qui ne bouge pas avec
+ *    les filtres — la taille du centre et le nombre d'intervenants côté entité ;
+ *    le compteur de résultats, lui, reste au-dessus de la liste, où il change.
+ * 4. **La ligne de synthèse cesse de répéter l'état des contrôles**, et ne porte
+ *    plus que le décompte. Elle énumérait « Métier : UX Research » quand le
+ *    `select` l'affichait déjà ; c'est le rail qui dit ce qui est actif — un
+ *    `select` posé, une pastille cochée —, et **c'est au pied du rail que le
+ *    retrait a rejoint les contrôles qu'il vide**.
+ * 5. **Le métier descend sous le nom**, avec la mention « côté entité » — la
+ *    formulation exacte de `PersonDetailHeader`, si bien que la ligne et la
+ *    fiche disent la même chose de la même façon. Il gagne
+ *    `content-neutral-dark` au passage : « côté entité » était jusqu'ici la
+ *    mention la plus faible de la ligne alors qu'elle décide de trois choses.
+ * 6. **La colonne des compétences se borne à deux étiquettes, puis « +N ».**
+ *    Elle en portait jusqu'à cinq, sur trois rangs : la hauteur d'une ligne
+ *    variait de 58 à 122 px, et c'est la comparaison ligne à ligne — celle qui
+ *    fonde la liste dense (`components/ui/list.tsx`) — qui tombait.
+ * 7. **Un chevron annonce que la ligne ouvre un panneau**, et non un écran :
+ *    sur `/projets`, une ligne du même dessin emmène ailleurs.
+ *
+ * **Ce que la direction coûte, et qui était nommé au canevas** : le rail prend
+ * 320 px à une liste dont les colonnes étaient déjà serrées, et « +3 » cache ce
+ * que la ligne portait. Rien n'est perdu — la fiche porte le profil entier, et
+ * c'est elle qui a la place de l'écrire.
+ *
+ * **Ce que la reprise ne touche pas** : la fiche en panneau, hors périmètre par
+ * consigne. Aucune requête, aucune action, aucun droit, aucune migration.
+ *
+ * ---
+ *
  * Un identifiant qui ne désigne rien dans le domaine est ignoré, jamais
  * affiché : inventer un libellé à partir d'un paramètre serait donner du crédit
  * à ce qu'on n'a pas lu.
  *
  * **Aucun classement, aucun décompte de correspondance** (garde-fous 2 et 3) :
- * l'ordre reste le nom quelle que soit la recherche, et une ligne retenue
- * affiche son profil entier — jamais les seules compétences qui ont filtré.
+ * l'ordre reste le nom quelle que soit la recherche, et les compétences d'une
+ * ligne sont les premières **du profil**, dans l'ordre que la requête rend —
+ * jamais celles qui ont filtré.
  *
  * **Une ligne ouvre la fiche, et n'emmène sur aucun écran** (D29, T5bis.4) : il
  * n'y a pas de page personne et il n'y en aura pas — la fiche est un panneau sur
@@ -37,9 +87,7 @@
  *
  * **Le décompte d'exclusivité ne porte que sur les clés de panneau.** Les cinq
  * clés de filtre n'en sont pas : les faire compter fermerait la fiche dès qu'on
- * filtre, et les balayer à la fermeture défairait la recherche. Le décompte est
- * écrit d'avance pour les deux clés que T5bis.6 ajoutera, comme celui de la page
- * produit l'avait été pour `releve`.
+ * filtre, et les balayer à la fermeture défairait la recherche.
  *
  * **Les sorties du panneau conservent les filtres**, à la différence des deux
  * autres pages hôtes, dont l'URL nue n'efface rien : ici elle effacerait la
@@ -52,17 +100,11 @@
  * la lecture, elle, ne passe par aucun droit (D9). Ce n'est pas ce rendu qui
  * protège : les six actions redérivent le droit sur l'identifiant **reçu**.
  *
- * **Trois clés d'ouverture de plus** — `profil`, `maitrise`, `archiver` —, et
- * `personne` n'a pas bougé : ce sont **deux droits**, et une clé unique aurait
- * fait tomber la fiche avec le droit d'écrire. `competence` reste une clé de
- * filtre et n'est pas devenue une clé de panneau ; `lib/navigation.ts` dit
- * pourquoi.
- *
  * Aucune requête directe : tout passe par `session.db`, déjà scopé sur le
  * domaine courant. Règle 1.
  */
 
-import { asc, inArray } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -73,6 +115,10 @@ import {
 import { ACTION_LINK_SM } from "@/components/ui/action-link";
 import { Avatar } from "@/components/ui/avatar";
 import { Button, buttonClass } from "@/components/ui/button";
+import {
+  filterChipClass,
+  FILTER_CHIP_INPUT,
+} from "@/components/ui/checkbox-chip";
 import { DrawerHost, DrawerLink } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { borderOf, CONTROL, CONTROL_TEXT } from "@/components/ui/form-field";
@@ -83,11 +129,12 @@ import {
   ListRow,
 } from "@/components/ui/list";
 import { Page, PageHeader } from "@/components/ui/page";
+import { Section } from "@/components/ui/section";
 import { Tag } from "@/components/ui/tag";
 import { loadTeamDrawer } from "./drawers";
 import { requireSession } from "@/lib/auth/provider";
 import { PERSON_AVAILABILITY_VALUES } from "@/lib/availability";
-import { jobs, skillLevels, skills } from "@/lib/db/schema";
+import { jobs, persons, skillLevels, skills } from "@/lib/db/schema";
 import {
   resolveTeamDrawer,
   TEAM_PANEL_PARAMS,
@@ -109,6 +156,7 @@ import {
   type PersonAvailability,
   type TeamFilterOption,
   type TeamFilterOptions,
+  type TeamMemberRow,
 } from "@/lib/queries/team";
 import { isUuid } from "@/lib/uuid";
 
@@ -116,19 +164,42 @@ export const metadata = {
   title: "Équipe — Vision",
 };
 
-/** Les gabarits de colonne, tenus en un seul endroit pour que l'en-tête et
- *  les lignes ne puissent pas diverger.
+/**
+ * Les gabarits de colonne, tenus en un seul endroit pour que l'en-tête et
+ * les lignes ne puissent pas diverger.
  *
- *  **Sous `xl`, la ligne se replie** (T7.6). La personne et ses compétences
- *  prennent chacune leur ligne : ce sont les deux seules colonnes dont le
- *  contenu est une liste, et les serrer côte à côte sur un téléphone les rendait
- *  illisibles l'une comme l'autre. */
+ * **Trois colonnes depuis la direction B**, et non quatre : le métier a rejoint
+ * le nom, dans la ligne qui le qualifie. C'est ce qui rend au profil la place
+ * que le rail lui prend.
+ *
+ * **Sous `xl`, la ligne se replie** (T7.6). La personne et ses compétences
+ * prennent chacune leur ligne : ce sont les deux seules colonnes dont le
+ * contenu est une liste, et les serrer côte à côte sur un téléphone les rendait
+ * illisibles l'une comme l'autre.
+ */
 const COLUMN = {
   person: "w-full min-w-0 xl:w-auto xl:flex-[1.2]",
-  job: "min-w-0 xl:flex-1",
-  availability: "flex-none xl:w-52",
+  availability: "flex-none xl:w-40",
   skills: "w-full min-w-0 xl:w-auto xl:flex-[1.6]",
 } as const;
+
+/**
+ * Combien de compétences une **ligne** affiche avant de compter le reste.
+ *
+ * **Deux, et le nombre est une mesure et non un goût.** À 1 440 px, le contenu
+ * fait 1 112 px ; le rail en prend 320 et sa gouttière 24, la carte 40 de
+ * padding, les gouttières de colonne 48, la disponibilité 160 et le chevron 16 :
+ * il reste environ 288 px pour les compétences. Une étiquette
+ * « compétence · niveau » en mesure de 180 à 320. Deux tiennent sur deux rangs,
+ * cinq en demandaient trois à quatre — et c'est cette variation, de 58 à 122 px
+ * de hauteur de ligne, que la direction B corrige.
+ *
+ * **Ce ne sont pas les compétences qui ont filtré**, et la nuance porte le
+ * garde-fou 2 : la requête rend le profil dans son ordre — rang décroissant,
+ * puis libellé —, et la ligne en montre le début. Elle n'affiche jamais une
+ * correspondance, et le reste n'est pas caché : il est dans la fiche, à un clic.
+ */
+const LIST_SKILLS_SHOWN = 2;
 
 /**
  * Les noms des paramètres d'URL.
@@ -264,19 +335,28 @@ export default async function TeamPage({
   /* Chaque valeur est confrontée au domaine avant d'être crue — la règle de
      `?produit=` (T2.5). `find` et `list` sont scopés : la valeur d'un autre
      domaine n'existe pas, elle ne « manque » pas. Les compétences passent par
-     **une seule** lecture, qui confronte et fournit les libellés de la ligne de
-     synthèse dans le même aller-retour ; celles que la couche n'a pas rendues
-     sont simplement ignorées. */
-  const [activeJob, activeLevel, activeSkills] = await Promise.all([
-    requestedJob ? session.db.find(jobs, requestedJob) : undefined,
-    requestedLevel ? session.db.find(skillLevels, requestedLevel) : undefined,
-    requestedSkills.length > 0
-      ? session.db.list(skills, {
-          where: inArray(skills.id, requestedSkills),
-          orderBy: [asc(skills.position), asc(skills.label)],
-        })
-      : [],
-  ]);
+     **une seule** lecture, qui confronte et fournit les identifiants cochés dans
+     le même aller-retour ; celles que la couche n'a pas rendues sont simplement
+     ignorées.
+
+     **Les deux décomptes de la ligne de faits voyagent avec.** Ce sont deux
+     `count` scopés sur `persons`, qui écartent les archivées comme `listTeam` —
+     et qui ne connaissent aucun filtre : la ligne de faits dit la taille du
+     domaine, pas le résultat d'une recherche. Un dénombrement, jamais un indice
+     (garde-fou 2, D39). */
+  const [activeJob, activeLevel, activeSkills, centerCount, stakeholderCount] =
+    await Promise.all([
+      requestedJob ? session.db.find(jobs, requestedJob) : undefined,
+      requestedLevel ? session.db.find(skillLevels, requestedLevel) : undefined,
+      requestedSkills.length > 0
+        ? session.db.list(skills, {
+            where: inArray(skills.id, requestedSkills),
+            orderBy: [asc(skills.position), asc(skills.label)],
+          })
+        : [],
+      session.db.count(persons, { where: eq(persons.kind, "center") }),
+      session.db.count(persons, { where: eq(persons.kind, "stakeholder") }),
+    ]);
 
   const options = await listTeamFilterOptions(session.db);
 
@@ -288,32 +368,21 @@ export default async function TeamPage({
     availability,
   });
 
-  /** Ce qui est actif, dit en toutes lettres. Le libellé vient de la ligne lue
-   *  en base, jamais du paramètre. */
-  const applied: { field: string; value: string }[] = [
-    ...(search ? [{ field: "Recherche", value: `« ${search} »` }] : []),
-    ...(activeJob ? [{ field: "Métier", value: activeJob.label }] : []),
-    ...(activeSkills.length > 0
-      ? [
-          {
-            field:
-              activeSkills.length > 1 ? "Compétences" : "Compétence",
-            value: activeSkills.map((skill) => skill.label).join(" et "),
-          },
-        ]
-      : []),
-    ...(activeLevel
-      ? [{ field: "Niveau minimum", value: activeLevel.label }]
-      : []),
-    ...(availability
-      ? [{ field: "Disponibilité", value: AVAILABILITY_LABEL[availability] }]
-      : []),
-  ];
+  /* Combien de filtres sont posés — et rien de plus. La direction B a retiré
+     l'énumération qui vivait ici : elle répétait, mot pour mot, l'état que les
+     contrôles du rail affichent déjà. Ce nombre ne sert qu'à trois décisions :
+     montrer le rail, proposer le retrait, et choisir l'état vide. */
+  const posedFilters =
+    (search ? 1 : 0) +
+    (activeJob ? 1 : 0) +
+    activeSkills.length +
+    (activeLevel ? 1 : 0) +
+    (availability ? 1 : 0);
 
-  /* La barre paraît dès qu'il y a quelque chose à filtrer, ou qu'un filtre est
+  /* Le rail paraît dès qu'il y a quelque chose à filtrer, ou qu'un filtre est
      déjà posé — sans quoi une recherche infructueuse retirerait le formulaire
      qui l'a produite, et il n'y aurait plus aucun moyen de la corriger. */
-  const showFilters = rows.length > 0 || applied.length > 0;
+  const showFilters = rows.length > 0 || posedFilters > 0;
 
   const checked = new Set(activeSkills.map((skill) => skill.id));
 
@@ -389,190 +458,278 @@ export default async function TeamPage({
         <PageHeader
           title="Équipe"
           lead="Qui compose le centre de compétence, et que sait faire chacun ?"
+          /* **Les faits du domaine, jamais ceux de la recherche.** Ce que
+             l'écran sait de son objet ne bouge pas quand on filtre ; le
+             compteur qui bouge est resté au-dessus de la liste, avec son
+             `aria-live`. Les deux nombres sont des dénombrements de lignes
+             saisies — la frontière que `CLAUDE.md` trace entre le chiffre
+             reporté et le chiffre calculé par Vision reste où elle est. */
+          facts={`${formatPersons(centerCount)} au centre · ${formatPersons(
+            stakeholderCount,
+          )} côté entité`}
           {...(addPersonLink ? { action: addPersonLink } : {})}
         />
 
-        {showFilters ? (
-          <TeamFilters
-            options={options}
-            search={search}
-            jobId={activeJob?.id}
-            checkedSkills={checked}
-            levelId={activeLevel?.id}
-            availability={availability}
-          />
-        ) : null}
+        {/* **Le rail à gauche, la liste à droite** — et `items-start`, sans quoi
+            le rail s'étirerait sur toute la hauteur de la rangée et `sticky`
+            n'aurait rien à faire glisser. Sous `xl`, les deux se remettent en
+            pile : c'est le palier de T7.6, celui au-dessus duquel les colonnes
+            de liste tiennent réellement. */}
+        <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
+          {showFilters ? (
+            <TeamFilters
+              options={options}
+              posedFilters={posedFilters}
+              search={search}
+              jobId={activeJob?.id}
+              checkedSkills={checked}
+              levelId={activeLevel?.id}
+              availability={availability}
+            />
+          ) : null}
 
-        {showFilters ? (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p
-              // Le compteur et les filtres changent sans rechargement de page
-              // perceptible : l'assistance doit l'entendre.
-              aria-live="polite"
-              className="flex flex-wrap items-center gap-2 text-sm text-content-neutral-dark"
-            >
-              <span className="font-semibold text-content-neutral-darkest">
+          <div className="flex min-w-0 flex-1 flex-col gap-4">
+            {showFilters ? (
+              <p
+                // Le compteur change sans rechargement de page perceptible :
+                // l'assistance doit l'entendre.
+                aria-live="polite"
+                className="text-sm font-semibold text-content-neutral-darkest"
+              >
                 {formatPersons(rows.length)}
-              </span>
-              {applied.map((filter) => (
-                <span key={filter.field} className="flex items-center gap-2">
-                  <span aria-hidden="true" className="text-content-neutral-light">
-                    ·
-                  </span>
-                  {filter.field} : {filter.value}
-                </span>
-              ))}
-            </p>
-
-            {applied.length > 0 ? (
-              <Link
-                href={ROUTES.team}
-                className={ACTION_LINK_SM}
-              >
-                Retirer tous les filtres
-              </Link>
+              </p>
             ) : null}
+
+            {rows.length > 0 ? (
+              <List label="Les personnes du domaine">
+                <ListHeader>
+                  <span className={COLUMN.person}>Personne</span>
+                  <span className={COLUMN.availability}>Disponibilité</span>
+                  <span className={COLUMN.skills}>Compétences déclarées</span>
+                  {/* La place du chevron, pour que le bandeau et les lignes
+                      s'alignent. Le bandeau entier est déjà `aria-hidden`. */}
+                  <span className="hidden w-4 flex-none xl:block" />
+                </ListHeader>
+
+                {rows.map((row) => (
+                  <ListRow key={row.id}>
+                    <PersonLine row={row} filters={activeFilters} />
+                  </ListRow>
+                ))}
+              </List>
+            ) : posedFilters > 0 ? (
+              <EmptyState
+                title="Aucune personne ne répond à ces critères"
+                description="Les filtres se combinent : chacun restreint le résultat du précédent, et les compétences cochées se cumulent — une personne doit les porter toutes. En décocher une suffit peut-être à retrouver ce que vous cherchez."
+                action={
+                  <Link href={ROUTES.team} className={ACTION_LINK_SM}>
+                    Voir toutes les personnes
+                  </Link>
+                }
+              />
+            ) : (
+              <EmptyState
+                title="Aucune personne pour l'instant"
+                description="Cette liste réunira les membres du centre de compétence et les intervenants côté entité — leur métier, leur disponibilité, et les compétences que chacun déclare. C'est ce référentiel qui dira un jour qui pourrait intervenir sur un accompagnement."
+                {...(addPersonLink ? { action: addPersonLink } : {})}
+              />
+            )}
           </div>
-        ) : null}
-
-        {rows.length > 0 ? (
-          <List label="Les personnes du domaine">
-            <ListHeader>
-              <span className={COLUMN.person}>Personne</span>
-              <span className={COLUMN.job}>Métier</span>
-              <span className={COLUMN.availability}>Disponibilité</span>
-              <span className={COLUMN.skills}>Compétences</span>
-            </ListHeader>
-
-            {rows.map((row) => (
-              /* **La ligne entière ouvre la fiche** (T5bis.4), et n'emmène sur
-                 aucun écran : il n'y a pas de page personne (D29). Le lien est
-                 posé *dans* la `ListRow` plutôt que par son `href` — `ListRow`
-                 rend un `<Link>` de navigation, et `components/ui/list.tsx` est
-                 hors du périmètre de ce ticket. Le résultat est le même : un seul
-                 arrêt de tabulation par personne, et une cible large.
-
-                 **C'est un vrai `<a href>`**, dont seul le clic gauche est
-                 intercepté : le `⌘`+clic, le clic milieu et l'absence de
-                 JavaScript retombent sur l'adresse, qui rend la même fiche au
-                 rendu serveur. Elle reconduit les filtres courants, pour que la
-                 sortie du panneau ne défasse pas la recherche. */
-              <ListRow key={row.id}>
-                <DrawerLink
-                  href={teamHref(activeFilters, {
-                    key: PERSON_PANEL_PARAM,
-                    value: row.id,
-                  })}
-                  request={{ kind: "personDetail", id: row.id }}
-                  /* **C'est ce lien, et non la `ListRow`, qui est le conteneur
-                     flex de la ligne** : le repli doit donc se poser ici aussi,
-                     sans quoi la dernière colonne sort de la carte et s'y fait
-                     rogner (T7.6). `LIST_ROW_FLEX` est la chaîne de
-                     `components/ui/list.tsx`, pour que les deux ne divergent
-                     pas. */
-                  className={`${LIST_ROW_FLEX} min-w-0 flex-1`}
-                >
-                  <span className={`${COLUMN.person} flex items-center gap-2`}>
-                    <Avatar name={row.fullName} tone={row.kind} />
-                    <span className="truncate font-semibold text-content-neutral-darkest">
-                      {row.fullName}
-                    </span>
-                    {row.kind === "stakeholder" ? (
-                      <span className="flex-none text-xs text-content-neutral-base">
-                        · côté entité
-                      </span>
-                    ) : null}
-                  </span>
-
-                  <span className={COLUMN.job}>
-                    <span className="sr-only">Métier : </span>
-                    {row.jobLabel ?? (
-                      <span className="text-content-neutral-base">Non renseigné</span>
-                    )}
-                  </span>
-
-                  {/* Un intervenant côté entité n'a pas de disponibilité : c'est une
-                      propriété du centre, et la colonne reste vide plutôt que
-                      d'inventer une valeur absente (arbitrage (d)). */}
-                  <span className={COLUMN.availability}>
-                    {row.availability ? (
-                      <>
-                        <span className="sr-only">Disponibilité : </span>
-                        <AvailabilityDot availability={row.availability} />
-                      </>
-                    ) : null}
-                  </span>
-
-                  {/* Le profil entier, et non les seules compétences qui ont
-                      filtré : une ligne affiche ce que la personne déclare, jamais
-                      une correspondance (garde-fou 2). */}
-                  <span className={COLUMN.skills}>
-                    <span className="sr-only">Compétences : </span>
-                    {row.skills.length > 0 ? (
-                      <span className="flex flex-wrap gap-1.5">
-                        {row.skills.map((skill) => (
-                          <Tag
-                            key={skill.id}
-                            label={`${skill.label} · ${skill.levelLabel}`}
-                          />
-                        ))}
-                      </span>
-                    ) : (
-                      <span className="text-content-neutral-base">
-                        Aucune compétence déclarée
-                      </span>
-                    )}
-                  </span>
-                </DrawerLink>
-              </ListRow>
-            ))}
-          </List>
-        ) : applied.length > 0 ? (
-          <EmptyState
-            title="Aucune personne ne répond à ces critères"
-            description="Les filtres se combinent : chacun restreint le résultat du précédent, et les compétences cochées se cumulent — une personne doit les porter toutes. En décocher une suffit peut-être à retrouver ce que vous cherchez."
-            action={
-              <Link
-                href={ROUTES.team}
-                className={ACTION_LINK_SM}
-              >
-                Voir toutes les personnes
-              </Link>
-            }
-          />
-        ) : (
-          <EmptyState
-            title="Aucune personne pour l'instant"
-            description="Cette liste réunira les membres du centre de compétence et les intervenants côté entité — leur métier, leur disponibilité, et les compétences que chacun déclare. C'est ce référentiel qui dira un jour qui pourrait intervenir sur un accompagnement."
-            {...(addPersonLink ? { action: addPersonLink } : {})}
-          />
-        )}
+        </div>
       </Page>
     </DrawerHost>
   );
 }
 
 /**
- * La barre de filtres.
+ * Une ligne de personne — trois colonnes, et le chevron qui dit où elle mène.
+ *
+ * **La ligne entière ouvre la fiche** (T5bis.4), et n'emmène sur aucun écran :
+ * il n'y a pas de page personne (D29). Le lien est posé *dans* la `ListRow`
+ * plutôt que par son `href` — `ListRow` rend un `<Link>` de navigation, et
+ * `components/ui/list.tsx` est hors du périmètre de cette reprise. Le résultat
+ * est le même : un seul arrêt de tabulation par personne, et une cible large.
+ *
+ * **C'est un vrai `<a href>`**, dont seul le clic gauche est intercepté : le
+ * `⌘`+clic, le clic milieu et l'absence de JavaScript retombent sur l'adresse,
+ * qui rend la même fiche au rendu serveur. Elle reconduit les filtres courants,
+ * pour que la sortie du panneau ne défasse pas la recherche.
+ */
+function PersonLine({
+  row,
+  filters,
+}: {
+  row: TeamMemberRow;
+  filters: AppliedFilters;
+}) {
+  /* **La formulation de `PersonDetailHeader`, mot pour mot** : la ligne et la
+     fiche qualifient une personne de la même façon, et « côté entité » n'est
+     plus la mention la plus faible de la ligne — elle est sur le trait qui
+     qualifie, au même poids que le métier. */
+  const qualifier =
+    [row.jobLabel, row.kind === "stakeholder" ? "côté entité" : null]
+      .filter((part) => part !== null)
+      .join(" · ") || "Métier non renseigné";
+
+  const shown = row.skills.slice(0, LIST_SKILLS_SHOWN);
+  const hidden = row.skills.length - shown.length;
+
+  return (
+    <DrawerLink
+      href={teamHref(filters, { key: PERSON_PANEL_PARAM, value: row.id })}
+      request={{ kind: "personDetail", id: row.id }}
+      /* **C'est ce lien, et non la `ListRow`, qui est le conteneur flex de la
+         ligne** : le repli doit donc se poser ici aussi, sans quoi la dernière
+         colonne sort de la carte et s'y fait rogner (T7.6). `LIST_ROW_FLEX` est
+         la chaîne de `components/ui/list.tsx`, pour que les deux ne divergent
+         pas. */
+      className={`${LIST_ROW_FLEX} min-w-0 flex-1`}
+    >
+      <span className={`${COLUMN.person} flex items-center gap-2`}>
+        <Avatar name={row.fullName} tone={row.kind} />
+        <span className="flex min-w-0 flex-col">
+          <span className="truncate font-semibold text-content-neutral-darkest">
+            {row.fullName}
+          </span>
+          <span className="truncate text-xs text-content-neutral-dark">
+            {qualifier}
+          </span>
+        </span>
+      </span>
+
+      {/* Un intervenant côté entité n'a pas de disponibilité : c'est une
+          propriété du centre, et la colonne porte un tiret plutôt que du vide
+          (arbitrage (d)). Le tiret est décoratif — l'absence est déjà dite en
+          toutes lettres par « côté entité », deux colonnes plus tôt. */}
+      <span className={COLUMN.availability}>
+        {row.availability ? (
+          <>
+            <span className="sr-only">Disponibilité : </span>
+            <AvailabilityDot availability={row.availability} />
+          </>
+        ) : (
+          <span aria-hidden="true" className="text-content-neutral-light">
+            —
+          </span>
+        )}
+      </span>
+
+      {/* Le début du profil, dans l'ordre que la requête rend — et non les
+          seules compétences qui ont filtré : une ligne affiche ce que la
+          personne déclare, jamais une correspondance (garde-fou 2). */}
+      <span className={COLUMN.skills}>
+        <span className="sr-only">Compétences : </span>
+        {row.skills.length > 0 ? (
+          <span className="flex flex-wrap items-center gap-1.5">
+            {shown.map((skill, index) => {
+              const tag = (
+                <Tag size="xs" label={`${skill.label} · ${skill.levelLabel}`} />
+              );
+
+              /* **Le reste voyage avec la dernière étiquette**, et c'est une
+                 correction lue au rendu : posé en frère dans la boîte
+                 `flex-wrap`, « +3 » partait seul sur un troisième rang dès que
+                 les deux étiquettes remplissaient le premier — un nombre
+                 orphelin sous les valeurs qu'il complète. Groupés, ils passent
+                 à la ligne ensemble ou pas du tout. */
+              if (index < shown.length - 1 || hidden === 0) {
+                return <span key={skill.id}>{tag}</span>;
+              }
+
+              return (
+                <span key={skill.id} className="flex items-center gap-1.5">
+                  {tag}
+                  {/* Le nombre se dit en toutes lettres à la voix : « +3 » seul
+                      ne dit ni de quoi ni où le lire. */}
+                  <span className="sr-only">
+                    {`et ${hidden} autre${hidden > 1 ? "s" : ""}, dans la fiche`}
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className="text-xs font-semibold text-content-neutral-base"
+                  >
+                    {`+${hidden}`}
+                  </span>
+                </span>
+              );
+            })}
+          </span>
+        ) : (
+          <span className="text-content-neutral-base">
+            Aucune compétence déclarée
+          </span>
+        )}
+      </span>
+
+      {/* **Ce que la ligne ouvre, dit à l'œil.** Sur `/projets`, une ligne du
+          même dessin emmène sur un écran ; ici elle ouvre un tiroir, et rien ne
+          les distinguait. Il sort de l'arbre d'accessibilité : le lien porte
+          déjà le nom de la personne, et un chevron lu à la voix n'ajouterait
+          rien.
+
+          **Il ne se rend qu'au-dessus du palier de repli.** Sous `xl` la ligne
+          se met en rangs et le chevron, qui n'est plus au bout de rien, tombait
+          seul sur un cinquième rang — un glyphe sans objet. Il se masque donc,
+          comme le bandeau de colonnes de `components/ui/list.tsx` et pour la
+          même raison : c'est le seul autre `hidden` responsive du dépôt, et lui
+          aussi ne porte que du décor. **Rien d'interactif ne disparaît**, le
+          seul critère de T7.6 — la ligne entière reste le lien.
+
+          **`content-neutral-base` et non `content-neutral-light`, et c'est la
+          mesure qui a tranché.** Le second donne 2,22:1 sur le fond de la
+          ligne — un chevron qu'on devine, quand celui-ci est justement ce qu'il
+          faut savoir voir (WCAG 1.4.11, le seuil de 3:1 d'un composant). Le
+          premier donne **4,98:1**, et c'est le couple que « +N » porte déjà
+          deux colonnes plus tôt : aucun jeton neuf, aucun couple neuf par la
+          position. */}
+      <span aria-hidden="true" className="hidden flex-none text-content-neutral-base xl:block">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-4 w-4"
+        >
+          <path d="m9 18 6-6-6-6" />
+        </svg>
+      </span>
+    </DrawerLink>
+  );
+}
+
+/**
+ * Le rail de filtres — la direction B.
  *
  * Un `form method="get"` : le navigateur écrit lui-même l'URL, l'écran la
  * relit, et rien n'est conservé en mémoire côté client. Chaque contrôle se
  * réaffiche sur la valeur active — le formulaire dit l'état de l'URL.
  *
- * Locale à cet écran, comme `ProjectFilters` l'est resté à la sienne : c'est
- * une barre de recherche de liste (D32), pas un composant de socle.
+ * Local à cet écran, comme `ProjectFilters` l'est resté au sien : c'est une
+ * barre de recherche de liste (D32), pas un composant de socle.
  *
- * **Deux rangs, et le second est un `<fieldset>`** : onze compétences ne
- * tiennent pas dans une barre en ligne, et un `<fieldset>` est ce qui dit à
- * l'assistance que ces cases forment un groupe et lui donne son nom.
+ * **Le rail est une `Section`, et ce n'est pas un détail de forme.** Les quatre
+ * mesures de la pastille sont prises sur `surface-neutral-pale` — le fond de la
+ * carte du formulaire de projet. `Section` porte exactement ce fond, si bien
+ * qu'**aucun couple de couleurs n'est neuf par la position** et que rien n'est à
+ * remesurer. Un rail posé nu sur le fond de page en aurait créé quatre.
  *
- * Les classes de contrôle viennent de `components/ui/form-field.tsx` — les
- * jetons y sont mesurés depuis T2.3 (`content-neutral-normal` à 3,88:1 sur
- * `surface-neutral-pale`, la bordure d'un composant se lisant à 3:1). **Aucun
- * jeton neuf, aucun septième substitut** ; les cases à cocher restent natives.
+ * **Il suit le défilement à partir de `xl`**, et pas avant : sous ce palier il
+ * repasse au-dessus de la liste, et un bloc collant en pile masquerait ce qu'il
+ * filtre. `items-start` sur la rangée est la condition technique — un élément
+ * flex étiré sur toute la hauteur n'a rien à faire glisser.
+ *
+ * **Onze compétences en colonne, sans repli et sans envoi implicite** : c'est ce
+ * que la direction B achète avec ses 320 px. La case reste native à l'intérieur
+ * de la pastille — elle porte l'état, elle part dans la requête, elle s'annonce
+ * à la voix —, mais elle est **hors de vue** : c'est la pastille qu'on voit et
+ * qu'on vise. `components/ui/checkbox-chip.ts` dit les trois conséquences de ce
+ * masquage et la seule valeur où la maquette a cédé à la mesure.
  */
 function TeamFilters({
   options,
+  posedFilters,
   search,
   jobId,
   checkedSkills,
@@ -580,6 +737,8 @@ function TeamFilters({
   availability,
 }: {
   options: TeamFilterOptions;
+  /** Combien de filtres sont posés — le retrait n'existe que s'il a de quoi retirer. */
+  posedFilters: number;
   search: string;
   jobId: string | undefined;
   checkedSkills: ReadonlySet<string>;
@@ -587,82 +746,112 @@ function TeamFilters({
   availability: PersonAvailability | undefined;
 }) {
   return (
-    <form
-      method="get"
-      action={ROUTES.team}
-      className="flex flex-col gap-3"
-      aria-label="Filtrer les personnes"
-    >
-      <div className="flex flex-wrap items-end gap-3">
-        <Field label="Rechercher" htmlFor="filtre-q" className="min-w-60 flex-1">
-          <input
-            id="filtre-q"
-            type="search"
-            name={PARAM.search}
-            defaultValue={search}
-            placeholder="Un nom…"
-            className={`${CONTROL_TEXT} ${borderOf(undefined)}`}
+    <div className="xl:sticky xl:top-9 xl:w-80 xl:flex-none">
+      <Section>
+        <form
+          method="get"
+          action={ROUTES.team}
+          className="flex flex-col gap-5"
+          aria-label="Filtrer les personnes"
+        >
+          <Field label="Rechercher" htmlFor="filtre-q">
+            <input
+              id="filtre-q"
+              type="search"
+              name={PARAM.search}
+              defaultValue={search}
+              placeholder="Un nom…"
+              className={`${CONTROL_TEXT} ${borderOf(undefined)}`}
+            />
+          </Field>
+
+          <Select
+            id="filtre-metier"
+            label="Métier"
+            name={PARAM.job}
+            all="Tous"
+            options={options.jobs}
+            value={jobId}
           />
-        </Field>
+          {/* « Au moins ce niveau » : c'est un seuil, d'où l'échelle entière et
+              l'intitulé qui le dit. */}
+          <Select
+            id="filtre-niveau"
+            label="Niveau minimum"
+            name={PARAM.level}
+            all="Tous"
+            options={options.levels}
+            value={levelId}
+          />
+          <Select
+            id="filtre-dispo"
+            label="Disponibilité"
+            name={PARAM.availability}
+            all="Toutes"
+            options={AVAILABILITY_OPTIONS}
+            value={availability}
+          />
 
-        <Select
-          id="filtre-metier"
-          label="Métier"
-          name={PARAM.job}
-          all="Tous"
-          options={options.jobs}
-          value={jobId}
-          className="w-56"
-        />
-        {/* « Au moins ce niveau » : c'est un seuil, d'où l'échelle entière et
-            l'intitulé qui le dit. */}
-        <Select
-          id="filtre-niveau"
-          label="Niveau minimum"
-          name={PARAM.level}
-          all="Tous"
-          options={options.levels}
-          value={levelId}
-          className="w-52"
-        />
-        <Select
-          id="filtre-dispo"
-          label="Disponibilité"
-          name={PARAM.availability}
-          all="Toutes"
-          options={AVAILABILITY_OPTIONS}
-          value={availability}
-          className="w-56"
-        />
+          {options.skills.length > 0 ? (
+            <fieldset className="flex flex-col gap-2">
+              {/* Un `<fieldset>` est ce qui dit à l'assistance que ces cases
+                  forment un groupe et lui donne son nom. La légende dit la
+                  règle une fois, là où l'on coche. */}
+              <legend className="mb-2 text-2xs font-semibold text-content-neutral-dark uppercase">
+                Compétences — cochées, elles se cumulent
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {options.skills.map((skill) => (
+                  <label
+                    key={skill.id}
+                    htmlFor={`filtre-competence-${skill.id}`}
+                    className={filterChipClass({ size: "xs" })}
+                  >
+                    <input
+                      id={`filtre-competence-${skill.id}`}
+                      type="checkbox"
+                      name={PARAM.skill}
+                      value={skill.id}
+                      defaultChecked={checkedSkills.has(skill.id)}
+                      className={FILTER_CHIP_INPUT}
+                    />
+                    {skill.label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ) : null}
 
-        <Button type="submit">Filtrer</Button>
-      </div>
+          {/* **Le retrait est au pied du rail, et non plus au-dessus de la
+              liste** (31/08/2026, à la demande). Il vivait à l'autre bout de
+              l'écran des contrôles qu'il vide — c'était la friction n° 4 du
+              diagnostic, à demi refermée : la ligne de synthèse avait cessé de
+              répéter l'état des filtres, mais le geste qui les défait était
+              resté avec elle.
 
-      {options.skills.length > 0 ? (
-        <fieldset>
-          <legend className="mb-2 text-2xs font-semibold text-content-neutral-dark uppercase">
-            Compétences — cochées, elles se cumulent
-          </legend>
-          <div className="flex flex-wrap gap-x-4 gap-y-2">
-            {options.skills.map((skill) => (
-              <label
-                key={skill.id}
-                className="flex items-center gap-2 text-sm text-content-neutral-darkest"
-              >
-                <input
-                  type="checkbox"
-                  name={PARAM.skill}
-                  value={skill.id}
-                  defaultChecked={checkedSkills.has(skill.id)}
-                  className="h-4 w-4 flex-none"
-                />
-                {skill.label}
-              </label>
-            ))}
+              **Un lien, jamais un `<button type="reset">`** : celui-ci
+              rétablirait les valeurs *par défaut* du formulaire, c'est-à-dire
+              les filtres actuellement appliqués — il ne ferait rien de visible.
+              Ce qui remet à zéro est une adresse, `ROUTES.team` nue, et elle
+              fonctionne sans une ligne de JavaScript comme le reste du rail.
+
+              **Il ne paraît que s'il a de quoi retirer.** Un geste inerte
+              posé en permanence sous le bouton d'envoi apprend à ne plus le
+              lire. `ACTION_LINK_SM` est la constante du socle pour ce rang, et
+              son commentaire nomme mot pour mot cet emploi. */}
+          <div className="flex flex-col items-center gap-3">
+            <Button type="submit" className="w-full">
+              Filtrer
+            </Button>
+            {posedFilters > 0 ? (
+              <Link href={ROUTES.team} className={ACTION_LINK_SM}>
+                Retirer tous les filtres
+              </Link>
+            ) : null}
           </div>
-        </fieldset>
-      ) : null}
-    </form>
+        </form>
+      </Section>
+    </div>
   );
 }
 
@@ -670,16 +859,14 @@ function TeamFilters({
 function Field({
   label,
   htmlFor,
-  className,
   children,
 }: {
   label: string;
   htmlFor: string;
-  className?: string;
   children: ReactNode;
 }) {
   return (
-    <div className={`flex flex-col gap-1 ${className ?? ""}`}>
+    <div className="flex flex-col gap-1">
       <label
         htmlFor={htmlFor}
         className="text-2xs font-semibold text-content-neutral-dark uppercase"
@@ -699,7 +886,6 @@ function Select({
   all,
   options,
   value,
-  className,
 }: {
   id: string;
   label: string;
@@ -708,12 +894,11 @@ function Select({
   all: string;
   options: TeamFilterOption[];
   value: string | undefined;
-  className?: string;
 }) {
   if (options.length === 0) return null;
 
   return (
-    <Field label={label} htmlFor={id} className={className}>
+    <Field label={label} htmlFor={id}>
       <select
         id={id}
         name={name}

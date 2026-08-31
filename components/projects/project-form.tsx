@@ -101,6 +101,10 @@ import { AvailabilityDot } from "@/components/team/availability-dot";
 import { ACTION_LINK_SM } from "@/components/ui/action-link";
 import { Button, buttonClass } from "@/components/ui/button";
 import {
+  CHECKBOX_CHIP,
+  CHECKBOX_CHIP_INPUT,
+} from "@/components/ui/checkbox-chip";
+import {
   borderOf,
   CONTROL_TEXT,
   FormAlert,
@@ -125,54 +129,6 @@ import type {
 
 /** Une valeur de référentiel : statut, métier, approche. */
 type ProjectFormOption = { id: string; label: string };
-
-/**
- * La pastille d'une valeur de référentiel — une case à cocher, en plus grand.
- *
- * **Le défaut réparé est une cible de clic.** Une case native mesure une
- * quinzaine de pixels et son seul agrandissement est le `<label>` qui la suit ;
- * treize valeurs de référentiel se cochaient donc sur une bande de vingt
- * pixels. La pastille porte `px-4 py-3` autour du couple case + texte, ce qui
- * donne un peu plus de 44 px de haut — le confort visé pour une cible, et le
- * seul motif de ce changement.
- *
- * **La case reste là, et c'est ce qui autorise le filet clair de l'état coché.**
- * Le contrôle qui se mesure à 3:1 (WCAG 1.4.11) est la case native, dessinée par
- * le navigateur ; la pastille est l'aire de son intitulé. Elle porte quand même
- * `content-neutral-normal` au repos — le filet de tous les contrôles de ce
- * formulaire, 3,88:1 sur la carte — plutôt qu'un filet de bloc, parce qu'une
- * valeur qu'on coche est un contrôle et se lit comme tel.
- *
- * **L'état ne tient pas à la couleur seule** : la case est cochée, et c'est elle
- * qui porte l'information. Le fond et le filet la redoublent, ils ne la
- * remplacent pas.
- *
- * **La teinte est en CSS, jamais calculée au rendu, et c'est un défaut évité de
- * peu.** Une classe choisie depuis `selected` aurait été juste au premier
- * affichage et fausse à la première coche : rien ne re-rend ce `<label>`, les
- * cases étant non contrôlées. `has-checked:` fait porter l'état par le sélecteur
- * `:has(:checked)` — il suit le clic, il suit une remise à zéro du formulaire,
- * et **il fonctionne sans une ligne de JavaScript**, comme le reste de cet
- * écran.
- *
- * Les deux couples sont mesurés sur `surface-neutral-pale`, le fond de la carte :
- *
- * | Couple | Ratio |
- * |---|---|
- * | `content-neutral-darkest` sur `surface-neutral-pale` — au repos | 17,87:1 |
- * | `content-neutral-normal` — le filet au repos | 3,88:1 |
- * | `content-primary-dark` sur `surface-primary-lightest` — coché | 15,14:1 |
- * | `border-primary-base` — le filet coché | 13,65:1 |
- *
- * **C'est la quatrième écriture d'une pastille dans le dépôt**, après les deux
- * chips de filtre et la bascule d'échelle. Aucune des trois n'est une case à
- * cocher ; l'extraction se fera le jour où deux le seront. Consigné.
- */
-const CHIP = [
-  "flex items-center gap-2 rounded-lg border px-4 py-3 text-sm",
-  "border-content-neutral-normal bg-surface-neutral-pale text-content-neutral-darkest",
-  "has-checked:border-border-primary-base has-checked:bg-surface-primary-lightest has-checked:font-medium has-checked:text-content-primary-dark",
-].join(" ");
 
 /**
  * Le rôle qu'affiche une ligne au premier rendu.
@@ -672,7 +628,7 @@ function CheckboxGroup({
             <label
               key={option.id}
               htmlFor={idFor(`${name}-${option.id}`)}
-              className={CHIP}
+              className={CHECKBOX_CHIP}
             >
               <input
                 id={idFor(`${name}-${option.id}`)}
@@ -681,7 +637,7 @@ function CheckboxGroup({
                 value={option.id}
                 defaultChecked={selected.has(option.id)}
                 aria-describedby={error ? errorId : undefined}
-                className="accent-surface-primary-base"
+                className={CHECKBOX_CHIP_INPUT}
               />
               {option.label}
             </label>

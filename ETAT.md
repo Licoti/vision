@@ -2,9 +2,10 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 31/08/2026, après les deux gestes hors ticket de la vue d'ensemble.
+**Dernière mise à jour :** 31/08/2026, après la reprise d'ergonomie d'`/equipe` (direction B).
 Dernier balayage : découpage de C7. **Le fichier dépasse les 250 lignes de la règle 5 — 553 au
-31/08/2026** ; le balayage appartient à la session de découpage de C8.
+31/08/2026, 576 après la reprise d'`/equipe`** ; le balayage appartient à la session de découpage
+de C8.
 **Chantier en cours :** **C7 — Finitions**, dix tickets, découpés dans `tickets-C7.md`. **Dernier
 chantier du POC** — `docs/05` §5 n'en a pas de huitième.
 **Ticket suivant :** **T7.7 — Accessibilité : clavier, focus, contraste, titres.**
@@ -240,6 +241,27 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   `start="11"`, le repli disparaissant quand il ne cache rien. **Un écart trouvé et non corrigé** :
   `countProjects` et la répartition par entité ne rejouent pas la jointure de statut de
   `listProjects`.
+- **Équipe — reprise d'ergonomie, direction B, hors ticket, 31/08/2026.** Sept gestes tirés d'un
+  canevas de maquettes (**dix-sept frictions**, trois directions) sur le dernier écran jamais repris,
+  et **le seul écran majeur conçu sans maquette de référence** : les cinq filtres passent dans un
+  rail collant de 320 px, les onze cases de 16 px deviennent des pastilles de **47 px** mesurées —
+  puis, à la demande, des pastilles **sans case visible** puis au calibre `xs`, ce qui fait tomber le
+  rail de 988 à **814 px** et lui retire la hauteur de la page —,
+  `PageHeader.facts` trouve son appelant, le métier descend sous le nom avec « côté entité » — la
+  formulation exacte de `PersonDetailHeader` —, et la colonne des compétences se borne à deux
+  étiquettes — au calibre `xs` que `Tag` reçoit ce jour-là, **27 px de haut ramenés à 23** —, et le
+  retrait des filtres rejoint le pied du rail, avec les contrôles qu'il vide. **Un énoncé faux
+  corrigé en chemin** : le « plancher de 44 px » n'est écrit ni dans `docs/06` §11 ni dans aucune
+  fiche — c'est WCAG 2.5.5, niveau **AAA**, quand le seuil **AA** est 24 px.
+  `CHECKBOX_CHIP` est **extraite du formulaire de projet, qui avait écrit sa propre
+  condition d'extraction**, et son `<form>` servi est **identique à l'octet près** — 28 043 contre
+  28 043, même `sha1`. Le résultat est mesuré au pixel : l'amplitude de hauteur de ligne tombe de
+  **61 → 163 px à 72 → 84**, huit lignes sur dix à 84, et la liste raccourcit de 335 px. **Deux
+  défauts trouvés par le rendu et non par le HTML servi** — « +N » orphelin sur un troisième rang,
+  chevron orphelin sous `xl` —, et **un troisième par la mesure** : le chevron à 2,22:1, sous le
+  seuil de 3:1 d'un composant, rétabli à 4,98. Sonde mise en défaut. Ni migration, ni action, ni
+  droit ; **aucun test neuf, régime des reprises de rendu** — 1 405 tests, inchangés. **Un écart sur
+  un interdit écrit** : « +3 » est un décompte de compétences sur une ligne.
 
 ---
 
@@ -271,6 +293,21 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 
 ### b. Assignés à un ticket
 
+- **Un test de `lib/queries/activities.test.ts` est intermittent, et sa cause est inconnue.**
+  « Sans exception, un type archivé n'est proposé à personne » a échoué **une fois sur six**
+  exécutions de la suite le 31/08/2026 ; il passe seul, et la suite entière repasse à 1 405/1 405.
+  L'hypothèse d'une ligne restée archivée par une exécution interrompue a été **vérifiée et
+  écartée** : le `beforeAll` crée un domaine neuf et les lectures sont scopées. Voisin, sans être
+  le même, du point sur les deux fichiers de tests d'action qui nettoient sur
+  `if (!f?.domainId) return`. → **au prochain qui ouvre ce fichier, sinon C8.**
+- **« +N » sur une ligne d'`/equipe` est un décompte de compétences, et T5bis.2 l'interdit.** Posé
+  le 31/08/2026 par la reprise de direction B, et **rendu visible sur les planches du canevas avant
+  d'être écrit**. La fiche du ticket dit : « Aucun décompte de compétences sur une ligne, aucun
+  niveau agrégé, aucun tri autre que le nom (garde-fous 2 et 3). » Ce que l'interdit visait est un
+  nombre qui **qualifie** une personne ; « +3 » est une marque de troncature, la parenté du « Voir
+  plus » de la vue d'ensemble. Mais deux lignes portant « +3 » et « +1 » se comparent, et c'est le
+  geste que le garde-fou 2 existe pour empêcher. Le remplaçant coûte une ligne : une marque non
+  chiffrée — « … » ou « et plus » — qui dit la suite sans la compter. → **arbitrage humain.**
 - **`countProjects` et la répartition par entité ne rejouent pas la jointure de statut de leur
   liste.** Trouvé le 31/08/2026 par une ligne forgée : un projet du domaine posé sur un statut d'un
   autre domaine est écarté par `listProjects` — jointure interne filtrée — mais **compté** par les
