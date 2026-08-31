@@ -45,7 +45,7 @@ export function formatMonth(date: Date): string {
 }
 
 /**
- * Les colonnes `date` du schéma (`started_on`, `expected_end_on`, `read_on`…)
+ * Les colonnes `date` du schéma (`period_start`, `period_end`, `read_on`…)
  * reviennent en chaîne `YYYY-MM-DD`, pas en `Date` : le pilote rend le type
  * PostgreSQL tel quel. La lecture se fait en UTC, pour la même raison que
  * `MONTH` porte son fuseau — un serveur à l'ouest reculerait d'un mois toute
@@ -151,20 +151,26 @@ export function formatMonthTick(month: string): string {
 }
 
 /**
- * La période d'un accompagnement, au mois (D13).
+ * Une période, au mois (D13).
  *
  * « mars 2024 → septembre 2024 » · « depuis février 2026 » ·
  * « jusqu'à septembre 2024 » · « Période non renseignée ».
  *
- * Une période ouverte se dit « depuis » et non « mars 2024 → ? » : un
- * accompagnement en cours n'a pas de fin manquante, il n'en a pas encore.
+ * Une période ouverte se dit « depuis » et non « mars 2024 → ? » : ce qui est
+ * en cours n'a pas de fin manquante, il n'en a pas encore.
+ *
+ * **Les deux cas ouverts ne se produisent plus pour un accompagnement** depuis
+ * que sa période se déduit de ses activités (31/08/2026) : `min` et `max`
+ * portent sur les mêmes lignes, et rendent leurs deux bornes ensemble ou
+ * aucune. Ils restent écrits parce que la fonction n'est pas réservée aux
+ * accompagnements et qu'une borne manquante reste un état que le type autorise.
  */
 export function formatPeriod(
-  startedOn: string | null,
-  expectedEndOn: string | null,
+  periodStart: string | null,
+  periodEnd: string | null,
 ): string {
-  const start = startedOn ? formatMonth(parseDay(startedOn)) : null;
-  const end = expectedEndOn ? formatMonth(parseDay(expectedEndOn)) : null;
+  const start = periodStart ? formatMonth(parseDay(periodStart)) : null;
+  const end = periodEnd ? formatMonth(parseDay(periodEnd)) : null;
 
   if (start && end) return `${start} → ${end}`;
   if (start) return `depuis ${start}`;
@@ -194,15 +200,13 @@ const MONTH_SHORT_YEAR = new Intl.DateTimeFormat("fr-FR", {
 });
 
 export function formatPeriodShort(
-  startedOn: string | null,
-  expectedEndOn: string | null,
+  periodStart: string | null,
+  periodEnd: string | null,
 ): string {
-  const start = startedOn
-    ? MONTH_SHORT_YEAR.format(parseDay(startedOn))
+  const start = periodStart
+    ? MONTH_SHORT_YEAR.format(parseDay(periodStart))
     : null;
-  const end = expectedEndOn
-    ? MONTH_SHORT_YEAR.format(parseDay(expectedEndOn))
-    : null;
+  const end = periodEnd ? MONTH_SHORT_YEAR.format(parseDay(periodEnd)) : null;
 
   if (start && end) return `${start} → ${end}`;
   if (start) return `depuis ${start}`;
@@ -248,8 +252,22 @@ export function formatCoverage(
 /**
  * La période d'une **activité**, au mois (D13).
  *
- * « août 2026 » · « mars 2026 → mai 2026 » · « À planifier » ·
- * « Période non renseignée ».
+ * « 12 juin 2026 » · « août 2026 » · « mars 2026 → mai 2026 » · « À planifier »
+ * · « Période non renseignée ».
+ *
+ * **Une date précise se lit au jour, et c'est la troisième entorse bornée au
+ * mois de D13** (31/08/2026). Les deux premières sont `formatDay` — la date de
+ * mesure d'un résultat — et `formatEventDay` — le jour d'un événement de
+ * journal ; leur argument est écrit deux fois plus haut, et il vaut ici mot
+ * pour mot : un fait daté ponctuel n'est pas une période. Une restitution du 12
+ * juin perdrait son sens en « juin 2026 », qui laisserait croire à un travail
+ * étalé sur tout le mois.
+ *
+ * Ce que `docs/03` §6 refuse — « personne ne saura dire qu'un atelier était
+ * prévu le 14 » — est la précision **fabriquée**. Celle-ci est **déclarée** :
+ * les deux bornes ne coïncident que parce qu'une personne a choisi le mode
+ * « date précise » dans le panneau, sur une activité dont le jour est connu.
+ * Une période saisie du 1er au 31 août garde son mois, elle.
  *
  * `formatPeriod` ne conviendrait pas : une activité tient le plus souvent dans
  * un seul mois — du 1er au 31 août —, et elle s'afficherait
@@ -267,6 +285,11 @@ export function formatActivityPeriod(
   isUnscheduled: boolean,
 ): string {
   if (isUnscheduled) return "À planifier";
+
+  /* Le même jour aux deux bornes : c'est une date précise, et elle se dit au
+     jour. **Avant** le repli au mois, qui l'écraserait — les deux bornes d'un
+     même jour tombent aussi dans le même mois. */
+  if (periodStart && periodStart === periodEnd) return formatDay(periodStart);
 
   const start = periodStart ? formatMonth(parseDay(periodStart)) : null;
   const end = periodEnd ? formatMonth(parseDay(periodEnd)) : null;

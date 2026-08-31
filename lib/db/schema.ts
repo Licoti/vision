@@ -820,9 +820,12 @@ export const projects = pgTable(
     statusId: uuid("status_id")
       .notNull()
       .references(() => projectStatuses.id, { onDelete: "restrict" }),
-    startedOn: date("started_on"),
-    /** Fin attendue, approximative. */
-    expectedEndOn: date("expected_end_on"),
+    /* **La période d'un accompagnement ne se saisit pas**, et aucune colonne ne
+       la porte : elle se déduit des périodes de ses activités
+       (`lib/queries/project-period.ts`), qui sont la seule source de vérité des
+       dates. `started_on` et `expected_end_on` ont porté cette saisie jusqu'à la
+       migration `0012` ; elles pouvaient contredire les activités qu'elles
+       étaient censées couvrir, et rien en base ne les en empêchait. */
     /**
      * Dénormalisé volontairement (§6) : le recalcul à l'affichage d'une
      * liste serait coûteux et fragile. Remis à jour par la couche

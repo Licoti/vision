@@ -90,12 +90,16 @@ export function Identity({
           <StatusPill nature={project.statusNature} label={project.statusLabel} />
         </Field>
 
-        {/* `formatPeriod` dit lui-même l'absence — « Période non renseignée » —,
-            et une période ouverte se dit « depuis février 2026 » plutôt que
-            « février 2026 → ? » : un accompagnement en cours n'a pas une fin
-            manquante, il n'en a pas encore. */}
+        {/* **La période se déduit des activités**, elle ne se saisit plus
+            (31/08/2026) : ses deux bornes sont donc présentes ensemble, ou
+            absentes ensemble. `formatPeriod` dit lui-même cette absence —
+            « Période non renseignée » —, et c'est ce qu'un accompagnement dont
+            aucune activité n'est planifiée doit lire. Ses deux cas ouverts,
+            « depuis » et « jusqu'à », ne peuvent plus se produire ici ; ils
+            restent écrits parce que la fonction n'est pas réservée à cet
+            usage. */}
         <Field label="Période">
-          {formatPeriod(project.startedOn, project.expectedEndOn)}
+          {formatPeriod(project.periodStart, project.periodEnd)}
         </Field>
 
         {/* **Le rang est la règle de continuité de `docs/06` §7**, et il reste

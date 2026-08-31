@@ -149,7 +149,7 @@ export function PersonDetail({
                       label={project.statusLabel}
                     />
                     <span className="text-content-neutral-base">
-                      {formatPeriod(project.startedOn, project.expectedEndOn)}
+                      {formatPeriod(project.periodStart, project.periodEnd)}
                     </span>
                   </span>
                   <span className="text-sm font-semibold text-content-neutral-darkest">

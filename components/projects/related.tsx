@@ -108,8 +108,8 @@ export function RelatedProjects({
                   statusNature={project.statusNature}
                   statusLabel={project.statusLabel}
                   productName={project.productName}
-                  startedOn={project.startedOn}
-                  expectedEndOn={project.expectedEndOn}
+                  periodStart={project.periodStart}
+                  periodEnd={project.periodEnd}
                   reason={project.reason}
                 />
               </li>
@@ -134,8 +134,8 @@ export function RelatedProjects({
                   statusNature={link.statusNature}
                   statusLabel={link.statusLabel}
                   productName={link.productName}
-                  startedOn={link.startedOn}
-                  expectedEndOn={link.expectedEndOn}
+                  periodStart={link.periodStart}
+                  periodEnd={link.periodEnd}
                   reason={link.reason}
                 >
                   {/* Les deux gestes ne se rendent que sur un lien **sortant**,
@@ -228,8 +228,8 @@ function LinkedProject({
   statusNature,
   statusLabel,
   productName,
-  startedOn,
-  expectedEndOn,
+  periodStart,
+  periodEnd,
   reason,
   children,
 }: {
@@ -238,8 +238,9 @@ function LinkedProject({
   statusNature: RelatedProject["statusNature"];
   statusLabel: string;
   productName: string;
-  startedOn: string | null;
-  expectedEndOn: string | null;
+  /** La période **déduite des activités** du voisin, jamais saisie. */
+  periodStart: string | null;
+  periodEnd: string | null;
   /** `null` sur un lien déclaré sans raison : elle est parfaitement optionnelle. */
   reason: string | null;
   children?: ReactNode;
@@ -258,8 +259,8 @@ function LinkedProject({
 
       {/* La situation du voisin, sur une ligne : son statut, son produit, sa
           période. Les libellés sont portés en propre pour l'assistance — hors
-          du contexte visuel, « Espace client web · depuis février 2026 » ne dit
-          pas lequel des deux est le produit. C'est la règle du bloc
+          du contexte visuel, « Espace client web · mars 2026 → oct. 2026 » ne
+          dit pas lequel des deux est le produit. C'est la règle du bloc
           « Ressources ».
 
           Le `·` est décoratif et garde la couleur du texte qu'il sépare, même
@@ -280,7 +281,7 @@ function LinkedProject({
         <span aria-hidden="true">·</span>
         <span>
           <span className="sr-only">Période : </span>
-          {formatPeriod(startedOn, expectedEndOn)}
+          {formatPeriod(periodStart, periodEnd)}
         </span>
       </p>
 

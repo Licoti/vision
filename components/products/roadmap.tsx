@@ -372,8 +372,8 @@ function Timeline({
                     style={{ left: placement.left }}
                   >
                     {formatPeriodShort(
-                      band.project.startedOn,
-                      band.project.expectedEndOn,
+                      band.project.periodStart,
+                      band.project.periodEnd,
                     )}
                   </span>
                   <div
@@ -525,15 +525,21 @@ export function Roadmap({
     );
   }
 
-  /* Un accompagnement sans **aucune** date n'a pas de barre : `docs/03` §7
-     interdit de positionner arbitrairement ce qui n'a pas de date. Celui qui
-     n'a qu'une fin est posé sur ce seul mois. */
+  /* Un accompagnement dont **aucune activité n'est planifiée** n'a pas de
+     barre : `docs/03` §7 interdit de positionner arbitrairement ce qui n'a pas
+     de date.
+
+     **Une seule condition suffit désormais.** La période étant déduite des
+     activités (31/08/2026), ses deux bornes sont présentes ensemble ou absentes
+     ensemble : `min` et `max` portent sur les mêmes lignes. Le cas « il n'a
+     qu'une fin, on le pose sur ce seul mois » ne peut plus se produire — c'est
+     le `coalesce` de `projectPeriods` qui l'a fermé, en base et non ici. */
   const dated: DatedProject[] = [];
   const undated: ProductProject[] = [];
 
   for (const project of projects) {
-    const start = project.startedOn ?? project.expectedEndOn;
-    if (start) dated.push({ project, start, end: project.expectedEndOn });
+    const start = project.periodStart;
+    if (start) dated.push({ project, start, end: project.periodEnd });
     else undated.push(project);
   }
 
@@ -541,7 +547,7 @@ export function Roadmap({
      de rien d'autre. Les relevés d'indicateurs n'y entrent plus : ils ont leur
      bloc et leur axe depuis le 17/08/2026. */
   const scale = timelineScale([
-    ...projects.flatMap((project) => [project.startedOn, project.expectedEndOn]),
+    ...projects.flatMap((project) => [project.periodStart, project.periodEnd]),
     ...milestones.map((milestone) => milestone.measuredOn),
   ]);
 

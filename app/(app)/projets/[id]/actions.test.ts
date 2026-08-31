@@ -416,6 +416,9 @@ function form(entries: Record<string, string>): FormData {
 function saisie(overrides: Record<string, string> = {}): FormData {
   return form({
     activityTypeId: f.typeId,
+    // Le mode de planification (31/08/2026) : le panneau en sert toujours un
+    // coché, et sans lui la saisie est refusée avant d'atteindre la base.
+    planning: "period",
     periodStart: "2026-11-01",
     periodEnd: "2026-11-30",
     externalUrl: LINK,
@@ -549,6 +552,7 @@ describe("updateActivity — la correction du lien", () => {
       { values: {} as never, errors: {} },
       form({
         activityTypeId: f.typeId,
+        planning: "period",
         periodStart: "2026-10-01",
         periodEnd: "2026-10-31",
         externalUrl: LINK,
@@ -571,6 +575,7 @@ describe("updateActivity — la correction du lien", () => {
       { values: {} as never, errors: {} },
       form({
         activityTypeId: f.typeId,
+        planning: "period",
         periodStart: "2026-10-01",
         periodEnd: "2026-10-31",
         externalUrl: "",
@@ -594,6 +599,7 @@ describe("updateActivity — la correction du lien", () => {
       { values: {} as never, errors: {} },
       form({
         activityTypeId: f.typeId,
+        planning: "period",
         periodStart: "2026-10-01",
         periodEnd: "2026-10-31",
         externalUrl: "https://exemple.invalid/force",
@@ -704,6 +710,7 @@ describe("le journal de l'activité — cinq gestes", () => {
         EMPTY,
         form({
           activityTypeId: f.typeId,
+          planning: "period",
           periodStart: "2026-12-01",
           periodEnd: "2027-01-31",
         }),
@@ -728,6 +735,7 @@ describe("le journal de l'activité — cinq gestes", () => {
     const identique = () =>
       form({
         activityTypeId: f.typeId,
+        planning: "period",
         periodStart: "2026-12-01",
         periodEnd: "2026-12-31",
       });
@@ -756,6 +764,7 @@ describe("le journal de l'activité — cinq gestes", () => {
         EMPTY,
         form({
           activityTypeId: f.typeId,
+          planning: "period",
           periodStart: "2026-12-01",
           periodEnd: "2026-12-31",
           participantIds: f.contributorId,

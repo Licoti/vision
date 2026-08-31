@@ -18,6 +18,8 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { db } from "@/lib/db/client";
 import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
 import {
+  activities,
+  activityTypes,
   approaches,
   domains,
   entities,
@@ -42,6 +44,8 @@ import {
 
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
 const teardownOrder = [
+  activities,
+  activityTypes,
   projectJobs,
   projectApproaches,
   projectMembers,
@@ -290,8 +294,10 @@ type DetailFixture = {
   secondId: string;
   /** Daté entre les deux, mais archivé : il ne compte pas. */
   archivedId: string;
-  /** Sans date de début : il ne se situe dans aucune chronologie. */
+  /** Sans activité datée : il ne se situe dans aucune chronologie. */
   undatedId: string;
+  /** Le type qui sert à dater : une période s'y pose par une activité. */
+  activityTypeId: string;
 };
 
 let c: DetailFixture;
@@ -335,28 +341,54 @@ async function seedDetailDomain(): Promise<DetailFixture> {
     entityId: entity.id,
   });
 
+  /* **Les dates ne vivent plus sur le projet** : sa période se déduit des
+     périodes de ses activités (31/08/2026). Dater un projet de fixture, c'est
+     donc lui donner une activité datée. */
+  const activityType = await scope.insert(activityTypes, {
+    label: "Atelier c",
+    family: "framing",
+  });
+
+  /** Une activité datée, le seul moyen de poser la période d'un projet. */
+  async function period(
+    projectId: string,
+    periodStart: string,
+    periodEnd?: string,
+  ) {
+    await scope.insert(activities, {
+      projectId,
+      activityTypeId: activityType.id,
+      // `done` exige une fin ; sans fin, l'activité reste `planned`.
+      state: periodEnd ? "done" : "planned",
+      periodStart,
+      ...(periodEnd ? { periodEnd } : {}),
+    });
+  }
+
   const first = await scope.insert(projects, {
     name: "Premier c",
     productId: product.id,
     statusId: done.id,
-    startedOn: "2024-03-01",
-    expectedEndOn: "2024-09-30",
   });
+  await period(first.id, "2024-03-01", "2024-09-30");
+
   const second = await scope.insert(projects, {
     name: "Second c",
     productId: product.id,
     statusId: active.id,
     objective: "Permettre les opérations courantes sans contact.",
     sponsor: "Direction des opérations c",
-    startedOn: "2026-02-01",
   });
+  await period(second.id, "2026-02-01");
+
   const archived = await scope.insert(projects, {
     name: "Archivé c",
     productId: product.id,
     statusId: active.id,
-    startedOn: "2025-01-01",
   });
+  await period(archived.id, "2025-01-01");
   await scope.archive(projects, archived.id);
+
   const undated = await scope.insert(projects, {
     name: "Sans date c",
     productId: product.id,
@@ -365,12 +397,12 @@ async function seedDetailDomain(): Promise<DetailFixture> {
 
   // Plus ancien que tous les autres, mais chez un autre produit : le rang de
   // « Second c » ne doit pas s'en apercevoir.
-  await scope.insert(projects, {
+  const neighbour = await scope.insert(projects, {
     name: "Voisin c",
     productId: otherProduct.id,
     statusId: active.id,
-    startedOn: "2020-01-01",
   });
+  await period(neighbour.id, "2020-01-01");
 
   await scope.insert(projectApproaches, {
     projectId: second.id,
@@ -424,6 +456,7 @@ async function seedDetailDomain(): Promise<DetailFixture> {
     secondId: second.id,
     archivedId: archived.id,
     undatedId: undated.id,
+    activityTypeId: activityType.id,
   };
 }
 
@@ -987,8 +1020,11 @@ describe("findProjectDetail", () => {
     expect(project?.entityLabel).toBe("Banque de détail c");
     expect(project?.statusLabel).toBe("En cours");
     expect(project?.statusNature).toBe("active");
-    expect(project?.startedOn).toBe("2026-02-01");
-    expect(project?.expectedEndOn).toBeNull();
+    /* Les deux bornes sortent ensemble : l'unique activité de « Second c » n'a
+       pas de fin, et le `coalesce` de `projectPeriods` rend son début des deux
+       côtés. */
+    expect(project?.periodStart).toBe("2026-02-01");
+    expect(project?.periodEnd).toBe("2026-02-01");
   });
 
   test("les approches sortent dans l'ordre du référentiel, pas dans celui de l'alphabet", async () => {
@@ -1020,7 +1056,8 @@ describe("findProjectDetail", () => {
     expect(project?.team).toEqual([]);
     expect(project?.approachLabels).toEqual([]);
     expect(project?.sponsor).toBeNull();
-    expect(project?.startedOn).toBeNull();
+    expect(project?.periodStart).toBeNull();
+    expect(project?.periodEnd).toBeNull();
   });
 
   test("un projet archivé reste lisible", async () => {
@@ -1087,7 +1124,7 @@ describe("findAccompanimentRank", () => {
     expect(await rankOf(c.firstId)).toBe(1);
   });
 
-  test("un projet sans date de début n'a pas de rang", async () => {
+  test("un projet sans activité datée n'a pas de rang", async () => {
     expect(await rankOf(c.undatedId)).toBeNull();
   });
 
@@ -1109,7 +1146,12 @@ describe("findAccompanimentRank", () => {
       name: "Intercalé c",
       productId: c.productId,
       statusId: c.activeStatusId,
-      startedOn: "2025-06-01",
+    });
+    await c.scope.insert(activities, {
+      projectId: inserted.id,
+      activityTypeId: c.activityTypeId,
+      state: "planned",
+      periodStart: "2025-06-01",
     });
 
     expect(await rankOf(c.secondId)).toBe(3);

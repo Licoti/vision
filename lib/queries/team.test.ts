@@ -41,6 +41,8 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { db } from "@/lib/db/client";
 import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
 import {
+  activities,
+  activityTypes,
   domains,
   entities,
   jobs,
@@ -58,6 +60,8 @@ import { findPersonDetail, listTeam, listTeamFilterOptions } from "./team";
 
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
 const teardownOrder = [
+  activities,
+  activityTypes,
   projectMembers,
   projects,
   products,
@@ -298,13 +302,36 @@ async function seedDomain(label: string): Promise<Fixture> {
     position: "1",
   });
 
+  /* **Les dates ne vivent plus sur le projet** : sa période se déduit des
+     périodes de ses activités (31/08/2026). Dater un projet de fixture, c'est
+     donc lui donner une activité datée. */
+  const activityType = await scope.insert(activityTypes, {
+    label: `Atelier ${label}`,
+    family: "framing",
+  });
+
+  /** Une activité datée, le seul moyen de poser la période d'un projet. */
+  async function period(
+    projectId: string,
+    periodStart: string,
+    periodEnd?: string,
+  ) {
+    await scope.insert(activities, {
+      projectId,
+      activityTypeId: activityType.id,
+      // `done` exige une fin ; sans fin, l'activité reste `planned`.
+      state: periodEnd ? "done" : "planned",
+      periodStart,
+      ...(periodEnd ? { periodEnd } : {}),
+    });
+  }
+
   const fresh = await scope.insert(projects, {
     name: `Refonte ${label}`,
     productId: product.id,
     statusId: active.id,
-    startedOn: "2026-02-01",
-    expectedEndOn: "2026-07-31",
   });
+  await period(fresh.id, "2026-02-01", "2026-07-31");
   /* Sous un produit archivé : la fiche le garde (arbitrage du ticket), là où
      `listProjects` l'écarterait. Un produit rangé ne fait pas disparaître ce
      que la personne a fait. */
@@ -312,16 +339,18 @@ async function seedDomain(label: string): Promise<Fixture> {
     name: `Reprise ${label}`,
     productId: archivedProduct.id,
     statusId: active.id,
-    startedOn: "2025-05-01",
   });
+  await period(underArchived.id, "2025-05-01");
+
   const old = await scope.insert(projects, {
     name: `Audit ${label}`,
     productId: product.id,
     statusId: done.id,
-    startedOn: "2024-03-01",
-    expectedEndOn: "2024-09-30",
   });
-  // Sans date : il doit fermer la liste, jamais l'ouvrir (`nulls last`).
+  await period(old.id, "2024-03-01", "2024-09-30");
+
+  // Sans activité datée : il doit fermer la liste, jamais l'ouvrir
+  // (`nulls last`).
   const undated = await scope.insert(projects, {
     name: `Cadrage ${label}`,
     productId: product.id,
@@ -334,14 +363,15 @@ async function seedDomain(label: string): Promise<Fixture> {
     name: `Rangé ${label}`,
     productId: product.id,
     statusId: active.id,
-    startedOn: "2023-01-01",
   });
+  await period(archivedProject.id, "2023-01-01");
+
   const probeLinkProject = await scope.insert(projects, {
     name: `Sonde liaison projet ${label}`,
     productId: product.id,
     statusId: active.id,
-    startedOn: "2022-01-01",
   });
+  await period(probeLinkProject.id, "2022-01-01");
 
   for (const projectId of [
     fresh.id,
@@ -1003,8 +1033,8 @@ describe("findPersonDetail", () => {
     expect(fresh?.name).toBe("Refonte a");
     expect(fresh?.statusLabel).toBe("En cours a");
     expect(fresh?.statusNature).toBe("active");
-    expect(fresh?.startedOn).toBe("2026-02-01");
-    expect(fresh?.expectedEndOn).toBe("2026-07-31");
+    expect(fresh?.periodStart).toBe("2026-02-01");
+    expect(fresh?.periodEnd).toBe("2026-07-31");
   });
 
   test("un accompagnement archivé n'est pas dans la fiche", async () => {

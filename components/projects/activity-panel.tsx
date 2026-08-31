@@ -56,6 +56,16 @@
  * correction, cette dérivation n'a lieu **que si la période a bougé** — même
  * fichier, même raison.
  *
+ * **La planification se choisit en trois modes exclusifs** (31/08/2026) — à
+ * planifier, période, date précise —, et les champs suivent le choix. Ce
+ * fichier a longtemps affirmé le contraire : *« sans JavaScript, un champ ne
+ * disparaît pas »*, écrit pour justifier que la case et les deux dates
+ * cohabitent. L'énoncé était juste quand il a été écrit et ne l'est plus —
+ * `:has()` est disponible partout depuis fin 2023, et `checkbox-chip.ts` s'en
+ * sert déjà pour teinter une pastille cochée sans une ligne de script. Le
+ * masquage est donc en CSS, `hidden group-has-checked:flex`, et **le panneau ne
+ * gagne aucun état React** : ce qui précède reste vrai au caractère près.
+ *
  * **Aucune ombre.** Le design system nomme ses élévations sans leur donner de
  * valeur (`docs/design/design-system.md` §8) ; la séparation vient du voile et
  * d'un filet, deux jetons du thème.
@@ -94,6 +104,19 @@ import type {
   ActivityTypeOption,
   ApproachOption,
 } from "@/lib/queries/activities";
+
+/* La carte d'une option de planification : un bouton radio, un titre, et la
+   phrase qui dit à quoi l'option sert.
+
+   **Ces classes sont celles du « Type » de produit** (`product-form.tsx`), au
+   caractère près — deuxième écriture du même motif. Les replier dans le socle
+   demanderait d'ouvrir ce fichier-là, hors du périmètre de cette demande
+   (règle 3) ; le point est au journal technique avec sa destination.
+
+   `py-3` et non `py-2` : la clause 2 de `socleLock` interdit le second, qui est
+   la signature d'un bouton secondaire. */
+const PLANNING_CARD =
+  "flex items-start gap-3 rounded-lg border border-content-neutral-normal bg-surface-neutral-pale px-4 py-3";
 
 /* Les six libellés de famille vivaient ici jusqu'à T7.4, qui en a eu besoin
    côté serveur pour la liste d'administration : ils sont partis dans
@@ -216,90 +239,200 @@ export function ActivityPanel({
         )}
       </FormField>
 
-      {/* D14 — « à planifier » n'est pas un état du schéma : c'est une
-          activité prévue qui n'a pas encore de date. La case et la période
-          se répondent, et le dire en toutes lettres est ce qui remplace le
-          masquage au clic de la maquette : sans JavaScript, un champ ne
-          disparaît pas. Les deux ensemble sont **refusées**, la saisie
-          revenant avec ses valeurs — plutôt que d'en jeter une des deux. */}
-      <fieldset className="flex flex-col gap-2">
+      {/* **Trois modes exclusifs, et les champs suivent le choix** (31/08/2026).
+
+          La case « à planifier » et les deux dates vivaient ici côte à côte,
+          toutes visibles, et leurs combinaisons illégales étaient refusées
+          après coup. Le commentaire qui s'y trouvait disait pourquoi : « sans
+          JavaScript, un champ ne disparaît pas ». **Ce n'est plus vrai.**
+          `:has()` est disponible partout depuis fin 2023, et le dépôt s'en sert
+          déjà — `checkbox-chip.ts` porte son état coché en `has-checked:`,
+          « il suit le clic, il suit une remise à zéro du formulaire, et il
+          fonctionne sans une ligne de JavaScript ».
+
+          Chaque option est un `group` qui contient sa carte **et** ses champs ;
+          le bloc de champs porte `hidden group-has-checked:flex`. Aucun état
+          React, rien à re-rendre, et le geste est identique avec et sans
+          script. C'est le premier masquage conditionnel en CSS pur du dépôt.
+
+          **Les trois blocs restent dans le document servi**, donc postés : ce
+          n'est pas un défaut à contourner, c'est ce qui rend les deux régimes
+          identiques. C'est le serveur qui décide lesquels comptent, sur
+          `planning` et sur rien d'autre (`lib/forms/activity.ts`).
+
+          La forme visuelle n'est pas neuve : c'est celle du « Type » de produit
+          (`product-form.tsx`), une carte par valeur, avec la phrase qui dit à
+          quoi elle sert. **Aucune teinte de sélection** — le radio natif porte
+          l'état, les champs qui apparaissent le portent mieux encore, et
+          `docs/06` §11 veut la hiérarchie par l'espacement et le poids, pas par
+          la couleur. */}
+      <fieldset className="flex flex-col gap-3">
         <legend className="text-2xs font-semibold text-content-neutral-dark uppercase">
-          Période
+          Planification
           <span className="font-normal text-content-neutral-base">
             {" (obligatoire)"}
           </span>
         </legend>
-        <label
-          htmlFor="activite-unscheduled"
-          className="flex items-center gap-2 text-sm text-content-neutral-darkest"
-        >
-          <input
-            id="activite-unscheduled"
-            name="isUnscheduled"
-            type="checkbox"
-            defaultChecked={values.isUnscheduled}
-            aria-invalid={errors.isUnscheduled ? true : undefined}
-            aria-describedby={
-              errors.isUnscheduled ? "activite-unscheduled-erreur" : undefined
-            }
-            className="accent-surface-primary-base"
-          />
-          À planifier, sans date
-        </label>
-        <p className="text-xs text-content-neutral-base">
-          {
-            "Cochée, elle remplace la période : l'activité rejoint le groupe « à planifier » de la roadmap. La période se saisit au jour et se lit au mois."
-          }
-        </p>
-        {errors.isUnscheduled ? (
+
+        {errors.planning ? (
           <p
-            id="activite-unscheduled-erreur"
+            id="activite-planning-erreur"
             className="text-xs font-semibold text-content-danger-dark"
           >
-            {errors.isUnscheduled}
+            {errors.planning}
           </p>
         ) : null}
 
-        <div className="flex flex-wrap gap-4">
-          <FormField
-            label="Début"
-            htmlFor="activite-debut"
-            error={errors.periodStart}
-            errorId="activite-debut-erreur"
-            className="flex-1"
+        {/* « À planifier » — D14. Aucun champ dessous : c'est tout le propos. */}
+        <div className="group flex flex-col gap-3">
+          <label
+            htmlFor="activite-planning-unscheduled"
+            className={PLANNING_CARD}
           >
             <input
-              id="activite-debut"
-              name="periodStart"
-              type="date"
-              defaultValue={values.periodStart}
-              aria-invalid={errors.periodStart ? true : undefined}
+              id="activite-planning-unscheduled"
+              name="planning"
+              type="radio"
+              value="unscheduled"
+              defaultChecked={values.planning === "unscheduled"}
               aria-describedby={
-                errors.periodStart ? "activite-debut-erreur" : undefined
+                errors.planning ? "activite-planning-erreur" : undefined
               }
-              className={`${CONTROL} ${borderOf(errors.periodStart)}`}
+              className="mt-1 accent-surface-primary-base"
             />
-          </FormField>
+            <span className="flex flex-col gap-1">
+              <span className="text-sm font-semibold text-content-neutral-darkest">
+                À planifier
+              </span>
+              <span className="text-xs text-content-neutral-dark">
+                {
+                  "La date n'est pas encore connue. L'activité rejoint le groupe « à planifier » de la roadmap."
+                }
+              </span>
+            </span>
+          </label>
+        </div>
 
-          <FormField
-            label="Fin"
-            htmlFor="activite-fin"
-            error={errors.periodEnd}
-            errorId="activite-fin-erreur"
-            className="flex-1"
-          >
+        {/* « Période » — le début est exigé, la fin ne l'est pas : `docs/03` §4
+            n'attend qu'une date de début d'une activité en cours. */}
+        <div className="group flex flex-col gap-3">
+          <label htmlFor="activite-planning-period" className={PLANNING_CARD}>
             <input
-              id="activite-fin"
-              name="periodEnd"
-              type="date"
-              defaultValue={values.periodEnd}
-              aria-invalid={errors.periodEnd ? true : undefined}
+              id="activite-planning-period"
+              name="planning"
+              type="radio"
+              value="period"
+              defaultChecked={values.planning === "period"}
               aria-describedby={
-                errors.periodEnd ? "activite-fin-erreur" : undefined
+                errors.planning ? "activite-planning-erreur" : undefined
               }
-              className={`${CONTROL} ${borderOf(errors.periodEnd)}`}
+              className="mt-1 accent-surface-primary-base"
             />
-          </FormField>
+            <span className="flex flex-col gap-1">
+              <span className="text-sm font-semibold text-content-neutral-darkest">
+                Période
+              </span>
+              <span className="text-xs text-content-neutral-dark">
+                Sur plusieurs jours ou semaines. La période se saisit au jour et
+                se lit au mois.
+              </span>
+            </span>
+          </label>
+
+          {/* Les champs sont **hors du `label`** : cliquer une date ne doit pas
+              traverser un label et retomber sur son bouton radio. */}
+          <div className="hidden flex-wrap gap-4 pl-4 group-has-checked:flex">
+            <FormField
+              label="Début"
+              htmlFor="activite-debut"
+              error={errors.periodStart}
+              errorId="activite-debut-erreur"
+              className="flex-1"
+            >
+              <input
+                id="activite-debut"
+                name="periodStart"
+                type="date"
+                defaultValue={values.periodStart}
+                aria-invalid={errors.periodStart ? true : undefined}
+                aria-describedby={
+                  errors.periodStart ? "activite-debut-erreur" : undefined
+                }
+                className={`${CONTROL} ${borderOf(errors.periodStart)}`}
+              />
+            </FormField>
+
+            <FormField
+              label="Fin"
+              htmlFor="activite-fin"
+              note="Facultative."
+              error={errors.periodEnd}
+              errorId="activite-fin-erreur"
+              className="flex-1"
+            >
+              <input
+                id="activite-fin"
+                name="periodEnd"
+                type="date"
+                defaultValue={values.periodEnd}
+                aria-invalid={errors.periodEnd ? true : undefined}
+                aria-describedby={
+                  errors.periodEnd ? "activite-fin-erreur" : undefined
+                }
+                className={`${CONTROL} ${borderOf(errors.periodEnd)}`}
+              />
+            </FormField>
+          </div>
+        </div>
+
+        {/* « Date précise » — en base, une période d'un jour : la même date aux
+            deux bornes. Aucune colonne ne dit le mode, il se relit sur elles. */}
+        <div className="group flex flex-col gap-3">
+          <label htmlFor="activite-planning-day" className={PLANNING_CARD}>
+            <input
+              id="activite-planning-day"
+              name="planning"
+              type="radio"
+              value="day"
+              defaultChecked={values.planning === "day"}
+              aria-describedby={
+                errors.planning ? "activite-planning-erreur" : undefined
+              }
+              className="mt-1 accent-surface-primary-base"
+            />
+            <span className="flex flex-col gap-1">
+              <span className="text-sm font-semibold text-content-neutral-darkest">
+                Date précise
+              </span>
+              <span className="text-xs text-content-neutral-dark">
+                {
+                  "Un seul jour — une restitution, un atelier. Elle se lit au jour."
+                }
+              </span>
+            </span>
+          </label>
+
+          <div className="hidden flex-wrap gap-4 pl-4 group-has-checked:flex">
+            <FormField
+              label="Le"
+              htmlFor="activite-jour"
+              error={errors.periodDay}
+              errorId="activite-jour-erreur"
+              className="flex-1"
+            >
+              <input
+                id="activite-jour"
+                name="periodDay"
+                type="date"
+                defaultValue={values.periodDay}
+                aria-invalid={errors.periodDay ? true : undefined}
+                aria-describedby={
+                  errors.periodDay ? "activite-jour-erreur" : undefined
+                }
+                className={`${CONTROL} ${borderOf(errors.periodDay)}`}
+              />
+            </FormField>
+          </div>
         </div>
 
         {/* L'état n'est pas un champ : il se déduit de ce qui précède

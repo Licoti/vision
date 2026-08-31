@@ -254,14 +254,12 @@ async function seedDomain(label: string): Promise<Fixture> {
     name: projectName,
     productId: product.id,
     statusId: status.id,
-    startedOn: "2026-02-01",
   });
   const otherProjectName = `Audit ${label}`;
   const other = await scope.insert(projects, {
     name: otherProjectName,
     productId: product.id,
     statusId: status.id,
-    startedOn: "2026-03-01",
   });
 
   return {

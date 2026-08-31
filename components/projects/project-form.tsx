@@ -328,61 +328,12 @@ export function ProjectForm({
         </FormField>
       </Section>
 
-      {/* La période se saisit au jour et se lit au mois (D13) : on saisit plus
-          fin qu'on n'affiche, et la fin reste une fin **attendue**. */}
-      <Section>
-        <SectionHeader
-          title="Période"
-          note="Facultative. Un accompagnement qui n'a pas de fin prévue s'affichera « depuis » son mois de début."
-        />
-        <fieldset>
-          {/* Le titre de section le dit à l'œil ; la légende le dit au moment
-              où l'on entre dans l'un des deux champs. Les deux sont nécessaires
-              et un seul est visible. */}
-          <legend className="sr-only">Période</legend>
-          <div className="flex flex-wrap gap-4">
-            <FormField
-              label="Début"
-              htmlFor={id("startedOn")}
-              error={errors.startedOn}
-              errorId={errorId("startedOn")}
-              className="flex-1"
-            >
-              <input
-                id={id("startedOn")}
-                name="startedOn"
-                type="date"
-                defaultValue={values.startedOn}
-                aria-invalid={errors.startedOn ? true : undefined}
-                aria-describedby={
-                  errors.startedOn ? errorId("startedOn") : undefined
-                }
-                className={`${CONTROL_TEXT} ${borderOf(errors.startedOn)}`}
-              />
-            </FormField>
-
-            <FormField
-              label="Fin attendue"
-              htmlFor={id("expectedEndOn")}
-              error={errors.expectedEndOn}
-              errorId={errorId("expectedEndOn")}
-              className="flex-1"
-            >
-              <input
-                id={id("expectedEndOn")}
-                name="expectedEndOn"
-                type="date"
-                defaultValue={values.expectedEndOn}
-                aria-invalid={errors.expectedEndOn ? true : undefined}
-                aria-describedby={
-                  errors.expectedEndOn ? errorId("expectedEndOn") : undefined
-                }
-                className={`${CONTROL_TEXT} ${borderOf(errors.expectedEndOn)}`}
-              />
-            </FormField>
-          </div>
-        </fieldset>
-      </Section>
+      {/* **Aucune section « Période ».** Elle portait deux champs de dates
+          jusqu'au 31/08/2026 ; la période d'un accompagnement se déduit
+          désormais des périodes de ses activités
+          (`lib/queries/project-period.ts`), et se lit sur sa page. Rien ne la
+          remplace ici : la saisie a lieu là où le fait a lieu, sur l'activité.
+          Le formulaire compte donc trois sections, et non quatre. */}
 
       <Section>
         <SectionHeader

@@ -26,6 +26,7 @@
 import { describe, expect, test } from "vitest";
 
 import {
+  formatActivityPeriod,
   formatDateMonth,
   formatDay,
   formatEventDay,
@@ -168,6 +169,75 @@ describe("formatMonthTick", () => {
        premier, donc **toute** graduation reculerait sans `timeZone: "UTC"` —
        et « janv. '26 » deviendrait « déc. '25 ». */
     expect(formatMonthTick("2026-01")).toBe("janv. '26");
+  });
+});
+
+describe("formatActivityPeriod", () => {
+  test("« à planifier » passe avant toute lecture de date", () => {
+    // D14 — et le drapeau est regardé en premier : une ligne qui porterait à
+    // la fois la case et des dates dirait « À planifier », jamais les deux.
+    expect(formatActivityPeriod(null, null, true)).toBe("À planifier");
+    expect(formatActivityPeriod("2026-06-12", "2026-06-12", true)).toBe(
+      "À planifier",
+    );
+  });
+
+  test("deux bornes du même jour se lisent au jour", () => {
+    /* La troisième entorse bornée au mois de D13 (31/08/2026), et sa raison
+       est celle que le module écrit déjà deux fois : un fait daté ponctuel
+       n'est pas une période. Une restitution du 12 juin perdrait son sens en
+       « juin 2026 ». */
+    expect(formatActivityPeriod("2026-06-12", "2026-06-12", false)).toBe(
+      "12 juin 2026",
+    );
+  });
+
+  test("le jour passe **avant** le repli au mois, qui l'écraserait", () => {
+    // Les deux bornes d'un même jour tombent aussi dans le même mois : sans
+    // l'ordre des branches, « 12 juin 2026 » se lirait « juin 2026 ».
+    expect(formatActivityPeriod("2026-06-12", "2026-06-12", false)).not.toBe(
+      "juin 2026",
+    );
+  });
+
+  test("une période d'un mois entier garde son mois", () => {
+    /* La frontière : ce que `docs/03` §6 refuse est la précision **fabriquée**.
+       Du 1er au 31 août n'est pas une date précise, et rien ne la fait passer
+       pour telle. */
+    expect(formatActivityPeriod("2026-08-01", "2026-08-31", false)).toBe(
+      "août 2026",
+    );
+  });
+
+  test("deux mois distincts se lisent en fourchette", () => {
+    expect(formatActivityPeriod("2026-03-02", "2026-05-31", false)).toBe(
+      "mars 2026 → mai 2026",
+    );
+  });
+
+  test("un début seul se lit au mois", () => {
+    expect(formatActivityPeriod("2026-08-03", null, false)).toBe("août 2026");
+  });
+
+  test("une fin seule se lit au mois", () => {
+    // Le schéma l'autorise — seuls `planned` et `done` sont contraints.
+    expect(formatActivityPeriod(null, "2026-08-31", false)).toBe("août 2026");
+  });
+
+  test("aucune date et aucun « à planifier » dit l'absence", () => {
+    expect(formatActivityPeriod(null, null, false)).toBe(
+      "Période non renseignée",
+    );
+  });
+
+  test("un premier du mois ne recule pas d'un mois", () => {
+    // Le piège du fuseau, sur les deux branches : au jour comme au mois.
+    expect(formatActivityPeriod("2026-01-01", "2026-01-01", false)).toBe(
+      "1 janvier 2026",
+    );
+    expect(formatActivityPeriod("2026-01-01", "2026-03-31", false)).toBe(
+      "janvier 2026 → mars 2026",
+    );
   });
 });
 

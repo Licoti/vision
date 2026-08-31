@@ -8671,3 +8671,308 @@ scopés. **Aucun test neuf, et c'est le régime des reprises de rendu** (T7.5) :
 liste est inchangé, et les 1 405 tests existants le prouvent. Le conjonctif a été éprouvé par
 l'URL — `?competence=<UX Research>` rend 4 lignes, `?competence=<Accessibilité>` en rend 3, les deux
 ensemble en rendent **1**, et une compétence hors domaine n'en filtre aucune.
+
+---
+
+## La période d'un accompagnement se déduit de ses activités, hors ticket (31/08/2026)
+
+Demande de l'humain. `projects.started_on` et `projects.expected_end_on` sont supprimées
+(migration `0012`), et la période d'un accompagnement se déduit des périodes de ses activités —
+la seule source de vérité des dates. **Explicitement dispensé de ticket**, comme les reprises du 28
+au 31/08.
+
+### Le second lieu de vérité n'était pas une hypothèse : il était déjà faux
+
+Rien dans le dépôt ne reliait les deux niveaux. Aucun `CHECK`, aucune validation, aucune lecture ne
+comparait `activities.period_*` à la période du projet qui les portait ; l'ordre
+`expected_end_on >= started_on` vivait dans `parseProjectForm` **et nulle part ailleurs**, donc une
+seed, un script ou une migration écrivaient ce qu'ils voulaient.
+
+**Mesuré avant d'être affirmé.** Une sonde en lecture seule sur la base de développement, comparant
+les deux colonnes à `min/max` sur les activités, sur les **sept** accompagnements vivants :
+
+| Accompagnement | Saisi | Déduit |
+|---|---|---|
+| AXE - Cadrage du front | 2024-02-01 → 2024-03-31 | **identique** |
+| Audit ergonomique | 2026-07-01 → 2026-08-28 | 2026-07-01 → 2026-07-30 |
+| Autonomie des opérations courantes | 2026-02-01 → *(ouvert)* | 2026-03-01 → 2026-10-31 |
+| Phase de discovery | 2026-01-15 → *(ouvert)* | 2026-01-15 → 2026-01-15 |
+| Phase de discovery de Pulse | 2026-08-01 → 2026-08-31 | 2026-08-10 → 2026-08-10 |
+| Phase de prototypage et tests utilisateurs | 2026-01-01 → *(ouvert)* | 2026-01-01 → 2026-07-15 |
+| Refonte du parcours de virement | 2024-03-01 → 2024-09-30 | **2024-04-01** → 2024-09-30 |
+
+**Un sur sept s'accordait avec ses propres activités.** Quatre portaient une contradiction sur une
+valeur remplie, deux n'avaient qu'une fin ouverte à refermer. Ce n'est pas une divergence redoutée,
+c'est une divergence installée.
+
+### La règle, et les quatre points qu'elle tranche
+
+`lib/queries/project-period.ts`, une sous-requête groupée, écrite **une fois** et jointe par cinq
+lectures :
+
+```
+début = min(coalesce(period_start, period_end))
+fin   = max(coalesce(period_end,   period_start))
+sur les activités non archivées et non annulées
+```
+
+**Le `coalesce` va dans les deux sens**, et ce n'est pas une symétrie décorative : le schéma
+autorise une activité `done` ou `in_progress` qui n'a **que** sa fin —
+`activities_planned_requires_period_or_unscheduled` n'exige un début que pour `planned`. Sans lui,
+un accompagnement aurait une fin et pas de début, et la frise n'aurait pas su où le poser.
+
+**Les activités `planned` comptent ici, alors que `last_activity_at` les exclut** (T2.1). C'est la
+seule chose de ce geste qu'on se reposera dans six mois, et les deux champs ont raison chacun de son
+côté : `last_activity_at` dit *depuis quand ça n'a pas bougé*, et une activité qui n'a pas eu lieu
+n'y entre pas ; la période dit *de quand à quand ça s'étend*, et ce qui vient en fait partie. Un
+audit prévu en octobre allonge la période et ne rafraîchit rien.
+
+**Les activités « à planifier » (D14) sortent d'elles-mêmes** : leurs deux dates sont nulles, `min`
+et `max` les ignorent. Aucune clause n'a eu à être écrite — c'est la propriété qui est testée, pas
+une ligne de code.
+
+**Une sous-requête groupée jointe, jamais une sous-requête corrélée.** T7.3 a trouvé un 500 exactement
+là : en position de sélection, Drizzle perd la qualification de table d'une sous-requête corrélée. Le
+modèle de `lastActivityExpression` ne vaut que dans un `UPDATE`, où il n'y a qu'une table.
+
+### Deux absences qui ne se ressemblent pas
+
+`findAccompanimentRank` a dû garder **deux** gardes, et la seconde n'était pas évidente. Un projet
+sans **aucune** activité n'a pas de ligne dans le regroupement : la jointure suffit à l'écarter. Un
+projet dont **toutes** les activités sont « à planifier » en a une, avec ses deux bornes nulles —
+et sans `isNotNull(periods.periodStart)` il **ouvrirait** la chronologie du produit, PostgreSQL
+plaçant les nuls en tête d'un tri ascendant. Le cas est né du geste : il n'existait pas avant, une
+colonne nulle n'ayant jamais produit de ligne à joindre. Il a son témoin de test, et sa
+neutralisation le fait tomber seul.
+
+### Le sceau du client, rencontré et respecté
+
+Le module devait typer les deux arguments que `joinedRead` passe à sa lecture. L'`import type` de
+`lib/db/client` a été **refusé par ESLint** — `no-restricted-imports`, « seul `lib/db/scoped.ts`
+importe `lib/db/client` » —, et le contourner par un type-only en aurait respecté la lettre contre
+l'intention. Les deux types sont donc **dérivés de `ScopedDb`** :
+`Parameters<ScopedDb["joinedRead"]>[0]`, puis ses propres paramètres. Un import de moins, et ils ne
+peuvent pas diverger de ce que la couche passe réellement.
+
+### La migration ne reprend rien, et c'est un refus
+
+La `0011` déplaçait une cible qui existait déjà ailleurs. Ici il n'y a rien à déplacer : « sauver »
+une période saisie demanderait de **fabriquer une activité** qui la porte, ce que `docs/03` §6
+interdit — « forcer une date inventée dégrade la donnée plus que de l'assumer absente » — et ce que
+T3.5 a déjà refusé pour « Marquer terminée ». Ce qui se perd est donc borné et nommable : la période
+saisie d'un accompagnement **dont aucune activité ne porte de date**. Aucun des sept de la base de
+développement n'est dans ce cas.
+
+### Deux branches d'affichage devenues inatteignables, gardées
+
+`formatPeriod` et `formatPeriodShort` portent quatre cas, dont « depuis mars 2026 » et « jusqu'à
+septembre 2024 ». Pour un accompagnement, **ils ne peuvent plus se produire** : `min` et `max`
+portent sur les mêmes lignes et rendent leurs deux bornes ensemble ou aucune. Les branches restent
+écrites — les fonctions ne sont pas réservées aux accompagnements, et une borne manquante reste un
+état que leur type autorise. C'est un choix, pas un oubli, et le HTML servi le confirme : **zéro
+occurrence de « depuis » sur les sept pages d'accompagnement**, contre trois avant.
+
+Conséquence d'affichage assumée : un accompagnement en cours ne se lit plus « depuis février 2026 »
+mais « mars 2026 → octobre 2026 ». C'est le comportement demandé.
+
+### Trois écarts documentaires, aucune décision rouverte
+
+**Aucune décision de `docs/07` ne traite de ces deux colonnes** — le point n'avait jamais été
+tranché, et la règle 6 n'est pas en cause. Les trois écarts sont ailleurs :
+
+- `docs/04` §3 les énumère (l. 140). Elles n'existent plus.
+- `docs/02` l. 147 dit d'un projet qu'« il a un début et une fin attendue, même approximative ». La
+  **fin attendue** cesse d'exister comme notion saisie : ce qui s'affiche est la fin de la dernière
+  activité planifiée, ce qui n'est pas la même phrase.
+- `docs/06` §5 et §6 affichent toujours une période aux mêmes endroits ; c'est sa **source** qui
+  change, et le document ne l'a jamais nommée.
+
+Deux précédents portent le geste sans qu'aucun ne le décide : **D40** — « le statut d'accompagnement
+d'un produit est calculé, jamais stocké » — et `formatCoverage`, dont ce journal a établi qu'« une
+borne retrouvée parmi des dates saisies n'est pas un indice » au sens de D39. La frontière de
+`CLAUDE.md` est celle de l'indice **qui qualifie** : ni durée, ni rythme, ni densité ne sont
+calculés ici.
+
+**D7 est le seul contre-argument**, et il tenait déjà : un projet peut exister sans aucune activité,
+il n'a alors pas de période — cas rendu partout avant ce geste comme après (`Undated` sur la frise,
+« Période non renseignée » ailleurs, rang `null`).
+
+### Le droit éprouvé par l'action, avec son étape témoin
+
+Le formulaire de correction a été **rejoué en HTTP sans JavaScript**, tous ses champs servis repris
+tels quels, plus `startedOn=1999-01-01` et `expectedEndOn=2099-12-31`. Réponse **303**, comme une
+correction qui réussit — *et le code HTTP ne dit jamais ce qui a été écrit.* La lecture en base
+tranche : les deux colonnes, encore physiquement présentes sur la base de développement faute de
+migration appliquée, **portent toujours 2024-03-01 et 2024-09-30**.
+
+**L'étape témoin est `updated_at`**, déplacé à la seconde de la soumission : sans elle, une action
+refusée aurait rendu le même constat. Les liaisons ont été recomptées — 3 métiers, 2 approches,
+4 membres —, le rejeu n'a donc rien détruit en chemin.
+
+**Premier essai à 500**, et la cause vaut d'être écrite : la charge Flight des champs `$ACTION_*` est
+servie **avec ses entités HTML**, et n'avoir décodé que `&#x27;` et `&amp;` laissait `&quot;` dans le
+JSON de l'identifiant d'action — « Failed to find Server Action », qui ressemble à un refus et n'en
+est pas un.
+
+### Ce qui n'a pas été vérifié au navigateur
+
+Le contraste n'a rien de neuf à mesurer : le diff ne change que du texte dans des positions
+existantes, et aucun couple de couleurs n'est neuf par la position. C'est dit plutôt que tu.
+
+---
+
+## Le mode de planification d'une activité, en trois options exclusives, hors ticket (31/08/2026)
+
+Demande de l'humain, dans la foulée de la dérivation de la période d'accompagnement : puisque les
+activités sont désormais **le seul endroit où une date se saisit**, cette saisie devait être
+comprise sans hésitation. Trois modes exclusifs — à planifier, période, date précise —, et les
+champs suivent le choix. **Explicitement dispensé de ticket.**
+
+### L'énoncé retourné : « sans JavaScript, un champ ne disparaît pas »
+
+`activity-panel.tsx` portait cette phrase depuis T3.3, et elle justifiait tout le reste : la case
+« à planifier » et les deux dates cohabitaient à l'écran, la maquette voulait un masquage au clic,
+le dépôt a préféré un refus de validation.
+
+**La phrase était juste quand elle a été écrite et ne l'est plus.** `:has()` est disponible partout
+depuis fin 2023, et le dépôt s'en servait déjà à quelques fichiers de là : `checkbox-chip.ts` porte
+son état coché en `has-checked:` et argumente, dans son propre en-tête, que le sélecteur « suit le
+clic, suit une remise à zéro du formulaire, et **fonctionne sans une ligne de JavaScript** ». Ce qui
+manquait n'était pas la technique, c'était de la retourner vers le masquage.
+
+Chaque option est un `group` qui contient sa carte **et** ses champs ; le bloc porte
+`hidden group-has-checked:flex`. **Premier masquage conditionnel en CSS pur du dépôt** —
+`group-open:hidden` existait dans `feed.tsx`, mais aucun `has-checked:hidden`.
+
+**La variante a été vérifiée dans la feuille servie, et c'est une discipline à retenir : une
+variante Tailwind qui ne compile pas ne rend aucune erreur, elle rend un champ toujours visible.**
+La règle est bien là — `.group-has-checked\:flex:is(:where(.group):has(:checked) *){display:flex}` —
+et le contrat aurait été faux sans avoir l'air de l'être.
+
+Le panneau **ne gagne aucun état React** : rien à `useState`, rien à re-rendre. Ce que ce fichier
+affirme depuis T3.2 — un formulaire identique avec et sans script — reste vrai au caractère près.
+
+### Les trois blocs sont postés, et c'est le serveur qui tranche
+
+Le CSS masque, il ne retire pas du document : les trois champs de dates partent avec chaque
+soumission. **Ce n'est pas un défaut à contourner, c'est ce qui rend les deux régimes identiques.**
+La conséquence est que `planning` doit être le seul arbitre, et il l'est :
+`deriveActivityState` lit `periodDay` **si et seulement si** le mode est `day`, `periodStart` et
+`periodEnd` si et seulement s'il est `period`, et rien du tout s'il est `unscheduled`.
+
+`readActivityForm` **rétrécit `planning` sur son énuméré avant tout le reste** — le geste de T7.4,
+où la `nature` d'un statut et la `family` d'un type se resserrent avant l'écriture. Une valeur forgée
+ne devient pas un mode : elle devient `""`, que la validation refuse.
+
+### Le déplacement de l'arbitrage du 13/08/2026
+
+Deux refus ont disparu, et **ils n'ont pas été assouplis : ils sont devenus impossibles.** « Une
+activité à planifier n'a pas de période » et « une fin de période sans début n'est pas une période »
+arbitraient une saisie où la case et les deux dates étaient visibles ensemble, donc où l'intention
+était ambiguë. Un mode choisi ne l'est plus.
+
+Le principe qui les fondait — *« Vision ne jette jamais ce qui a été tapé »* — est **déplacé, pas
+abandonné** : un refus revient avec les trois champs remplis comme ils l'étaient, dans tous les
+modes. Ce que le mode écarte, il l'écarte au moment de **composer la ligne**, jamais au moment de
+relire la saisie. Un test le dit explicitement (`values.periodStart` intact quand `input.periodStart`
+porte le jour).
+
+### Une date précise est une période d'un jour — aucune colonne, aucune migration
+
+Le mode est une notion de **saisie**, pas une donnée. En base, « date précise » s'écrit
+`period_start = period_end`, et c'est ce qu'elle est. Tout ce qui existe fonctionne sans retouche :
+les deux `CHECK`, la dérivation d'état, `last_activity_at`, les clés de tri de la roadmap, et la
+période d'accompagnement déduite le matin même — `min` et `max` rendent le même jour.
+
+Le mode se **déduit** à la réouverture (`inferPlanning`), et l'inférence est totale :
+`is_unscheduled` → à planifier ; deux bornes égales et non nulles → date précise ; tout le reste →
+période. Une colonne de plus aurait été une colonne dérivable, c'est-à-dire celle qu'on relit un jour
+sans savoir pourquoi (T5.2).
+
+**Cas de bord assumé** : une ligne qui ne porte **qu'une fin** existe dans le schéma — seuls
+`planned` et `done` sont contraints — sans que ce formulaire ait jamais pu la produire. Elle se
+rouvre en « période » avec un début vide, et sa correction exigera désormais ce début. Un
+resserrement, pas une perte : rien n'est effacé tant qu'on n'enregistre pas. Son test existe.
+
+### La troisième entorse bornée au mois de D13
+
+`formatActivityPeriod` reçoit une branche **avant** son repli au mois : deux bornes du même jour se
+lisent au jour. L'ordre compte — deux bornes d'un même jour tombent aussi dans le même mois, et le
+repli les aurait écrasées ; un test le dit à lui seul.
+
+L'argument n'est pas neuf, `lib/format.ts` l'écrit déjà deux fois : la date de mesure d'un résultat
+(`formatDay`) et le jour d'un événement de journal (`formatEventDay`) sont des **faits datés
+ponctuels**, pas des périodes. Une restitution du 12 juin en est un troisième.
+
+**La frontière est nette et elle vaut d'être écrite** : ce que `docs/03` §6 refuse — « personne ne
+saura dire qu'un atelier était prévu le 14 » — est la précision **fabriquée**. Celle-ci est
+**déclarée** : les deux bornes ne coïncident que parce qu'une personne a choisi ce mode sur une
+activité dont le jour est connu. Une période du 1er au 31 août garde son mois, et un test le tient.
+
+### `required` : ce qu'on croyait être le piège, et ce qu'il est vraiment
+
+Le plan annonçait qu'un `required` sur un champ masqué en CSS bloquerait la soumission sur un
+contrôle que le navigateur ne peut pas mettre au point. **C'est faux ici** : le `<form>` de `Panel`
+porte `noValidate`, la validation native est désactivée, et un `required` n'y bloquerait rien. Le
+vrai motif est plus simple et plus fort : **annoncer `required` sur un champ que le CSS masque est un
+énoncé faux pour l'assistance.** Les trois champs de dates n'en portent donc pas, et l'obligation se
+dit sur la légende puis se tient dans la validation.
+
+### Aucune teinte de sélection, et six couples mesurés
+
+La carte cochée ne change pas de fond. Le radio natif porte l'état, et **les champs qui apparaissent
+le portent mieux encore** ; `docs/06` §11 veut d'ailleurs la hiérarchie « par l'espacement et le
+poids typographique, pas par la couleur ». Cela évite surtout d'ajouter une cinquième position à la
+dette de la carte qui ne se détache d'aucun fond — le plus franc des `surface-neutral-*` plafonne à
+2,22:1, sous le seuil de 3:1 d'un composant.
+
+Mesures sur `surface-neutral-pale` (#fdfdfd), le fond de la carte : titre d'option **17,87:1**,
+phrase d'option **8,12:1**, filet **3,88:1**, pastille du radio **13,65:1**, note de bas **4,98:1**,
+message d'erreur de mode **6,90:1**. Tous au-dessus de leur seuil.
+
+### Le contrat, éprouvé par l'action et non par l'écran
+
+Trois soumissions forgées en HTTP **sans JavaScript**, sur le panneau servi :
+
+- `planning=day` avec `periodDay=2026-06-12` **et** un `periodStart`/`periodEnd` de mars posté à
+  côté → la ligne écrite porte **2026-06-12 aux deux bornes**, et rien de mars ;
+- `planning=unscheduled` avec les trois dates postées → **les deux bornes à `null`**,
+  `is_unscheduled = true`, état `planned` ;
+- `planning=sabot` → **rendu 200**, comme une correction qui réussit, et **`updated_at` inchangé à la
+  milliseconde près**.
+
+**L'étape témoin a été jouée** : une correction valide immédiatement après déplace `updated_at` et
+rétablit les bornes. Sans elle, le troisième constat n'aurait rien prouvé — une action qui ignore un
+champ et une action refusée rendent le même écran.
+
+**Un piège d'outillage, à noter pour la prochaine fois** : une colonne `date` relue par le pilote
+Neon revient en `Date` JavaScript et **recule d'un jour** à la conversion UTC. La première sonde
+annonçait 2026-06-11 pour une ligne qui porte 2026-06-12. Le remède est `to_char(col,'YYYY-MM-DD')`
+en SQL — une date déformée par la sonde ne prouve rien, et elle a l'air juste.
+
+### Un test qui passait pour la mauvaise raison, trouvé par la mise en défaut
+
+« Une date précise au jour même donne une activité en cours » **survivait au retrait de la branche
+`day`** : la période de repli de la fabrique `valid()` couvre elle aussi le jour de référence, et le
+test concluait juste sans rien mesurer. Il constate désormais les **deux bornes** avec l'état, et il
+tombe avec sa règle. Quatre autres neutralisations — le rétrécissement de l'énuméré, l'exigence du
+début en mode période, la branche du jour à l'affichage, l'inférence à la réouverture — font tomber
+exactement leurs tests et rien d'autre.
+
+### Point ouvert : la carte radio est maintenant écrite deux fois
+
+`product-form.tsx:132-160` — le « Type » de produit — porte **les mêmes classes au caractère près**,
+et son commentaire énonce déjà la raison du motif : « deux valeurs fermées se lisent mieux dépliées
+qu'en liste ». Le sélecteur de planification en est la deuxième écriture, et `checkbox-chip.ts` pose
+sa propre condition d'extraction — « une constante et non un composant », pour « deux appelants qui
+n'ont en commun que leur forme ». Cette condition est désormais remplie.
+
+L'extraire demande d'ouvrir `product-form.tsx`, hors du périmètre de cette demande (règle 3), et
+impose de mesurer que son `<form>` servi reste identique à l'octet — le geste exact du 31/08 pour
+`CHECKBOX_CHIP`. La constante vit en attendant dans `activity-panel.tsx` sous le nom
+`PLANNING_CARD`, avec la note de son origine.
+
+**Une classe à ne pas laisser dériver** : `py-3` et non `py-2`. La clause 2 de `socleLock` interdit
+`border-content-neutral-normal.*px-4.*py-2` hors du socle — c'est la signature d'un bouton
+secondaire, et la carte y ressemblerait d'une valeur près.
+

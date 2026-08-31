@@ -75,9 +75,6 @@ export type ProjectFormValues = {
   objective: string;
   sponsor: string;
   statusId: string;
-  /** Colonnes `date` : `YYYY-MM-DD`, telles que les rend `input type="date"`. */
-  startedOn: string;
-  expectedEndOn: string;
   jobIds: string[];
   approachIds: string[];
   /** `personId` → rôle saisi. Les personnes hors équipe y figurent aussi. */
@@ -104,8 +101,6 @@ export const EMPTY_PROJECT_VALUES: ProjectFormValues = {
   objective: "",
   sponsor: "",
   statusId: "",
-  startedOn: "",
-  expectedEndOn: "",
   jobIds: [],
   approachIds: [],
   team: {},
@@ -161,8 +156,6 @@ export function readProjectForm(formData: FormData): ProjectFormValues {
     objective: field(formData, "objective"),
     sponsor: field(formData, "sponsor"),
     statusId: field(formData, "statusId"),
-    startedOn: field(formData, "startedOn"),
-    expectedEndOn: field(formData, "expectedEndOn"),
     jobIds: fields(formData, "jobIds"),
     approachIds: fields(formData, "approachIds"),
     team,
@@ -172,9 +165,17 @@ export function readProjectForm(formData: FormData): ProjectFormValues {
 /* ==========================================================================
    Les dates
 
-   Les colonnes sont en `date` : la valeur y va telle quelle, en `YYYY-MM-DD`.
-   L'affichage, lui, reste au mois partout (D13, `formatPeriod`) — on saisit
-   plus fin qu'on n'affiche, et c'est assumé.
+   **Ce formulaire n'en saisit plus aucune** depuis le 31/08/2026 : la période
+   d'un accompagnement se déduit des périodes de ses activités
+   (`lib/queries/project-period.ts`), qui sont la seule source de vérité des
+   dates. Les deux champs qui vivaient ici pouvaient contredire le planning
+   qu'ils étaient censés couvrir, et rien ne les en empêchait.
+
+   `isIsoDay` reste ici, et n'est pas orpheline : `activity.ts`, `result.ts`,
+   `reading.ts` et `budget.ts` l'importent toutes les quatre de ce module. Les
+   colonnes qu'elles servent sont en `date` — la valeur y va telle quelle, en
+   `YYYY-MM-DD`. L'affichage, lui, reste au mois partout (D13, `formatPeriod`) :
+   on saisit plus fin qu'on n'affiche, et c'est assumé.
    ========================================================================== */
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -225,27 +226,12 @@ export function validateProjectForm(
     errors.statusId = "Ce statut n'est pas reconnu.";
   }
 
-  if (values.startedOn && !isIsoDay(values.startedOn)) {
-    errors.startedOn = "Cette date de début n'existe pas.";
-  }
-
-  if (values.expectedEndOn && !isIsoDay(values.expectedEndOn)) {
-    errors.expectedEndOn = "Cette date de fin n'existe pas.";
-  }
-
-  // Le schéma ne porte aucune contrainte sur ce couple : la règle est ici, et
-  // nulle part ailleurs. Comparaison de chaînes — deux dates `YYYY-MM-DD`
-  // s'ordonnent lexicographiquement comme elles s'ordonnent dans le temps.
-  if (
-    !errors.startedOn &&
-    !errors.expectedEndOn &&
-    values.startedOn &&
-    values.expectedEndOn &&
-    values.expectedEndOn < values.startedOn
-  ) {
-    errors.expectedEndOn =
-      "La fin attendue ne peut pas précéder le début de l'accompagnement.";
-  }
+  /* **Aucune règle de dates ici.** Les deux qui s'y trouvaient — format ISO et
+     « la fin ne précède pas le début » — sont parties avec les champs. La
+     seconde n'avait aucun équivalent en base, et c'est justement ce qui rendait
+     la contradiction possible par toute autre voie que ce formulaire. La règle
+     d'ordre survit là où elle est tenue par le schéma : `activities_period_order`,
+     sur la période d'une activité. */
 
   if (values.jobIds.some((id) => !isUuid(id))) {
     errors.jobIds = "Un métier sélectionné n'est pas reconnu.";
@@ -276,8 +262,6 @@ export type ProjectRowInput = {
   objective: string | null;
   sponsor: string | null;
   statusId: string;
-  startedOn: string | null;
-  expectedEndOn: string | null;
 };
 
 /** Une désignation d'équipe, telle qu'elle part en base. */
@@ -346,8 +330,6 @@ export function parseProjectForm(formData: FormData): {
         objective: valueOrNull(values.objective),
         sponsor: valueOrNull(values.sponsor),
         statusId: values.statusId,
-        startedOn: valueOrNull(values.startedOn),
-        expectedEndOn: valueOrNull(values.expectedEndOn),
       },
       jobIds: values.jobIds,
       approachIds: values.approachIds,

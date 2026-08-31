@@ -38,6 +38,8 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { db } from "@/lib/db/client";
 import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
 import {
+  activities,
+  activityTypes,
   approaches,
   domains,
   entities,
@@ -58,6 +60,8 @@ import {
 
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
 const teardownOrder = [
+  activities,
+  activityTypes,
   projectLinks,
   projectApproaches,
   projectMembers,
@@ -234,16 +238,31 @@ async function seedDomain(label: string): Promise<Fixture> {
   /* Le nom sort avec l'identifiant depuis T6.5 : les constats sur les liens
      déclarés lisent le nom rendu par la lecture, et le recomposer au point
      d'appel serait un second endroit qui décide du suffixe. */
+  /* **Les dates ne vivent plus sur le projet** : sa période se déduit des
+     périodes de ses activités (31/08/2026). Chaque projet de cette fixture
+     reçoit donc une activité datée, et tous la même — ce que ces tests lisent
+     est une colonne rendue, pas un ordre. */
+  const activityType = await scope.insert(activityTypes, {
+    label: `Atelier ${suffix}`,
+    family: "framing",
+  });
+
   async function project(
     name: string,
     productId: string,
   ): Promise<{ id: string; name: string }> {
-    return scope.insert(projects, {
+    const row = await scope.insert(projects, {
       name: `${name} ${suffix}`,
       productId,
       statusId: status.id,
-      startedOn: "2026-02-01",
     });
+    await scope.insert(activities, {
+      projectId: row.id,
+      activityTypeId: activityType.id,
+      state: "planned",
+      periodStart: "2026-02-01",
+    });
+    return row;
   }
 
   async function team(projectId: string, personIds: string[]): Promise<void> {
@@ -376,7 +395,6 @@ beforeAll(async () => {
       productId: a.productOneId,
       statusId: a.statusId,
       name: `November ${suffix}`,
-      startedOn: "2026-02-01",
     })
     .returning({ id: projects.id });
   leakedDomainProjectId = leakedProject[0]!.id;
@@ -607,7 +625,8 @@ describe("listRelatedProjects — préséance, ordre et périmètre", () => {
     expect(row?.productName).toBe(`Espace client a`);
     expect(row?.statusLabel).toBe(`En cours a`);
     expect(row?.statusNature).toBe("active");
-    expect(row?.startedOn).toBe("2026-02-01");
+    expect(row?.periodStart).toBe("2026-02-01");
+    expect(row?.periodEnd).toBe("2026-02-01");
   });
 
   test("ni le projet archivé, ni celui d'un produit archivé n'apparaissent", async () => {
@@ -735,7 +754,8 @@ describe("listDeclaredLinks — la lecture est symétrique", () => {
     expect(row?.productName).toBe("Caisse a");
     expect(row?.statusLabel).toBe("En cours a");
     expect(row?.statusNature).toBe("active");
-    expect(row?.startedOn).toBe("2026-02-01");
+    expect(row?.periodStart).toBe("2026-02-01");
+    expect(row?.periodEnd).toBe("2026-02-01");
   });
 
   test("un lien entre deux autres projets n'entre pas", async () => {

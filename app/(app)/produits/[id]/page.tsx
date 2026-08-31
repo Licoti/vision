@@ -247,7 +247,7 @@ export default async function ProductPage({
      demanderait une règle de choix qu'aucun document ne donne. Le bloc
      « Accompagnements » les porte tous, avec leur statut écrit. */
   const coverage = formatCoverage(
-    projects.flatMap((project) => [project.startedOn, project.expectedEndOn]),
+    projects.flatMap((project) => [project.periodStart, project.periodEnd]),
   );
 
   const {

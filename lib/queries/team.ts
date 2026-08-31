@@ -45,6 +45,7 @@ import {
   skillLevels,
   skills,
 } from "@/lib/db/schema";
+import { projectPeriods } from "@/lib/queries/project-period";
 import type { ProjectStatusNature } from "@/lib/queries/projects";
 
 /** Le côté d'où vient la personne — centre de compétence ou entité (docs/04 §2). */
@@ -473,9 +474,13 @@ export type PersonProject = {
   name: string;
   statusLabel: string;
   statusNature: ProjectStatusNature;
-  /** `date` en base : une période se dit au jour, jamais en horodatage. */
-  startedOn: string | null;
-  expectedEndOn: string | null;
+  /**
+   * La période **déduite des activités** de l'accompagnement
+   * (`lib/queries/project-period.ts`), jamais saisie. `date` en base : une
+   * période se dit au jour, jamais en horodatage.
+   */
+  periodStart: string | null;
+  periodEnd: string | null;
 };
 
 /** Tout ce que la fiche affiche d'une personne, et rien de plus. */
@@ -568,6 +573,8 @@ export function findPersonDetail(
     const person = found[0];
     if (!person) return null;
 
+    const periods = projectPeriods(database, filter);
+
     /* Les trois lectures suivantes sont indépendantes : un seul temps
        d'attente, la discipline de la page projet depuis T4.1. */
     const [skillRows, projectRows, scaleRows] = await Promise.all([
@@ -596,8 +603,8 @@ export function findPersonDetail(
           name: projects.name,
           statusLabel: projectStatuses.label,
           statusNature: projectStatuses.nature,
-          startedOn: projects.startedOn,
-          expectedEndOn: projects.expectedEndOn,
+          periodStart: periods.periodStart,
+          periodEnd: periods.periodEnd,
         })
         .from(projectMembers)
         .innerJoin(
@@ -611,6 +618,9 @@ export function findPersonDetail(
             filter(projectStatuses),
           ),
         )
+        /* `leftJoin` : un accompagnement sans activité datée reste sur la
+           fiche, et ferme la marche. */
+        .leftJoin(periods, eq(periods.projectId, projects.id))
         .where(
           and(
             filter(projectMembers),
@@ -619,12 +629,12 @@ export function findPersonDetail(
           ),
         )
         /* Le plus récent d'abord, comme la liste des accompagnements d'un
-           produit. Un projet sans date de début vient en dernier plutôt que de
-           passer devant tout le monde ; le nom départage, et l'identifiant en
-           dernier — un ordre qui varierait d'un affichage à l'autre serait un
-           défaut. */
+           produit. Un projet sans activité datée vient en dernier plutôt que
+           de passer devant tout le monde ; le nom départage, et l'identifiant
+           en dernier — un ordre qui varierait d'un affichage à l'autre serait
+           un défaut. */
         .orderBy(
-          sql`${projects.startedOn} desc nulls last`,
+          sql`${periods.periodStart} desc nulls last`,
           asc(projects.name),
           asc(projects.id),
         ),

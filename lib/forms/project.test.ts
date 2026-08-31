@@ -39,8 +39,6 @@ function valid(overrides: Partial<ProjectFormValues> = {}): ProjectFormValues {
     objective: "Réduire l'abandon en cours de saisie.",
     sponsor: "Marc Tellier",
     statusId: STATUS,
-    startedOn: "2026-03-01",
-    expectedEndOn: "2026-09-30",
     jobIds: [JOB],
     approachIds: [APPROACH],
     team: { [PERSON]: "contributor", [OTHER_PERSON]: "none" },
@@ -76,8 +74,6 @@ describe("readProjectForm", () => {
         objective: "Réduire l'abandon.",
         sponsor: "Marc Tellier",
         statusId: STATUS,
-        startedOn: "2026-03-01",
-        expectedEndOn: "2026-09-30",
         jobIds: [JOB],
         approachIds: [APPROACH],
         [teamFieldName(PERSON)]: "member",
@@ -89,8 +85,6 @@ describe("readProjectForm", () => {
     expect(values.objective).toBe("Réduire l'abandon.");
     expect(values.sponsor).toBe("Marc Tellier");
     expect(values.statusId).toBe(STATUS);
-    expect(values.startedOn).toBe("2026-03-01");
-    expect(values.expectedEndOn).toBe("2026-09-30");
     expect(values.jobIds).toEqual([JOB]);
     expect(values.approachIds).toEqual([APPROACH]);
     expect(values.team).toEqual({ [PERSON]: "member" });
@@ -116,13 +110,21 @@ describe("readProjectForm", () => {
        balisage de T2.6 a été servi pendant deux semaines —, et ce qui les rend
        inoffensifs n'est pas un refus mais une non-lecture. Un refus se raisonne
        et se contourne ; une clé absente de `ProjectFormValues` n'a nulle part
-       où aller. */
+       où aller.
+
+       **`startedOn` et `expectedEndOn` y sont depuis le 31/08/2026**, et pour
+       exactement la même raison : le balisage qui les portait a été servi
+       pendant des semaines, et une soumission forgée peut encore les poster. La
+       période se déduit maintenant des activités, ces deux clés n'ont plus de
+       colonne où aller, et c'est ici que cela se lit. */
     const values = readProjectForm(
       form({
         name: "Refonte",
         domainId: "un-autre-domaine",
         id: "forcé",
         lastActivityAt: "2026-01-01",
+        startedOn: "2026-03-01",
+        expectedEndOn: "2026-09-30",
         newPersonName: "Marc Tellier",
         newPersonKind: "stakeholder",
         newPersonRole: "contributor",
@@ -131,13 +133,11 @@ describe("readProjectForm", () => {
 
     expect(Object.keys(values).sort()).toEqual([
       "approachIds",
-      "expectedEndOn",
       "jobIds",
       "name",
       "objective",
       "productId",
       "sponsor",
-      "startedOn",
       "statusId",
       "team",
     ]);
@@ -201,54 +201,12 @@ describe("validateProjectForm", () => {
     expect(validateProjectForm(valid({ statusId: "aucun" })).statusId).toBeDefined();
   });
 
-  test("accepte une période absente : elle est facultative", () => {
-    expect(
-      validateProjectForm(valid({ startedOn: "", expectedEndOn: "" })),
-    ).toEqual({});
-  });
-
-  test("accepte une période ouverte, sans fin attendue", () => {
-    expect(validateProjectForm(valid({ expectedEndOn: "" }))).toEqual({});
-  });
-
-  test("refuse une date qui n'existe pas", () => {
-    // Le motif seul l'accepterait ; PostgreSQL, non.
-    expect(
-      validateProjectForm(valid({ startedOn: "2026-02-31" })).startedOn,
-    ).toBeDefined();
-  });
-
-  test("refuse une date mal formée", () => {
-    expect(
-      validateProjectForm(valid({ startedOn: "01/03/2026" })).startedOn,
-    ).toBeDefined();
-  });
-
-  test("refuse une fin antérieure au début", () => {
-    expect(
-      validateProjectForm(
-        valid({ startedOn: "2026-09-30", expectedEndOn: "2026-03-01" }),
-      ).expectedEndOn,
-    ).toBeDefined();
-  });
-
-  test("accepte une fin le jour même du début", () => {
-    expect(
-      validateProjectForm(
-        valid({ startedOn: "2026-03-01", expectedEndOn: "2026-03-01" }),
-      ),
-    ).toEqual({});
-  });
-
-  test("ne compare pas deux dates dont l'une est déjà refusée", () => {
-    // Sinon le message d'ordre masquerait celui de la date impossible.
-    const errors = validateProjectForm(
-      valid({ startedOn: "2026-02-31", expectedEndOn: "2026-01-01" }),
-    );
-
-    expect(errors.startedOn).toBeDefined();
-    expect(errors.expectedEndOn).toBeUndefined();
-  });
+  /* **Aucun test de dates ici.** Les sept qui s'y trouvaient sont partis avec
+     les deux champs le 31/08/2026 : le formulaire n'en saisit plus, et la seule
+     règle d'ordre qui subsiste est celle du schéma sur la période d'une
+     activité (`activities_period_order`). Ce qui les remplace est ailleurs :
+     la dérivation est éprouvée dans `lib/queries/project-period.test.ts`, et la
+     non-lecture des deux clés forgées dans `readProjectForm` ci-dessus. */
 
   test("refuse un métier qui n'a pas la forme d'un identifiant", () => {
     expect(validateProjectForm(valid({ jobIds: [JOB, "ux"] })).jobIds).toBeDefined();
@@ -281,7 +239,6 @@ describe("validateProjectForm", () => {
         productId: "",
         name: "",
         statusId: "",
-        startedOn: "2026-13-01",
         jobIds: ["ux"],
       }),
     );
@@ -290,7 +247,6 @@ describe("validateProjectForm", () => {
       "jobIds",
       "name",
       "productId",
-      "startedOn",
       "statusId",
     ]);
   });
@@ -334,8 +290,6 @@ describe("parseProjectForm", () => {
         objective: "Réduire l'abandon.",
         sponsor: "Marc Tellier",
         statusId: STATUS,
-        startedOn: "2026-03-01",
-        expectedEndOn: "2026-09-30",
         jobIds: [JOB],
         approachIds: [APPROACH],
         [teamFieldName(PERSON)]: "contributor",
@@ -349,8 +303,6 @@ describe("parseProjectForm", () => {
       objective: "Réduire l'abandon.",
       sponsor: "Marc Tellier",
       statusId: STATUS,
-      startedOn: "2026-03-01",
-      expectedEndOn: "2026-09-30",
     });
     expect(input?.jobIds).toEqual([JOB]);
     expect(input?.approachIds).toEqual([APPROACH]);
@@ -361,23 +313,19 @@ describe("parseProjectForm", () => {
     const { input } = parseProjectForm(minimal());
 
     expect(Object.keys(input?.row ?? {}).sort()).toEqual([
-      "expectedEndOn",
       "name",
       "objective",
       "productId",
       "sponsor",
-      "startedOn",
       "statusId",
     ]);
   });
 
-  test("un objectif, un commanditaire et une période vides deviennent `null`", () => {
+  test("un objectif et un commanditaire vides deviennent `null`", () => {
     const { input } = parseProjectForm(minimal());
 
     expect(input?.row.objective).toBeNull();
     expect(input?.row.sponsor).toBeNull();
-    expect(input?.row.startedOn).toBeNull();
-    expect(input?.row.expectedEndOn).toBeNull();
   });
 
   test("une personne hors équipe ne produit aucune désignation", () => {

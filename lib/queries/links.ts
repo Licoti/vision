@@ -78,6 +78,7 @@ import {
   projectStatuses,
   projects,
 } from "@/lib/db/schema";
+import { projectPeriods } from "@/lib/queries/project-period";
 import type { ProjectStatusNature } from "@/lib/queries/projects";
 
 /**
@@ -112,9 +113,12 @@ export type RelatedProject = {
   productName: string;
   statusLabel: string;
   statusNature: ProjectStatusNature;
-  /** Colonnes `date` : chaînes `YYYY-MM-DD`, formatées par `lib/format`. */
-  startedOn: string | null;
-  expectedEndOn: string | null;
+  /**
+   * La période **déduite des activités** (`lib/queries/project-period.ts`),
+   * jamais saisie. Chaînes `YYYY-MM-DD`, formatées par `lib/format`.
+   */
+  periodStart: string | null;
+  periodEnd: string | null;
   rule: RelationRule;
   /** La raison, en toutes lettres. Jamais un chiffre. */
   reason: string;
@@ -300,6 +304,8 @@ export function listRelatedProjects(
       );
     }
 
+    const periods = projectPeriods(database, filter);
+
     const candidates = await database
       .select({
         id: projects.id,
@@ -310,8 +316,8 @@ export function listRelatedProjects(
         entityLabel: entities.label,
         statusLabel: projectStatuses.label,
         statusNature: projectStatuses.nature,
-        startedOn: projects.startedOn,
-        expectedEndOn: projects.expectedEndOn,
+        periodStart: periods.periodStart,
+        periodEnd: periods.periodEnd,
       })
       .from(projects)
       .innerJoin(
@@ -326,6 +332,8 @@ export function listRelatedProjects(
         projectStatuses,
         and(eq(projectStatuses.id, projects.statusId), filter(projectStatuses)),
       )
+      /* `leftJoin` : un voisin sans activité datée reste un voisin. */
+      .leftJoin(periods, eq(periods.projectId, projects.id))
       .where(
         and(
           filter(projects),
@@ -432,8 +440,8 @@ export function listRelatedProjects(
         productName: candidate.productName,
         statusLabel: candidate.statusLabel,
         statusNature: candidate.statusNature,
-        startedOn: candidate.startedOn,
-        expectedEndOn: candidate.expectedEndOn,
+        periodStart: candidate.periodStart,
+        periodEnd: candidate.periodEnd,
         ...reason,
       });
     }
@@ -497,9 +505,12 @@ export type DeclaredLink = {
   productName: string;
   statusLabel: string;
   statusNature: ProjectStatusNature;
-  /** Colonnes `date` : chaînes `YYYY-MM-DD`, formatées par `lib/format`. */
-  startedOn: string | null;
-  expectedEndOn: string | null;
+  /**
+   * La période **déduite des activités** (`lib/queries/project-period.ts`),
+   * jamais saisie. Chaînes `YYYY-MM-DD`, formatées par `lib/format`.
+   */
+  periodStart: string | null;
+  periodEnd: string | null;
   /** La raison saisie, en texte libre. `null` quand personne n'en a donné. */
   reason: string | null;
 };
@@ -537,6 +548,8 @@ export function listDeclaredLinks(
        consulté. Écrit une fois, dans le `on`, il vaut pour les deux sens. */
     const otherProjectId = sql`case when ${projectLinks.fromProjectId} = ${projectId} then ${projectLinks.toProjectId} else ${projectLinks.fromProjectId} end`;
 
+    const periods = projectPeriods(database, filter);
+
     const rows = await database
       .select({
         id: projectLinks.id,
@@ -548,8 +561,8 @@ export function listDeclaredLinks(
         productName: products.name,
         statusLabel: projectStatuses.label,
         statusNature: projectStatuses.nature,
-        startedOn: projects.startedOn,
-        expectedEndOn: projects.expectedEndOn,
+        periodStart: periods.periodStart,
+        periodEnd: periods.periodEnd,
       })
       .from(projectLinks)
       .innerJoin(
@@ -564,6 +577,9 @@ export function listDeclaredLinks(
         projectStatuses,
         and(eq(projectStatuses.id, projects.statusId), filter(projectStatuses)),
       )
+      /* `leftJoin` : un lien déclaré vers un accompagnement sans activité datée
+         reste lisible, et reste retirable. */
+      .leftJoin(periods, eq(periods.projectId, projects.id))
       .where(
         and(
           filter(projectLinks),

@@ -17,6 +17,8 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { db } from "@/lib/db/client";
 import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
 import {
+  activities,
+  activityTypes,
   domains,
   entities,
   persons,
@@ -35,6 +37,8 @@ import {
 
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
 const teardownOrder = [
+  activities,
+  activityTypes,
   projectMembers,
   projects,
   products,
@@ -118,19 +122,44 @@ async function seedDomain(label: string): Promise<Fixture> {
   });
   await scope.archive(products, archivedProduct.id);
 
+  /* **Les dates ne vivent plus sur le projet** : sa période se déduit des
+     périodes de ses activités (31/08/2026). Donner une période à un projet de
+     fixture, c'est donc lui donner une activité datée. */
+  const activityType = await scope.insert(activityTypes, {
+    label: `Atelier ${label}`,
+    family: "framing",
+  });
+
+  /** Une activité datée, le seul moyen de poser la période d'un projet. */
+  async function period(
+    projectId: string,
+    periodStart: string,
+    periodEnd: string | null,
+  ) {
+    await scope.insert(activities, {
+      projectId,
+      activityTypeId: activityType.id,
+      // `done` exige une fin ; sans fin, l'activité reste `planned`.
+      state: periodEnd ? "done" : "planned",
+      periodStart,
+      ...(periodEnd ? { periodEnd } : {}),
+    });
+  }
+
   const old = await scope.insert(projects, {
     name: `Ancien ${label}`,
     productId: product.id,
     statusId: done.id,
-    startedOn: "2024-03-01",
-    expectedEndOn: "2024-09-30",
   });
+  await period(old.id, "2024-03-01", "2024-09-30");
+
   const recent = await scope.insert(projects, {
     name: `Récent ${label}`,
     productId: product.id,
     statusId: active.id,
-    startedOn: "2026-02-01",
   });
+  await period(recent.id, "2026-02-01", null);
+
   await scope.insert(projects, {
     name: `Sans date ${label}`,
     productId: product.id,
@@ -140,8 +169,8 @@ async function seedDomain(label: string): Promise<Fixture> {
     name: `Archivé ${label}`,
     productId: product.id,
     statusId: active.id,
-    startedOn: "2027-01-01",
   });
+  await period(archived.id, "2027-01-01", null);
   await scope.archive(projects, archived.id);
 
   // Un projet du second produit : il ne doit apparaître sur aucune liste du
@@ -150,8 +179,8 @@ async function seedDomain(label: string): Promise<Fixture> {
     name: `Ailleurs ${label}`,
     productId: otherProduct.id,
     statusId: active.id,
-    startedOn: "2026-06-01",
   });
+  await period(elsewhere.id, "2026-06-01", null);
 
   const alice = await scope.insert(persons, {
     fullName: `Alice ${label}`,
@@ -261,7 +290,7 @@ describe("listProductProjects", () => {
   test("les accompagnements sortent du plus récent au plus ancien", async () => {
     const rows = await listProductProjects(a.scope, a.productId);
 
-    // Le projet sans date de début ferme la marche : `nulls last`.
+    // Le projet sans activité datée ferme la marche : `nulls last`.
     expect(rows.map((row) => row.name)).toEqual([
       "Récent a",
       "Ancien a",
@@ -283,11 +312,16 @@ describe("listProductProjects", () => {
 
     expect(recent?.statusLabel).toBe("En cours");
     expect(recent?.statusNature).toBe("active");
-    expect(recent?.startedOn).toBe("2026-02-01");
-    expect(recent?.expectedEndOn).toBeNull();
+    /* **Les deux bornes sortent ensemble.** L'activité de « Récent » n'a pas de
+       fin ; le `coalesce` de `projectPeriods` rend donc son début des deux
+       côtés, et non un début seul suivi d'un `null`. C'est ce qui fait qu'un
+       accompagnement ne se lit plus « depuis février 2026 ». */
+    expect(recent?.periodStart).toBe("2026-02-01");
+    expect(recent?.periodEnd).toBe("2026-02-01");
 
     expect(old?.statusNature).toBe("done");
-    expect(old?.expectedEndOn).toBe("2024-09-30");
+    expect(old?.periodStart).toBe("2024-03-01");
+    expect(old?.periodEnd).toBe("2024-09-30");
   });
 
   test("l'équipe rendue est celle du projet, triée par nom", async () => {

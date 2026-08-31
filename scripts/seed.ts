@@ -468,8 +468,6 @@ const PROJECTS: {
   product: string;
   status: string;
   objective: string;
-  startedOn: string;
-  expectedEndOn?: string;
   approaches: string[];
   /** L'équipe. `contributor` faux pour qui figure sans écrire (D9, D19). */
   team: { person: string; contributor: boolean }[];
@@ -479,8 +477,6 @@ const PROJECTS: {
     product: "Espace client web",
     status: "Terminé",
     objective: "Réduire les abandons en cours de virement.",
-    startedOn: "2024-03-01",
-    expectedEndOn: "2024-09-30",
     approaches: ["Research", "Audit UX"],
     team: [
       { person: "Camille Roux", contributor: true },
@@ -494,7 +490,6 @@ const PROJECTS: {
     status: "En cours",
     objective:
       "Permettre les opérations courantes sans contact avec le support.",
-    startedOn: "2026-02-01",
     approaches: ["Research", "Audit d'accessibilité", "Mesure des usages"],
     team: [
       { person: "Camille Roux", contributor: true },
@@ -509,7 +504,6 @@ const PROJECTS: {
     status: "En cours",
     objective:
       "Permettre une déclaration complète sans passer par un conseiller.",
-    startedOn: "2026-05-01",
     approaches: ["Design Thinking", "Audit UX"],
     team: [
       { person: "Thomas Lemaire", contributor: true },
@@ -1154,10 +1148,10 @@ async function seed(): Promise<void> {
         productId: idOf(productIndex, project.product, "Produit"),
         statusId: idOf(statusIndex, project.status, "Statut"),
         objective: project.objective,
-        startedOn: project.startedOn,
-        expectedEndOn: project.expectedEndOn ?? null,
-        // `last_activity_at` n'est jamais écrit ici : la couche d'accès le
-        // recalcule à chaque écriture d'activité (docs/04 §6).
+        // Aucune date ici : la période d'un accompagnement se déduit des
+        // périodes de ses activités, semées plus bas. `last_activity_at` n'est
+        // pas écrit non plus — la couche d'accès le recalcule à chaque écriture
+        // d'activité (docs/04 §6).
       },
     })),
   );

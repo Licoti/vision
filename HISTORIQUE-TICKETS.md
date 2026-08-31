@@ -5318,3 +5318,205 @@ commentaires. **1 402 tests, inchangés**, `tsc`, `eslint --max-warnings=0` et `
 ne figuraient pas dans la liste de fichiers de la fiche, alors que l'« Attendu » nomme la frise —
 qui vit dans le second — et que la gouttière de la coquille vit dans le premier. Trois fichiers du
 périmètre annoncé n'ont en revanche rien reçu. Consigné au `JOURNAL-TECHNIQUE.md`.
+
+---
+
+## La période d'un accompagnement se déduit de ses activités — hors ticket (31/08/2026)
+
+**Demande de l'humain**, dispensée de ticket comme les reprises du 28 au 31/08. Objet : fermer la
+double saisie des dates. Jusqu'ici le produit en demandait à deux niveaux — une période sur
+l'accompagnement, une période par activité — sans que rien n'accorde les deux.
+
+### Ce qui a été fait
+
+`projects.started_on` et `projects.expected_end_on` sont **supprimées** (migration `0012`, deux
+`DROP COLUMN`, la seconde destructive après la `0011` du 29/08). La période d'un accompagnement se
+déduit en SQL des périodes de ses activités, par une sous-requête groupée écrite **une fois** dans
+`lib/queries/project-period.ts` et jointe en `leftJoin` par les **cinq** lectures qui affichaient une
+période : page produit, en-tête d'accompagnement, rang chronologique, fiche personne, et les deux
+lectures de liens. `listProjects`, `/projets` et la vue d'ensemble ne changent pas — D18 leur
+interdit d'afficher une période, elles ne lisent que `last_activity_at`.
+
+La saisie disparaît des **deux** formulaires, qui partagent `project-form.tsx` : la section
+« Période » et ses deux `input type="date"` s'en vont, avec les deux règles de validation qui les
+accompagnaient. Le formulaire passe de quatre sections à trois. **Rien ne les remplace** : la saisie
+a lieu là où le fait a lieu, sur l'activité.
+
+Les champs de lecture changent de nom — `startedOn`/`expectedEndOn` deviennent
+`periodStart`/`periodEnd`, le vocabulaire de leur source. Garder « fin **attendue** » pour la fin de
+la dernière activité aurait été un énoncé faux de plus.
+
+### Trois arbitrages rendus avant écriture
+
+1. Colonnes **supprimées**, période dérivée — et non cache dénormalisé, qui serait le second lieu de
+   vérité que la demande ferme.
+2. Les activités **archivées et annulées** ne pèsent pas.
+3. Le bloc « Période » disparaît de la **création et de la correction**.
+
+### Le fait qui a porté le geste
+
+Une sonde en lecture seule sur la base de développement a comparé, avant tout code, les deux colonnes
+au `min/max` de leurs activités : **sur sept accompagnements vivants, un seul portait une période qui
+s'accordait avec les siennes.** Quatre portaient une contradiction sur une valeur remplie — « Refonte
+du parcours de virement » annonçait mars 2024 pour des activités qui commençaient en avril —, deux
+n'avaient qu'une fin ouverte à refermer. La divergence n'était pas redoutée, elle était installée.
+
+### Ce que le HTML servi rend
+
+Les **sept** pages d'accompagnement rendent désormais une période close, et **aucune ne lit
+« depuis »** — trois le faisaient. « Refonte du parcours de virement » passe de *mars 2024 →
+septembre 2024* à **avril 2024 → septembre 2024** ; « Autonomie des opérations courantes » de
+*depuis février 2026* à **mars 2026 → octobre 2026** ; « Audit ergonomique » de *juillet → août 2026*
+à **juillet → juillet 2026**. La même correction se lit sur la page produit, sur la ligne d'étendue
+couverte (`formatCoverage`) et dans le panneau de fiche personne, servi dans le document.
+
+Le `<form>` de `/projets/nouveau` et celui de `/projets/[id]/modifier` ne portent **aucun**
+`name="startedOn"`, aucun `name="expectedEndOn"`, **aucun `type="date"`**, et trois `<h2>` de section
+au lieu de quatre.
+
+### Les disciplines
+
+**Les tests mis en défaut, cinq fois, cinq chutes isolées.** Retirer l'exclusion des annulées, celle
+des archivées, l'un des deux `coalesce`, le `filter(activities)` de la sous-requête, puis
+l'`isNotNull` du rang : **un seul test tombe à chaque fois**, et c'est le sien —
+1 408/1 409 à chaque neutralisation.
+
+**Une cascade a été trouvée et corrigée avant d'être crue.** La première rédaction faisait tomber
+*deux* tests sur la neutralisation des annulées : les périodes témoins allaient de 2020 à 2030 et
+déplaçaient les extrémités que le rang lit. La fixture a reçu **deux bornes de chronologie**
+— « Ouverture » en 2025, « Clôture » en 2027 — hors de portée de toute neutralisation, et le test de
+rang a cessé de lire des dates pour ne lire qu'un miroir : le premier de la liste porte le dernier
+rang, le dernier daté porte le premier, les deux nombres venant de la lecture elle-même.
+
+**Le droit éprouvé par l'action.** Le formulaire de correction rejoué en HTTP sans JavaScript, tous
+ses champs servis repris, plus `startedOn=1999-01-01` et `expectedEndOn=2099-12-31`. **303**, comme
+une correction qui réussit — et la lecture en base tranche : les deux colonnes, encore physiquement
+là faute de migration appliquée sur cette base, portent toujours 2024-03-01 et 2024-09-30. **L'étape
+témoin est `updated_at`**, déplacé à la seconde : sans elle, une action refusée aurait rendu le même
+constat. Liaisons recomptées — 3 métiers, 2 approches, 4 membres —, rien de détruit en chemin.
+
+**Le contraste n'a rien de neuf à mesurer**, et c'est dit plutôt que tu : le diff ne change que du
+texte dans des positions existantes.
+
+### Le compte
+
+**Onze tests neufs** dans un fichier neuf, `lib/queries/project-period.test.ts` — dont l'exemple
+exact de la demande, écrit à rebours de son ordre —, **sept retirés** avec les règles de dates du
+formulaire : 1 405 → 1 409. `tsc`, `eslint --max-warnings=0` et la suite entière au vert.
+
+### Ce qui reste ouvert
+
+La migration `0012` est appliquée **à la branche de test seulement**. La base de développement
+n'avait déjà pas reçu la `0010` : il lui en faut désormais deux, et c'est une action humaine.
+
+Un écart de nommage subsiste dans `lib/db/scoped.ts` : `lastActivityExpression` et la nouvelle
+`projectPeriods` disent deux règles voisines à deux endroits, l'une excluant `planned` et l'autre
+non. Elles ont raison chacune de son côté — c'est écrit au journal —, mais rien en base ni dans le
+compilateur ne tient cet accord.
+
+---
+
+## Le mode de planification d'une activité, en trois options exclusives — hors ticket (31/08/2026)
+
+**Demande de l'humain**, dans la foulée de la dérivation de la période d'accompagnement du même jour.
+Puisque les activités sont devenues **le seul endroit où une date se saisit**, cette saisie devait
+être comprise sans hésitation ni risque d'erreur.
+
+### Ce qui a été fait
+
+Le panneau posait une case « à planifier » **et** deux champs de dates, tous visibles ensemble, et
+refusait après coup leurs combinaisons illégales. Il pose désormais **trois modes exclusifs** — à
+planifier · période · date précise —, en trois cartes radio portant chacune la phrase qui dit à quoi
+elle sert, et **les champs apparaissent sous l'option choisie**.
+
+La forme visuelle n'est pas neuve : c'est celle du « Type » de produit (`product-form.tsx`), à ses
+classes près. Ce qui est neuf est le masquage, **en CSS pur** — `hidden group-has-checked:flex` —,
+qui ne coûte au panneau **aucun état React**.
+
+Côté serveur, `planning` devient un champ à part entière, rétréci sur son énuméré avant tout le
+reste, et **seul arbitre** de ce qui part en base. `isUnscheduled` quitte les valeurs du formulaire ;
+`periodDay` s'y ajoute. Une date précise s'écrit `period_start = period_end` — **aucune migration,
+aucune colonne** — et le mode se déduit à la réouverture.
+
+### Trois arbitrages rendus avant écriture
+
+1. Une **liste de trois options**, champs sous l'option — pas des segments côte à côte, qui ne
+   tiennent pas sur une ligne à 375 px.
+2. Une date précise **se lit au jour** : « 12 juin 2026 ».
+3. En mode « Période », la **fin reste facultative** — `docs/03` §4 n'exige qu'un début d'une
+   activité en cours, et l'exiger forcerait à inventer une date.
+
+### Un énoncé du dépôt retourné
+
+`activity-panel.tsx` affirmait depuis T3.3 : *« sans JavaScript, un champ ne disparaît pas »*, et
+c'est ce qui justifiait la cohabitation. **La phrase était juste et ne l'est plus** : `:has()` est
+disponible partout depuis fin 2023, et `checkbox-chip.ts` s'en servait déjà à quelques fichiers de là
+— en écrivant, dans son propre en-tête, que le sélecteur « fonctionne sans une ligne de
+JavaScript ». Premier masquage conditionnel en CSS pur du dépôt.
+
+**La variante a été cherchée dans la feuille servie**, et c'est une discipline neuve : une variante
+Tailwind qui ne compile pas ne rend aucune erreur — elle rend un champ toujours visible, et le
+contrat serait faux sans en avoir l'air. La règle est là :
+`.group-has-checked\:flex:is(:where(.group):has(:checked) *){display:flex}`.
+
+### Deux refus devenus impossibles
+
+« Une activité à planifier n'a pas de période » et « une fin sans début n'est pas une période »
+disparaissent — **ils n'ont pas été assouplis, ils n'ont plus de forme de saisie où se produire.** Le
+principe qui les fondait, *« Vision ne jette jamais ce qui a été tapé »*, est **déplacé et non
+abandonné** : un refus revient avec les trois champs remplis, et ce que le mode écarte, il l'écarte
+au moment de composer la ligne. Un test le dit à lui seul.
+
+### Ce que le HTML servi rend
+
+`?activite=nouvelle` porte **trois `input[name=planning]`**, un seul coché (« Période »), **les trois
+champs de dates présents dans le document** — deux dans des blocs `group-has-checked:flex` —, et
+**aucun `required`**. En correction, le bon radio est coché sans JavaScript sur chacun des trois
+modes.
+
+Sur la carte de roadmap, **deux activités du même mois se lisent différemment sur le même écran** :
+« 12 juin 2026 » pour la date précise, « juin 2026 » pour l'audit qui court du 1er au 30. C'est toute
+la démonstration de la troisième entorse bornée à D13 — la précision **déclarée** contre la
+précision **fabriquée** que `docs/03` §6 refuse.
+
+### Les disciplines
+
+**Cinq mises en défaut, cinq chutes maîtrisées** : le rétrécissement de `planning` sur son énuméré
+(2 tests, les deux moitiés d'une même garantie — la lecture et la ligne), la branche `day` de la
+dérivation (5), l'exigence du début en mode période (1), la branche du jour à l'affichage (3),
+l'inférence à la réouverture (1).
+
+**Un test passait pour la mauvaise raison, et la mise en défaut l'a trouvé.** « Une date précise au
+jour même donne une activité en cours » survivait au retrait de sa propre règle : la période de repli
+de la fabrique couvre elle aussi le jour de référence. Il constate désormais les **deux bornes** avec
+l'état, et il tombe avec sa règle.
+
+**Le droit frappé en HTTP sans JavaScript**, trois fois, la ligne relue en base à chaque fois :
+`planning=day` avec un `periodEnd` de mars posté à côté écrit **2026-06-12 aux deux bornes** ;
+`planning=unscheduled` avec les trois dates postées écrit **`null` aux deux bornes** ;
+`planning=sabot` rend **200 — comme une correction qui réussit — et `updated_at` ne bouge pas d'une
+milliseconde**. **L'étape témoin a été jouée** : une correction valide immédiatement après déplace
+`updated_at`, sans quoi le troisième constat n'aurait rien prouvé.
+
+**Six couples de couleurs mesurés** sur le fond de carte : 17,87 · 8,12 · 3,88 · 13,65 · 4,98 ·
+6,90:1. **Aucune teinte de sélection n'est introduite** — le radio natif et les champs qui
+apparaissent portent l'état, et la dette de la carte sans fond n'est pas rouverte.
+
+**Un piège d'outillage** : une colonne `date` relue par le pilote Neon revient en `Date` JavaScript
+et **recule d'un jour**. La première sonde annonçait 2026-06-11 pour une ligne qui porte 2026-06-12 ;
+`to_char` en SQL a corrigé la lecture avant qu'elle serve de preuve.
+
+### Le compte
+
+**25 tests neufs** (1 409 → 1 434) : la lecture et le refus d'un mode forgé, les trois modes à la
+dérivation, l'inférence sur cinq formes de ligne, et **un `describe` propre pour
+`formatActivityPeriod`, qui n'en avait aucun** depuis T3.1. Ni migration, ni requête, ni action, ni
+droit. `tsc`, `eslint --max-warnings=0` et la suite entière au vert.
+
+### Ce qui reste ouvert
+
+La carte radio est désormais écrite **deux fois**, aux mêmes classes — « Type » de produit et
+« Planification ». `checkbox-chip.ts` écrit sa propre condition d'extraction, et elle est remplie ;
+l'extraire demande d'ouvrir `product-form.tsx`, hors périmètre. La constante vit en attendant dans
+`activity-panel.tsx` sous le nom `PLANNING_CARD`, avec la note de son origine.
+

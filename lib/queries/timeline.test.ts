@@ -572,25 +572,41 @@ async function seedDomain(label: string): Promise<Fixture> {
   const empty = await product("Vide");
   const other = await product("Voisin");
 
-  const project = async (
-    name: string,
-    productId: string,
-    startedOn: string,
-    expectedEndOn: string | null,
-  ) =>
-    scope.insert(projects, {
-      name: `${name} ${label}`,
-      productId,
-      statusId: active.id,
-      startedOn,
-      expectedEndOn,
-    });
-
   const audit = await scope.insert(activityTypes, {
     label: `Audit UX ${label}`,
     family: "evaluation",
     producesResult: true,
   });
+
+  /* **Les dates ne vivent plus sur le projet** : sa période se déduit des
+     périodes de ses activités (31/08/2026). Le cadrage porte donc la période
+     que ces quatre projets annonçaient ; il ne porte aucun résultat, et
+     n'entre donc dans aucun repère. */
+  const framing = await scope.insert(activityTypes, {
+    label: `Cadrage ${label}`,
+    family: "framing",
+  });
+
+  const project = async (
+    name: string,
+    productId: string,
+    periodStart: string,
+    periodEnd: string | null,
+  ) => {
+    const row = await scope.insert(projects, {
+      name: `${name} ${label}`,
+      productId,
+      statusId: active.id,
+    });
+    await scope.insert(activities, {
+      projectId: row.id,
+      activityTypeId: framing.id,
+      state: periodEnd ? "done" : "planned",
+      periodStart,
+      ...(periodEnd ? { periodEnd } : {}),
+    });
+    return row;
+  };
 
   const activity = async (
     projectId: string,

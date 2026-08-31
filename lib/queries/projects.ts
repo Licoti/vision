@@ -53,6 +53,7 @@ import {
   resources,
   results,
 } from "@/lib/db/schema";
+import { projectPeriods } from "@/lib/queries/project-period";
 
 /** Les quatre natures de statut, telles que le schéma les énumère. */
 export type ProjectStatusNature = (typeof projectStatusNature.enumValues)[number];
@@ -434,9 +435,13 @@ export type ProjectDetail = {
   sponsor: string | null;
   statusLabel: string;
   statusNature: ProjectStatusNature;
-  /** Colonnes `date` : chaînes `YYYY-MM-DD`, formatées par `lib/format`. */
-  startedOn: string | null;
-  expectedEndOn: string | null;
+  /**
+   * La période **déduite de ses activités** (`lib/queries/project-period.ts`),
+   * jamais saisie. Chaînes `YYYY-MM-DD`, formatées par `lib/format`. Les deux
+   * bornes sont présentes ensemble, ou absentes ensemble.
+   */
+  periodStart: string | null;
+  periodEnd: string | null;
   /** Le parent, affiché **et cliquable** : un projet ne s'affiche jamais seul. */
   productId: string;
   productName: string;
@@ -480,6 +485,7 @@ export function findProjectDetail(
   id: string,
 ): Promise<ProjectDetail | undefined> {
   return scope.joinedRead(async (database, { filter }) => {
+    const periods = projectPeriods(database, filter);
     const rows = await database
       .select({
         id: projects.id,
@@ -488,8 +494,8 @@ export function findProjectDetail(
         sponsor: projects.sponsor,
         statusLabel: projectStatuses.label,
         statusNature: projectStatuses.nature,
-        startedOn: projects.startedOn,
-        expectedEndOn: projects.expectedEndOn,
+        periodStart: periods.periodStart,
+        periodEnd: periods.periodEnd,
         productId: products.id,
         productName: products.name,
         entityLabel: entities.label,
@@ -508,6 +514,9 @@ export function findProjectDetail(
         projectStatuses,
         and(eq(projectStatuses.id, projects.statusId), filter(projectStatuses)),
       )
+      /* `leftJoin` : un accompagnement sans activité datée garde son en-tête,
+         et sa période s'y lit « Période non renseignée » (D7). */
+      .leftJoin(periods, eq(periods.projectId, projects.id))
       .where(and(eq(projects.id, id), filter(projects)))
       .limit(1);
 
@@ -560,33 +569,41 @@ export function findProjectDetail(
  * **Il se calcule, il ne se saisit pas** : aucune colonne ne le porte, et il
  * change tout seul le jour où un accompagnement plus ancien est enregistré.
  *
- * L'ordre est l'exact miroir de celui de la page produit — `started_on` puis
- * le nom —, si bien que le rang lu ici et la position lue là-bas ne peuvent
- * pas se contredire. Les accompagnements archivés ne comptent pas, comme ils
- * ne s'affichent pas ; le projet consulté fait exception, un projet archivé
- * restant lisible (règle 4).
+ * L'ordre est l'exact miroir de celui de la page produit — le début de période
+ * puis le nom —, si bien que le rang lu ici et la position lue là-bas ne
+ * peuvent pas se contredire. C'est la **même** expression dérivée des deux
+ * côtés, ce qui rend la contradiction impossible plutôt qu'improbable. Les
+ * accompagnements archivés ne comptent pas, comme ils ne s'affichent pas ; le
+ * projet consulté fait exception, un projet archivé restant lisible (règle 4).
  *
- * Rend `null` quand le projet n'a pas de date de début : on ne situe pas dans
- * une chronologie ce qui n'y est pas daté, et la mention disparaît alors de
- * l'écran plutôt que d'annoncer un rang inventé.
+ * Rend `null` quand le projet n'a aucune activité datée, et **les deux absences
+ * ne se ressemblent pas** : celui qui n'a aucune activité n'a pas de ligne dans
+ * le regroupement, la jointure suffit à l'écarter ; celui dont toutes les
+ * activités sont « à planifier » (D14) en a une, avec ses deux bornes nulles,
+ * et c'est `isNotNull` qui l'écarte — sans quoi il **ouvrirait** la chronologie
+ * du produit, PostgreSQL plaçant les nuls en tête d'un tri ascendant. On ne
+ * situe pas dans une chronologie ce qui n'y est pas daté : la mention disparaît
+ * de l'écran plutôt que d'annoncer un rang inventé.
  */
 export function findAccompanimentRank(
   scope: ScopedDb,
   project: { id: string; productId: string },
 ): Promise<number | null> {
   return scope.joinedRead(async (database, { filter }) => {
+    const periods = projectPeriods(database, filter);
     const siblings = await database
       .select({ id: projects.id })
       .from(projects)
+      .innerJoin(periods, eq(periods.projectId, projects.id))
       .where(
         and(
           filter(projects),
           eq(projects.productId, project.productId),
-          isNotNull(projects.startedOn),
+          isNotNull(periods.periodStart),
           or(isNull(projects.archivedAt), eq(projects.id, project.id)),
         ),
       )
-      .orderBy(asc(projects.startedOn), asc(projects.name));
+      .orderBy(asc(periods.periodStart), asc(projects.name));
 
     const index = siblings.findIndex((sibling) => sibling.id === project.id);
     return index === -1 ? null : index + 1;

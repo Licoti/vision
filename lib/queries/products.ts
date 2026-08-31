@@ -27,6 +27,7 @@ import {
   projectStatuses,
   projects,
 } from "@/lib/db/schema";
+import { projectPeriods } from "@/lib/queries/project-period";
 
 /** Une ligne de la liste : les quatre colonnes du ticket, et de quoi lier. */
 export type ProductRow = {
@@ -194,9 +195,14 @@ export type ProductProject = {
   objective: string | null;
   statusLabel: string;
   statusNature: (typeof projectStatusNature.enumValues)[number];
-  /** Colonnes `date` : chaînes `YYYY-MM-DD`, formatées par `lib/format`. */
-  startedOn: string | null;
-  expectedEndOn: string | null;
+  /**
+   * La période **déduite de ses activités** (`lib/queries/project-period.ts`),
+   * jamais saisie. Colonnes `date` : chaînes `YYYY-MM-DD`, formatées par
+   * `lib/format`. Les deux bornes sont présentes ensemble, ou absentes
+   * ensemble — un accompagnement sans activité datée n'a pas de période.
+   */
+  periodStart: string | null;
+  periodEnd: string | null;
   team: ProjectMember[];
 };
 
@@ -204,12 +210,15 @@ export type ProductProject = {
  * Les accompagnements successifs d'un produit, du plus récent au plus ancien
  * (docs/06 §6).
  *
- * **« Le plus récent » se lit sur `started_on`**, la date de l'accompagnement
- * lui-même, et non sur `last_activity_at` : une activité saisie aujourd'hui
- * sur un accompagnement clos en 2024 ne doit pas le faire remonter en tête
- * d'une liste qui raconte une chronologie. Les projets sans date de début
- * ferment la marche, et le nom départage à date égale — un ordre qui varierait
- * d'un affichage à l'autre serait un défaut.
+ * **« Le plus récent » se lit sur le début de la période**, celle de
+ * l'accompagnement lui-même, et non sur `last_activity_at` : une activité
+ * saisie aujourd'hui sur un accompagnement clos en 2024 ne doit pas le faire
+ * remonter en tête d'une liste qui raconte une chronologie. L'opposition tient
+ * toujours depuis que la période est déduite des activités — les deux valeurs
+ * se lisent sur les mêmes lignes, l'une prend la plus petite date et l'autre la
+ * plus récente, et elles ne rangent pas dans le même ordre. Les projets sans
+ * activité datée ferment la marche, et le nom départage à date égale — un ordre
+ * qui varierait d'un affichage à l'autre serait un défaut.
  *
  * Les projets archivés sont exclus, comme dans le compte de la liste des
  * produits : un accompagnement rangé n'est plus un accompagnement affiché.
@@ -225,6 +234,7 @@ export function listProductProjects(
   productId: string,
 ): Promise<ProductProject[]> {
   return scope.joinedRead(async (database, { filter }) => {
+    const periods = projectPeriods(database, filter);
     const rows = await database
       .select({
         id: projects.id,
@@ -232,8 +242,8 @@ export function listProductProjects(
         objective: projects.objective,
         statusLabel: projectStatuses.label,
         statusNature: projectStatuses.nature,
-        startedOn: projects.startedOn,
-        expectedEndOn: projects.expectedEndOn,
+        periodStart: periods.periodStart,
+        periodEnd: periods.periodEnd,
       })
       .from(projects)
       .innerJoin(
@@ -243,6 +253,9 @@ export function listProductProjects(
           filter(projectStatuses),
         ),
       )
+      /* `leftJoin` et non `innerJoin` : un accompagnement sans activité datée
+         reste dans la liste, sans période (D7). */
+      .leftJoin(periods, eq(periods.projectId, projects.id))
       .where(
         and(
           filter(projects),
@@ -250,7 +263,7 @@ export function listProductProjects(
           eq(projects.productId, productId),
         ),
       )
-      .orderBy(sql`${projects.startedOn} desc nulls last`, asc(projects.name));
+      .orderBy(sql`${periods.periodStart} desc nulls last`, asc(projects.name));
 
     if (rows.length === 0) return [];
 

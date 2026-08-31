@@ -2,10 +2,10 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 31/08/2026, après la reprise d'ergonomie d'`/equipe` (direction B).
+**Dernière mise à jour :** 31/08/2026, après le mode de planification d'une activité.
 Dernier balayage : découpage de C7. **Le fichier dépasse les 250 lignes de la règle 5 — 553 au
-31/08/2026, 576 après la reprise d'`/equipe`** ; le balayage appartient à la session de découpage
-de C8.
+31/08/2026, 642 après le mode de planification** ; le balayage appartient à la session de
+découpage de C8.
 **Chantier en cours :** **C7 — Finitions**, dix tickets, découpés dans `tickets-C7.md`. **Dernier
 chantier du POC** — `docs/05` §5 n'en a pas de huitième.
 **Ticket suivant :** **T7.7 — Accessibilité : clavier, focus, contraste, titres.**
@@ -262,6 +262,39 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   seuil de 3:1 d'un composant, rétabli à 4,98. Sonde mise en défaut. Ni migration, ni action, ni
   droit ; **aucun test neuf, régime des reprises de rendu** — 1 405 tests, inchangés. **Un écart sur
   un interdit écrit** : « +3 » est un décompte de compétences sur une ligne.
+- **La période d'un accompagnement se déduit de ses activités — hors ticket, 31/08/2026.** Demande
+  de l'humain : la double saisie est fermée, `projects.started_on` et `expected_end_on` supprimées
+  (migration `0012`), et **une seule source de vérité reste, les activités**. La règle vit une fois
+  — `min(coalesce(period_start, period_end))` / `max(coalesce(period_end, period_start))` sur les
+  activités ni archivées ni annulées — et **cinq lectures la joignent**, en sous-requête groupée et
+  non corrélée : le 500 de T7.3 disait où était le piège. **Le geste a été mesuré avant d'être
+  écrit** : sur les **sept** accompagnements de la base, **un seul** portait une période qui
+  s'accordait avec ses propres activités. Les `planned` comptent ici quand `last_activity_at` les
+  exclut, et les deux ont raison — l'une dit l'étendue, l'autre la fraîcheur. Deux formulaires
+  perdent leur section « Période » ; deux branches de `formatPeriod` deviennent inatteignables et
+  restent écrites. **Cinq neutralisations, cinq chutes isolées**, après **une cascade trouvée et
+  refermée** — la fixture a reçu deux bornes de chronologie hors de portée, et le test de rang ne lit
+  plus de date mais un miroir. Droit **frappé en HTTP sans JavaScript** avec les deux champs forgés :
+  303, et les colonnes inchangées, `updated_at` faisant l'étape témoin. Onze tests neufs, sept
+  retirés (1 405 → 1 409). **Trois écarts documentaires**, aucune décision rouverte — `docs/07` n'a
+  jamais tranché ces deux colonnes.
+- **Le mode de planification d'une activité — hors ticket, 31/08/2026.** Demande de l'humain, dans
+  la foulée : puisque les activités portent seules les dates, leur saisie devait se comprendre sans
+  hésitation. La case « à planifier » et les deux champs cohabitaient à l'écran ; **trois modes
+  exclusifs** les remplacent — à planifier · période · date précise —, et les champs apparaissent
+  sous l'option choisie. **Le masquage est en CSS pur** (`hidden group-has-checked:flex`), donc le
+  panneau **ne gagne aucun état React** : ce fichier affirmait depuis T3.3 que « sans JavaScript, un
+  champ ne disparaît pas », et l'énoncé est retourné — `:has()` était déjà employé deux fichiers plus
+  loin. **La variante a été cherchée dans la feuille servie** : une variante qui ne compile pas ne
+  rend aucune erreur, elle rend un champ toujours visible. **Deux refus deviennent impossibles** au
+  lieu d'être assouplis, et le principe qui les fondait est déplacé, pas abandonné. Une date précise
+  est une **période d'un jour** — ni migration ni colonne —, le mode se **déduit** à la réouverture,
+  et elle **se lit au jour** : troisième entorse bornée à D13, avec l'argument que `lib/format.ts`
+  écrit déjà deux fois. Deux activités du même mois se lisent différemment sur le même écran.
+  **Cinq neutralisations, cinq chutes maîtrisées**, et **un test qui passait pour la mauvaise raison
+  trouvé par l'une d'elles**. Droit frappé en HTTP sans JavaScript **trois fois**, `updated_at` en
+  étape témoin ; six couples mesurés, aucune teinte de sélection. **25 tests neufs** (1 409 → 1 434),
+  dont le premier `describe` de `formatActivityPeriod`.
 
 ---
 
@@ -279,10 +312,13 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   dans l'URL**. `docs/05` §5 s'arrête à sept chantiers : **C8 est hors POC et reste entièrement à
   découper.** → **session de découpage de C8.**
 
-- **La base de développement n'a pas reçu la migration `0010`.** Elle est appliquée à la branche de
-  test ; la commande a été refusée à l'agent sur la base de développement. Sans conséquence
-  d'exécution — plus rien n'écrit `persons.availability`, et le `CHECK` survivant accepte le `null` —,
-  mais schéma et base divergent tant que `npm run db:migrate` n'a pas tourné. → **action humaine.**
+- **La base de développement doit deux migrations : `0010` et `0012`.** Toutes deux sont appliquées
+  à la branche de test ; la commande a été refusée à l'agent sur la base de développement. Sans
+  conséquence d'exécution — plus rien n'écrit `persons.availability` ni `projects.started_on` /
+  `expected_end_on`, et les colonnes survivantes sont nullables ou acceptent le `null` —, mais schéma
+  et base divergent tant que `npm run db:migrate` n'a pas tourné. **La `0012` est destructive** :
+  elle emporte la période saisie des accompagnements **dont aucune activité ne porte de date**, et
+  aucun des sept de cette base n'est dans ce cas. → **action humaine.**
 - **Les secrets Neon n'ont jamais été tournés.** Deux chaînes ont transité en clair le 12/08/2026.
   Hors dépôt — `.env.local` seul —, mais valides. **Reportées deux fois** : au découpage de C6, puis
   à celui de C7, qui n'en dépendaient ni l'un ni l'autre. → **action humaine.**
@@ -448,6 +484,13 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 - **Les deux use cases de la fixture n'ont aucun persona rattaché.** `scripts/seed.ts` n'en sème
   aucun. Le rattachement est facultatif et le lien a été éprouvé par sonde scopée : ce qui manque est
   un **jeu d'essai**. → **au prochain ticket qui sème des personae.**
+- **La carte radio est écrite deux fois, aux mêmes classes** — le « Type » de produit
+  (`product-form.tsx:132-160`) et la « Planification » d'une activité (31/08/2026). `checkbox-chip.ts`
+  écrit sa propre condition d'extraction — « une constante et non un composant », pour « deux
+  appelants qui n'ont en commun que leur forme » — et elle est désormais remplie. L'extraire impose
+  de mesurer que le `<form>` servi du formulaire de produit reste identique à l'octet, le geste exact
+  du 31/08 pour `CHECKBOX_CHIP`. La constante vit en attendant dans `activity-panel.tsx`, sous le nom
+  `PLANNING_CARD`. → **au prochain ticket qui ouvre `product-form.tsx`.**
 - **`sameReferentialLabel` et `sameEntityLabel` disent la même règle deux fois**, et l'entité est
   la seule des neuf lignes de référentiel dont le formulaire **ne saisit pas** sa `position` alors
   que la colonne existe — `entities.position` n'ayant aucun lecteur. (`tools` n'en saisit pas non
@@ -541,6 +584,14 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 - **La liste transverse n'est ni paginée ni plafonnée.** `docs/06` §4 la projette « à quinze puis
   cinquante projets », ce qu'une page rend sans effort. Au-delà, un plafond avant une pagination.
   → **si l'usage le réclame.**
+- **Deux règles de période voisines vivent à deux endroits, et rien ne tient leur accord.**
+  `lastActivityExpression` (`lib/db/scoped.ts`) et `projectPeriods` (`lib/queries/project-period.ts`)
+  lisent les mêmes lignes avec les mêmes exclusions — ni archivée, ni annulée — **et divergent sur un
+  point voulu** : la seconde compte les activités `planned`, la première les écarte (T2.1). L'une dit
+  l'étendue, l'autre la fraîcheur, et elles ont raison chacune de son côté ; mais ni la base ni le
+  compilateur n'obligent la prochaine lecture de période à choisir sciemment. Deux témoins de test
+  tiennent l'accord, un par règle. → **sans échéance ; à reposer si une troisième lecture de période
+  apparaît.**
 - **Une activité `in_progress` porte une fin de période à venir.** La fraîcheur retient
   `max(coalesce(period_end, period_start))` : pour un atelier en cours en août, c'est le 31 août ;
   au mois, l'affichage reste juste. → **le jour où une période se dira au jour.**

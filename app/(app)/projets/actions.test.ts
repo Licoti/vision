@@ -266,7 +266,6 @@ function saisie(overrides: Record<string, string> = {}): FormData {
     name: `Refonte du panier ${suffix}`,
     productId: f.productId,
     statusId: f.statusId,
-    startedOn: "2026-01-05",
     ...overrides,
   });
 }

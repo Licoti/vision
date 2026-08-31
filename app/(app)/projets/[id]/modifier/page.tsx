@@ -111,8 +111,6 @@ export default async function EditProjectPage({
             objective: project.objective ?? "",
             sponsor: project.sponsor ?? "",
             statusId: project.statusId,
-            startedOn: project.startedOn ?? "",
-            expectedEndOn: project.expectedEndOn ?? "",
             jobIds: links.jobIds,
             approachIds: links.approachIds,
             team: Object.fromEntries(
