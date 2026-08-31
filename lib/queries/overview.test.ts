@@ -165,6 +165,9 @@ let archivedProductId: string;
 let sleepyProjectId: string;
 let freshProjectId: string;
 let keptProjectId: string;
+/* Le statut terminé et son projet — l'exclusion du 31/08/2026. */
+let doneStatusId: string;
+let doneProjectId: string;
 
 /* Les lignes forgées de T6.7, nommées par le filtre qu'elles éprouvent. */
 let leakedDomainProjectId: string;
@@ -666,6 +669,33 @@ beforeAll(async () => {
     lastActivityAt: SEEDED_AT,
   });
   freshProjectId = fresh.id;
+
+  /* **Le terminé qui dormirait sans sa nature** : sa dernière activité est
+     ancienne, son produit est vivant, il n'est pas archivé — la seule chose qui
+     l'écarte est la nature `done` de son statut. C'est la condition pour que le
+     `ne()` retiré fasse tomber **ce** constat et lui seul.
+
+     Le statut est **neuf et non archivé** : `archivedUsedStatusId` porte déjà
+     la nature `done`, mais il est archivé et son projet est frais — s'en servir
+     mêlerait trois causes d'exclusion à celle qu'on éprouve.
+
+     `STALE_TAIL_AT` et non l'absence d'activité, la règle des témoins qui ne
+     doivent jamais figurer : sans activité, il ouvrirait la marche et chasserait
+     du plafond de deux les lignes attendues. */
+  const doneStatus = await a.scope.insert(projectStatuses, {
+    label: `Terminé ${suffix}`,
+    nature: "done",
+    position: "7",
+  });
+  doneStatusId = doneStatus.id;
+
+  const done = await a.scope.insert(projects, {
+    name: `Accompagnement terminé ${suffix}`,
+    productId: a.productId,
+    statusId: doneStatusId,
+    lastActivityAt: STALE_TAIL_AT,
+  });
+  doneProjectId = done.id;
 
   /* `c` n'a que ses deux projets d'amorçage, sans activité : datés de
      l'instant du semis, ils font de lui le domaine dont **aucun** projet ne
@@ -1328,6 +1358,65 @@ describe("listStaleProjects", () => {
     const rows = await listStaleProjects(a.scope);
 
     expect(rows.map((row) => row.id)).not.toContain(leakedProductProjectId);
+  });
+
+  test("un accompagnement terminé n'y figure pas", async () => {
+    const rows = await listStaleProjects(a.scope);
+
+    // Il dormirait sans sa nature : dernière activité ancienne, produit
+    // vivant, pas archivé. Un accompagnement terminé n'est pas un
+    // accompagnement qui s'endort (31/08/2026).
+    expect(rows.map((row) => row.id)).not.toContain(doneProjectId);
+  });
+
+  test("un accompagnement en cours à la même date, lui, y figure", async () => {
+    const rows = await listStaleProjects(a.scope);
+
+    // L'autre moitié de la règle, et c'est elle qui prouve que l'exclusion
+    // porte sur la **nature** et non sur la date : `sleepyProjectId` est plus
+    // ancien encore, et il entre. Sans ce constat, un `ne()` devenu `eq()` —
+    // ou une clause qui viderait la liste — passerait au vert.
+    expect(rows.map((row) => row.id)).toContain(sleepyProjectId);
+  });
+
+  test("un projet dont le statut est d'un autre domaine n'y figure pas — `filter(projectStatuses)`", async () => {
+    /* **La seule ligne forgée du fichier qui vive dans son test**, et la
+       raison est mesurée : un projet de `a` posé sur un statut de `b` est
+       écarté par la fraîcheur et par `listProjects`, mais **compté** par
+       `countProjects` et par la répartition par entité, qui ne rejouent pas la
+       jointure de statut de leur liste. Laissée dans le semis, elle faisait
+       tomber deux constats voisins qui n'éprouvent pas ce filtre-ci — une
+       chute non isolée ne désigne plus le filtre qu'elle vise (leçon de T6.3).
+       L'écart des deux décomptes est consigné dans `JOURNAL-TECHNIQUE.md`.
+
+       Sa nature est `active`, celle du statut d'amorçage de `b` : `done`
+       l'écarterait en amont, et le `filter()` visé passerait au vert une fois
+       retiré. */
+    const forged = await db
+      .insert(projects)
+      .values({
+        domainId: a.domainId,
+        name: `Fuite de projet par le statut ${suffix}`,
+        productId: a.productId,
+        statusId: b.statusId,
+        lastActivityAt: STALE_TAIL_AT,
+      })
+      .returning({ id: projects.id });
+    const forgedId = forged[0]!.id;
+
+    try {
+      const rows = await listStaleProjects(a.scope);
+
+      // Le projet est de `a`, son produit aussi, sa nature est `active` :
+      // seule la jointure filtrée l'écarte. C'est la clause qu'ajoute la
+      // restriction de nature, et elle porte son `filter()` comme toute table
+      // jointe.
+      expect(rows.map((row) => row.id)).not.toContain(forgedId);
+    } finally {
+      // `finally` : un constat qui tombe ne doit pas laisser la ligne derrière
+      // lui, sans quoi la chute suivante serait celle du voisin.
+      await db.delete(projects).where(eq(projects.id, forgedId));
+    }
   });
 });
 

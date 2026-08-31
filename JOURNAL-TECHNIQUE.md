@@ -8297,3 +8297,100 @@ dépôt » a été mesuré à la session de découpage de C7 ; cinq tickets ont 
 portait **29** à l'ouverture de celui-ci. Il en porte 62. L'écart ne change rien au constat — ils
 sont toujours arrivés par hasard —, mais un chiffre cité dans une fiche vieillit entre le découpage
 et le ticket.
+
+**Hors ticket, 31/08/2026 — un livrable défait le lendemain de son ticket.** T7.5 a ramené la barre
+d'ancres de la page accompagnement au rendu le 30/08 ; elle en repart le 31/08, à la demande. Rien
+n'a échoué : le ticket a livré ce que sa fiche demandait, et c'est l'usage qui a tranché contre le
+sommaire. Ce que la fiche ne pouvait pas voir, la page servie l'a montré — un sommaire de trois
+entrées au-dessus d'une page qui se lit d'une traite. **Une fiche de ticket décrit un attendu, elle
+ne prouve pas un besoin.**
+
+**Trois choses restent posées et inertes, et cette fois c'est choisi.** `subnav.tsx` sans appelant,
+le `scroll-mt-19` de `Section`, le `scroll-behavior: smooth` de `app/globals.css`. C'est très
+exactement la situation que ce journal reprochait au 21/08/2026 — mais l'inertie d'alors était un
+oubli, celle-ci est un arbitrage : les `id` de section survivent à la barre, un lien `#ressources`
+collé dans un message ayant le même besoin de décalage et de glissement qu'une entrée de sommaire.
+Les trois commentaires le disent sur place, à leur date. La dette est nommée ici : **le jour où la
+barre revient, il n'y a rien à reposer** ; le jour où l'on décide que ces fragments ne se partagent
+pas, trois retraits suivent.
+
+**La leçon des dix jours reste dans le code, et c'est ce qu'on garde d'un composant qu'on
+débranche.** `subnav.tsx` ne connaît toujours aucune liste d'ancres — c'est la page qui les
+construisait, depuis `hasActivity`, la variable même qui décide du bloc « Démarrage ». Une propriété
+acquise à un ticket ne se paie pas deux fois : elle est écrite dans l'en-tête du composant, pas
+seulement dans le `page.tsx` qui vient de perdre son appel.
+
+**La sonde de T7.5 se repose à l'envers, et son piège avec.** Prouver une absence est plus fragile
+que prouver une présence : `grep 'aria-label="Sections de l'accompagnement"'` rend « absent » sur
+une page qui porte la barre, React servant `&#x27;`. Le motif retenu s'arrête donc avant
+l'apostrophe, et surtout **il a été mesuré sur les deux états** — 1 sur les sept accompagnements
+avant le retrait, 0 après. Une sonde qui rendrait 0 dans les deux états ne prouverait rien, et c'est
+la seule mise en défaut qu'un retrait de rendu autorise. Le diff du HTML servi le confirme au nœud
+près : **treize lignes en moins, celles du `<nav>`, et rien d'autre** hors des identifiants de
+requête que Next régénère.
+
+**Aucun écart documentaire n'est ouvert.** `docs/06` ne prescrit nulle part de barre de
+sous-navigation — elle venait de `docs/design/maquettes/blocs/project-v2`, qui est une référence
+visuelle et non un contrat. C'est ce qui distingue ce retrait de celui de « Projets liés », qui a
+ouvert un écart à la liste close de `docs/06` §5 et vit depuis dans les points ouverts d'`ETAT.md`.
+
+**Hors ticket, 31/08/2026 — un « Voir plus » contre deux commentaires qui l'interdisaient.**
+`feed.tsx` et `RECENT_EVENTS_LIMIT` écrivaient noir sur blanc « ni « voir plus » ». La demande est
+venue quand même, et la lecture attentive des deux textes donne raison au geste : ce qu'ils
+protègent est **le décompte**, pas le repli. La fiche T6.6, elle, interdit « aucune pagination » et
+« aucun décompte présenté comme une mesure d'activité du centre ». Un `<details>` n'est ni l'un ni
+l'autre — le document servi porte les quinze événements, la balise les garde dans l'arbre même
+fermée, il n'y a ni second aller-retour, ni page suivante, ni nombre écrit. **Le libellé est donc la
+seule chose qui compte** : « Voir plus » passe, « Voir les cinq suivants » ne passerait pas. Les deux
+commentaires sont récrits sur place, avec cette distinction ; l'interdit n'est pas levé, il est
+rendu à ce qu'il visait.
+
+**Deux nombres pour deux questions, et c'est ce qui les empêche de dériver.** `RECENT_EVENTS_LIMIT`
+(15) dit ce que la page **lit** ; `VISIBLE_EVENTS` (10) dit ce que l'écran **pose d'emblée**. Le
+second vit dans le rendu, pas dans la requête, parce qu'il ne décide d'aucune lecture — et le repli
+ne se rend que s'il cache quelque chose, mesuré en portant `VISIBLE_EVENTS` à 20 : aucun `<details>`
+servi, une seule liste de quinze lignes.
+
+**Deux `<ol>` pour un seul ordre, et `start` est ce qui les recoud.** Le repli coupe la liste en
+deux, et un second `<ol>` repartirait de un — « premier élément » annoncé au milieu du flux à qui
+lit par l'assistance. `start={VISIBLE_EVENTS + 1}` rend `start="11"` dans le HTML servi. C'est le
+genre de détail qu'aucun regard ne rattrape et qu'aucun test de rendu ne cherchait ; il est mesuré
+dans le document.
+
+**Un accompagnement terminé n'est pas un accompagnement qui dort**, et la règle se lit sur la
+`nature`, jamais sur le libellé. C'est la troisième lecture du dépôt à écrire
+`ne(projectStatuses.nature, "done")` — `listTeam` et le décompte de charge la portaient déjà —, et
+les trois ne partagent pas leur SQL : ce sont trois formes, tenues d'accord par des témoins de test.
+D42 tient sans être rouverte : l'archivage n'est pas un statut, il est écarté par `archived_at` deux
+lignes plus haut, et un projet archivé **et** terminé sort par les deux portes.
+
+**Une ligne forgée qui prouve trop est une ligne forgée qui ne prouve rien** — et celle-ci a coûté
+deux constats avant de trouver sa place. La jointure neuve porte son `filter(projectStatuses)`, donc
+elle demandait son témoin : un projet du domaine posé sur un statut d'un **autre** domaine. Semé
+comme ses dix aînés dans le `beforeAll`, il a fait tomber deux tests voisins — la répartition par
+entité (7 contre 6) et `countProjects` (8 contre 7) —, qui ne rejouent pas la jointure de statut de
+`listProjects` et **comptaient** donc une ligne que la liste écarte. Le témoin vit désormais **dans
+son test**, forgé et défait dans un `finally` : c'est la seule forme qui isole la chute. L'écart des
+deux décomptes est réel et reste ouvert dans `ETAT.md` → C8 ; il ne se corrige pas ici, il n'était
+pas demandé, et sur une base saine il ne se manifeste pas.
+
+**Les deux règles se mettent en défaut séparément, et chacune fait tomber un test et un seul.**
+Le `ne()` retiré : « un accompagnement terminé n'y figure pas », rien d'autre. Le
+`filter(projectStatuses)` retiré : le constat d'étanchéité, rien d'autre. Le témoin inverse — « un
+accompagnement en cours à la même date, lui, y figure » — est ce qui empêcherait un `ne()` devenu
+`eq()`, ou une clause qui viderait la liste, de passer au vert.
+
+**Le critère se lit dans le HTML servi, des deux côtés de la règle.** Neutralisée, la liste des
+dormants rend **quatre** lignes ; rétablie, **deux** — et les deux qui partent sont exactement les
+deux accompagnements de nature `done` que la base de développement porte. Un constat qui n'aurait
+été mesuré qu'après le changement n'aurait pas distingué « la règle marche » de « il n'y avait rien
+à écarter ».
+
+**Deux phrases d'écran devenues fausses, récrites avec la règle.** La `note` du bloc dit désormais
+« Les accompagnements **en cours** dont… », et son état vide « Tous les accompagnements **en cours**
+ont reçu une activité… ». Sans ce mot, l'absence d'un accompagnement terminé qu'on sait dormant se
+lirait comme un défaut de rendu — et une note qui décrit mal ce qu'elle surmonte est plus coûteuse
+qu'une note absente.
+
+**Pour T7.7** : le `<summary>` du repli est un point d'arrêt clavier neuf sur la vue d'ensemble, et
+le seul de cet écran. Il porte le `*:focus-visible` global, sans style propre.

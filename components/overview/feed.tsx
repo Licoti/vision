@@ -28,11 +28,28 @@
  * contrôle, pas de compréhension »*, celui-ci est la réponse à la question de
  * l'écran.
  *
- * **Aucun décompte, nulle part.** Ni sur l'en-tête, ni en pied, ni un « voir
- * les suivants ». Compter les événements du domaine serait une mesure
- * d'activité du centre, que `docs/06` §3 refuse nommément sur l'écran que verra
- * un responsable, et que la fiche du ticket interdit. Le plafond est un nombre
+ * **Aucun décompte, nulle part.** Ni sur l'en-tête, ni en pied, ni sur le
+ * repli. Compter les événements du domaine serait une mesure d'activité du
+ * centre, que `docs/06` §3 refuse nommément sur l'écran que verra un
+ * responsable, et que la fiche du ticket interdit. Le plafond est un nombre
  * écrit dans la requête ; il ne s'annonce pas.
+ *
+ * **Le flux se replie au-delà de dix lignes** (31/08/2026, hors ticket et à la
+ * demande) : les dix plus récentes se lisent, les suivantes attendent dans un
+ * `<details>` que « Voir plus » ouvre. C'est ce qui allège l'écran sans rien
+ * lui retirer.
+ *
+ * **Ce n'est pas une pagination**, et la fiche T6.6 qui l'interdit n'est donc
+ * pas rouverte : le document servi porte les quinze événements, `<details>`
+ * les gardant dans l'arbre même fermé — trouvables par la recherche du
+ * navigateur, lisibles sans une ligne de JavaScript, sans second aller-retour
+ * et sans page suivante. Ce qui reste interdit reste tenu : **le libellé ne
+ * porte aucun nombre**, ni ce qu'il cache, ni ce qu'il montre. « Voir les cinq
+ * suivants » serait le décompte que la règle vise, « Voir plus » ne l'est pas.
+ *
+ * **Le second groupe reprend la numérotation où le premier s'arrête**
+ * (`start`) : ce sont deux `<ol>` pour une seule liste, et un ordre qui
+ * repartirait de un dirait une seconde liste à qui lit par l'assistance.
  *
  * **Le journal n'est pas un historique** (D22) : chaque ligne dit la phrase
  * figée à l'écriture, son acteur, son origine et sa date. Ni valeur avant, ni
@@ -59,6 +76,22 @@ import { formatEventDay } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
 import type { EventOrigin, RecentEvent } from "@/lib/queries/overview";
 
+/**
+ * Ce qui se lit sans rien ouvrir — **dix lignes** (31/08/2026, hors ticket et à
+ * la demande).
+ *
+ * Le plafond de la lecture, lui, ne bouge pas : `RECENT_EVENTS_LIMIT` en rend
+ * quinze, et les cinq dernières attendent dans le repli. Deux nombres pour deux
+ * questions — combien la page **lit**, combien l'écran **pose d'emblée** —, et
+ * c'est pourquoi celui-ci vit dans le rendu et non dans la requête.
+ *
+ * **Il ne s'affiche nulle part**, pas plus que son aîné : le libellé du repli
+ * ne dit ni « dix », ni ce qu'il cache. Un flux qui annoncerait sa longueur
+ * inviterait à la comparer d'un jour à l'autre, et ce serait la mesure
+ * d'activité du centre que la fiche T6.6 interdit.
+ */
+const VISIBLE_EVENTS = 10;
+
 export function RecentActivity({ events }: { events: RecentEvent[] }) {
   return (
     <Section>
@@ -68,64 +101,76 @@ export function RecentActivity({ events }: { events: RecentEvent[] }) {
       />
 
       {events.length > 0 ? (
-        /* Une liste **ordonnée** : l'ordre est l'information — du plus récent
-           au plus ancien —, là où les ressources et les pistes sont des `ul`
-           dont l'ordre n'est qu'un tri d'affichage. C'est la règle du bloc
-           « Journal », et la même raison. */
-        <ol role="list" className="flex flex-col gap-3">
-          {events.map((event) => (
-            <li key={event.id}>
-              <p className="text-sm text-content-neutral-darkest">
-                {event.summary}
-              </p>
+        <>
+          {/* Une liste **ordonnée** : l'ordre est l'information — du plus
+             récent au plus ancien —, là où les ressources et les pistes sont
+             des `ul` dont l'ordre n'est qu'un tri d'affichage. C'est la règle
+             du bloc « Journal », et la même raison. */}
+          <ol role="list" className="flex flex-col gap-3">
+            {events.slice(0, VISIBLE_EVENTS).map((event) => (
+              <Entry key={event.id} event={event} />
+            ))}
+          </ol>
 
-              {/* Les trois libellés sont portés en propre pour l'assistance :
-                  hors du contexte visuel, « Camille Roux · Refonte du parcours
-                  de virement · 27 août 2026 » ne dit pas lequel des trois est
-                  l'acteur. C'est la règle du bloc « Ressources », reprise par
-                  le bloc « Journal », et le `·` est décoratif comme le sien.
+          {/* **Le repli ne se rend que s'il cache quelque chose** : à dix
+             événements ou moins, aucune affordance ne se pose — un « Voir
+             plus » qui n'ouvrirait rien serait pire qu'une absence
+             (`docs/06` §9). C'est la condition qui rend le premier jour d'un
+             domaine identique à ce qu'il était. */}
+          {events.length > VISIBLE_EVENTS ? (
+            /* `group` porte le retournement du chevron : il vit sur le
+               `<details>`, seule balise dont `group-open` puisse lire l'état.
+               **Aucun `open`** — c'est l'absence de l'attribut qui replie, et
+               le replié est l'état servi. La forme est celle du bloc
+               « Journal », à ceci près que le repli ne prend ici que la fin de
+               la liste. */
+            <details className="group">
+              {/* Le libellé bascule sans une ligne de JavaScript, et il ne
+                  porte **aucun nombre** — c'est la seule chose que la fiche
+                  T6.6 interdise ici. `<summary>` expose déjà l'état ouvert ou
+                  fermé à l'assistance : le chevron et la bascule du mot sont
+                  la même information rendue à l'œil.
 
-                  Il garde la couleur du texte qu'il sépare, même règle et même
-                  raison qu'en T4bis.5 : les trois côtés ont exactement la même
-                  taille, et un séparateur plus pâle laisserait lire une seule
-                  suite de mots.
+                  `list-none` et le pseudo-élément WebKit retirent la puce que
+                  certains navigateurs laissent malgré `flex` — la parade de
+                  `section.tsx`, éprouvée depuis le 18/08/2026. `w-fit` garde
+                  la cible du clic sur les deux mots plutôt que sur toute la
+                  largeur du bloc.
 
                   **Aucun couple de couleurs neuf par la position** :
-                  `content-neutral-base` sur `surface-neutral-pale` — le fond de
-                  `Section` — est le couple mesuré à 4,98:1 du bloc « Journal »,
-                  et `content-neutral-darkest` celui de tout titre de bloc sur
-                  cette même surface. */}
-              <p className="mt-1 text-xs text-content-neutral-base">
-                {/* **Un acteur nul se lit, il ne disparaît pas.** `actor_id`
-                    est nullable — une écriture sans personne courante, un
-                    acteur effacé — et la jointure filtrée rend le même `null`
-                    pour une personne d'un autre domaine. « par l'amorçage » dit
-                    ce que la ligne sait, plutôt que de laisser un vide qu'on
-                    lirait comme un défaut de rendu. C'est le mot du bloc
-                    « Journal », et il ne s'en écarte pas. */}
-                <span className="sr-only">Par : </span>
-                {event.actorName ?? "l'amorçage"}
+                  `content-info-base` souligné sur `surface-neutral-pale` est
+                  celui des liens de ce bloc et du « Voir toute la roadmap » de
+                  `roadmap-filter.tsx`, qui n'est pas un lien non plus. */}
+              <summary className="flex w-fit cursor-pointer list-none items-center gap-2 text-sm font-semibold text-content-info-base underline [&::-webkit-details-marker]:hidden">
+                <span
+                  aria-hidden="true"
+                  className="inline-block text-2xs leading-none no-underline transition-transform group-open:rotate-90"
+                >
+                  ▶
+                </span>
+                <span className="group-open:hidden">Voir plus</span>
+                <span className="hidden group-open:inline">Voir moins</span>
+              </summary>
 
-                {/* **L'origine n'est rendue que si elle existe.** Elle manque
-                    quand l'événement ne porte aucun rattachement, et quand
-                    celui qu'il porte a été écarté par le filtre de domaine :
-                    dans les deux cas la ligne se lit sans lien, plutôt que de
-                    disparaître ou de mener nulle part. */}
-                {event.origin ? (
-                  <>
-                    <span aria-hidden="true">{" · "}</span>
-                    <span className="sr-only">Sur : </span>
-                    <Origin origin={event.origin} />
-                  </>
-                ) : null}
-
-                <span aria-hidden="true">{" · "}</span>
-                <span className="sr-only">Le : </span>
-                {formatEventDay(event.occurredAt)}
-              </p>
-            </li>
-          ))}
-        </ol>
+              {/* **`start` reprend la numérotation où le premier `<ol>` s'est
+                  arrêté** : ce sont deux listes pour un seul ordre, et repartir
+                  de un dirait une seconde liste à qui lit par l'assistance.
+                  `mt-3` et non le `gap-4` de `Section` : le `<details>` est un
+                  frère de la liste, et une gouttière ne s'applique qu'entre
+                  frères — la suite doit garder le pas de la liste qu'elle
+                  continue, pas celui du bloc. */}
+              <ol
+                role="list"
+                start={VISIBLE_EVENTS + 1}
+                className="mt-3 flex flex-col gap-3"
+              >
+                {events.slice(VISIBLE_EVENTS).map((event) => (
+                  <Entry key={event.id} event={event} />
+                ))}
+              </ol>
+            </details>
+          ) : null}
+        </>
       ) : (
         /* **L'état vide est le premier rendu de tout domaine existant** : le
            journal démarre vide, et aucun rattrapage rétroactif n'a été écrit —
@@ -145,6 +190,67 @@ export function RecentActivity({ events }: { events: RecentEvent[] }) {
         </BlockNote>
       )}
     </Section>
+  );
+}
+
+/**
+ * Une ligne du flux — un événement, jamais une activité (`docs/04` §4).
+ *
+ * **Extrait le 31/08/2026**, quand le repli a fait de la liste deux listes :
+ * le `<li>` était écrit une fois dans le `map` et le recopier en aurait fait
+ * deux à tenir d'accord. C'est la recopie de signature que TD.3 → TD.6 ont
+ * passé six tickets à retirer, et elle ne se réintroduit pas ici.
+ */
+function Entry({ event }: { event: RecentEvent }) {
+  return (
+    <li>
+      <p className="text-sm text-content-neutral-darkest">{event.summary}</p>
+
+      {/* Les trois libellés sont portés en propre pour l'assistance :
+          hors du contexte visuel, « Camille Roux · Refonte du parcours
+          de virement · 27 août 2026 » ne dit pas lequel des trois est
+          l'acteur. C'est la règle du bloc « Ressources », reprise par
+          le bloc « Journal », et le `·` est décoratif comme le sien.
+
+          Il garde la couleur du texte qu'il sépare, même règle et même
+          raison qu'en T4bis.5 : les trois côtés ont exactement la même
+          taille, et un séparateur plus pâle laisserait lire une seule
+          suite de mots.
+
+          **Aucun couple de couleurs neuf par la position** :
+          `content-neutral-base` sur `surface-neutral-pale` — le fond de
+          `Section` — est le couple mesuré à 4,98:1 du bloc « Journal »,
+          et `content-neutral-darkest` celui de tout titre de bloc sur
+          cette même surface. */}
+      <p className="mt-1 text-xs text-content-neutral-base">
+        {/* **Un acteur nul se lit, il ne disparaît pas.** `actor_id`
+            est nullable — une écriture sans personne courante, un
+            acteur effacé — et la jointure filtrée rend le même `null`
+            pour une personne d'un autre domaine. « par l'amorçage » dit
+            ce que la ligne sait, plutôt que de laisser un vide qu'on
+            lirait comme un défaut de rendu. C'est le mot du bloc
+            « Journal », et il ne s'en écarte pas. */}
+        <span className="sr-only">Par : </span>
+        {event.actorName ?? "l'amorçage"}
+
+        {/* **L'origine n'est rendue que si elle existe.** Elle manque
+            quand l'événement ne porte aucun rattachement, et quand
+            celui qu'il porte a été écarté par le filtre de domaine :
+            dans les deux cas la ligne se lit sans lien, plutôt que de
+            disparaître ou de mener nulle part. */}
+        {event.origin ? (
+          <>
+            <span aria-hidden="true">{" · "}</span>
+            <span className="sr-only">Sur : </span>
+            <Origin origin={event.origin} />
+          </>
+        ) : null}
+
+        <span aria-hidden="true">{" · "}</span>
+        <span className="sr-only">Le : </span>
+        {formatEventDay(event.occurredAt)}
+      </p>
+    </li>
   );
 }
 

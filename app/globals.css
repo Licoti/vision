@@ -209,12 +209,15 @@
     font-family: var(--font-family-primary);
     -webkit-font-smoothing: antialiased;
 
-    /* La barre d'ancres de la page projet (`components/projects/subnav.tsx`)
-       saute d'un bloc à l'autre : sans glissement, la page change de contenu
-       d'un seul coup et l'on ne sait pas d'où l'on vient. C'est le seul
-       mouvement de tout le produit hors du tiroir, et il est **retiré** à qui a
-       demandé moins de mouvement, ci-dessous — la règle de `--duration-drawer`.
-       Aucune valeur n'est écrite : `smooth` est un mot-clé, pas une durée. */
+    /* Un lien de fragment saute d'un bloc à l'autre : sans glissement, la page
+       change de contenu d'un seul coup et l'on ne sait pas d'où l'on vient. La
+       règle a été posée pour la barre d'ancres de la page projet
+       (`components/projects/subnav.tsx`), **sans appelant depuis le
+       31/08/2026** ; elle sert désormais les `id` de section visés à la main,
+       et la barre le jour où elle revient. C'est le seul mouvement de tout le
+       produit hors du tiroir, et il est **retiré** à qui a demandé moins de
+       mouvement, ci-dessous — la règle de `--duration-drawer`. Aucune valeur
+       n'est écrite : `smooth` est un mot-clé, pas une durée. */
     scroll-behavior: smooth;
   }
 

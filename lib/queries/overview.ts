@@ -29,7 +29,7 @@
  * et il y en a trois.
  */
 
-import { and, asc, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, lt, ne, or, sql } from "drizzle-orm";
 
 import type { ScopedDb } from "@/lib/db/scoped";
 import {
@@ -488,6 +488,10 @@ export const STALE_AFTER_MONTHS = 1;
  * attire le regard sur ce qui s'endort, il ne tient pas l'inventaire de ce qui
  * dort — c'est la page `/projets`, triée par activité récente, qui le fait.
  *
+ * **Le plafond porte sur les accompagnements en cours seuls** depuis le
+ * 31/08/2026 : les terminés ne le consomment plus, et dix places rendent donc
+ * dix projets sur lesquels quelque chose peut encore se faire.
+ *
  * **Rien ne l'affiche**, ni « 10 premiers », ni « voir plus » : un bloc qui
  * annoncerait sa longueur inviterait à la comparer d'une semaine à l'autre, et
  * ce serait la mesure d'activité du centre que la fiche interdit.
@@ -557,6 +561,14 @@ export type StaleProject = {
  * raison qu'à la répartition : un projet rangé n'est pas un projet qui dort, et
  * un accompagnement sous produit archivé non plus.
  *
+ * **Ni les accompagnements terminés** (31/08/2026, hors ticket et à la
+ * demande) : la nature `done` de leur statut dit que plus rien n'y sera saisi,
+ * et la liste ne relève pas ce qui s'arrête pour de bonnes raisons. C'est une
+ * **restriction**, jamais un jugement — le bloc dit toujours un nom et une
+ * date, il ne mesure ni ne classe personne. La lecture se fait sur la
+ * `nature`, l'énuméré du schéma, jamais sur le libellé : un domaine renomme
+ * « Terminé » en « Clôturé » sans que la liste change de contenu.
+ *
  * **Le tri est un tri, jamais un classement.** Du plus ancien au plus récent,
  * les « jamais » en tête, le nom départageant à égalité — un ordre qui varierait
  * d'un affichage à l'autre serait un défaut, d'autant qu'ici il décide qui entre
@@ -589,10 +601,33 @@ export function listStaleProjects(
           isNull(products.archivedAt),
         ),
       )
+      /* Le statut, joint **pour sa seule nature** : rien n'en est sélectionné,
+         et le bloc n'en rend rien. La jointure est interne comme celle de
+         `listProjects`, et elle porte son `filter()` — un statut d'un autre
+         domaine ne décide pas de ce qui dort ici. */
+      .innerJoin(
+        projectStatuses,
+        and(
+          eq(projectStatuses.id, projects.statusId),
+          filter(projectStatuses),
+        ),
+      )
       .where(
         and(
           filter(projects),
           isNull(projects.archivedAt),
+          /* **Un accompagnement terminé ne dort pas, il est fini** (31/08/2026,
+             hors ticket et à la demande). Son absence d'activité n'est pas un
+             fait à signaler : c'est la conséquence de son statut, et la lire
+             comme un endormissement était le seul contresens que ce bloc
+             pouvait produire.
+
+             `ne` sur la **nature**, jamais sur le libellé : la nature est
+             l'énuméré du schéma, le libellé se renomme (`schema.ts`). C'est
+             l'exclusion de `listTeam` et du décompte de charge, écrite de la
+             même façon — et D42 tient : l'archivage n'est pas un statut, et il
+             est écarté deux lignes plus haut. */
+          ne(projectStatuses.nature, "done"),
           /* `or` ne rend `undefined` que sans condition : il y en a deux. */
           or(
             isNull(projects.lastActivityAt),

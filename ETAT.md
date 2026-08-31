@@ -2,9 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 30/08/2026, après T7.6. Dernier balayage : découpage de C7. **Le fichier
-dépasse les 250 lignes de la règle 5 — 514 au 30/08/2026** ; le balayage appartient à la session de
-découpage de C8.
+**Dernière mise à jour :** 31/08/2026, après les deux gestes hors ticket de la vue d'ensemble.
+Dernier balayage : découpage de C7. **Le fichier dépasse les 250 lignes de la règle 5 — 553 au
+31/08/2026** ; le balayage appartient à la session de découpage de C8.
 **Chantier en cours :** **C7 — Finitions**, dix tickets, découpés dans `tickets-C7.md`. **Dernier
 chantier du POC** — `docs/05` §5 n'en a pas de huitième.
 **Ticket suivant :** **T7.7 — Accessibilité : clavier, focus, contraste, titres.**
@@ -209,6 +209,37 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   seule table de la page sans borne haute. Un seul fichier touché, aucun test ne portait sur le
   repli. Vérifié dans le HTML servi : `<details>` **sans `open`**, et le `<ol>` des événements
   présent dans le document malgré le repli. 1 257 tests, inchangés.
+- **La barre d'ancres de la page accompagnement est retirée — hors ticket, 31/08/2026.** Demande de
+  l'humain, **au lendemain de T7.5 qui l'avait ramenée au rendu** : la page se lit d'une traite, et
+  le sommaire n'y gagnait pas sa place. Le geste est celui des retraits du 28/08 — **on retire
+  l'appelant, on ne supprime rien** : `subnav.tsx` reste entier et sans appelant, comme
+  `related.tsx`, et une ligne le remet au rendu. **Les `id` de section ne bougent pas** —
+  `#activites`, `#ressources`, `#indicateurs`, `#demarrage` restent des cibles de fragment qu'on
+  partage, avec le `scroll-mt-19` de `Section` et le `scroll-behavior: smooth` qui les servent ;
+  trois choses inertes, cette fois **choisies et nommées** au journal technique. Aucun écart
+  documentaire : `docs/06` ne prescrit nulle part de barre de sous-navigation, elle venait de la
+  maquette. Un seul fichier de rendu touché, trois commentaires ailleurs, aucun test ne portait sur
+  la barre. **Sonde mise en défaut par le couple avant/après** : `aria-label="Sections` — sans
+  l'apostrophe, que React sert `&#x27;` — rend **1 sur les sept accompagnements avant, 0 après**, et
+  le HTML servi ne diffère que des **treize lignes du `<nav>`**. La branche « sans activité »,
+  forcée par neutralisation de `hasActivity`, rend son `id="demarrage"` sans barre. 1 402 tests,
+  inchangés.
+- **Vue d'ensemble : les terminés sortent des dormants, le flux se replie à dix — hors ticket,
+  31/08/2026.** Deux demandes de l'humain sur le même écran. **(1)** Un accompagnement dont le
+  statut est de nature `done` ne remonte plus dans « Projets sans activité récente » : son silence
+  n'est pas un endormissement, c'est ce que son statut annonce. La clause vit dans
+  `listStaleProjects`, sur la **nature** et jamais sur le libellé, avec la jointure filtrée qu'elle
+  exige — l'exclusion de `listTeam`, écrite de la même façon. **(2)** « Activité récente » ne pose
+  d'emblée que ses **dix** lignes les plus récentes ; les suivantes attendent dans un `<details>`
+  que « Voir plus » ouvre. **Ce n'est pas une pagination** — les quinze événements sont dans le
+  document servi —, et **le libellé ne porte aucun nombre** : ce que la fiche T6.6 interdit est le
+  décompte, et il n'est pas écrit. Deux commentaires du dépôt disaient « ni voir plus » ; ils sont
+  récrits, l'écart est au journal. **Trois tests neufs** (1 402 → 1 405), **deux neutralisations,
+  deux chutes isolées**. Critère lu dans le HTML servi : les dormants passent de **4 à 2** — les
+  deux terminés, et eux seuls, quittent la liste — et le flux rend **10 + 5** lignes avec
+  `start="11"`, le repli disparaissant quand il ne cache rien. **Un écart trouvé et non corrigé** :
+  `countProjects` et la répartition par entité ne rejouent pas la jointure de statut de
+  `listProjects`.
 
 ---
 
@@ -240,6 +271,14 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 
 ### b. Assignés à un ticket
 
+- **`countProjects` et la répartition par entité ne rejouent pas la jointure de statut de leur
+  liste.** Trouvé le 31/08/2026 par une ligne forgée : un projet du domaine posé sur un statut d'un
+  autre domaine est écarté par `listProjects` — jointure interne filtrée — mais **compté** par les
+  deux lectures ci-dessus, qui s'arrêtent au produit. Le contrat écrit dans `overview.ts` — *« chaque
+  décompte rejoue les jointures de sa liste »* — est donc faux d'une jointure, et les deux constats
+  d'égalité du test ne tiennent aujourd'hui que parce qu'aucune ligne de ce genre n'existe. Sans
+  conséquence sur une base saine : c'est une étanchéité de second rang, pas une fuite entre domaines.
+  → **C8.**
 - **Deux colonnes de `docs/06` §4 manquent aux lignes de la liste transverse** — l'entité et les
   métiers, sur les sept énumérées. T7.2 a posé leurs **filtres**, pas leurs colonnes : son
   « Attendu » ne les nommait pas. Aucun ticket de C7 n'ouvre cet écran, T7.9 se l'interdit.

@@ -22,6 +22,13 @@
  * activité » est un fait, pas un retard. C'est souvent un accompagnement qui
  * vient d'être créé — raison de plus pour ne rien en conclure.
  *
+ * **Un accompagnement terminé, lui, n'y figure plus** (31/08/2026, hors ticket
+ * et à la demande). Son silence n'est pas un endormissement : c'est ce que son
+ * statut annonce. Le lire comme un dormant était le seul contresens que ce bloc
+ * pouvait produire — la liste dit ce qui **peut** encore bouger et ne bouge
+ * pas. L'exclusion vit dans `listStaleProjects`, sur la `nature` du statut ;
+ * rien ne se filtre ici, et le bloc n'affiche toujours ni statut ni badge.
+ *
  * **La liste est ordonnée, du plus ancien au plus récent** : c'est un tri, pas
  * un classement (interdit de la fiche). Aucun numéro de rang ne se rend, aucune
  * comparaison entre deux lignes n'est proposée ; l'ordre existe parce qu'un
@@ -49,7 +56,12 @@ export function StaleProjects({ projects }: { projects: StaleProject[] }) {
     <Section>
       <SectionHeader
         title="Projets sans activité récente"
-        note="Les accompagnements dont la dernière activité saisie remonte à plus d'un mois."
+        /* **« en cours » dit l'exclusion sans nommer un statut** (31/08/2026) :
+           la note doit rendre compte de ce que la liste ne montre pas, sinon
+           l'absence d'un accompagnement terminé se lit comme un défaut. Elle
+           reste une phrase de périmètre — ni décompte, ni proportion, ni
+           jugement. */
+        note="Les accompagnements en cours dont la dernière activité saisie remonte à plus d'un mois."
       />
 
       {projects.length > 0 ? (
@@ -98,9 +110,9 @@ export function StaleProjects({ projects }: { projects: StaleProject[] }) {
            le bloc a son en-tête, et il n'a **aucun geste** à proposer — on ne
            réveille pas un projet depuis la vue d'ensemble. */
         <BlockNote>
-          Tous les accompagnements ont reçu une activité au cours du dernier
-          mois. Ceux qui s&apos;endormiraient s&apos;afficheraient ici, avec la
-          date de leur dernière activité.
+          Tous les accompagnements en cours ont reçu une activité au cours du
+          dernier mois. Ceux qui s&apos;endormiraient s&apos;afficheraient ici,
+          avec la date de leur dernière activité.
         </BlockNote>
       )}
     </Section>

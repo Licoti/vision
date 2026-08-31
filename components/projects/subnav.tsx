@@ -1,8 +1,15 @@
 /**
  * La barre de sous-navigation de la page d'un accompagnement (20/08/2026),
- * d'après `docs/design/maquettes/blocs/project-v2`. **Retirée le 21/08/2026,
- * rendue de nouveau par T7.5** — elle a passé dix jours sans appelant, ses `id`
- * de section et le `scroll-mt-19` de `Section` restant posés et inertes.
+ * d'après `docs/design/maquettes/blocs/project-v2`.
+ *
+ * **Elle est de nouveau sans appelant depuis le 31/08/2026**, hors ticket et à
+ * la demande, au lendemain du ticket qui la lui avait rendu (T7.5) : la page se
+ * lit d'une traite, et le sommaire n'y gagnait pas sa place. C'est le geste des
+ * retraits du 28/08/2026 — on retire l'appelant, on ne supprime rien : ce
+ * fichier est entier, et `<Subnav entries={anchors} />` le remet au rendu. Les
+ * `id` de section et le `scroll-mt-19` de `Section` restent posés, cette fois
+ * **inertes en connaissance de cause** : ce sont des cibles de fragment qu'on
+ * partage, et la dette est nommée dans `JOURNAL-TECHNIQUE.md`.
  *
  * La page est longue — le récit, les pistes, les blocs de référence — et la
  * maquette y répond par une barre collante qui saute d'un bloc à l'autre. Ce
@@ -10,13 +17,15 @@
  * onglet, et fonctionnent sans une ligne de JavaScript.
  *
  * **Elle ne connaît aucune liste d'ancres, et c'est la leçon des dix jours
- * d'absence.** Elle en portait quatre en dur ; trois cibles ont disparu depuis
- * sans qu'une ligne d'ici bouge — « Projets liés » a quitté le rendu, « Budget »
- * a cessé d'être une `Section` pour devenir un rang de la fiche d'identité, et
+ * d'absence — celle qui vaut le jour où la barre revient.** Elle en portait
+ * quatre en dur ; trois cibles ont changé de statut pendant ce temps sans
+ * qu'une ligne d'ici bouge — « Projets liés » a quitté le rendu, « Budget » a
+ * cessé d'être une `Section` pour devenir un rang de la fiche d'identité, et
  * « Démarrage » ne se rend plus que sur un accompagnement sans activité. Une
- * ancre qui ne vise rien ne se voit pas à l'œil. C'est donc **la page** qui
- * construit les entrées, depuis les variables mêmes qui décident de ses blocs,
- * et ce composant ne fait que les rendre.
+ * ancre qui ne vise rien ne se voit pas à l'œil. Les entrées se construisent
+ * donc **dans la page**, depuis les variables mêmes qui décident de ses blocs,
+ * et ce composant ne fait que les rendre : c'est ainsi que T7.5 les a posées,
+ * et ainsi qu'elles se reposeront.
  *
  * **Aucune entrée n'est marquée « active », et c'est délibéré.** La maquette en
  * colore une, mais l'entrée courante d'une barre d'ancres est celle que le

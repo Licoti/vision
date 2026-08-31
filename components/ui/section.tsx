@@ -32,11 +32,17 @@
  * redessine pas.
  *
  * **`id` et `scroll-mt` vont ensemble**, et c'est la barre de sous-navigation
- * qui les demande (`components/projects/subnav.tsx`) : elle est collante, donc
+ * qui les demandait (`components/projects/subnav.tsx`) : elle est collante, donc
  * une ancre qui viserait le haut exact de la carte la ferait passer dessous.
  * Les 76 px sont ceux de la maquette, et ils s'écrivent par l'échelle —
- * `scroll-mt-19` vaut `19 × --number-4`. Le décalage est inerte partout où
- * aucune ancre ne vise le bloc.
+ * `scroll-mt-19` vaut `19 × --number-4`.
+ *
+ * **La barre est sans appelant depuis le 31/08/2026, et le décalage est donc
+ * inerte partout aujourd'hui.** Il reste posé : les `id` des blocs de la page
+ * projet sont des cibles de fragment qu'on copie et qu'on partage, et un lien
+ * `#ressources` collé dans un message a le même besoin de décalage que la barre
+ * — le jour où celle-ci revient, il n'y a rien à reposer. Dette nommée dans
+ * `JOURNAL-TECHNIQUE.md`.
  *
  * **La note se rend depuis TD.4 (19/08/2026), et c'est la correction d'un
  * défaut réel.** La prop était déclarée depuis T2.3 et **n'était affichée nulle
