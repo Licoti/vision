@@ -9188,3 +9188,166 @@ et le piège ci-dessus l'attend peut-être aussi.
 Il se rendait « dès que l'un des deux droits est ouvert ». « Voir les repères » n'en demande aucun
 (D9), si bien qu'il y a toujours au moins une entrée. Les deux conditions n'ont pas disparu : elles ne
 décident plus de l'existence du menu, seulement de son contenu.
+
+---
+
+## Le bouton aligné sur le design system de référence — hors ticket, 01/09/2026
+
+### La spécification n'était pas dans la feuille de style
+
+La demande est venue avec une URL de feuille CSS et trois exemples de balisage en `medium`. La
+feuille donne les jetons — `--color-primary-500` vaut `--midnight-500`, les rayons, les tailles de
+texte —, mais **elle ne peut pas donner ce qui était demandé** : un rythme par taille ne se lit pas
+dans une liste d'utilitaires, où `.px-3` et `.px-6` coexistent sans dire lequel appartient à quel
+palier.
+
+Ce qui l'a donné : le **bundle du site de documentation**, `/docs/_astro/dist.*.js`, où la
+définition du composant `Button` survit à la minification sous forme de tables de variantes
+lisibles. Les quatre tailles, les quatre apparences, le sens des états et l'opacité du désactivé y
+sont écrits en toutes lettres. **À retenir : la documentation d'un design system est son code
+servi, pas seulement sa feuille de style** — et une page de démonstration rendue côté client ne
+laisse rien dans le HTML statique qu'un `curl` rapporterait.
+
+### Les valeurs ne se traduisent pas, elles se renomment
+
+`--color-primary-N` du design system **est** `--midnight-N` de `app/tokens.css`, à la valeur près.
+La correspondance a donc été posée sur la couche sémantique, sans qu'aucune couleur n'ait à être
+choisie : `primary-500` → `surface-primary-base`, `primary-400` → `surface-primary-normal`,
+`primary-300` → `content-primary-light`, `primary-700` → `surface-primary-dark`, `primary-200` →
+`surface-primary-lighter`, `primary-100` → `surface-primary-lightest`, `greyscale-50` →
+`content-neutral-pale`. Idem pour la typographie : le `text-[0.625rem]` du design system est
+`text-2xs` (10 px), son `text-base` est `text-md` (16 px). **La règle 2 n'a jamais été approchée.**
+
+Un détail relevé sans conséquence : les paliers `midnight-50` et `midnight-100` sont **intervertis**
+entre les deux dépôts (`#f6f8fe` / `#f5f9ff`). Les deux sont des blancs bleutés à 1,01:1 l'un de
+l'autre ; la correspondance a été faite sur le rôle, pas sur le numéro.
+
+### Trois décisions antérieures retournées, et il faut les nommer
+
+1. **L'invariant « trois rangs, même gabarit » est rompu.** `button.tsx` le portait depuis TD.3, avec
+   son argument — un `border` d'un pixel transparent sur les trois rangs, si bien qu'échanger une
+   variante ne déplaçait aucun pixel — et sa source, la maquette `fiche-accompagnement.css:90`. Le
+   design system fait l'inverse : son tertiaire est serré (`p-2` contre `px-4 py-3`), **trente-huit
+   pixels contre quarante-six**. Arbitrage humain, pris en connaissance de l'invariant. Le filet
+   reste, sa raison a changé : il tient l'égalité du primaire et du secondaire, plus celle des trois.
+
+   **Conséquence à ne pas croire plus grande qu'elle n'est** : cinq des six `variant="tertiary"` du
+   dépôt passent par `ActionMenu`, donc par `iconOnly`, dont le carré de 32 px est hors de l'échelle
+   et ne bouge pas. **Deux boutons seulement** se resserrent — les « Retirer » d'`activity-panel.tsx`
+   et de `project-form.tsx`.
+
+2. **Le commentaire de `components/projects/roadmap.tsx:576` cite un argument qui n'est plus vrai.**
+   Il justifie le rang discret de son kebab par « le gabarit ne bouge pas — les trois rangs portent
+   le même `border` d'un pixel ». Son kebab, lui, ne bouge effectivement pas : il est `iconOnly`. Mais
+   la proposition générale qu'il invoque est fausse depuis ce jour. **Non corrigé — hors du périmètre
+   annoncé (règle 3), et consigné ici plutôt que laissé à découvrir.**
+
+3. **Le filet du secondaire n'est plus le substitut au jeton manquant.** Il passe de
+   `content-neutral-normal` (**3,88:1**, la limite de 3:1 tenue de justesse depuis TD.3) à
+   `border-primary-base` (**13,65:1**). Le manque de jeton de bordure de contrôle reste entier sur
+   `form-field.tsx` ; il ne porte simplement plus sur le bouton, et le point d'`ETAT.md` a été
+   **récrit**, pas complété.
+
+4. **Le survol du primaire change de sens.** Il assombrissait vers `surface-primary-dark`, et
+   c'était le seul état. Il **éclaircit** désormais (`surface-primary-normal`, 9,50:1), et c'est
+   l'appui qui assombrit (`surface-primary-dark`, 15,72:1). Un geste s'allume sous le pointeur et
+   s'enfonce sous le doigt.
+
+### `cursor-pointer` : la preflight de Tailwind 4 ne le pose plus
+
+Le design system porte `cursor-pointer` dans sa chaîne de base, et l'on pouvait croire à une
+redondance. Vérification faite dans `node_modules/tailwindcss/preflight.css` (4.3.3) puis **dans le
+CSS servi** : **aucune règle de curseur ne vise `button`**, le mot n'y paraît que pour les flèches
+d'un `<input type="number">` sous Safari. Tailwind 3 posait `button, [role="button"] { cursor:
+pointer }` ; v4 l'a retiré au profit du défaut du navigateur, qui est `default`.
+
+**Tous les gestes du produit rendaient donc une flèche depuis la migration.** Personne ne l'avait
+relevé. **À retenir : une preflight qui change ne casse rien de visible et ne dit rien.**
+
+### Le huitième manque du design system : `--duration-state`
+
+Le fondu de 300 ms du design system ne peut pas s'écrire `duration-300` — c'est une valeur en dur
+(règle 2), et l'échelle `duration-*` de Tailwind dérive d'un nombre, pas d'un jeton. Le document ne
+nomme toujours aucune durée. `--duration-state: 300ms` rejoint donc `--duration-drawer` et
+`--easing-drawer` dans `app/tokens.css`, **à la place des autres**, et le manque s'aggrave d'une
+valeur.
+
+Nommé `--duration-state` et non `--duration-hover` : il porte le survol **et** l'appui.
+
+Il est coupé sous `prefers-reduced-motion` à côté de `--duration-drawer`. **Ce n'est pas une
+obligation** : un fondu de couleur n'est pas un déplacement, et aucun critère WCAG ne le vise. C'est
+une cohérence avec la règle déjà écrite du tiroir — « qui a demandé moins de mouvement n'en reçoit
+aucun ». Le fait est noté pour que le prochain ne prenne pas la coupure pour une exigence.
+
+### `text-sm` a failli disparaître du kebab
+
+`BASE` portait `text-sm`. Il en sort, parce que la taille du texte appartient désormais au gabarit —
+et `ICON_ONLY`, qui n'est dans aucune des deux tables de gabarits, **l'aurait perdu en silence**. Le
+kebab et la croix du tiroir sont des caractères (`⋯`, `✕`) : ils auraient hérité la taille de leur
+contexte, différente d'un bloc à l'autre, sans qu'aucun outil ne le signale.
+
+`ICON_ONLY = "size-8 text-sm"` restitue exactement ce qui était servi. **Vérifié dans le HTML servi
+sur trois pages**, la chaîne du kebab étant celle qu'on attendait au caractère près.
+
+### Trois tailles sans appelant — le troisième écart de ce genre
+
+`xs`, `small` et `large` sont écrites alors que **les trente points d'appel restent tous au défaut
+`medium`**. C'est exactement ce que l'en-tête de `button.tsx` proscrit — « un composant de socle qui
+porte une variante sans appelant est une variante que le suivant emploiera de travers » —, et c'est
+la troisième fois que la règle cède à la demande, après le rang `tertiary` (qui avait trouvé son
+appelant le lendemain) et les props d'icône de `Button` (qui n'en ont toujours pas, un mois après).
+
+**Dette assumée, à la demande.** L'échelle du design system est écrite entière ou elle n'est pas
+l'échelle du design system.
+
+### Le survol du secondaire ne se voit pas, et c'est le design system qui le dessine
+
+`surface-primary-lightest` sur `surface-neutral-pale` : **1,04:1**. Contre le fond de page,
+**1,01:1**. Le survol du secondaire est, en pratique, invisible. Aucun jeton du design system ne fait
+mieux sans changer de palier (`surface-primary-lighter`, l'appui, monte à 1,26:1).
+
+Aucun seuil WCAG ne porte sur un survol, et le focus clavier ne dépend pas de lui — il est porté par
+`*:focus-visible` de `globals.css`. Le fait est **rapporté dans l'en-tête du composant**, comme
+l'était déjà le survol à 1,24:1 hérité de la maquette. C'est la même famille de manque que « une
+carte ne se détache d'aucun fond » : il n'y a pas, dans cette palette, de gris ou de bleu de survol
+qui se voie sans crier.
+
+### Le motif ESLint du secondaire mordra un jour sur un chip de filtre
+
+Les trois motifs anti-recopie du bouton portaient la signature `px-4 py-2`. Elle n'est plus celle
+d'aucun bouton : **laissés tels quels, ils ne gardaient plus rien**, en silence et au vert. Remis à
+`px-4 py-3`, et celui du secondaire à `border-border-primary-base`.
+
+Mis en défaut dans les deux sens, comme l'exige le protocole : une recopie neuve de chaque forme
+fait tomber exactement la clause attendue ; l'ancienne signature `px-4 py-2` ne déclenche plus rien
+nulle part.
+
+**Le risque introduit, mesuré et non masqué** : `border-border-primary-base` + `px-4 py-3` est aussi
+la signature du chip de filtre `sm` de `components/ui/checkbox-chip.ts`. Il n'est pas atteint —
+`socleLock` ignore `components/ui/`, et la chaîne y vit dans une constante, hors de tout attribut
+`className`. Mais **la même chaîne écrite en clair dans un `className` hors du socle déclenchera le
+message du bouton secondaire**, vérifié par une sonde. Le jour où cela arrive, c'est le motif qu'il
+faudra resserrer, pas le chip.
+
+**Et le tertiaire n'a aucun gardien.** Depuis qu'il s'est resserré, sa signature se réduit à `p-2` et
+à une couleur de texte — un motif qui mordrait sur la moitié des mises en page du dépôt. Un cliquet
+qu'on désactive au premier usage ne garde rien ; il n'est pas posé.
+
+### Ce que le HTML servi n'a pas pu montrer
+
+Le protocole veut que le critère se lise dans le HTML servi. Il s'y lit pour trois formes sur
+quatre — le primaire, le secondaire et l'icône seule, relevés sur les treize routes du produit, tous
+au gabarit `medium`.
+
+**Le tertiaire à texte n'est servi nulle part.** Ses deux appelants sont des « Retirer » qui
+n'existent qu'une fois une personne retenue, donc derrière un état client, l'un d'eux dans un
+tiroir. Faute de pouvoir le lire, deux preuves d'une autre nature :
+
+- les douze chaînes de `buttonClass()` — quatre tailles × trois rangs — évaluées et comparées à la
+  table du design system, plus `iconOnly` et le défaut ;
+- **la présence de chaque utilitaire dans le CSS servi** : `.p-0\.5`, `.p-1`, `.p-2`, `.p-3`,
+  `.px-2`, `.py-1`, `.px-6`, `.py-4`, `.text-2xs`, `.text-md`, les six variantes `hover:`/`active:`
+  neuves et `.duration-\[var\(--duration-state\)\]`. **C'est le vrai risque d'une classe sans
+  appelant** : Tailwind 4 n'émet que ce qu'il trouve dans les sources, et une classe absente de la
+  feuille ne rend rien, sans erreur. Toutes sont là, y compris la coupure de `--duration-state` sous
+  `prefers-reduced-motion`.

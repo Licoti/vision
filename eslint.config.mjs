@@ -166,11 +166,11 @@ const spacingScaleLock = {
  */
 const SOCLE_CLAUSES = [
   ...classNameRule(
-    String.raw`bg-surface-primary-base.*px-4.*py-2`,
+    String.raw`bg-surface-primary-base.*px-4.*py-3`,
     "Bouton primaire recopié : employer `Button` de `components/ui/button.tsx`, ou `buttonClass()` quand la balise n'est pas un `<button>`.",
   ),
   ...classNameRule(
-    String.raw`border-content-neutral-normal.*px-4.*py-2`,
+    String.raw`border-border-primary-base.*px-4.*py-3`,
     'Bouton secondaire recopié : employer `<Button variant="secondary">` de `components/ui/button.tsx`, ou `buttonClass({ variant: "secondary" })` quand la balise n\'est pas un `<button>`.',
   ),
   /* La troisième écriture du bouton, et la seule que TD.6 ne pouvait pas
@@ -180,9 +180,14 @@ const SOCLE_CLAUSES = [
      d'`ETAT.md`). Les coquilles ont disparu ; ce motif garde leur forme, qui ne
      nomme aucune couleur et n'avait donc aucun gardien. */
   ...classNameRule(
-    String.raw`inline-flex.*rounded-lg.*px-4.*py-2.*font-semibold`,
+    String.raw`inline-flex.*rounded-lg.*px-4.*py-3.*font-semibold`,
     "Coquille de bouton recopiée : employer `buttonClass({ variant })` de `components/ui/button.tsx`, et non une forme dont l'appelant fournit la couleur.",
   ),
+  /* **Le tertiaire n'a pas de gardien, et c'est délibéré.** Depuis qu'il a pris
+     le rythme serré du design system, sa signature se réduit à `p-2` et à une
+     couleur de texte — un motif qui mordrait sur la moitié des mises en page du
+     dépôt. Un cliquet qu'on désactive au premier usage ne garde rien ; celui-ci
+     n'est donc pas posé. Le fait est consigné dans JOURNAL-TECHNIQUE.md. */
   ...classNameRule(
     String.raw`font-semibold.*text-content-primary-dark.*underline`,
     "Lien d'action recopié : employer `ACTION_LINK` (`xs`) ou `ACTION_LINK_SM` (`sm`) de `components/ui/action-link.ts` (TD.1, TD.3).",

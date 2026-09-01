@@ -2,10 +2,10 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 01/09/2026, après les repères sur l'axe de la North Star.
+**Dernière mise à jour :** 01/09/2026, après l'alignement du bouton sur le design system.
 Dernier balayage : découpage de C7. **Le fichier dépasse les 250 lignes de la règle 5 — 553 au
 31/08/2026, 642 après le mode de planification, 660 après le dispositif de mesure** ; le balayage
-appartient à la session de découpage de C8. **674 après les repères.**
+appartient à la session de découpage de C8. **674 après les repères, 693 après le bouton.**
 **Chantier en cours :** **C7 — Finitions**, dix tickets, découpés dans `tickets-C7.md`. **Dernier
 chantier du POC** — `docs/05` §5 n'en a pas de huitième.
 **Ticket suivant :** **T7.7 — Accessibilité : clavier, focus, contraste, titres.**
@@ -326,6 +326,19 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   d'exclusivité inchangé pour la neuvième fois**. **Onze neutralisations, onze chutes exactes** ;
   droit éprouvé par les trois actions, dont la soumission forgée qui rattache un accompagnement d'un
   autre produit. **58 tests neufs** (1 524 → 1 582).
+- **Le bouton aligné sur le design system de référence — hors ticket.** Spécification **lue dans le
+  bundle du composant `Button`** du site de documentation, non déduite de sa feuille de style : les
+  quatre tailles (`xs` `px-2 py-1` → `large` `px-6 py-4`, le tertiaire à part de `p-0.5` à `p-3`),
+  le survol qui **éclaircit** et l'appui qui assombrit, `disabled:opacity-40`, un fondu de 300 ms
+  (`--duration-state`, **huitième manque du design system**, coupé sous `prefers-reduced-motion`).
+  Sa palette `primary-*` **est** la primitive `midnight-*` : rien n'est traduit. **Trois décisions
+  retournées** — l'invariant « trois rangs, même gabarit » rompu pour le tertiaire, le filet du
+  secondaire passé de `content-neutral-normal` à `border-primary-base` (**3,88 → 13,65:1**), le
+  survol du primaire changé de sens. `cursor-pointer` ajouté : la preflight de Tailwind 4 ne le pose
+  plus, et **tous les gestes rendaient une flèche** — lu dans le CSS servi. **Onze couples mesurés,
+  tous les seuils tenus** ; les trois motifs anti-recopie d'ESLint remis à la nouvelle signature,
+  **mis en défaut et remis au vert**. **Aucun appelant touché** : les trente restent au défaut
+  `medium`. Aucun test neuf (1 582).
 
 ---
 
@@ -537,9 +550,13 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   `confirm-panel.tsx` — gardent le lien souligné `ACTION_LINK_SM`, et **la divergence est réelle** :
   le même geste porte deux rangs selon l'écran. → **au prochain ticket qui ouvre un pied de
   formulaire.**
-- **`disabled:opacity-60` est servi sur douze balises qui ne peuvent pas être désactivées** — les
+- **`disabled:opacity-40` est servi sur douze balises qui ne peuvent pas être désactivées** — les
   `<a>`, `<Link>` et `<DrawerLink>` qui portent un bouton, contre une seule source pour l'état
-  désactivé. La douzième est le « Annuler » du formulaire de projet (29/08). → **sans échéance.**
+  désactivé. La douzième est le « Annuler » du formulaire de projet (29/08). La valeur est passée de
+  60 à 40 le 01/09 avec l'alignement sur le design system, et **la chaîne a quitté les trois
+  variantes pour la base** — une source au lieu de trois, le fait inchangé. Composée sur la page,
+  elle mesure **2,35:1** contre 4,09:1 auparavant ; WCAG 1.4.3 exempte les composants inactifs.
+  → **sans échéance.**
 - **Le formulaire de projet dit « (obligatoire) », celui de produit non.** `FormField` porte la prop
   depuis TD.1 ; seul le premier des deux formulaires pleine page la passe, depuis le 29/08. La
   reprise était bornée à un écran, et l'écart est donc **ouvert, pas assumé**. → **au prochain ticket
@@ -570,9 +587,12 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   → **design system, sinon C8.**
 - **Le design system a huit manques, et aucun n'a été inventé.** Trois élévations et deux gradients
   nommés sans valeur ; aucun jeton de bordure de contrôle, de bordure d'erreur, d'interlettrage, de
-  voile au-delà de 40 %, de séparateur, de mouvement (`--duration-drawer`, `--easing-drawer` sont
-  dans `app/tokens.css` faute de mieux) ; **`--number-*` s'arrête à 100 px** pour dix-neuf valeurs
-  légitimes au-delà. **Six substituts mesurés**, de 3,05:1 à 5,19:1. → **design system.**
+  voile au-delà de 40 %, de séparateur, de mouvement (`--duration-drawer`, `--easing-drawer` et,
+  depuis le 01/09, `--duration-state` sont dans `app/tokens.css` faute de mieux) ; **`--number-*`
+  s'arrête à 100 px** pour dix-neuf valeurs légitimes au-delà. **Six substituts mesurés**, de 3,05:1
+  à 5,19:1. Le manque de **bordure de contrôle** ne porte plus sur le bouton depuis que son
+  secondaire a pris `border-primary-base` (13,65:1) ; il reste entier sur `form-field.tsx`, où
+  `content-neutral-normal` tient toujours à 3,88:1. → **design system.**
 - **Le filtre de la roadmap ne se partage plus par son adresse.** Repassé côté client à la demande :
   il ne se copie plus, ne survit plus au rechargement, n'existe plus sans JavaScript. Une adresse
   reviendrait par `history.replaceState`, **sans** rendre le clic navigant. L'arbitrage du 21/08 est

@@ -5823,3 +5823,93 @@ consigné). La base de développement n'a reçu que le `CREATE TABLE` ; **aucune
 
 La **cible de clic de 24 px** reste sous les 44 px d'usage tactile — point ouvert donné à T7.7, qui
 est le ticket suivant et le ticket des attributs.
+
+---
+
+## Le bouton aligné sur le design system de référence — hors ticket, 01/09/2026
+
+**La demande** : *« affiner le style CSS des boutons (call to action). Ces boutons sont normalement
+de plusieurs types : Primary, Secondary, Tertiary. Et on différentes tailles chacun : Large, Medium,
+Small, XS. […] Globalement on va être sur des tailles Medium. »* Trois exemples de balisage en
+`medium` et l'URL d'une feuille de style.
+
+**Ce que le produit gagne** : le bouton du design system, au pixel — quatre tailles, un survol et un
+appui, un fondu, et un secondaire qui appartient visiblement à la famille du primaire. Aucun des
+trente points d'appel n'a changé d'une ligne.
+
+### La spécification était dans le code servi, pas dans la feuille de style
+
+La feuille donne les jetons ; elle ne peut pas dire quel padding appartient à quel palier. C'est le
+**bundle du composant `Button`** du site de documentation qui les porte, en tables de variantes
+lisibles sous la minification. Les quatre tailles, le sens des états et l'opacité du désactivé en
+viennent tels quels — rien n'a été déduit d'un rendu.
+
+| | `xs` | `small` | `medium` | `large` |
+|---|---|---|---|---|
+| primaire, secondaire | `px-2 py-1` | `px-3 py-2` | `px-4 py-3` | `px-6 py-4` |
+| tertiaire | `p-0.5` | `p-1` | `p-2` | `p-3` |
+| libellé | `text-2xs` | `text-xs` | `text-sm` | `text-md` |
+
+Sa palette `primary-*` **est** la primitive `midnight-*` de `app/tokens.css`. Aucune couleur n'a eu
+à être choisie : la correspondance s'est posée sur la couche sémantique, et la règle 2 n'a jamais
+été approchée.
+
+### Quatre arbitrages humains, pris contre des décisions écrites
+
+1. **Les quatre tailles sont écrites**, alors que `xs`, `small` et `large` n'ont aucun appelant.
+   C'est le troisième écart à « pas de variante sans appelant », après le rang `tertiary` et les
+   props d'icône.
+2. **Le tertiaire prend le rythme serré du design system** — trente-huit pixels contre quarante-six.
+   L'invariant « trois rangs, même gabarit » de TD.3 est rompu. **Deux boutons seulement** en
+   bougent : les « Retirer » d'`activity-panel.tsx` et de `project-form.tsx`. Les cinq autres
+   tertiaires du dépôt sont des kebabs `iconOnly`, dont le carré de 32 px est hors de l'échelle.
+3. **Le secondaire prend le filet et le texte de la couleur primaire.** Le filet passe de **3,88:1 à
+   13,65:1**, et le substitut au jeton de bordure de contrôle qui manque au design system cesse
+   d'être employé ici — il reste entier sur `form-field.tsx`.
+4. **Le survol éclaircit, l'appui assombrit**, `disabled:opacity-40`, fondu de 300 ms.
+
+### Deux choses trouvées en chemin
+
+**Tous les gestes du produit rendaient une flèche.** La preflight de Tailwind 4 ne pose plus
+`cursor: pointer` sur `<button>` — v3 le faisait. Lu dans le CSS servi, où aucune règle de curseur
+ne vise `button`. `cursor-pointer` entre dans la base.
+
+**`text-sm` a failli disparaître du kebab.** Il vivait dans `BASE` ; il en sort avec le reste du
+gabarit, et `ICON_ONLY` — qui n'est dans aucune des deux tables de tailles — l'aurait perdu en
+silence, laissant deux caractères hériter la taille de leur contexte. `ICON_ONLY = "size-8 text-sm"`
+restitue exactement ce qui était servi.
+
+### Le huitième manque du design system
+
+Le fondu de 300 ms ne peut pas s'écrire en dur. `--duration-state: 300ms` rejoint
+`--duration-drawer` et `--easing-drawer` dans `app/tokens.css`, faute de mieux, et se coupe sous
+`prefers-reduced-motion` — par cohérence avec la règle du tiroir, non par obligation : un fondu de
+couleur n'est pas un déplacement.
+
+### Vérification
+
+**Onze couples mesurés, tous les seuils tenus**, résolus depuis `app/tokens.css` et non retapés :
+13,65 / 9,50 / 15,72 pour le primaire ; 13,65 / 13,15 / 10,27 pour le secondaire, plus son filet à
+13,65 sur la carte et 12,97 sur la page ; 12,97 / 6,75 / 14,94 pour le tertiaire.
+
+**Deux faits rapportés, non masqués** : le survol du secondaire ne se détache que de **1,04:1** de
+son propre repos — c'est ce que le design system dessine, et aucun jeton ne fait mieux ; le désactivé
+tombe à **2,35:1** composé sur la page, contre 4,09:1 auparavant, WCAG 1.4.3 exemptant les composants
+inactifs.
+
+**Lu dans le HTML servi** sur les treize routes : trois formes, toutes au gabarit `medium` — le
+primaire, le secondaire, et le kebab dont la chaîne est celle d'avant au caractère près. **Le
+tertiaire à texte n'est servi nulle part** : ses deux appelants sont derrière un état client. Il est
+prouvé autrement — les douze chaînes de `buttonClass()` comparées à la table du design system, et la
+**présence de chaque utilitaire dans le CSS servi**, ce qui est le vrai risque d'une classe sans
+appelant : Tailwind 4 n'émet que ce qu'il trouve.
+
+**Les trois motifs anti-recopie d'ESLint étaient devenus faux** : ils gardaient la signature
+`px-4 py-2`, qui n'est plus celle d'aucun bouton, et ne gardaient donc plus rien — au vert et en
+silence. Remis à la nouvelle signature, **mis en défaut dans les deux sens** : chaque recopie neuve
+fait tomber exactement la clause attendue, l'ancienne signature ne déclenche plus rien.
+
+`npm run lint` au vert, `npx tsc --noEmit` au vert, **1 582 tests au vert** — aucun neuf, et aucun ne
+porte sur le socle d'interface : ce n'est pas une preuve, c'est une absence de régression ailleurs.
+**Le droit n'a pas été éprouvé, et n'avait pas à l'être** : aucun point d'entrée HTTP, aucune
+requête, aucun droit n'est touché.

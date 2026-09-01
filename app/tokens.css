@@ -383,17 +383,31 @@
      Deux jetons sont donc posés ici, à la place des autres, et le manque
      est à faire remonter avec les six précédents (ETAT.md).
 
-     La courbe est décélérée : le tiroir part vite et se pose. */
+     La courbe est décélérée : le tiroir part vite et se pose.
+
+     `--duration-state` est le troisième, et il vient du bouton : le design
+     system de référence fait fondre le fond, le filet et le texte d'un
+     geste sur 300 ms au survol comme à l'appui. La valeur est la sienne,
+     le nom est d'ici — il porte les deux états, pas le seul survol. Le
+     manque du design system s'aggrave donc d'une valeur, à faire remonter
+     avec les sept autres (ETAT.md). */
   --duration-instant: 0ms;
   --duration-drawer: 220ms;
+  --duration-state: 300ms;
   --easing-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-/* Qui a demandé moins de mouvement n'en reçoit aucun : la durée tombe à
-   zéro, et le tiroir paraît au lieu de glisser. Un seul endroit à couper,
-   parce qu'un seul jeton porte le mouvement. */
+/* Qui a demandé moins de mouvement n'en reçoit aucun : les durées tombent à
+   zéro, le tiroir paraît au lieu de glisser et un bouton change d'état d'un
+   coup. Un seul endroit à couper, parce que deux jetons portent tout le
+   mouvement du produit.
+
+   Le fondu d'un bouton n'est pas un déplacement, et aucun critère WCAG ne
+   le vise : il est coupé par cohérence avec la règle du tiroir, non par
+   obligation. */
 @media (prefers-reduced-motion: reduce) {
   :root {
     --duration-drawer: var(--duration-instant);
+    --duration-state: var(--duration-instant);
   }
 }
