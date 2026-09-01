@@ -339,6 +339,48 @@ export const TAGGING_PANEL_PARAM = "plan";
 export const TAGGING_PANEL_EDIT = "modifier";
 
 /**
+ * Le panneau qui **liste les repères** d'un produit — ce qui s'est passé sur
+ * lui, sur l'axe de la North Star.
+ *
+ * **Une seule valeur d'ouverture**, comme `vision` et `plan` : l'objet visé est
+ * le produit de la page, et la liste n'a rien à désigner. Elle se lit par tout
+ * le domaine (D9) — c'est une lecture, pas un geste.
+ *
+ * **Trois clés pour cette couche, et trois mots distincts.** La leçon de
+ * `persona`/`fiche` et d'`usecase`/`scenario` : deux clés qui ne diffèrent que
+ * d'une lettre se confondent à la relecture comme à la frappe.
+ */
+export const MARKERS_PANEL_PARAM = "reperes";
+
+/** La seule valeur d'ouverture. Toute autre n'ouvre rien. */
+export const MARKERS_PANEL_ALL = "tout";
+
+/**
+ * Le panneau de la **fiche d'un repère d'accompagnement** — une activité
+ * terminée, lue depuis la page du produit.
+ *
+ * Sa valeur est toujours un identifiant d'**activité** : c'est la forme de
+ * `fiche` et de `scenario`, les deux autres lectures de cette page. Il ne se
+ * confond pas avec `reperes` : le mot dit la marque, pas la liste.
+ *
+ * **Aucun jumeau d'écriture** : rien ne se saisit ici. Une activité se corrige
+ * sur la page de son accompagnement, où elle a son panneau et son droit.
+ */
+export const MARKER_DETAIL_PARAM = "marque";
+
+/**
+ * Le panneau de saisie d'un **repère de contexte** — la moitié manuelle de la
+ * couche, et son seul geste d'écriture.
+ *
+ * La **valeur** porte le cas, la forme d'`indicateur` : `nouveau` ouvre le
+ * panneau vide, un identifiant l'ouvre sur la ligne à corriger.
+ */
+export const CONTEXT_PANEL_PARAM = "contexte";
+
+/** La valeur d'ouverture du panneau vide. Un identifiant corrige. */
+export const CONTEXT_PANEL_NEW = "nouveau";
+
+/**
  * Le panneau de la **fiche d'une personne** (T5bis.4), seule clé d'ouverture de
  * la page Équipe — et la première d'une page qui n'a pas d'objet à elle.
  *
@@ -808,6 +850,33 @@ export const ROUTES = {
    */
   productTaggingPlan: (id: string) =>
     `/produits/${id}?${TAGGING_PANEL_PARAM}=${TAGGING_PANEL_EDIT}`,
+  /**
+   * La page du produit, **liste des repères** ouverte. Même mécanique que
+   * `productVision` : un paramètre, pas un écran de plus, et la fermeture reste
+   * `product(id)`. Elle ne demande aucun droit — la liste se lit par tout le
+   * domaine (D9) ; les gestes *dans* le panneau tombent avec le droit.
+   */
+  productMarkers: (id: string) =>
+    `/produits/${id}?${MARKERS_PANEL_PARAM}=${MARKERS_PANEL_ALL}`,
+  /**
+   * La même page, **fiche d'un repère d'accompagnement** ouverte en lecture. La
+   * valeur est l'identifiant de l'**activité** : c'est elle que la marque
+   * situe. Aucun droit non plus, pour la raison de `productPersona`.
+   */
+  productMarker: (id: string, activityId: string) =>
+    `/produits/${id}?${MARKER_DETAIL_PARAM}=${activityId}`,
+  /**
+   * La page du produit, panneau de saisie d'un repère de contexte ouvert sur le
+   * vide. Même mécanique que `productTrackingNew` jusqu'au nom de la clé.
+   */
+  productContextNew: (id: string) =>
+    `/produits/${id}?${CONTEXT_PANEL_PARAM}=${CONTEXT_PANEL_NEW}`,
+  /**
+   * Le même panneau, ouvert sur un repère de contexte à corriger : la valeur
+   * porte le cas, et c'est la seule différence avec l'entrée ci-dessus.
+   */
+  productContextEdit: (id: string, markerId: string) =>
+    `/produits/${id}?${CONTEXT_PANEL_PARAM}=${markerId}`,
   productUseCase: (id: string, useCaseId: string) =>
     `/produits/${id}?${USE_CASE_DETAIL_PARAM}=${useCaseId}`,
   projects: "/projets",

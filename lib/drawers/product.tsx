@@ -38,15 +38,20 @@ import { ReadingPanel } from "@/components/products/reading-panel";
 import { TaggingPlanPanel } from "@/components/products/tagging-plan-panel";
 import { TrackingPanel } from "@/components/products/tracking-panel";
 import { ReadingsPanel } from "@/components/products/readings-panel";
+import { ContextMarkerPanel } from "@/components/products/context-marker-panel";
+import { MarkerDetail } from "@/components/products/marker-detail";
+import { MarkersPanel } from "@/components/products/markers-panel";
 import { VisionPanel } from "@/components/products/vision-panel";
 import type { Session } from "@/lib/auth/session";
 import {
+  contextMarkers,
   indicatorReadings,
   indicators,
   personas,
   productTrackings,
   useCases,
 } from "@/lib/db/schema";
+import { toContextMarkerFormValues } from "@/lib/forms/context-marker";
 import { toIndicatorFormValues } from "@/lib/forms/indicator";
 import { toPersonaFormValues } from "@/lib/forms/persona";
 import { toReadingFormValues } from "@/lib/forms/reading";
@@ -57,8 +62,13 @@ import { toVisionFormValues } from "@/lib/forms/vision";
 import {
   ARCHIVE_PANEL_CONFIRM,
   ARCHIVE_PANEL_PARAM,
+  CONTEXT_PANEL_NEW,
+  CONTEXT_PANEL_PARAM,
   INDICATOR_PANEL_NEW,
   INDICATOR_PANEL_PARAM,
+  MARKER_DETAIL_PARAM,
+  MARKERS_PANEL_ALL,
+  MARKERS_PANEL_PARAM,
   PERSONA_DETAIL_PARAM,
   PERSONA_PANEL_NEW,
   PERSONA_PANEL_PARAM,
@@ -93,8 +103,13 @@ import {
   listProductIndicators,
   listProductReadings,
 } from "@/lib/queries/indicators";
-import type { ProductDetail } from "@/lib/queries/products";
+import type { ProductDetail, ProductProject } from "@/lib/queries/products";
 import { listProductProjects } from "@/lib/queries/products";
+import {
+  listProductMarkers,
+  neighbourReadings,
+  type ProductMarker,
+} from "@/lib/queries/timeline";
 import { isUuid } from "@/lib/uuid";
 
 import {
@@ -102,15 +117,18 @@ import {
   updateProductVision,
 } from "@/app/(app)/produits/actions";
 import {
+  archiveContextMarker,
   archivePersona,
   archiveReading,
   archiveUseCase,
+  createContextMarker,
   createIndicator,
   createPersona,
   createReading,
   createTracking,
   createUseCase,
   saveTaggingPlan,
+  updateContextMarker,
   updateIndicator,
   updateTracking,
   updatePersona,
@@ -148,6 +166,22 @@ export type ProductDrawerContext = {
    * la page laisse vide **dans tous les cas**, et que seule l'ouverture paie.
    */
   tools: readonly AnalyticsTool[];
+  /**
+   * Les repères du produit — les activités terminées et les repères de
+   * contexte, fondus et triés (`mergeMarkers`).
+   *
+   * **La page les a déjà lus pour son axe** : elle les passe tels quels, comme
+   * les indicateurs et les relevés. Seule l'ouverture par le clic les paie.
+   */
+  markers: readonly ProductMarker[];
+  /**
+   * Les accompagnements vivants du produit — le `<select>` du panneau de
+   * saisie, et rien d'autre.
+   *
+   * Ce n'est **pas** ce qui protège : `createContextMarker` revérifie que
+   * l'accompagnement reçu appartient bien à ce produit.
+   */
+  projects: readonly ProductProject[];
 };
 
 /** Le droit d'écrire, dérivé une fois pour les deux chemins. */
@@ -186,6 +220,8 @@ export async function loadProductDrawerContext(
       personas: [],
       useCases: [],
       tools: [],
+      markers: [],
+      projects: [],
     };
   }
 
@@ -197,6 +233,8 @@ export async function loadProductDrawerContext(
       personas: await listProductPersonas(session.db, product.id),
       useCases: [],
       tools: [],
+      markers: [],
+      projects: [],
     };
   }
 
@@ -216,6 +254,8 @@ export async function loadProductDrawerContext(
       personas: productPersonas,
       useCases: productUseCases,
       tools: [],
+      markers: [],
+      projects: [],
     };
   }
 
@@ -227,6 +267,8 @@ export async function loadProductDrawerContext(
       personas: await listProductPersonas(session.db, product.id),
       useCases: [],
       tools: [],
+      markers: [],
+      projects: [],
     };
   }
 
@@ -240,6 +282,58 @@ export async function loadProductDrawerContext(
       personas: [],
       useCases: [],
       tools: await listAnalyticsTools(session.db),
+      markers: [],
+      projects: [],
+    };
+  }
+
+  if (request.kind === "markers") {
+    return {
+      canWrite,
+      indicators: [],
+      readings: [],
+      personas: [],
+      useCases: [],
+      tools: [],
+      markers: await listProductMarkers(session.db, product.id),
+      projects: [],
+    };
+  }
+
+  /* La fiche d'un repère a besoin des trois : le repère lui-même, la North Star
+     qu'il encadre, et sa série. C'est la lecture la plus chère de ce module, et
+     elle n'a lieu que sur ce clic-là. */
+  if (request.kind === "markerDetail") {
+    const [productIndicators, productReadings, productMarkers] =
+      await Promise.all([
+        listProductIndicators(session.db, product.id),
+        listProductReadings(session.db, product.id),
+        listProductMarkers(session.db, product.id),
+      ]);
+    return {
+      canWrite,
+      indicators: productIndicators,
+      readings: productReadings,
+      personas: [],
+      useCases: [],
+      tools: [],
+      markers: productMarkers,
+      projects: [],
+    };
+  }
+
+  /* Le panneau de saisie relit sa propre ligne par identifiant ; il n'a besoin
+     que des accompagnements que son `<select>` propose. */
+  if (request.kind === "contextMarker") {
+    return {
+      canWrite,
+      indicators: [],
+      readings: [],
+      personas: [],
+      useCases: [],
+      tools: [],
+      markers: [],
+      projects: await listProductProjects(session.db, product.id),
     };
   }
 
@@ -250,6 +344,8 @@ export async function loadProductDrawerContext(
     personas: [],
     useCases: [],
     tools: [],
+    markers: [],
+    projects: [],
   };
 }
 
@@ -708,6 +804,130 @@ export async function resolveProductDrawer(
         ),
       };
     }
+
+    /* **Aucun droit à l'ouverture** — la liste se lit par tout le domaine (D9),
+       comme les deux fiches voisines. Ce sont les gestes *dans* le panneau qui
+       tombent avec `canWrite`, et ce n'est pas ce rendu qui protège : les trois
+       actions redérivent le droit sur l'identifiant reçu. */
+    case "markers": {
+      return {
+        titleId: "panneau-reperes-titre",
+        title: "Repères",
+        subtitles: [product.name],
+        body: (
+          <MarkersPanel
+            markers={context.markers}
+            addContextHref={
+              context.canWrite ? ROUTES.productContextNew(product.id) : null
+            }
+            markerHref={(activityId) =>
+              ROUTES.productMarker(product.id, activityId)
+            }
+            editContextHref={
+              context.canWrite
+                ? (markerId) => ROUTES.productContextEdit(product.id, markerId)
+                : null
+            }
+            archiveContextMarker={
+              context.canWrite
+                ? archiveContextMarker.bind(null, product.id)
+                : null
+            }
+          />
+        ),
+      };
+    }
+
+    /* La fiche d'un repère d'**accompagnement** : l'identifiant est celui d'une
+       activité, et la résolution se fait sur la collection déjà lue plutôt que
+       par une requête de plus — la règle de `personaDetail`. Un identifiant qui
+       ne désigne aucun repère de cette collection n'ouvre rien : il peut être
+       celui d'une activité d'un autre produit, d'une activité non terminée, ou
+       d'un repère de contexte, et aucun des trois n'a de fiche ici. */
+    case "markerDetail": {
+      if (!isUuid(request.id)) return null;
+
+      const marker =
+        context.markers.find(
+          (entry) =>
+            entry.kind === "accompaniment" && entry.id === request.id,
+        ) ?? null;
+      if (!marker) return null;
+
+      /* ⚠ La lisière de D39, et elle se prépare ici plutôt que dans le
+         composant : `neighbourReadings` **sélectionne**, elle ne calcule pas.
+         Sans North Star désignée, il n'y a rien à encadrer — le rang disparaît
+         entièrement plutôt que de montrer les relevés d'un indicateur qui ne
+         porte pas l'objectif du produit. */
+      const northStar =
+        context.indicators.find((indicator) => indicator.isNorthStar) ?? null;
+      const series = northStar
+        ? context.readings.filter(
+            (reading) => reading.indicatorId === northStar.id,
+          )
+        : [];
+      const { before, after } = neighbourReadings(series, marker.on);
+
+      return {
+        titleId: "panneau-marque-titre",
+        title: marker.label,
+        subtitles: [product.name],
+        body: (
+          <MarkerDetail
+            marker={marker}
+            northStarLabel={northStar ? northStar.label : null}
+            before={before}
+            after={after}
+            unit={northStar ? northStar.unit : null}
+            projectHref={
+              marker.projectId ? ROUTES.project(marker.projectId) : null
+            }
+            markersHref={ROUTES.productMarkers(product.id)}
+          />
+        ),
+      };
+    }
+
+    /* Le seul geste d'écriture de la couche. La ligne se relit par identifiant,
+       et la confrontation au produit et à l'archivage est celle de `tracking`. */
+    case "contextMarker": {
+      if (!context.canWrite) return null;
+
+      const row =
+        request.id && isUuid(request.id)
+          ? await session.db.find(contextMarkers, request.id)
+          : undefined;
+      const marker =
+        row && row.productId === product.id && row.archivedAt === null
+          ? row
+          : null;
+
+      if (request.id && !marker) return null;
+
+      return {
+        titleId: "panneau-contexte-titre",
+        title: marker
+          ? "Modifier le repère de contexte"
+          : "Ajouter un repère de contexte",
+        subtitles: [product.name],
+        body: (
+          <ContextMarkerPanel
+            action={
+              marker
+                ? updateContextMarker.bind(null, product.id, marker.id)
+                : createContextMarker.bind(null, product.id)
+            }
+            projects={context.projects}
+            {...(marker
+              ? {
+                  submitLabel: "Enregistrer les modifications",
+                  initial: toContextMarkerFormValues(marker),
+                }
+              : { submitLabel: "Ajouter ce repère" })}
+          />
+        ),
+      };
+    }
   }
 }
 
@@ -737,6 +957,9 @@ export function productRequestFromParams(asked: {
   scenario?: string | undefined;
   mesure?: string | undefined;
   plan?: string | undefined;
+  reperes?: string | undefined;
+  marque?: string | undefined;
+  contexte?: string | undefined;
 }): ProductDrawerRequest | null {
   if (asked.archiver === ARCHIVE_PANEL_CONFIRM) return { kind: "archive" };
 
@@ -782,6 +1005,17 @@ export function productRequestFromParams(asked: {
      que l'objet visé est celui de la page. Toute autre valeur n'ouvre rien. */
   if (asked.plan === TAGGING_PANEL_EDIT) return { kind: "taggingPlan" };
 
+  if (asked.reperes === MARKERS_PANEL_ALL) return { kind: "markers" };
+
+  if (asked.marque !== undefined)
+    return { kind: "markerDetail", id: asked.marque };
+
+  if (asked.contexte !== undefined) {
+    return asked.contexte === CONTEXT_PANEL_NEW
+      ? { kind: "contextMarker" }
+      : { kind: "contextMarker", id: asked.contexte };
+  }
+
   return null;
 }
 
@@ -805,4 +1039,7 @@ export const PRODUCT_PANEL_PARAMS = [
   USE_CASE_DETAIL_PARAM,
   TRACKING_PANEL_PARAM,
   TAGGING_PANEL_PARAM,
+  MARKERS_PANEL_PARAM,
+  MARKER_DETAIL_PARAM,
+  CONTEXT_PANEL_PARAM,
 ] as const;

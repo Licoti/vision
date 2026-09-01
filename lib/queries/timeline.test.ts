@@ -23,6 +23,7 @@ import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
 import {
   activities,
   activityTypes,
+  contextMarkers,
   domains,
   entities,
   products,
@@ -32,8 +33,12 @@ import {
 } from "@/lib/db/schema";
 
 import {
+  curveTimeline,
   defaultWindow,
-  listProductMilestones,
+  listAccompanimentMarkers,
+  listContextMarkers,
+  listProductMarkers,
+  mergeMarkers,
   monthBand,
   monthMark,
   monthTicks,
@@ -41,10 +46,12 @@ import {
   timelineWindow,
   valueOffset,
   valueScale,
+  neighbourReadings,
   windowMonths,
   windowYears,
   withinWindow,
   yearWindow,
+  type ProductMarker,
   type TimelineScale,
   type ValueScale,
 } from "./timeline";
@@ -511,6 +518,10 @@ function round(value: number): number {
 
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
 const teardownOrder = [
+  /* **Avant `projects` et `products`**, la règle « enfants d'abord » : un
+     oubli ici laisse un domaine résiduel, et c'est le **fichier suivant** qui
+     tombe, sur une résolution « premier domaine actif par nom ». */
+  contextMarkers,
   results,
   activities,
   projects,
@@ -533,6 +544,18 @@ type Fixture = {
   auditActivityId: string;
   /** L'activité de conformité du second — le repère de 2026. */
   complianceActivityId: string;
+  /**
+   * Une activité terminée **sans aucun résultat**. C'est elle que la jointure
+   * gauche laisse passer, et la passer en jointure interne doit la faire
+   * disparaître — elle seule.
+   */
+  bareActivityId: string;
+  /** Un repère de contexte rattaché à un accompagnement vivant. */
+  releaseMarkerId: string;
+  /** Un repère de contexte sans accompagnement — le cas normal. */
+  campaignMarkerId: string;
+  /** Un repère de contexte rattaché à un accompagnement **archivé**. */
+  orphanMarkerId: string;
 };
 
 const suffix = Math.random().toString(36).slice(2, 10);
@@ -540,9 +563,12 @@ let a: Fixture;
 let b: Fixture;
 
 /**
- * Trois produits, quatre accompagnements et six résultats : deux qui se lisent,
- * quatre que la lecture doit écarter — un résultat archivé, une activité
- * archivée, un accompagnement archivé, un produit voisin.
+ * Trois produits, quatre accompagnements, six résultats et quatre repères de
+ * contexte.
+ *
+ * Ce que la lecture doit **écarter** est écrit avec le reste : une activité
+ * prévue, une activité annulée, une activité archivée, un accompagnement
+ * archivé, un repère de contexte retiré, et un produit voisin.
  *
  * Les résultats sont écrits **dans le désordre** par rapport à l'ordre attendu :
  * c'est la requête qui doit trier, pas la suite des insertions.
@@ -580,8 +606,10 @@ async function seedDomain(label: string): Promise<Fixture> {
 
   /* **Les dates ne vivent plus sur le projet** : sa période se déduit des
      périodes de ses activités (31/08/2026). Le cadrage porte donc la période
-     que ces quatre projets annonçaient ; il ne porte aucun résultat, et
-     n'entre donc dans aucun repère. */
+     que ces quatre projets annonçaient. Il ne porte aucun résultat — et il
+     **entre malgré tout dans les repères** depuis que la lecture s'est élargie
+     à toutes les activités terminées : un cadrage est un accompagnement
+     réalisé. */
   const framing = await scope.insert(activityTypes, {
     label: `Cadrage ${label}`,
     family: "framing",
@@ -719,6 +747,75 @@ async function seedDomain(label: string): Promise<Fixture> {
     measuredOn: "2026-05-31",
   });
 
+  /* --- Ce que l'élargissement fait entrer, et ce qu'il laisse dehors ----- */
+
+  /* **Une activité terminée sans aucun résultat** : c'est elle que la jointure
+     gauche laisse passer, et la décision de ce ticket tient à elle seule. */
+  const bare = await activity(current.id, "2025-04-01", "2025-04-30");
+
+  /* Une activité **prévue** : elle n'a pas eu lieu, elle n'est pas un repère.
+     Sans fin de période, elle n'aurait de toute façon pas d'abscisse. */
+  await scope.insert(activities, {
+    projectId: current.id,
+    activityTypeId: audit.id,
+    state: "planned",
+    periodStart: "2026-09-01",
+  });
+
+  /* Une activité **annulée**, datée des deux bouts : c'est le seul cas écarté
+     qui porterait une abscisse valide, donc le seul que le filtre d'état
+     protège vraiment. */
+  await scope.insert(activities, {
+    projectId: current.id,
+    activityTypeId: audit.id,
+    state: "cancelled",
+    periodStart: "2025-01-01",
+    periodEnd: "2025-01-31",
+    cancellationReason: `Annulée ${label}`,
+  });
+
+  /* --- Les repères de contexte ------------------------------------------- */
+
+  const release = await scope.insert(contextMarkers, {
+    productId: full.id,
+    projectId: current.id,
+    happenedOn: "2025-06-15",
+    label: `Mise en production ${label}`,
+    note: `Note de mise en production ${label}`,
+  });
+
+  /* Sans accompagnement — le cas normal : une campagne n'est pas la nôtre. */
+  const campaign = await scope.insert(contextMarkers, {
+    productId: full.id,
+    happenedOn: "2024-11-01",
+    label: `Campagne ${label}`,
+  });
+
+  /* Rattaché à un accompagnement **archivé** : la jointure gauche filtrée doit
+     rendre l'identifiant **et** le nom à nul ensemble. Un identifiant sans nom
+     mènerait vers une page qu'on ne saurait plus annoncer. */
+  const orphan = await scope.insert(contextMarkers, {
+    productId: full.id,
+    projectId: archivedProject.id,
+    happenedOn: "2023-05-05",
+    label: `Repère orphelin ${label}`,
+  });
+
+  /* Retiré (règle 4) : il ne se lit plus, et il ne bloque pas sa place. */
+  const retired = await scope.insert(contextMarkers, {
+    productId: full.id,
+    happenedOn: "2026-10-01",
+    label: `Repère retiré ${label}`,
+  });
+  await scope.archive(contextMarkers, retired.id);
+
+  /* Le produit voisin, pour les repères de contexte aussi. */
+  await scope.insert(contextMarkers, {
+    productId: other.id,
+    happenedOn: "2026-03-01",
+    label: `Repère du voisin ${label}`,
+  });
+
   return {
     domainId: domain.id,
     scope,
@@ -727,6 +824,10 @@ async function seedDomain(label: string): Promise<Fixture> {
     otherId: other.id,
     auditActivityId: auditActivity.id,
     complianceActivityId: compliance.id,
+    bareActivityId: bare.id,
+    releaseMarkerId: release.id,
+    campaignMarkerId: campaign.id,
+    orphanMarkerId: orphan.id,
   };
 }
 
@@ -744,84 +845,385 @@ afterAll(async () => {
   await db.delete(domains).where(inArray(domains.id, ids));
 });
 
-describe("listProductMilestones — ce que la lecture rend", () => {
-  test("les repères sortent de la plus ancienne mesure à la plus récente", async () => {
-    const rows = await listProductMilestones(a.scope, a.fullId);
+describe("listAccompanimentMarkers — ce que la lecture rend", () => {
+  test("toutes les activités terminées, de la plus ancienne fin à la plus récente", async () => {
+    const rows = await listAccompanimentMarkers(a.scope, a.fullId);
 
-    // Le résultat de 2026 a été écrit en premier : sans l'`order by`, il
-    // ouvrirait la liste.
-    expect(rows.map((row) => row.id)).toEqual([
-      a.auditActivityId,
-      a.complianceActivityId,
+    /* Les cinq activités terminées du produit, cadrages compris. Les résultats
+       ont été écrits dans le désordre : sans l'`order by`, celui de 2026
+       ouvrirait la liste. */
+    expect(rows.map((row) => row.on)).toEqual([
+      "2024-05-31",
+      "2024-09-30",
+      "2025-04-30",
+      "2026-06-30",
+      "2026-07-31",
     ]);
+    expect(rows.every((row) => row.kind === "accompaniment")).toBe(true);
   });
 
-  test("un repère porte son activité, son accompagnement et son résultat", async () => {
-    const rows = await listProductMilestones(a.scope, a.fullId);
+  test("une activité terminée **sans résultat** est un repère", async () => {
+    /* La décision du ticket, et elle tient à la jointure gauche : un atelier de
+       restitution ou un cadrage sont des accompagnements réalisés. La passer en
+       jointure interne doit faire tomber ce test, et lui seul avec ses voisins
+       de la même famille. */
+    const rows = await listAccompanimentMarkers(a.scope, a.fullId);
+    const bare = rows.find((row) => row.id === a.bareActivityId);
+
+    expect(bare).toMatchObject({
+      kind: "accompaniment",
+      on: "2025-04-30",
+      label: "Audit UX a",
+      projectName: "Autonomie a",
+      resultLabel: null,
+      resultValue: null,
+      resultMeasuredOn: null,
+    });
+  });
+
+  test("un repère porte son type, son accompagnement et son résultat", async () => {
+    const rows = await listAccompanimentMarkers(a.scope, a.fullId);
     const audit = rows.find((row) => row.id === a.auditActivityId);
 
     expect(audit).toMatchObject({
-      typeLabel: "Audit UX a",
+      label: "Audit UX a",
       projectName: "Refonte a",
       resultLabel: "Score d'audit UX a",
       resultUnit: "/100",
-      measuredOn: "2024-05-31",
+      resultMeasuredOn: "2024-05-31",
     });
     // `numeric(18,4)` revient en chaîne du pilote : la lecture ne met pas en
     // forme, `formatResultValue` s'en charge à l'écran.
     expect(audit?.resultValue).toBe("62.0000");
   });
 
-  test("un produit sans résultat rend une liste vide", async () => {
-    expect(await listProductMilestones(a.scope, a.emptyId)).toEqual([]);
+  test("la date du repère est la **fin d'activité**, jamais celle du résultat", async () => {
+    /* Les deux diffèrent sur le repère de conformité : l'activité finit le 30
+       juin, le résultat est mesuré le 30 aussi — mais c'est `period_end` qui
+       porte l'abscisse, et `results.measured_on` qui reste sur la fiche. Le
+       constat porte sur l'activité d'audit, où les deux coïncident, et sur le
+       repère nu, où la seconde n'existe pas. */
+    const rows = await listAccompanimentMarkers(a.scope, a.fullId);
+    const bare = rows.find((row) => row.id === a.bareActivityId);
+
+    expect(bare?.on).toBe("2025-04-30");
+    expect(bare?.resultMeasuredOn).toBeNull();
+  });
+
+  test("un produit sans accompagnement rend une liste vide", async () => {
+    expect(await listAccompanimentMarkers(a.scope, a.emptyId)).toEqual([]);
   });
 });
 
-describe("listProductMilestones — ce que la lecture écarte", () => {
-  test("un résultat retiré n'a plus de repère", async () => {
-    const rows = await listProductMilestones(a.scope, a.fullId);
+describe("listAccompanimentMarkers — ce que la lecture écarte", () => {
+  test("une activité **prévue** n'est pas un repère", async () => {
+    const rows = await listAccompanimentMarkers(a.scope, a.fullId);
 
-    expect(rows.map((row) => row.resultLabel)).not.toContain(
-      "Résultat retiré a",
-    );
+    expect(rows.map((row) => row.on)).not.toContain("2026-09-01");
   });
 
-  test("le résultat d'une activité archivée n'a plus de repère", async () => {
-    const rows = await listProductMilestones(a.scope, a.fullId);
+  test("une activité **annulée** n'est pas un repère", async () => {
+    /* Le seul cas écarté qui porterait une abscisse valide : c'est donc lui qui
+       éprouve le filtre d'état, et non l'activité prévue, que l'absence de fin
+       de période écarterait de toute façon. */
+    const rows = await listAccompanimentMarkers(a.scope, a.fullId);
 
-    expect(rows.map((row) => row.resultLabel)).not.toContain(
-      "Résultat d'activité archivée a",
-    );
+    expect(rows.map((row) => row.on)).not.toContain("2025-01-31");
   });
 
-  test("le résultat d'un accompagnement archivé n'a plus de repère", async () => {
+  test("une activité archivée n'est plus un repère", async () => {
+    const rows = await listAccompanimentMarkers(a.scope, a.fullId);
+
+    expect(rows.map((row) => row.on)).not.toContain("2026-08-31");
+  });
+
+  test("un résultat retiré laisse son activité, sans sa valeur", async () => {
+    /* L'élargissement retourne ce constat : avant, retirer le résultat retirait
+       le repère. Désormais l'activité reste — elle a bien eu lieu — et c'est sa
+       **valeur** qui disparaît. */
+    const rows = await listAccompanimentMarkers(a.scope, a.fullId);
+    const host = rows.find((row) => row.on === "2026-07-31");
+
+    expect(host).toBeDefined();
+    expect(host?.resultLabel).toBeNull();
+  });
+
+  test("les activités d'un accompagnement archivé n'ont plus de repère", async () => {
     /* La cohérence entre les deux couches : `listProductProjects` écarte
-       l'accompagnement rangé, donc sa bande n'existe pas, et un repère sans
-       bande sous laquelle se lire serait un fait orphelin. */
-    const rows = await listProductMilestones(a.scope, a.fullId);
+       l'accompagnement rangé, et un repère sans accompagnement lisible serait un
+       fait orphelin. */
+    const rows = await listAccompanimentMarkers(a.scope, a.fullId);
 
-    expect(rows.map((row) => row.resultLabel)).not.toContain(
-      "Résultat d'accompagnement rangé a",
-    );
+    expect(rows.map((row) => row.projectName)).not.toContain("Rangé a");
   });
 
   test("le repère du produit voisin ne déborde pas", async () => {
-    const rows = await listProductMilestones(a.scope, a.fullId);
-    const neighbour = await listProductMilestones(a.scope, a.otherId);
+    const rows = await listAccompanimentMarkers(a.scope, a.fullId);
+    const neighbour = await listAccompanimentMarkers(a.scope, a.otherId);
 
-    expect(rows.map((row) => row.resultLabel)).not.toContain(
-      "Résultat du voisin a",
-    );
-    expect(neighbour.map((row) => row.resultLabel)).toEqual([
-      "Résultat du voisin a",
+    expect(rows.map((row) => row.projectName)).not.toContain("Voisin a");
+    expect(neighbour.map((row) => row.projectName)).toEqual([
+      "Voisin a",
+      "Voisin a",
     ]);
   });
 
   test("le produit d'un **autre domaine** ne rend rien", async () => {
     /* L'étanchéité : l'identifiant est réel, la lecture est faite sous l'autre
-       domaine. Sans `filter` sur chaque table jointe, elle rendrait les deux
-       repères du domaine b. */
-    expect(await listProductMilestones(a.scope, b.fullId)).toEqual([]);
-    expect(await listProductMilestones(b.scope, a.fullId)).toEqual([]);
+       domaine. Sans `filter` sur chaque table jointe, elle rendrait les repères
+       du domaine b. */
+    expect(await listAccompanimentMarkers(a.scope, b.fullId)).toEqual([]);
+    expect(await listAccompanimentMarkers(b.scope, a.fullId)).toEqual([]);
+  });
+});
+
+describe("listContextMarkers — la moitié manuelle de la couche", () => {
+  test("les repères sortent du plus ancien au plus récent", async () => {
+    const rows = await listContextMarkers(a.scope, a.fullId);
+
+    expect(rows.map((row) => row.id)).toEqual([
+      a.orphanMarkerId,
+      a.campaignMarkerId,
+      a.releaseMarkerId,
+    ]);
+    expect(rows.every((row) => row.kind === "context")).toBe(true);
+  });
+
+  test("un repère porte son intitulé, sa note et son accompagnement", async () => {
+    const rows = await listContextMarkers(a.scope, a.fullId);
+    const release = rows.find((row) => row.id === a.releaseMarkerId);
+
+    expect(release).toMatchObject({
+      on: "2025-06-15",
+      label: "Mise en production a",
+      note: "Note de mise en production a",
+      projectName: "Autonomie a",
+    });
+  });
+
+  test("un repère sans accompagnement est un état normal", async () => {
+    const rows = await listContextMarkers(a.scope, a.fullId);
+    const campaign = rows.find((row) => row.id === a.campaignMarkerId);
+
+    expect(campaign?.projectId).toBeNull();
+    expect(campaign?.projectName).toBeNull();
+  });
+
+  test("un accompagnement archivé rend l'identifiant **et** le nom à nul", async () => {
+    /* La jointure gauche est filtrée sur l'archivage, et l'identifiant est lu
+       **sur la jointure** : les deux tombent ensemble. Le lire sur la colonne
+       aurait rendu un identifiant sans nom, donc un lien qu'on ne sait plus
+       annoncer. */
+    const rows = await listContextMarkers(a.scope, a.fullId);
+    const orphan = rows.find((row) => row.id === a.orphanMarkerId);
+
+    expect(orphan).toBeDefined();
+    expect(orphan?.projectId).toBeNull();
+    expect(orphan?.projectName).toBeNull();
+  });
+
+  test("aucun repère ne porte de résultat", async () => {
+    /* Un repère de contexte n'est pas une mesure : les cinq colonnes de
+       résultat sont nulles par construction, et c'est ce qui les distingue à la
+       lecture comme à l'écran. */
+    const rows = await listContextMarkers(a.scope, a.fullId);
+
+    expect(
+      rows.every((row) => row.resultLabel === null && row.resultUrl === null),
+    ).toBe(true);
+  });
+
+  test("un repère retiré ne se lit plus", async () => {
+    const rows = await listContextMarkers(a.scope, a.fullId);
+
+    expect(rows.map((row) => row.label)).not.toContain("Repère retiré a");
+  });
+
+  test("le repère du produit voisin ne déborde pas", async () => {
+    const rows = await listContextMarkers(a.scope, a.fullId);
+    const neighbour = await listContextMarkers(a.scope, a.otherId);
+
+    expect(rows.map((row) => row.label)).not.toContain("Repère du voisin a");
+    expect(neighbour.map((row) => row.label)).toEqual(["Repère du voisin a"]);
+  });
+
+  test("le produit d'un **autre domaine** ne rend rien", async () => {
+    expect(await listContextMarkers(a.scope, b.fullId)).toEqual([]);
+    expect(await listContextMarkers(b.scope, a.fullId)).toEqual([]);
+  });
+});
+
+describe("listProductMarkers — les deux natures sur un seul axe", () => {
+  test("les huit repères se fondent dans l'ordre des dates", async () => {
+    const rows = await listProductMarkers(a.scope, a.fullId);
+
+    expect(rows.map((row) => [row.on, row.kind])).toEqual([
+      ["2023-05-05", "context"],
+      ["2024-05-31", "accompaniment"],
+      ["2024-09-30", "accompaniment"],
+      ["2024-11-01", "context"],
+      ["2025-04-30", "accompaniment"],
+      ["2025-06-15", "context"],
+      ["2026-06-30", "accompaniment"],
+      ["2026-07-31", "accompaniment"],
+    ]);
+  });
+
+  test("un produit sans rien rend une liste vide", async () => {
+    expect(await listProductMarkers(a.scope, a.emptyId)).toEqual([]);
+  });
+});
+
+/* ==========================================================================
+   Le tri de la fusion, l'axe, et les relevés voisins — purs, sans base
+   ========================================================================== */
+
+/** Un repère minimal : ces trois tests ne regardent que `on`, `id` et `kind`. */
+function marker(
+  on: string,
+  id: string,
+  kind: ProductMarker["kind"] = "accompaniment",
+): ProductMarker {
+  return {
+    kind,
+    id,
+    on,
+    label: id,
+    note: null,
+    projectId: null,
+    projectName: null,
+    resultLabel: null,
+    resultValue: null,
+    resultUnit: null,
+    resultMeasuredOn: null,
+    resultUrl: null,
+  };
+}
+
+describe("mergeMarkers — le tri de la fusion", () => {
+  test("les deux natures s'entremêlent par date", () => {
+    const merged = mergeMarkers(
+      [marker("2026-01-01", "a1"), marker("2026-03-01", "a2")],
+      [marker("2026-02-01", "c1", "context")],
+    );
+
+    expect(merged.map((row) => row.id)).toEqual(["a1", "c1", "a2"]);
+  });
+
+  test("deux repères du même jour se départagent par identifiant", () => {
+    /* Sans ce départage, l'ordre de deux repères de natures différentes posés
+       le même jour dépendrait de l'implémentation du tri — donc varierait d'un
+       rendu à l'autre, ce que le HTML servi ne doit jamais faire. */
+    const merged = mergeMarkers(
+      [marker("2026-01-01", "b")],
+      [marker("2026-01-01", "a", "context")],
+    );
+
+    expect(merged.map((row) => row.id)).toEqual(["a", "b"]);
+  });
+
+  test("les entrées ne sont pas supposées triées", () => {
+    const merged = mergeMarkers(
+      [marker("2026-05-01", "tard"), marker("2024-01-01", "tôt")],
+      [],
+    );
+
+    expect(merged.map((row) => row.id)).toEqual(["tôt", "tard"]);
+  });
+
+  test("deux listes vides rendent une liste vide", () => {
+    expect(mergeMarkers([], [])).toEqual([]);
+  });
+});
+
+describe("curveTimeline — l'axe contient les deux séries", () => {
+  test("un repère hors de la fenêtre des relevés **élargit** l'axe", () => {
+    /* Le défaut que cette fonction corrige : borné sur les seuls relevés, l'axe
+       ramenait le repère de 2024 contre son bord (`clampIndex`), c'est-à-dire
+       qu'il affirmait une date fausse. */
+    const scale = curveTimeline(["2026-01-15", "2026-06-15"], ["2024-03-10"]);
+
+    expect(scale).toEqual<TimelineScale>({
+      firstMonth: "2024-03",
+      lastMonth: "2026-06",
+      monthCount: 28,
+    });
+  });
+
+  test("un repère postérieur au dernier relevé élargit l'autre borne", () => {
+    const scale = curveTimeline(["2026-01-15"], ["2026-09-01"]);
+
+    expect(scale?.lastMonth).toBe("2026-09");
+  });
+
+  test("sans repère, l'axe est celui des seuls relevés", () => {
+    /* Le témoin : sans lui, le test précédent passerait aussi sur une fonction
+       qui élargirait toujours. */
+    expect(curveTimeline(["2026-01-15", "2026-06-15"], [])).toEqual(
+      timelineScale(["2026-01-15", "2026-06-15"]),
+    );
+  });
+
+  test("des repères seuls suffisent à faire un axe", () => {
+    expect(curveTimeline([], ["2025-02-01"])?.firstMonth).toBe("2025-02");
+  });
+
+  test("sans aucune date, il n'y a pas d'axe", () => {
+    expect(curveTimeline([], [])).toBeNull();
+  });
+});
+
+describe("neighbourReadings — la sélection, jamais un calcul", () => {
+  const series = [
+    { readOn: "2026-06-15", value: "71" },
+    { readOn: "2026-01-10", value: "64" },
+    { readOn: "2025-09-01", value: "63" },
+  ];
+
+  test("le dernier avant, le premier après", () => {
+    const { before, after } = neighbourReadings(series, "2026-03-15");
+
+    expect(before?.readOn).toBe("2026-01-10");
+    expect(after?.readOn).toBe("2026-06-15");
+  });
+
+  test("un relevé du **jour même** compte comme « avant »", () => {
+    /* La mesure existait quand l'activité s'est terminée ; la ranger « après »
+       ferait dire à l'écran qu'elle lui succède. */
+    const { before, after } = neighbourReadings(series, "2026-01-10");
+
+    expect(before?.readOn).toBe("2026-01-10");
+    expect(after?.readOn).toBe("2026-06-15");
+  });
+
+  test("avant le premier relevé, il n'y a pas de « avant »", () => {
+    const { before, after } = neighbourReadings(series, "2024-01-01");
+
+    expect(before).toBeNull();
+    expect(after?.readOn).toBe("2025-09-01");
+  });
+
+  test("après le dernier, il n'y a pas de « après »", () => {
+    const { before, after } = neighbourReadings(series, "2027-01-01");
+
+    expect(before?.readOn).toBe("2026-06-15");
+    expect(after).toBeNull();
+  });
+
+  test("une série vide rend deux absences", () => {
+    expect(neighbourReadings([], "2026-01-01")).toEqual({
+      before: null,
+      after: null,
+    });
+  });
+
+  test("l'ordre de la série ne change rien au résultat", () => {
+    /* La sélection ne suppose aucun tri : un appelant qui changerait le sien ne
+       casserait rien en silence. */
+    const reversed = [...series].reverse();
+
+    expect(neighbourReadings(reversed, "2026-03-15")).toEqual(
+      neighbourReadings(series, "2026-03-15"),
+    );
   });
 });

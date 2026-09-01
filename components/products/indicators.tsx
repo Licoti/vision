@@ -129,6 +129,7 @@ import { Tag } from "@/components/ui/tag";
 import { ACTION_LINK } from "@/components/ui/action-link";
 import {
   formatDateMonth,
+  formatDay,
   formatIndicatorDirection,
   formatMonthTick,
   formatReadings,
@@ -149,12 +150,60 @@ import {
   type TargetGap,
 } from "@/lib/queries/indicators";
 import {
+  curveTimeline,
   monthMark,
   monthTicks,
-  timelineScale,
   valueOffset,
+  type ProductMarker,
   type ValueScale,
 } from "@/lib/queries/timeline";
+
+/**
+ * La nature d'un repère, écrite. **La forme ne porte jamais seule** (`docs/06`
+ * §11) : le disque et l'anneau se doublent de ce mot, dans l'infobulle comme
+ * dans la phrase accessible.
+ */
+const TOOLTIP_KIND: Record<ProductMarker["kind"], string> = {
+  accompaniment: "accompagnement",
+  context: "contexte",
+};
+
+const MARKER_KIND: Record<ProductMarker["kind"], string> = {
+  accompaniment: "accompagnement",
+  context: "repère de contexte",
+};
+
+/**
+ * Ce qu'une marque de l'axe dit à l'assistance, en une phrase entière.
+ *
+ * Elle est le **nom accessible** du lien, pas un complément : l'infobulle est
+ * `aria-hidden`, et une marque de 8 px n'a aucun contenu textuel propre. Sans
+ * cette phrase, la bande serait une rangée de liens sans nom.
+ *
+ * **Le résultat y entre quand il existe** — une valeur reportée avec son
+ * libellé (D39) —, et rien n'en est tiré : aucune comparaison, aucun jugement.
+ */
+function markerSentence(marker: ProductMarker): string {
+  const value = formatResultValue(marker.resultValue, marker.resultUnit);
+
+  /* **La nature ne s'écrit qu'à défaut de nom d'accompagnement** : « Audit UX,
+     accompagnement Refonte 2026 » dit déjà que le repère en est un, et le
+     répéter donnait « accompagnement · accompagnement Refonte 2026 » — relevé
+     dans le HTML servi. Un repère de contexte, lui, n'a souvent aucun
+     accompagnement à nommer : c'est là que le mot porte. */
+  const origin = marker.projectName
+    ? `${MARKER_KIND[marker.kind]} ${marker.projectName}`
+    : MARKER_KIND[marker.kind];
+
+  const result =
+    marker.resultLabel && value
+      ? `${marker.resultLabel} : ${value}`
+      : marker.resultLabel;
+
+  return `Repère du ${formatDay(marker.on)} — ${marker.label}, ${origin}.${
+    result ? ` ${result}.` : ""
+  }`;
+}
 
 /**
  * La phrase d'écart à la cible du produit.
@@ -244,6 +293,10 @@ export function Indicators({
   archiveTracking,
   taggingPlanHref,
   archiveTaggingPlan,
+  markers,
+  markersHref,
+  markerHref,
+  addContextHref,
 }: {
   /**
    * La raison d'être du produit, telle qu'elle est écrite. `null` quand elle ne
@@ -279,6 +332,22 @@ export function Indicators({
   /** Une seule adresse pour les deux gestes : le plan est unique par produit. */
   taggingPlanHref: string | null;
   archiveTaggingPlan: (() => Promise<void>) | null;
+  /* --- Les repères, posés sur l'axe de la North Star ---------------------- */
+  /**
+   * Ce qui s'est passé sur le produit — les activités terminées de ses
+   * accompagnements, et les repères de contexte saisis. **Déjà fondus et
+   * triés** par `mergeMarkers` ; le bloc ne retrie rien.
+   */
+  markers: readonly ProductMarker[];
+  /**
+   * Le panneau qui liste les repères. **Jamais nul** : il se lit par tout le
+   * domaine (D9), comme la fiche d'un persona.
+   */
+  markersHref: string;
+  /** La fiche d'un repère d'accompagnement. Jamais nulle, même raison. */
+  markerHref: (activityId: string) => string;
+  /** Le seul geste d'écriture de la couche. `null` le retire. */
+  addContextHref: string | null;
 }) {
   const series = groupByIndicator(readings);
 
@@ -324,67 +393,93 @@ export function Indicators({
         <BlockHeader
           title="Vision produit"
           note="Pourquoi ce produit existe, et la mesure qui dit s'il y va."
-          /* **Deux droits, un seul menu.** Ils tombent séparément —
-             `visionHref` sur `manageDomain`, `setNorthStar` sur le droit dérivé
-             des accompagnements —, et le menu se rend dès que l'un des deux est
-             ouvert. Une personne peut donc n'y voir qu'un geste, ou l'autre :
-             c'est exact, et c'est ce que les deux règles disent. */
+          /* **Trois droits, un seul menu, et il se rend toujours.** Ils
+             tombent séparément — `visionHref` sur `manageDomain`,
+             `setNorthStar` et `addContextHref` sur le droit dérivé des
+             accompagnements —, et une personne peut n'y voir qu'un geste, ou
+             deux : c'est exact, et c'est ce que les règles disent.
+
+             **La condition d'existence du menu a disparu** le jour où les
+             repères y sont entrés : « Voir les repères » ne tombe avec aucun
+             droit (D9), si bien qu'il y a toujours au moins une entrée. Les
+             conditions ne décident plus que du contenu. */
           action={
-            visionHref || designate ? (
-              <ActionMenu
-                /* Le rang discret, celui des gestes en haut à droite d'un bloc
-                   (21/08/2026). Sur la surface bleue, les trois points tiennent
-                   15,14:1 — mesuré, pas supposé. */
-                variant="tertiary"
-                label="Options du bloc de la vision produit"
-              >
-                {/* **Le geste de la vision en tête**, avant les désignations :
-                    c'est l'ordre de lecture du bloc, et un menu qui rangerait
-                    le premier rang après le second se lirait à l'envers. */}
-                {visionHref ? (
-                  <DrawerLink
-                    href={visionHref}
-                    request={{ kind: "vision" }}
-                    role="menuitem"
-                    className={MENU_ITEM}
-                  >
-                    {vision
-                      ? "Modifier la vision produit"
-                      : "Ajouter la vision produit"}
-                  </DrawerLink>
-                ) : null}
-                {designate
-                  ? indicators.map((indicator) => (
-                      <form
-                        key={indicator.id}
-                        action={designate.bind(null, indicator.id)}
-                      >
-                        <button
-                          type="submit"
-                          role="menuitem"
-                          disabled={indicator.isNorthStar}
-                          className={`${MENU_ITEM} disabled:text-content-neutral-light`}
-                        >
-                          {indicator.isNorthStar
-                            ? `★ ${indicator.label}`
-                            : `Désigner ${indicator.label}`}
-                        </button>
-                      </form>
-                    ))
-                  : null}
-                {designate && northStar ? (
-                  <form action={designate.bind(null, null)}>
-                    <button
-                      type="submit"
-                      role="menuitem"
-                      className={MENU_ITEM_DANGER}
+            <ActionMenu
+              /* Le rang discret, celui des gestes en haut à droite d'un bloc
+                 (21/08/2026). Sur la surface bleue, les trois points tiennent
+                 15,14:1 — mesuré, pas supposé. */
+              variant="tertiary"
+              label="Options du bloc de la vision produit"
+            >
+              {/* **Le geste de la vision en tête**, avant les désignations :
+                  c'est l'ordre de lecture du bloc, et un menu qui rangerait
+                  le premier rang après le second se lirait à l'envers. */}
+              {visionHref ? (
+                <DrawerLink
+                  href={visionHref}
+                  request={{ kind: "vision" }}
+                  role="menuitem"
+                  className={MENU_ITEM}
+                >
+                  {vision
+                    ? "Modifier la vision produit"
+                    : "Ajouter la vision produit"}
+                </DrawerLink>
+              ) : null}
+              {designate
+                ? indicators.map((indicator) => (
+                    <form
+                      key={indicator.id}
+                      action={designate.bind(null, indicator.id)}
                     >
-                      Retirer la North Star
-                    </button>
-                  </form>
-                ) : null}
-              </ActionMenu>
-            ) : null
+                      <button
+                        type="submit"
+                        role="menuitem"
+                        disabled={indicator.isNorthStar}
+                        className={`${MENU_ITEM} disabled:text-content-neutral-light`}
+                      >
+                        {indicator.isNorthStar
+                          ? `★ ${indicator.label}`
+                          : `Désigner ${indicator.label}`}
+                      </button>
+                    </form>
+                  ))
+                : null}
+              {/* **Les deux entrées des repères**, et c'est tout ce que la
+                  page annonce de la couche : le reste tient en six marques de
+                  8 px sur l'axe. La lecture est ouverte à tout le domaine
+                  (D9) ; la saisie tombe avec le droit dérivé, comme les
+                  indicateurs et le dispositif de mesure. */}
+              <DrawerLink
+                href={markersHref}
+                request={{ kind: "markers" }}
+                role="menuitem"
+                className={MENU_ITEM}
+              >
+                Voir les repères
+              </DrawerLink>
+              {addContextHref ? (
+                <DrawerLink
+                  href={addContextHref}
+                  request={{ kind: "contextMarker" }}
+                  role="menuitem"
+                  className={MENU_ITEM}
+                >
+                  Ajouter un repère de contexte
+                </DrawerLink>
+              ) : null}
+              {designate && northStar ? (
+                <form action={designate.bind(null, null)}>
+                  <button
+                    type="submit"
+                    role="menuitem"
+                    className={MENU_ITEM_DANGER}
+                  >
+                    Retirer la North Star
+                  </button>
+                </form>
+              ) : null}
+            </ActionMenu>
           }
         />
 
@@ -500,6 +595,9 @@ export function Indicators({
             <NorthStar
               indicator={northStar}
               series={series.get(northStar.id) ?? []}
+              markers={markers}
+              markersHref={markersHref}
+              markerHref={markerHref}
             />
           </div>
         ) : (
@@ -628,10 +726,17 @@ export function Indicators({
 function NorthStar({
   indicator,
   series,
+  markers,
+  markersHref,
+  markerHref,
 }: {
   indicator: ProductIndicator;
   /** Du plus récent au plus ancien — l'ordre de la lecture. */
   series: ProductReading[];
+  /** Les repères, **déjà triés**. Le composant les passe sans les regarder. */
+  markers: readonly ProductMarker[];
+  markersHref: string;
+  markerHref: (activityId: string) => string;
 }) {
   /* La courbe se lit du plus ancien au plus récent, l'inverse de la série
      écrite. **Une copie est inversée**, jamais le tableau du groupement : il est
@@ -719,6 +824,9 @@ function NorthStar({
           series={ordered}
           productTarget={indicator.targetValue}
           gap={gap}
+          markers={markers}
+          markersHref={markersHref}
+          markerHref={markerHref}
         />
       ) : null}
     </div>
@@ -809,6 +917,9 @@ function Curve({
   series,
   productTarget,
   gap,
+  markers,
+  markersHref,
+  markerHref,
 }: {
   scale: ValueScale;
   unit: string | null;
@@ -824,8 +935,25 @@ function Curve({
    * `NorthStar`. ⚠ C'est l'indice que D39 interdit — voir l'en-tête.
    */
   gap: TargetGap | null;
+  /**
+   * Les repères posés sur la ligne du bas — ce qui s'est passé sur le produit.
+   *
+   * **Ils entrent dans l'axe**, et c'est la seule chose qu'ils y changent : la
+   * bande n'ajoute aucune hauteur, ne porte aucun libellé, et l'échelle
+   * verticale ne les voit pas — un repère n'a pas de valeur.
+   */
+  markers: readonly ProductMarker[];
+  markersHref: string;
+  markerHref: (activityId: string) => string;
 }) {
-  const timeline = timelineScale(series.map((reading) => reading.readOn));
+  /* **L'axe contient les deux séries**, et il le doit : borné sur les seuls
+     relevés, il ramenait tout repère hors fenêtre contre son bord (`clampIndex`)
+     — une date affirmée qui est fausse. La règle vit dans `curveTimeline`, pure
+     et éprouvée, plutôt que dans cette expression. */
+  const timeline = curveTimeline(
+    series.map((reading) => reading.readOn),
+    markers.map((marker) => marker.on),
+  );
   const ticks = timeline ? monthTicks(timeline) : [];
 
   /** L'ordonnée d'une valeur, en pourcentage **depuis le haut**. */
@@ -839,6 +967,14 @@ function Curve({
   }));
 
   const targetTop = productTarget === null ? null : topOf(productTarget);
+
+  /* Les repères prennent **la même abscisse que les points** : même fenêtre,
+     même `monthMark`. Rien de neuf ne se calcule — c'est ce qui garantit qu'un
+     repère de mars 2026 tombe exactement sous le relevé de mars 2026. */
+  const marks = markers.map((marker) => ({
+    marker,
+    x: timeline ? monthMark(timeline, marker.on) : 50,
+  }));
 
   /* ⚠ **Le crochet d'écart et sa pastille** (18/08/2026, maquette
      `northstar-v2`). Ils redisent en image ce que la phrase de la colonne de
@@ -997,6 +1133,91 @@ function Curve({
                 </span>
               </>
             ) : null}
+
+            {/* ============ LES REPÈRES ============
+
+              Six marques de 8 px posées **sur la ligne du bas** — l'axe des
+              dates, déjà là. Aucune hauteur ajoutée : la cible de clic de 24 px
+              déborde du tracé sans le pousser, et le bloc garde exactement la
+              taille qu'il avait.
+
+              **La forme distingue, jamais la couleur seule** (`docs/06` §11) :
+              disque plein pour un accompagnement, anneau pour un repère de
+              contexte — et chaque marque porte sa phrase entière en `sr-only`,
+              si bien que ni la forme ni l'infobulle ne portent seules.
+
+              **L'infobulle est en CSS pur.** Elle paraît au survol et au focus
+              clavier ; au doigt, c'est le panneau qui s'ouvre, ce qui est le
+              meilleur des deux comportements tactiles. Aucun JavaScript, aucun
+              composant client — le bloc reste rendu sur le serveur. Elle est
+              `aria-hidden` : le nom accessible est le `sr-only`, et le lire
+              deux fois serait bégayer.
+
+              Sa surface est `surface-neutral-darkest`, la **seule du thème qui
+              se détache sans ombre** — `tokens.css` §8 nomme trois élévations
+              sans leur donner de valeur, et aucun neuvième jeton ne s'invente.
+
+              Son calage suit celui des valeurs de point, et pour la même
+              raison : centrée au milieu, rentrée aux deux bouts. */}
+            {marks.map(({ marker, x }) => (
+              <DrawerLink
+                key={`${marker.kind}-${marker.id}`}
+                href={
+                  marker.kind === "accompaniment"
+                    ? markerHref(marker.id)
+                    : markersHref
+                }
+                request={
+                  marker.kind === "accompaniment"
+                    ? { kind: "markerDetail", id: marker.id }
+                    : { kind: "markers" }
+                }
+                className="group absolute flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center"
+                style={{ left: `${x}%`, top: "100%" }}
+              >
+                <span className="sr-only">{markerSentence(marker)}</span>
+                <span
+                  aria-hidden="true"
+                  className={`block size-2 rounded-full border-[length:var(--border-width-1)] ${
+                    marker.kind === "accompaniment"
+                      ? "border-surface-neutral-pale bg-surface-primary-dark"
+                      : "border-surface-neutral-base bg-surface-neutral-pale"
+                  }`}
+                />
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none absolute bottom-6 z-10 hidden w-64 rounded-xl bg-surface-neutral-darkest px-3 py-2 group-hover:block group-focus-visible:block ${
+                    x <= 8
+                      ? "left-0"
+                      : x >= 92
+                        ? "right-0"
+                        : "left-1/2 -translate-x-1/2"
+                  }`}
+                >
+                  <span className="block text-2xs leading-125 text-content-neutral-light">
+                    {formatDay(marker.on)}
+                    {" · "}
+                    {TOOLTIP_KIND[marker.kind]}
+                  </span>
+                  <span className="mt-1 block text-xs font-semibold leading-125 text-content-neutral-pale">
+                    {marker.label}
+                  </span>
+                  {marker.projectName ? (
+                    <span className="mt-1 block text-2xs leading-125 text-content-neutral-light">
+                      {marker.projectName}
+                    </span>
+                  ) : null}
+                  {marker.resultLabel ? (
+                    <span className="mt-1.5 block text-2xs leading-125 text-content-neutral-pale">
+                      {marker.resultLabel}
+                      {formatResultValue(marker.resultValue, marker.resultUnit)
+                        ? ` : ${formatResultValue(marker.resultValue, marker.resultUnit)}`
+                        : ""}
+                    </span>
+                  ) : null}
+                </span>
+              </DrawerLink>
+            ))}
           </div>
         </div>
       </div>
@@ -1005,7 +1226,10 @@ function Curve({
           retrait à gauche pour les libellés d'axe (`ml-11`) et même gouttière à
           droite (`mr-8`) que le tracé. Sans la seconde, la dernière graduation
           tomberait à droite du dernier point qu'elle situe. */}
-      <div className="relative ml-11 mr-8 mt-2 h-4">
+      {/* **`mt-3` et non `mt-2` depuis les repères** : les marques enjambent la
+          ligne du bas du tracé et débordent de quatre pixels dessous. Sans ces
+          quatre pixels rendus, elles touchaient les graduations. */}
+      <div className="relative ml-11 mr-8 mt-3 h-4">
         {ticks.map((tick) => (
           <span
             key={tick.month}

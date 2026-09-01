@@ -15,16 +15,15 @@
  * titre : sa fenêtre cadre l'année en cours, mais son contenu est toute
  * l'histoire du produit.
  *
- * **Deux couches sur un axe commun** (`docs/03` §7) : une **bande par
- * accompagnement**, un **repère par activité porteuse d'un résultat**. La
- * troisième — une courbe par indicateur, empilée ici par T5.6 — vit désormais
- * dans le bloc « Vision produit » (`indicators.tsx`, où `indicator-curves.tsx`
- * a été fusionné). L'écart à l'arbitrage (d) de `tickets-C5.md`, qui voulait
- * l'axe partagé par les trois, est consigné dans `JOURNAL-TECHNIQUE.md`.
- *
- * **La ligne des repères est masquée pour le POC** (`SHOW_MILESTONES`, demande
- * du 17/08/2026) : il n'en reste qu'une seule à l'écran. Le code de la couche
- * est intact, ses dates portent toujours l'axe, et la rallumer est un booléen.
+ * **Une seule couche désormais** : une **bande par accompagnement**, et rien
+ * d'autre. Des trois de `docs/03` §7, les deux autres ont déménagé dans le bloc
+ * « Vision produit » (`indicators.tsx`) — la courbe d'indicateur le 17/08/2026,
+ * les **repères** le jour où ils sont passés sur l'axe de la North Star. Ce
+ * dernier déménagement a emporté avec lui le drapeau `SHOW_MILESTONES`, qui
+ * tenait la ligne éteinte depuis le 17/08/2026 : garder un drapeau mort à côté
+ * d'une couche vivante aurait laissé deux notions de « repère » dans le dépôt.
+ * L'écart à l'arbitrage (d) de `tickets-C5.md`, qui voulait l'axe partagé par
+ * les trois, est consigné dans `JOURNAL-TECHNIQUE.md`.
  *
  * **C'est la juxtaposition de `docs/03` §7, et rien d'autre.** Elle répond à
  * « est-ce que ce que nous avons recommandé a fonctionné ? » en donnant à lire,
@@ -82,46 +81,20 @@ import { BlockNote, EmptyState } from "@/components/ui/empty-state";
 import { List, ListRow } from "@/components/ui/list";
 import { BAND_BG, StatusPill } from "@/components/ui/status-pill";
 import {
-  formatDay,
   formatMonthTick,
   formatPeriodShort,
-  formatResultValue,
 } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
 import type { ProductProject } from "@/lib/queries/products";
 import {
   monthBand,
-  monthMark,
   monthTicks,
   timelineScale,
   windowYears,
   withinWindow,
   yearWindow,
-  type TimelineMilestone,
   type TimelineScale,
 } from "@/lib/queries/timeline";
-
-/**
- * Ce qu'un repère dit au survol, et à l'assistance.
- *
- * Le résultat est une valeur **reportée** d'un outil externe, avec sa date
- * (D39) : la date se lit au **jour** — la seule entorse au mois, bornée à une
- * date de mesure depuis T4.3, parce qu'un audit rendu le 31 mai perdrait son
- * sens en « mai 2024 ». Aucun jugement n'est tiré de la valeur.
- *
- * L'accompagnement est nommé : un repère vit sur sa propre ligne, sous les
- * bandes, et rien d'autre ne dirait de quel accompagnement il vient.
- */
-function milestoneTitle(milestone: TimelineMilestone): string {
-  const value = formatResultValue(milestone.resultValue, milestone.resultUnit);
-
-  return [
-    milestone.typeLabel,
-    value ? `${milestone.resultLabel} : ${value}` : milestone.resultLabel,
-    formatDay(milestone.measuredOn),
-    milestone.projectName,
-  ].join(" · ");
-}
 
 /**
  * Ce que la fenêtre laisse de côté, dit d'une phrase entière.
@@ -188,17 +161,6 @@ function periodPlacement(
 }
 
 /**
- * La ligne des repères, **masquée pour le POC** (demande du 17/08/2026).
- *
- * Un drapeau, et non une suppression : la couche est celle de T5.5, elle a ses
- * données (`listProductMilestones`), son calcul (`monthMark`) et son intitulé.
- * Tout reste en place et compile ; la rallumer est ce booléen. Les dates de
- * mesure continuent de porter l'axe, si bien que le retour de la ligne ne
- * déplacera aucune barre.
- */
-const SHOW_MILESTONES = false;
-
-/**
  * L'identité d'un accompagnement : ce qu'on lit avant sa barre.
  *
  * **Un seul dessin pour les deux endroits** où un accompagnement se lit dans ce
@@ -253,7 +215,7 @@ type DatedProject = {
 };
 
 /**
- * La frise d'une fenêtre : son axe, ses bandes, ses repères.
+ * La frise d'une fenêtre : son axe et ses bandes.
  *
  * **Elle est rendue une fois par préréglage** (21/08/2026) et c'est ce qui
  * permet au filtre de n'être qu'un `useState` : le serveur dessine « Tout » et
@@ -264,11 +226,9 @@ type DatedProject = {
 function Timeline({
   window,
   dated,
-  milestones,
 }: {
   window: TimelineScale;
   dated: DatedProject[];
-  milestones: TimelineMilestone[];
 }) {
   /* `withinWindow` écarte ceux que la fenêtre ne montre pas — sans lui,
      `monthBand` les écraserait contre un bord au lieu de les taire. */
@@ -277,12 +237,6 @@ function Timeline({
     .map((row) => ({ ...row, ...monthBand(window, row.start, row.end) }));
 
   const hidden = dated.length - bands.length;
-
-  /* Les repères aussi se taisent hors fenêtre : un repère de 2024 ramené contre
-     le bord d'une fenêtre 2026 affirmerait une date qu'il n'a pas. */
-  const marks = milestones.filter((milestone) =>
-    withinWindow(window, milestone.measuredOn, milestone.measuredOn),
-  );
 
   const ticks = monthTicks(window);
 
@@ -386,45 +340,6 @@ function Timeline({
             );
           })}
 
-          {/* ---- Les repères : une activité porteuse d'un résultat ----
-
-            Sur leur propre ligne, comme dans le croquis de `docs/03` §7 : ce
-            sont les « activités marquantes positionnées sur l'axe ». Une
-            activité sans résultat n'y figure pas — la roadmap de son
-            accompagnement reste le seul endroit où elle se lit.
-
-            Aucun lien : la fiche n'en demande que sur les bandes (règle 3).
-            L'intitulé est porté deux fois — `title` pour le survol, `sr-only`
-            pour l'assistance, un `title` seul n'étant pas exposé de façon
-            fiable sur un élément sans contenu. */}
-          {SHOW_MILESTONES && marks.length > 0 ? (
-            <div className="flex items-center gap-6 border-t border-surface-neutral-lighter py-4">
-              <div
-                className={`${IDENTITY_WIDTH} flex-none text-xs text-content-neutral-base`}
-              >
-                Activités porteuses d&apos;un résultat
-              </div>
-              <div className="relative h-4 min-w-0 flex-1">
-                <div
-                  aria-hidden="true"
-                  className="absolute inset-x-0 top-1/2 h-px bg-surface-neutral-lighter"
-                />
-                {marks.map((milestone) => (
-                  <span
-                    key={milestone.id}
-                    title={milestoneTitle(milestone)}
-                    className="absolute top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-surface-secondary-dark"
-                    style={{
-                      left: `${monthMark(window, milestone.measuredOn)}%`,
-                    }}
-                  >
-                    <span className="sr-only">{milestoneTitle(milestone)}</span>
-                  </span>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
           {bands.length === 0 ? (
             <BlockNote className="border-t border-surface-neutral-lighter py-6 text-center">
               Aucun accompagnement sur cette période.
@@ -484,7 +399,6 @@ function Undated({ projects }: { projects: ProductProject[] }) {
 
 export function Roadmap({
   projects,
-  milestones,
   addHref,
 }: {
   /**
@@ -494,8 +408,6 @@ export function Roadmap({
    * clavier.
    */
   projects: ProductProject[];
-  /** Les activités porteuses d'un résultat vivant, de la plus ancienne mesure. */
-  milestones: TimelineMilestone[];
   /** `null` retire le point d'entrée — le composant ne connaît aucun droit. */
   addHref: string | null;
 }) {
@@ -543,13 +455,12 @@ export function Roadmap({
     else undated.push(project);
   }
 
-  /* L'axe entier se déduit de **toutes** les dates connues des deux couches, et
-     de rien d'autre. Les relevés d'indicateurs n'y entrent plus : ils ont leur
-     bloc et leur axe depuis le 17/08/2026. */
-  const scale = timelineScale([
-    ...projects.flatMap((project) => [project.periodStart, project.periodEnd]),
-    ...milestones.map((milestone) => milestone.measuredOn),
-  ]);
+  /* L'axe entier se déduit des dates d'accompagnement, et de rien d'autre. Les
+     relevés d'indicateurs n'y entrent pas — ils ont leur bloc et leur axe
+     depuis le 17/08/2026 —, et les repères non plus, partis les rejoindre. */
+  const scale = timelineScale(
+    projects.flatMap((project) => [project.periodStart, project.periodEnd]),
+  );
 
   /* **Sans axe, pas de fenêtre à filtrer** : il n'y a que des accompagnements
      sans date, et la section du bas les porte tous. */
@@ -576,18 +487,12 @@ export function Roadmap({
     {
       key: "all",
       label: "Tout",
-      view: <Timeline window={scale} dated={dated} milestones={milestones} />,
+      view: <Timeline window={scale} dated={dated} />,
     },
     ...years.map((year) => ({
       key: String(year),
       label: String(year),
-      view: (
-        <Timeline
-          window={yearWindow(scale, year)}
-          dated={dated}
-          milestones={milestones}
-        />
-      ),
+      view: <Timeline window={yearWindow(scale, year)} dated={dated} />,
     })),
   ];
 

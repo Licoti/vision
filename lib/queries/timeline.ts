@@ -34,101 +34,135 @@
  * courant. Règle 1.
  */
 
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull } from "drizzle-orm";
 
 import type { ScopedDb } from "@/lib/db/scoped";
 import {
   activities,
   activityTypes,
+  contextMarkers,
   projects,
   results,
 } from "@/lib/db/schema";
 
 /* ==========================================================================
-   Les repères — les activités porteuses d'un résultat
+   Les repères — ce qui s'est passé sur le produit, posé sur l'axe
+
+   **Deux natures, un seul type.** Un repère d'accompagnement est une activité
+   terminée du centre ; un repère de contexte est un fait du produit que le
+   centre n'a pas produit. Les deux se lisent sur le même axe, se distinguent à
+   l'écran par la forme, et ne se calculent jamais l'un contre l'autre.
+
+   **Ce module ne calcule aucun indice.** Il rend des faits datés — une valeur
+   reportée d'un outil externe, avec sa date — et des **positions** sur un axe.
+   Une position n'est pas un indice au sens de D39 : elle ne qualifie ni un
+   projet, ni une personne, ni une entité ; elle situe une date entre deux
+   bornes, et c'est le lecteur qui juxtapose. Aucun écart, aucune tendance,
+   aucune causalité — `docs/03` §7 nomme le « +12 % depuis l'accompagnement »
+   comme le point de bascule.
+
+   La lecture joint, donc elle passe par `joinedRead`, et **chaque table jointe
+   porte `filter(table)`** : c'est la condition posée par l'en-tête de
+   `joinedRead`, et un oubli serait une fuite que rien d'autre ne rattraperait.
    ========================================================================== */
 
-/** Un repère de la frise : l'activité, son résultat, et de quoi le nommer. */
-export type TimelineMilestone = {
-  /** L'identifiant de l'**activité** : c'est elle que la frise positionne. */
-  id: string;
-  projectId: string;
-  /** Le nom de l'accompagnement, pour nommer le repère hors de sa bande. */
-  projectName: string;
-  /** Le libellé du type, **archivé compris** : on décrit, on ne propose pas. */
-  typeLabel: string;
-  objective: string | null;
-  resultLabel: string;
+/** Un repère de la frise : ce qu'il est, quand, et d'où il vient. */
+export type ProductMarker = {
   /**
-   * `numeric(18,4)` : le pilote rend la chaîne brute — « 62.0000 » et non 62.
-   * La mise en forme appartient à `lib/format`, jamais à la lecture.
+   * D'où vient le repère, et c'est **la seule chose que l'écran en tire pour
+   * le dessiner** : un disque plein pour ce que le centre a fait, un anneau
+   * pour le contexte. La couleur ne porte jamais seule (`docs/06` §11), et le
+   * mot est écrit à côté partout où le repère se lit.
    */
+  kind: "accompaniment" | "context";
+  /**
+   * L'identifiant de l'objet d'origine : une **activité** pour un repère
+   * d'accompagnement, une ligne de `context_markers` pour un repère de
+   * contexte. Les deux tables ne partagent pas d'espace de noms, et c'est
+   * `kind` qui dit laquelle interroger.
+   */
+  id: string;
+  /**
+   * La date qui pose le repère sur l'axe, « YYYY-MM-DD ».
+   *
+   * Pour un accompagnement, c'est `activities.period_end` — **garantie non
+   * nulle** pour une activité terminée par la contrainte
+   * `activities_done_requires_period_end`, si bien qu'aucune n'est écartée
+   * faute de date. Ce n'est **pas** la date de mesure du résultat : le repère
+   * est l'activité, et le résultat garde la sienne, écrite sur la fiche.
+   *
+   * Pour un repère de contexte, c'est `happened_on`, obligatoire à la saisie.
+   */
+  on: string;
+  /** Le libellé du type d'activité, ou l'intitulé saisi. */
+  label: string;
+  /** L'objectif de l'activité, ou la note du repère. */
+  note: string | null;
+  /**
+   * L'accompagnement, quand il y en a un. **Nul est une réponse normale** pour
+   * un repère de contexte : une mise en production n'est pas la nôtre.
+   */
+  projectId: string | null;
+  projectName: string | null;
+  /**
+   * Le résultat vivant de l'activité, quand elle en porte un. Une valeur
+   * **reportée** d'un outil externe, avec sa date et son lien — ce que D39
+   * autorise, et rien de plus.
+   */
+  resultLabel: string | null;
+  /** `numeric(18,4)` : le pilote rend la chaîne brute — « 62.0000 » et non 62. */
   resultValue: string | null;
   resultUnit: string | null;
-  /**
-   * La date de mesure, « YYYY-MM-DD » — colonne `date`, **non nulle en base**.
-   *
-   * C'est elle qui positionne le repère, et non la période de l'activité
-   * (arbitrage du 16/08/2026) : elle est toujours renseignée, donc aucun repère
-   * n'est écarté faute de date, et c'est la valeur que D39 autorise à reporter
-   * « avec sa date ». Une activité, elle, peut n'avoir aucune période — et
-   * `docs/03` §7 interdit de positionner arbitrairement ce qui n'a pas de date.
-   */
-  measuredOn: string;
+  resultMeasuredOn: string | null;
+  resultUrl: string | null;
 };
 
 /**
- * Les activités d'un produit qui portent un résultat vivant, de la plus
- * ancienne mesure à la plus récente.
+ * Les activités **terminées** d'un produit, de la plus ancienne à la plus
+ * récente.
+ *
+ * **Toutes, et non les seules porteuses d'un résultat** — c'est ce qui a changé
+ * en même temps que les repères ont quitté la frise pour l'axe de la North
+ * Star. Un atelier de restitution ou un cadrage sont des accompagnements
+ * réalisés ; les écarter parce qu'aucun outil n'a mesuré quoi que ce soit
+ * aurait fait de la présence d'un résultat une condition d'existence.
+ *
+ * C'est la **jointure gauche** sur `results` qui porte cette décision, et elle
+ * seule : la passer en jointure interne rendrait exactement la lecture d'avant.
  *
  * **Une seule lecture pour toute la couche**, quel que soit le nombre
- * d'accompagnements : la frise ne descend pas projet par projet.
+ * d'accompagnements : l'axe ne descend pas projet par projet.
  *
- * `results` est la table de départ, et les trois jointures sont internes : elles
- * **sont** la question. `activities` porte le rattachement et l'archivage,
- * `projects` porte le produit et son propre archivage, `activityTypes` porte le
- * libellé. Chacune filtrée sur le domaine — la règle du fichier, et sans elle un
- * `activity_id` d'un autre domaine rendrait son type.
- *
- * **Les accompagnements archivés sont écartés parce que `listProductProjects` les
- * écarte déjà** : un repère sans bande sous laquelle se lire serait un fait
- * orphelin sur un axe qui ne le porte plus. La cohérence entre les deux couches
- * prime, et c'est la même règle qui vaut entre le bloc « Indicateurs adoptés » et
- * la page produit depuis T5.4.
+ * **Les accompagnements archivés sont écartés parce que `listProductProjects`
+ * les écarte déjà** : un repère sans accompagnement lisible serait un fait
+ * orphelin. La cohérence entre les deux couches prime.
  *
  * L'unicité partielle de T4bis.6 garantit **un résultat vivant au plus par
- * activité** : une ligne rendue est un repère, sans regroupement à faire.
+ * activité** : la jointure gauche ne peut donc pas dédoubler une ligne.
  *
- * Le tri est par date de mesure, `id` départageant deux mesures du même jour :
- * un ordre qui varierait d'un affichage à l'autre serait un défaut — la règle de
- * tri de `listProjectResources`.
+ * Le tri est par date de fin, `id` départageant deux activités du même jour :
+ * un ordre qui varierait d'un affichage à l'autre serait un défaut.
  */
-export function listProductMilestones(
+export function listAccompanimentMarkers(
   scope: ScopedDb,
   productId: string,
-): Promise<TimelineMilestone[]> {
+): Promise<ProductMarker[]> {
   return scope.joinedRead(async (database, { filter }) => {
-    return database
+    const rows = await database
       .select({
         id: activities.id,
+        on: activities.periodEnd,
+        label: activityTypes.label,
+        note: activities.objective,
         projectId: projects.id,
         projectName: projects.name,
-        typeLabel: activityTypes.label,
-        objective: activities.objective,
         resultLabel: results.label,
         resultValue: results.value,
         resultUnit: results.unit,
-        measuredOn: results.measuredOn,
+        resultMeasuredOn: results.measuredOn,
+        resultUrl: results.externalUrl,
       })
-      .from(results)
-      .innerJoin(
-        activities,
-        and(
-          eq(activities.id, results.activityId),
-          filter(activities),
-          isNull(activities.archivedAt),
-        ),
-      )
+      .from(activities)
       .innerJoin(
         projects,
         and(
@@ -138,6 +172,7 @@ export function listProductMilestones(
           eq(projects.productId, productId),
         ),
       )
+      /* Le libellé du type, **archivé compris** : on décrit, on ne propose pas. */
       .innerJoin(
         activityTypes,
         and(
@@ -145,9 +180,131 @@ export function listProductMilestones(
           filter(activityTypes),
         ),
       )
-      .where(and(filter(results), isNull(results.archivedAt)))
-      .orderBy(asc(results.measuredOn), asc(results.id));
+      /* ⚠ **Gauche, et c'est toute la décision** — voir l'en-tête. Un résultat
+         archivé ne remonte pas, mais son activité, si : elle a bien eu lieu. */
+      .leftJoin(
+        results,
+        and(
+          eq(results.activityId, activities.id),
+          filter(results),
+          isNull(results.archivedAt),
+        ),
+      )
+      .where(
+        and(
+          filter(activities),
+          isNull(activities.archivedAt),
+          eq(activities.state, "done"),
+          /* La contrainte `activities_done_requires_period_end` le garantit
+             déjà ; le prédicat est ici pour que la base ne rende jamais une
+             ligne que le code devrait écarter en silence. */
+          isNotNull(activities.periodEnd),
+        ),
+      )
+      .orderBy(asc(activities.periodEnd), asc(activities.id));
+
+    /* Le `flatMap` ne sert qu'à rétrécir le type : `period_end` est nullable en
+       colonne, et le prédicat ci-dessus a déjà vidé cette branche. Une
+       assertion non nulle dirait la même chose sans que rien ne la tienne. */
+    return rows.flatMap((row) =>
+      row.on === null
+        ? []
+        : [{ kind: "accompaniment" as const, ...row, on: row.on }],
+    );
   });
+}
+
+/**
+ * Les repères de contexte d'un produit, du plus ancien au plus récent.
+ *
+ * **L'accompagnement se lit par la jointure, jamais par la colonne** : un repère
+ * rattaché à un accompagnement archivé rendrait un identifiant sans nom, donc un
+ * lien vers une page qu'on ne sait plus annoncer. La jointure gauche filtrée met
+ * les deux à nul ensemble, ce qui est l'état lisible.
+ */
+export function listContextMarkers(
+  scope: ScopedDb,
+  productId: string,
+): Promise<ProductMarker[]> {
+  return scope.joinedRead(async (database, { filter }) => {
+    const rows = await database
+      .select({
+        id: contextMarkers.id,
+        on: contextMarkers.happenedOn,
+        label: contextMarkers.label,
+        note: contextMarkers.note,
+        projectId: projects.id,
+        projectName: projects.name,
+      })
+      .from(contextMarkers)
+      .leftJoin(
+        projects,
+        and(
+          eq(projects.id, contextMarkers.projectId),
+          filter(projects),
+          isNull(projects.archivedAt),
+        ),
+      )
+      .where(
+        and(
+          filter(contextMarkers),
+          isNull(contextMarkers.archivedAt),
+          eq(contextMarkers.productId, productId),
+        ),
+      )
+      .orderBy(asc(contextMarkers.happenedOn), asc(contextMarkers.id));
+
+    return rows.map((row) => ({
+      kind: "context" as const,
+      ...row,
+      resultLabel: null,
+      resultValue: null,
+      resultUnit: null,
+      resultMeasuredOn: null,
+      resultUrl: null,
+    }));
+  });
+}
+
+/**
+ * Les deux natures fondues en une seule suite, du plus ancien au plus récent.
+ *
+ * **Pure, et c'est pour ça qu'elle existe** : le tri d'une fusion est ce qui se
+ * casse le plus discrètement, et une comparaison écrite au milieu d'un `await`
+ * ne s'éprouve pas. Les deux entrées arrivent déjà triées chacune de son côté ;
+ * cette fonction ne suppose rien de tel et retrie tout.
+ *
+ * `id` départage deux repères du même jour — la règle de tri des deux lectures,
+ * qui vaut aussi entre elles : sans elle, l'ordre de deux repères de natures
+ * différentes posés le même jour dépendrait de l'implémentation du tri.
+ */
+export function mergeMarkers(
+  accompaniments: readonly ProductMarker[],
+  contexts: readonly ProductMarker[],
+): ProductMarker[] {
+  return [...accompaniments, ...contexts].sort((left, right) =>
+    left.on === right.on
+      ? left.id.localeCompare(right.id)
+      : left.on.localeCompare(right.on),
+  );
+}
+
+/**
+ * Tout ce qui s'est passé sur un produit, sur un seul axe.
+ *
+ * Les deux lectures partent ensemble : elles ne se conditionnent pas l'une
+ * l'autre, et les enchaîner ferait payer deux allers-retours là où un suffit.
+ */
+export async function listProductMarkers(
+  scope: ScopedDb,
+  productId: string,
+): Promise<ProductMarker[]> {
+  const [accompaniments, contexts] = await Promise.all([
+    listAccompanimentMarkers(scope, productId),
+    listContextMarkers(scope, productId),
+  ]);
+
+  return mergeMarkers(accompaniments, contexts);
 }
 
 /* ==========================================================================
@@ -246,6 +403,71 @@ export function timelineScale(
     lastMonth: monthKey(last),
     monthCount: last - first + 1,
   };
+}
+
+/**
+ * Les deux relevés qui **encadrent** une date : le dernier avant, le premier
+ * après.
+ *
+ * ⚠ **C'est le geste le plus proche de la ligne de D39, et il faut le dire.**
+ * Poser deux relevés en regard d'un accompagnement oriente la lecture, même
+ * sans soustraction. Ce qui l'autorise : `docs/03` §7 dit que la juxtaposition
+ * **est** la réponse — *« elle y répond en donnant à lire, pas en concluant »*
+ * —, et les deux valeurs rendues ici sont **reportées** avec leurs dates, ce que
+ * D39 nomme expressément comme autorisé.
+ *
+ * Ce qui l'en sépare tient en une phrase : **cette fonction sélectionne, elle ne
+ * calcule pas.** Aucun écart, aucun pourcentage, aucune tendance, aucune durée
+ * entre les deux. Le jour où l'un des deux apparaît ici, c'est le « +12 % depuis
+ * l'accompagnement » que `docs/06` §6 refuse en propres termes.
+ *
+ * **Un relevé posé le jour même compte comme « avant »** : la mesure existait
+ * quand l'activité s'est terminée, et la ranger « après » ferait dire à l'écran
+ * qu'elle lui succède.
+ *
+ * La série arrive dans **n'importe quel ordre** : la sélection ne suppose rien,
+ * et un appelant qui changerait de tri ne casserait rien en silence.
+ */
+export function neighbourReadings<T extends { readOn: string }>(
+  readings: readonly T[],
+  on: string,
+): { before: T | null; after: T | null } {
+  let before: T | null = null;
+  let after: T | null = null;
+
+  for (const reading of readings) {
+    if (reading.readOn <= on) {
+      if (before === null || reading.readOn > before.readOn) before = reading;
+    } else if (after === null || reading.readOn < after.readOn) {
+      after = reading;
+    }
+  }
+
+  return { before, after };
+}
+
+/**
+ * L'axe de la courbe North Star : les relevés **et** les repères.
+ *
+ * **C'est une règle, pas un raccourci d'appel.** La courbe bornait son axe sur
+ * les seules dates de relevé ; un repère hors de cette fenêtre était alors
+ * ramené contre le bord par `clampIndex` — une date affirmée qui est fausse, et
+ * le contraire de ce que la juxtaposition prétend montrer. La règle vit ici,
+ * pure et exportée, parce qu'aucun test du dépôt ne rend un composant : une
+ * règle qu'on ne peut pas neutraliser ne se met pas en défaut.
+ *
+ * Elle n'ajoute rien à `timelineScale`, elle **dit ce qu'on lui donne**. Et
+ * elle ne touche pas à l'échelle **verticale** : un repère ne porte pas de
+ * valeur, donc `axisScale` reste borné par les relevés et la cible.
+ *
+ * Rend `null` quand aucune date n'est connue des deux côtés : il n'y a alors
+ * pas d'axe, et l'état vide appartient à l'écran (règle 5).
+ */
+export function curveTimeline(
+  readOns: readonly (string | null | undefined)[],
+  markerOns: readonly (string | null | undefined)[],
+): TimelineScale | null {
+  return timelineScale([...readOns, ...markerOns]);
 }
 
 /** Ramène un indice de mois dans la fenêtre : **rien ne déborde de l'axe**. */

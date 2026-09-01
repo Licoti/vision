@@ -2,10 +2,10 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 01/09/2026, après le dispositif de mesure.
+**Dernière mise à jour :** 01/09/2026, après les repères sur l'axe de la North Star.
 Dernier balayage : découpage de C7. **Le fichier dépasse les 250 lignes de la règle 5 — 553 au
 31/08/2026, 642 après le mode de planification, 660 après le dispositif de mesure** ; le balayage
-appartient à la session de découpage de C8.
+appartient à la session de découpage de C8. **674 après les repères.**
 **Chantier en cours :** **C7 — Finitions**, dix tickets, découpés dans `tickets-C7.md`. **Dernier
 chantier du POC** — `docs/05` §5 n'en a pas de huitième.
 **Ticket suivant :** **T7.7 — Accessibilité : clavier, focus, contraste, titres.**
@@ -315,6 +315,17 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   `TonePill` et un ton `warning` — 7,64:1 mesuré —, et `BlockDivider` un `action`. **Quatorze
   neutralisations, quatorze chutes exactes** ; droit éprouvé par les cinq actions, sur un membre non
   contributeur et sur un produit archivé. **90 tests neufs** (1 434 → 1 524).
+- **Les repères sur l'axe de la North Star — hors ticket, 01/09/2026.** Les accompagnements réalisés
+  paraissent sur la courbe : **six marques de 8 px sur sa ligne du bas**, et **pas un pixel de
+  hauteur en plus** — la liste, la fiche et la saisie vivent derrière deux entrées du menu du bloc,
+  dans trois panneaux. `listProductMilestones` s'élargit à **toutes** les activités terminées et
+  devient `listAccompanimentMarkers` : c'est la **jointure gauche** sur `results` qui porte la
+  décision. `context_markers` est la table neuve (migration **0014**, l'arbitrage (a) de C7 rompu une
+  seconde fois), et la ligne morte de la frise — `SHOW_MILESTONES`, éteinte depuis le 17/08 — est
+  **supprimée** plutôt que doublée. Trois clés d'URL de plus (douze, treize et quatorze), **décompte
+  d'exclusivité inchangé pour la neuvième fois**. **Onze neutralisations, onze chutes exactes** ;
+  droit éprouvé par les trois actions, dont la soumission forgée qui rattache un accompagnement d'un
+  autre produit. **58 tests neufs** (1 524 → 1 582).
 
 ---
 
@@ -376,6 +387,11 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   par une **sonde de rendu serveur**. Restent à faire au clavier — la bascule au montage, `↓`/`↑`,
   `Entrée` qui retient sans soumettre, `Échap` qui ferme la liste **sans** fermer le tiroir, le clic
   extérieur, « Retirer ». → **T7.7.**
+- **La cible de clic d'un repère fait 24 px, sous les 44 px d'usage tactile.** La marque visible en
+  fait 8, posée sur la ligne du bas du tracé. L'agrandir **n'ajoute aucune hauteur** — la cible
+  déborde déjà du tracé sans le pousser —, mais deux repères de mois voisins se recouvriraient : à
+  vingt-deux mois d'axe sur 670 px, un mois vaut trente pixels. Poser un attribut ou une dimension
+  d'accessibilité est le geste de T7.7, pas celui d'un ticket de fonctionnalité. → **T7.7.**
 - **La frise du produit défile désormais dans son conteneur, et ce conteneur n'est pas atteignable
   au clavier.** T7.6 lui a donné `overflow-x-auto` — 720 px de tracé dans 390 à 768 px — sans
   `tabindex="0"` ni `role`/`aria-label` : poser un attribut d'accessibilité est le geste de T7.7, pas
@@ -457,12 +473,14 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 - **Rétablir un accompagnement sous un produit archivé le laisse invisible.** Les lectures écartent
   les projets d'un produit archivé — six depuis T6.7 —, donc le geste paraît ne rien faire. Aucun
   garde-fou (arbitrage (f) de C4bis) ; rien n'est perdu. → **T7.10.**
-- **Huit objets écrivent sans laisser de trace au journal** : persona, use case, indicateur,
-  personne, entité, vision produit, le budget de T7.1, et la **suppression d'un accompagnement**
-  (28/08). Ce dernier est d'une autre nature : `events.project_id` étant `cascade`, une trace écrite
-  juste avant serait effacée par l'instruction suivante — il n'y a pas de ligne à écrire, il y a une
-  disparition à admettre. Les six `event_target_type` restent une liste fermée sans migration
-  (arbitrage (b) de C6, (d) de C7). → **C8.**
+- **Onze objets écrivent sans laisser de trace au journal** : persona, use case, indicateur,
+  personne, entité, vision produit, le budget de T7.1, l'outil de mesure et le plan de taggage
+  (01/09), le **repère de contexte** (01/09), et la **suppression d'un accompagnement** (28/08). Ce
+  dernier est d'une autre nature : `events.project_id` étant `cascade`, une trace écrite juste avant
+  serait effacée par l'instruction suivante — il n'y a pas de ligne à écrire, il y a une disparition à
+  admettre. Les six `event_target_type` restent une liste fermée sans migration (arbitrage (b) de C6,
+  (d) de C7), et chaque hors-ticket qui ajoute une table de référence du produit allonge cette liste
+  d'un nom. → **C8.**
 - **`lib/auth/session.ts:10` promet encore que « C7 change de source d'identité ».** Cinquième
   énoncé de la famille que la sortie du SSO a rendu faux ; T7.5 en a corrigé quatre, tous dans son
   périmètre — les trois de la fiche, plus `provider.ts:47`. Celui-ci est hors périmètre (règle 3).

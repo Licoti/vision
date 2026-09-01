@@ -39,6 +39,7 @@ import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { db } from "@/lib/db/client";
 import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
 import {
+  contextMarkers,
   domains,
   entities,
   events,
@@ -58,6 +59,7 @@ import {
   useCases,
 } from "@/lib/db/schema";
 import { EMPTY_PERSONA_VALUES } from "@/lib/forms/persona";
+import { EMPTY_CONTEXT_MARKER_VALUES } from "@/lib/forms/context-marker";
 import { EMPTY_TAGGING_PLAN_VALUES } from "@/lib/forms/tagging-plan";
 import { EMPTY_TRACKING_VALUES } from "@/lib/forms/tracking";
 import { EMPTY_USE_CASE_VALUES } from "@/lib/forms/use-case";
@@ -108,17 +110,20 @@ vi.mock("next/navigation", () => ({
 }));
 
 const {
+  archiveContextMarker,
   archivePersona,
   archiveReading,
   archiveTaggingPlan,
   archiveTracking,
   archiveUseCase,
+  createContextMarker,
   createPersona,
   createReading,
   createTracking,
   createUseCase,
   saveTaggingPlan,
   setNorthStar,
+  updateContextMarker,
   updatePersona,
   updateReading,
   updateTracking,
@@ -154,6 +159,14 @@ type Fixture = {
   toolId: string;
   /** Un second, pour éprouver l'unicité sans toucher au premier. */
   otherToolId: string;
+  /* --- Les repères de contexte -------------------------------------------- */
+  /** L'accompagnement du produit — le rattachement légitime d'un repère. */
+  projectId: string;
+  /**
+   * Un accompagnement du produit **voisin**. C'est lui que porte la soumission
+   * forgée : un identifiant réel, du bon domaine, du mauvais produit.
+   */
+  otherProjectId: string;
 };
 
 let f: Fixture;
@@ -224,6 +237,15 @@ beforeAll(async () => {
     isContributor: true,
   });
 
+  /* Un accompagnement du produit **voisin** : rien ne le rattache à
+     `contributor`, et c'est précisément ce qu'une soumission forgée essaierait
+     de poser sur le produit de la page. */
+  const otherProject = await scope.insert(projects, {
+    name: `Accompagnement voisin ${suffix}`,
+    productId: otherProduct.id,
+    statusId: status.id,
+  });
+
   const indicator = await scope.insert(indicators, {
     productId: product.id,
     label: `Autonomie ${suffix}`,
@@ -274,6 +296,8 @@ beforeAll(async () => {
     archivedIndicatorId: archivedIndicator.id,
     toolId: tool.id,
     otherToolId: otherTool.id,
+    projectId: project.id,
+    otherProjectId: otherProject.id,
   };
 }, 180_000);
 
@@ -283,6 +307,9 @@ afterAll(async () => {
      ce ticket écrit, et que ce nettoyage ne connaissait pas. */
   const tables = [
     events,
+    /* `context_markers` avant `projects` et `products`, qu'elle référence : la
+       règle « enfants d'abord, parents ensuite » du fichier. */
+    contextMarkers,
     productTrackings,
     taggingPlans,
     indicatorReadings,
@@ -1814,5 +1841,356 @@ describe("archiveTaggingPlan — le retrait", () => {
     const state = await saveTaggingPlan(f.productId, EMPTY_PLAN, planForm());
     expect(state.ok).toBe(true);
     expect(await plansOf(f.productId)).toHaveLength(1);
+  });
+});
+
+/* ==========================================================================
+   Les repères de contexte — la moitié manuelle de la couche des repères
+
+   **Trois actions, une seule porte** : `openProductWrite`, le droit dérivé des
+   accompagnements du produit, celui des indicateurs et du dispositif de mesure.
+   Aucune condition neuve ne s'écrit ici, et ces tests l'éprouvent plutôt que de
+   l'annoncer.
+
+   **La garde propre à cette couche** est ailleurs : `projectId` est facultatif,
+   et l'accompagnement qu'il désigne doit appartenir à **ce** produit. Le
+   `<select>` du panneau ne propose que les bons, et cela ne protège rien — les
+   identifiants d'une action serveur voyagent en clair dans le champ
+   `$ACTION_…`. C'est la soumission forgée du dernier groupe.
+
+   **Aucune ligne de journal** n'est attendue : le précédent des indicateurs, du
+   budget (arbitrage (d) de T7.1) et du dispositif de mesure. Le constat se fait
+   sur `context_markers`, jamais sur `events`. */
+
+const EMPTY_MARKER = { values: EMPTY_CONTEXT_MARKER_VALUES, errors: {} };
+
+function markerForm(overrides: Record<string, string> = {}): FormData {
+  const data = new FormData();
+  data.set("happenedOn", "2026-05-02");
+  data.set("label", `Mise en production ${suffix}`);
+  data.set("note", "");
+  data.set("projectId", "");
+  for (const [name, value] of Object.entries(overrides)) data.set(name, value);
+  return data;
+}
+
+async function markersOf(productId: string) {
+  return f.scope.list(contextMarkers, {
+    where: eq(contextMarkers.productId, productId),
+  });
+}
+
+/**
+ * Les repères **rangés compris** : `list` écarte les archivés par défaut, et
+ * c'est ce qui distingue « la ligne est rangée » de « la ligne a disparu ». La
+ * règle 4 se constate ici, jamais sur la lecture des vivants.
+ */
+async function allMarkersOf(productId: string) {
+  return f.scope.list(contextMarkers, {
+    where: eq(contextMarkers.productId, productId),
+    includeArchived: true,
+  });
+}
+
+describe("createContextMarker — le droit", () => {
+  test("un membre non contributeur est refusé, et rien n'est écrit", async () => {
+    /* Le menu ne s'affiche pas pour lui — et ce n'est pas ce qui le protège. */
+    currentPerson = f.outsiderId;
+
+    try {
+      const state = await createContextMarker(
+        f.productId,
+        EMPTY_MARKER,
+        markerForm(),
+      );
+
+      expect(state.ok).toBeUndefined();
+      expect(state.message).toBeDefined();
+      expect(await markersOf(f.productId)).toHaveLength(0);
+    } finally {
+      /* **Le nettoyage même quand rien n'est censé s'écrire** : sous une règle
+         neutralisée, ce test écrit — et sans ce balayage, sa ligne ferait
+         tomber le suivant, qui compte. Une chute en cascade n'éprouve rien. */
+      await db
+        .delete(contextMarkers)
+        .where(eq(contextMarkers.productId, f.productId));
+    }
+
+  });
+
+  test("un contributeur d'un accompagnement du produit écrit", async () => {
+    /* Le pendant du refus ci-dessus : sans lui, le test précédent passerait
+       aussi sur une action qui refuse tout le monde. */
+    currentPerson = f.contributorId;
+    try {
+      const state = await createContextMarker(
+        f.productId,
+        EMPTY_MARKER,
+        markerForm(),
+      );
+
+      expect(state.ok).toBe(true);
+      expect(await markersOf(f.productId)).toHaveLength(1);
+    } finally {
+      await db
+        .delete(contextMarkers)
+        .where(eq(contextMarkers.productId, f.productId));
+    }
+  });
+
+  test("un produit archivé ne reçoit rien, même du responsable", async () => {
+    /* La règle 4 et la transposition de T4bis.2 : `openProductWrite` refuse le
+       produit archivé **reçu**. */
+    currentPerson = f.managerId;
+
+    try {
+      const state = await createContextMarker(
+        f.archivedProductId,
+        EMPTY_MARKER,
+        markerForm(),
+      );
+
+      expect(state.ok).toBeUndefined();
+      expect(await markersOf(f.archivedProductId)).toHaveLength(0);
+    } finally {
+      /* **Le nettoyage même quand rien n'est censé s'écrire** : sous une règle
+         neutralisée, ce test écrit — et sans ce balayage, sa ligne ferait
+         tomber le suivant, qui compte. Une chute en cascade n'éprouve rien. */
+      await db
+        .delete(contextMarkers)
+        .where(eq(contextMarkers.productId, f.archivedProductId));
+    }
+
+  });
+
+  test("une saisie invalide ne rend aucun message de droit", async () => {
+    /* Les deux refus ne se confondent pas : l'un porte sur un champ, l'autre
+       sur la personne. */
+    currentPerson = f.managerId;
+
+    try {
+      const state = await createContextMarker(
+        f.productId,
+        EMPTY_MARKER,
+        markerForm({ label: "" }),
+      );
+
+      expect(state.message).toBeUndefined();
+      expect(state.errors.label).toBeDefined();
+      expect(await markersOf(f.productId)).toHaveLength(0);
+    } finally {
+      /* **Le nettoyage même quand rien n'est censé s'écrire** : sous une règle
+         neutralisée, ce test écrit — et sans ce balayage, sa ligne ferait
+         tomber le suivant, qui compte. Une chute en cascade n'éprouve rien. */
+      await db
+        .delete(contextMarkers)
+        .where(eq(contextMarkers.productId, f.productId));
+    }
+
+  });
+});
+
+describe("createContextMarker — l'accompagnement rattaché", () => {
+  test("l'accompagnement du produit est accepté", async () => {
+    currentPerson = f.managerId;
+    try {
+      const state = await createContextMarker(
+        f.productId,
+        EMPTY_MARKER,
+        markerForm({ projectId: f.projectId }),
+      );
+
+      expect(state.ok).toBe(true);
+      const rows = await markersOf(f.productId);
+      expect(rows[0]?.projectId).toBe(f.projectId);
+    } finally {
+      await db
+        .delete(contextMarkers)
+        .where(eq(contextMarkers.productId, f.productId));
+    }
+  });
+
+  test("l'accompagnement d'un **autre produit** est refusé", async () => {
+    /* La soumission forgée que le rendu ne peut pas empêcher : l'identifiant
+       est réel, du bon domaine, et d'un produit que cette page ne porte pas. Le
+       refus est **de champ** — c'est le `<select>` qui porte la valeur fautive. */
+    currentPerson = f.managerId;
+
+    try {
+      const state = await createContextMarker(
+        f.productId,
+        EMPTY_MARKER,
+        markerForm({ projectId: f.otherProjectId }),
+      );
+
+      expect(state.ok).toBeUndefined();
+      expect(state.errors.projectId).toBeDefined();
+      expect(await markersOf(f.productId)).toHaveLength(0);
+    } finally {
+      /* **Le nettoyage même quand rien n'est censé s'écrire** : sous une règle
+         neutralisée, ce test écrit — et sans ce balayage, sa ligne ferait
+         tomber le suivant, qui compte. Une chute en cascade n'éprouve rien. */
+      await db
+        .delete(contextMarkers)
+        .where(eq(contextMarkers.productId, f.productId));
+    }
+
+  });
+
+  test("aucun accompagnement est un état normal", async () => {
+    currentPerson = f.managerId;
+    try {
+      const state = await createContextMarker(
+        f.productId,
+        EMPTY_MARKER,
+        markerForm(),
+      );
+
+      expect(state.ok).toBe(true);
+      const rows = await markersOf(f.productId);
+      expect(rows[0]?.projectId).toBeNull();
+    } finally {
+      await db
+        .delete(contextMarkers)
+        .where(eq(contextMarkers.productId, f.productId));
+    }
+  });
+});
+
+describe("updateContextMarker — la correction", () => {
+  test("un membre non contributeur ne corrige rien", async () => {
+    currentPerson = f.managerId;
+    const created = await createContextMarker(
+      f.productId,
+      EMPTY_MARKER,
+      markerForm(),
+    );
+    expect(created.ok).toBe(true);
+    const [row] = await markersOf(f.productId);
+
+    try {
+      currentPerson = f.outsiderId;
+      const state = await updateContextMarker(
+        f.productId,
+        row!.id,
+        EMPTY_MARKER,
+        markerForm({ label: `Récrit ${suffix}` }),
+      );
+
+      expect(state.ok).toBeUndefined();
+      const [after] = await markersOf(f.productId);
+      expect(after?.label).toBe(row!.label);
+    } finally {
+      await db
+        .delete(contextMarkers)
+        .where(eq(contextMarkers.productId, f.productId));
+    }
+  });
+
+  test("un repère d'un **autre produit** n'est pas corrigible d'ici", async () => {
+    currentPerson = f.managerId;
+    const created = await createContextMarker(
+      f.otherProductId,
+      EMPTY_MARKER,
+      markerForm(),
+    );
+    expect(created.ok).toBe(true);
+    const [row] = await markersOf(f.otherProductId);
+
+    try {
+      const state = await updateContextMarker(
+        f.productId,
+        row!.id,
+        EMPTY_MARKER,
+        markerForm({ label: `Détourné ${suffix}` }),
+      );
+
+      expect(state.ok).toBeUndefined();
+      const [after] = await markersOf(f.otherProductId);
+      expect(after?.label).toBe(row!.label);
+    } finally {
+      await db
+        .delete(contextMarkers)
+        .where(eq(contextMarkers.productId, f.otherProductId));
+    }
+  });
+
+  test("le responsable corrige, et la ligne change en base", async () => {
+    currentPerson = f.managerId;
+    const created = await createContextMarker(
+      f.productId,
+      EMPTY_MARKER,
+      markerForm(),
+    );
+    expect(created.ok).toBe(true);
+    const [row] = await markersOf(f.productId);
+
+    try {
+      const state = await updateContextMarker(
+        f.productId,
+        row!.id,
+        EMPTY_MARKER,
+        markerForm({ label: `Récrit ${suffix}`, happenedOn: "2026-06-01" }),
+      );
+
+      expect(state.ok).toBe(true);
+      const [after] = await markersOf(f.productId);
+      expect(after?.label).toBe(`Récrit ${suffix}`);
+      expect(after?.happenedOn).toBe("2026-06-01");
+    } finally {
+      await db
+        .delete(contextMarkers)
+        .where(eq(contextMarkers.productId, f.productId));
+    }
+  });
+});
+
+describe("archiveContextMarker — le retrait", () => {
+  test("un membre non contributeur ne retire rien", async () => {
+    currentPerson = f.managerId;
+    const created = await createContextMarker(
+      f.productId,
+      EMPTY_MARKER,
+      markerForm(),
+    );
+    expect(created.ok).toBe(true);
+    const [row] = await markersOf(f.productId);
+
+    try {
+      currentPerson = f.outsiderId;
+      await archiveContextMarker(f.productId, row!.id);
+
+      const [after] = await markersOf(f.productId);
+      expect(after?.archivedAt).toBeNull();
+    } finally {
+      await db
+        .delete(contextMarkers)
+        .where(eq(contextMarkers.productId, f.productId));
+    }
+  });
+
+  test("le responsable range, et rien n'est supprimé (règle 4)", async () => {
+    currentPerson = f.managerId;
+    const created = await createContextMarker(
+      f.productId,
+      EMPTY_MARKER,
+      markerForm(),
+    );
+    expect(created.ok).toBe(true);
+    const [row] = await markersOf(f.productId);
+
+    try {
+      await archiveContextMarker(f.productId, row!.id);
+
+      /* Rangé, donc absent des vivants — et toujours là quand on les rouvre. */
+      expect(await markersOf(f.productId)).toHaveLength(0);
+      const rows = await allMarkersOf(f.productId);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.archivedAt).not.toBeNull();
+    } finally {
+      await db
+        .delete(contextMarkers)
+        .where(eq(contextMarkers.productId, f.productId));
+    }
   });
 });

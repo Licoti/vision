@@ -89,6 +89,7 @@ import { revalidatePath } from "next/cache";
 import { requireSession } from "@/lib/auth/provider";
 import type { Session } from "@/lib/auth/session";
 import {
+  contextMarkers,
   indicatorReadings,
   indicators,
   personaTraits,
@@ -102,6 +103,11 @@ import {
   useCases,
 } from "@/lib/db/schema";
 import { DomainScopeError, type Row } from "@/lib/db/scoped";
+import {
+  parseContextMarkerForm,
+  readContextMarkerForm,
+  type ContextMarkerFormState,
+} from "@/lib/forms/context-marker";
 import {
   parseIndicatorForm,
   readIndicatorForm,
@@ -1766,4 +1772,202 @@ export async function archiveTaggingPlan(productId: string): Promise<void> {
 
   revalidatePath(ROUTES.product(productId));
   revalidatePath(ROUTES.products);
+}
+
+/* ==========================================================================
+   Les repères de contexte — ce qui s'est passé sur le produit, hors du centre
+   ==========================================================================
+
+   **Le même droit que les indicateurs et le dispositif de mesure.**
+   `openProductWrite` n'est pas touché : responsable de domaine, ou contributeur
+   désigné d'au moins un accompagnement de ce produit. Un repère de contexte est
+   un fait constaté par qui travaille sur le produit, comme un relevé — pas une
+   propriété du produit comme sa vision, qui a pris `manageDomain` le
+   18/08/2026. Arbitrage rendu en session.
+
+   **Rien ne se saisit pour les repères d'accompagnement.** Ils remontent des
+   activités terminées, qui ont déjà leur écran et leur droit sur la page
+   projet. Ce fichier ne porte donc que la moitié manuelle de la couche.
+
+   **Aucune ligne de journal** — le précédent des indicateurs, du budget
+   (arbitrage (d) de T7.1) et du dispositif de mesure. `events` ne gagne ni
+   verbe ni cible : ce sont des faits du **produit**, pas des faits
+   d'accompagnement. Le point ouvert des objets non journalisés reçoit un nom de
+   plus, il ne se referme pas à moitié.
+
+   **Une seule revalidation.** Aucun autre écran ne lit ces lignes — c'est ce
+   qui sépare ce geste de celui du plan de taggage, dont la liste des produits
+   affiche l'état. La leçon de T4.2, pesée dans les deux sens. */
+
+function markerRefusal(
+  formData: FormData,
+  message: string,
+): ContextMarkerFormState {
+  return { values: readContextMarkerForm(formData), errors: {}, message };
+}
+
+function markerScopeRefusal(
+  error: unknown,
+  formData: FormData,
+): ContextMarkerFormState {
+  if (error instanceof DomainScopeError) {
+    return markerRefusal(
+      formData,
+      "Une référence de ce formulaire n'appartient pas au domaine : la saisie n'a pas été enregistrée.",
+    );
+  }
+  throw error;
+}
+
+const MARKER_WRITE_REFUSED =
+  "La saisie d'un repère de contexte est réservée au responsable de domaine et aux contributeurs désignés d'un accompagnement de ce produit.";
+
+const MARKER_GONE = "Ce repère n'existe plus sur ce produit.";
+
+/**
+ * L'accompagnement rattaché appartient-il à **ce** produit ?
+ *
+ * **La garde qu'aucune voisine n'a**, et elle est nécessaire : le formulaire ne
+ * propose que les accompagnements du produit, et cela ne protège rien — les
+ * identifiants d'une action serveur voyagent en clair dans le champ
+ * `$ACTION_…`, réécrivable. Un identifiant valide du bon domaine mais d'un
+ * autre produit poserait un repère qui nommerait un accompagnement qu'on ne
+ * peut pas atteindre depuis cette page.
+ *
+ * Le message est **de champ** et non global : c'est le `<select>` qui porte la
+ * valeur fautive, et l'y renvoyer est ce qui permet de la corriger.
+ */
+async function foreignProject(
+  session: Session,
+  productId: string,
+  projectId: string | null,
+): Promise<boolean> {
+  if (projectId === null) return false;
+
+  const project = await session.db.find(projects, projectId);
+  return !project || project.productId !== productId;
+}
+
+/**
+ * Le garde d'un repère existant : le droit du produit, puis l'appartenance de
+ * la ligne — la forme d'`openTracking`.
+ */
+async function openContextMarker(
+  session: Session,
+  productId: string,
+  markerId: string,
+  refused: string,
+): Promise<
+  | { product: Row<typeof products>; marker: Row<typeof contextMarkers> }
+  | { message: string }
+> {
+  const gate = await openProductWrite(session, productId, refused);
+  if ("message" in gate) return gate;
+
+  const marker = await session.db.find(contextMarkers, markerId);
+  if (
+    !marker ||
+    marker.productId !== productId ||
+    marker.archivedAt !== null
+  ) {
+    return { message: MARKER_GONE };
+  }
+
+  return { product: gate.product, marker };
+}
+
+/** Poser un repère de contexte sur ce produit. */
+export async function createContextMarker(
+  productId: string,
+  _previous: ContextMarkerFormState,
+  formData: FormData,
+): Promise<ContextMarkerFormState> {
+  const session = await requireSession();
+
+  const gate = await openProductWrite(
+    session,
+    productId,
+    MARKER_WRITE_REFUSED,
+  );
+  if ("message" in gate) return markerRefusal(formData, gate.message);
+
+  const { values, errors, input } = parseContextMarkerForm(formData);
+  if (!input) return { values, errors };
+
+  if (await foreignProject(session, productId, input.projectId)) {
+    return {
+      values,
+      errors: { projectId: "Cet accompagnement n'est pas celui de ce produit." },
+    };
+  }
+
+  try {
+    await session.db.insert(contextMarkers, { productId, ...input });
+  } catch (error) {
+    return markerScopeRefusal(error, formData);
+  }
+
+  revalidatePath(ROUTES.product(productId));
+
+  return { values, errors: {}, ok: true };
+}
+
+/** Corriger un repère de contexte — le même formulaire, le même panneau. */
+export async function updateContextMarker(
+  productId: string,
+  markerId: string,
+  _previous: ContextMarkerFormState,
+  formData: FormData,
+): Promise<ContextMarkerFormState> {
+  const session = await requireSession();
+
+  const gate = await openContextMarker(
+    session,
+    productId,
+    markerId,
+    MARKER_WRITE_REFUSED,
+  );
+  if ("message" in gate) return markerRefusal(formData, gate.message);
+
+  const { values, errors, input } = parseContextMarkerForm(formData);
+  if (!input) return { values, errors };
+
+  if (await foreignProject(session, productId, input.projectId)) {
+    return {
+      values,
+      errors: { projectId: "Cet accompagnement n'est pas celui de ce produit." },
+    };
+  }
+
+  try {
+    const updated = await session.db.update(contextMarkers, markerId, input);
+    if (!updated) return markerRefusal(formData, MARKER_GONE);
+  } catch (error) {
+    return markerScopeRefusal(error, formData);
+  }
+
+  revalidatePath(ROUTES.product(productId));
+
+  return { values, errors: {}, ok: true };
+}
+
+/** Retirer un repère de contexte — archivage, comme partout (règle 4). */
+export async function archiveContextMarker(
+  productId: string,
+  markerId: string,
+): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openContextMarker(
+    session,
+    productId,
+    markerId,
+    // Jamais rendu : ce geste n'affiche aucun refus.
+    MARKER_WRITE_REFUSED,
+  );
+  if ("message" in gate) return;
+
+  await session.db.archive(contextMarkers, markerId);
+
+  revalidatePath(ROUTES.product(productId));
 }

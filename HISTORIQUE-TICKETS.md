@@ -5690,3 +5690,136 @@ commande avait été refusée à l'agent à l'époque. La `0012` est destructive
 colonnes de période saisie des accompagnements —, mais sa condition de perte était réputée vide :
 aucun des sept accompagnements de cette base n'avait de période sans activité datée. Schéma et base
 ne divergent plus. **Le geste n'avait pas été redemandé** ; il est signalé comme tel dans `ETAT.md`.
+
+---
+
+## Les repères sur l'axe de la North Star — hors ticket, 01/09/2026
+
+**La demande** : « faire apparaître les accompagnements réalisés comme des événements datés sur la
+timeline de la North Star », pour observer ce qui s'est passé après un accompagnement — sans
+attribuer quoi que ce soit à personne. Puis, sur les maquettes : *« cacher au max cette partie, elle
+ne s'affiche qu'au besoin. Garder la page produit la plus simple possible malgré l'ajout. »*
+
+**Ce que la page gagne** : six marques de 8 px, posées sur la ligne du bas du tracé — l'axe des
+dates, qui existait déjà. Le bloc « Vision produit » ne gagne aucun rang, aucun libellé, **pas un
+pixel de hauteur**. Le reste vit derrière deux entrées du menu du bloc et dans trois panneaux.
+
+### Le mot, et les deux qu'il évite
+
+**« Repère »**, celui que le dépôt employait déjà (`TimelineMilestone`, `milestoneTitle`).
+**« Jalon »** est proscrit par `docs/02` §8 ; **« événement »** est réservé au journal par
+`tickets-C7.md`. La demande disait « événements » : le mot a été traduit, pas repris.
+
+### Deux natures, une seule lecture
+
+Un **repère d'accompagnement** est une activité terminée : rien ne se saisit, tout remonte.
+`listProductMilestones` ne rendait que les activités **porteuses d'un résultat** ; elle s'élargit à
+**toutes** les activités terminées et devient `listAccompanimentMarkers`. Un atelier de restitution et
+un cadrage sont des accompagnements réalisés — les écarter parce qu'aucun outil n'a mesuré quoi que
+ce soit faisait de la présence d'un résultat une condition d'existence. **C'est la jointure gauche
+sur `results` qui porte toute la décision** ; la repasser en jointure interne rend exactement la
+lecture d'avant.
+
+Le repère se date désormais sur `activities.period_end` — garantie non nulle par
+`activities_done_requires_period_end` — et non plus sur `results.measured_on`. Le résultat garde sa
+date, écrite sur la fiche.
+
+Un **repère de contexte** est un fait du produit que le centre n'a pas produit : une mise en
+production, une campagne, un changement d'équipe. `context_markers`, table neuve — migration
+**0014**, la seizième table de `docs/04` §4 et la sixième qu'aucun `docs/` ne nomme.
+
+### La ligne morte de la frise est partie avec
+
+`components/products/roadmap.tsx` portait `SHOW_MILESTONES = false` depuis le 17/08/2026 : une couche
+entière, écrite et éteinte par un booléen, avec la promesse qu'on la rallumerait. Elle renaît
+ailleurs ; garder le drapeau aurait laissé deux notions de repère dans le dépôt, dont une morte.
+`SHOW_MILESTONES`, `milestoneTitle`, la prop `milestones` et le filtre `marks` sont supprimés, avec
+trois imports devenus muets.
+
+### L'axe, et la seule correction qui comptait
+
+`Curve` bornait son axe sur les seules dates de relevé. Un repère hors de cette fenêtre était ramené
+contre le bord par `clampIndex` — **une date affirmée qui est fausse**. La règle s'extrait en
+`curveTimeline`, pure et exportée : aucun test du dépôt ne rend un composant, et une règle qu'on ne
+peut pas neutraliser ne se met pas en défaut. L'échelle **verticale** ne bouge pas : un repère n'a pas
+de valeur, `axisScale` ne le voit pas.
+
+### L'infobulle, en CSS et sans jeton
+
+Une marque de 8 px n'a aucun contenu textuel : `group-hover` et `group-focus-visible` révèlent une
+carte de 256 px qui porte la date au jour, le type, l'accompagnement et le résultat. **Aucun
+JavaScript**, le bloc reste rendu sur le serveur ; au doigt, c'est le panneau qui s'ouvre. Elle se
+pose sur `surface-neutral-darkest`, la seule surface du thème qui se détache sans ombre — `tokens.css`
+§8 nomme trois élévations sans leur donner de valeur, et aucun neuvième jeton ne s'invente.
+
+### Trois panneaux, trois clés, un seul geste d'écriture
+
+`?reperes=tout` liste, `?marque=<activité>` détaille, `?contexte=nouveau|<id>` saisit. Les deux
+premières se lisent par tout le domaine (D9) ; la troisième tombe avec `canWriteIndicators`, **le même
+droit dérivé** que les indicateurs et le dispositif de mesure — aucune condition neuve ne s'écrit.
+Douzième, treizième et quatorzième clés d'URL, **décompte d'exclusivité inchangé pour la neuvième
+fois**.
+
+Le menu du bloc « Vision produit » **se rend désormais toujours** : « Voir les repères » ne tombe avec
+aucun droit, si bien qu'il y a au moins une entrée quel que soit le lecteur.
+
+### ⚠ La lisière de D39, signalée trois fois
+
+La fiche d'un repère fait paraître le relevé d'avant et celui d'après. `docs/03` §7 autorise la
+juxtaposition — *« elle y répond en donnant à lire, pas en concluant »* —, et les deux valeurs sont
+reportées avec leurs dates. Ce qui l'en sépare : `neighbourReadings` **sélectionne, elle ne calcule
+pas**. Aucun écart, aucune tendance, aucune durée. Le panneau le dit lui-même sous les deux lignes.
+Point rouvrable par l'humain : il tombe en retirant un bloc.
+
+### Les disciplines
+
+**Le critère se lit dans le HTML servi.** Six marques servies sur un produit peuplé, avec leur
+abscisse (`5 %`, `81,6667 %`, `98,3333 %`…), leur phrase accessible entière et leur infobulle —
+présente dans le balisage, cachée en CSS, avec ses trois ancrages selon la position. Les trois clés
+ouvrent leur panneau ; **deux clés ensemble n'ouvrent rien**, une valeur fantaisiste sur `reperes` non
+plus, un `marque` malformé non plus, et **un identifiant d'activité qui n'est pas un repère de ce
+produit non plus**. `panelParams` sert bien quatorze clés. L'état vide du panneau se lit sur un
+produit sans repère. La frise « Accompagnements » rend ses bandes, et *« Activités porteuses d'un
+résultat »* a disparu du balisage.
+
+**Deux défauts trouvés par la sonde, et corrigés** : la phrase accessible écrivait *« accompagnement ·
+accompagnement AXE - Cadrage du front »* — la nature ne s'écrit plus quand un accompagnement est
+nommé —, et la marge des graduations était restée à `mt-2` alors que les marques enjambent la ligne du
+bas. Aucun des deux ne se voyait à la lecture du diff.
+
+**Les tests se mettent en défaut — onze neutralisations, onze chutes exactes.** L'axe qui oublie les
+repères (3), le filtre d'état `done` (3), la jointure gauche passée en jointure interne (6, dont les
+trois du repère sans résultat), l'archivage des activités (3), celui des accompagnements (3), celui
+des repères de contexte (3), le filtre d'archivage de la jointure gauche sur `projects` (1), le
+départage par identifiant de `mergeMarkers` (1), le jour même de `neighbourReadings` (1), la garde
+d'appartenance de l'accompagnement (1), la porte d'écriture (2).
+
+**Deux chutes étaient des cascades, et elles ont été corrigées plutôt que rapportées** : sous une
+règle neutralisée, quatre tests de refus écrivaient une ligne sans la balayer, et faisaient tomber le
+test suivant. Ils portent désormais leur `finally`. Une chute en cascade n'éprouve rien.
+
+**Le contraste se mesure**, l'instrument validé d'abord sur deux couples que le dépôt annonçait déjà —
+7,64:1 et 6,42:1, retrouvés au centième. Quatre couples neufs par la position : le disque plein
+**15,72:1**, l'anneau **4,98:1** (limite 3:1, objet graphique), et les deux textes de l'infobulle
+**17,87:1** et **8,05:1** (limite 4,5:1).
+
+**Le droit s'éprouve par l'action.** Les trois actions interrogées directement : un membre non
+contributeur est refusé et **rien n'est écrit** ; un produit archivé refuse même au responsable ; un
+repère d'un autre produit n'est pas corrigible ; le contributeur désigné, lui, écrit. Et la soumission
+forgée propre à cette couche — un accompagnement **réel, du bon domaine, d'un autre produit** — est
+refusée par un message **de champ**, celui du `<select>` qui la porte.
+
+### Le compte
+
+**58 tests neufs** (1 524 → 1 582) : 30 sur les lectures et la fusion, 17 sur le formulaire, 11 sur
+les trois actions. Lint à `--max-warnings=0` et `tsc --noEmit` propres.
+
+### Ce qui reste
+
+La **migration 0014** a été appliquée à la main sur les deux bases — `drizzle-kit migrate` s'arrête sur
+`applying migrations…`, sort avec le code 0 et n'applique rien avec le pilote `neon-http` (piège
+consigné). La base de développement n'a reçu que le `CREATE TABLE` ; **aucune donnée n'y a été
+écrite**.
+
+La **cible de clic de 24 px** reste sous les 44 px d'usage tactile — point ouvert donné à T7.7, qui
+est le ticket suivant et le ticket des attributs.

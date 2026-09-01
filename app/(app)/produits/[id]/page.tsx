@@ -132,7 +132,7 @@ import {
 import { listProductPersonas } from "@/lib/queries/personas";
 import { listProductUseCases } from "@/lib/queries/use-cases";
 import { findProductDetail, listProductProjects } from "@/lib/queries/products";
-import { listProductMilestones } from "@/lib/queries/timeline";
+import { listProductMarkers } from "@/lib/queries/timeline";
 import { isUuid } from "@/lib/uuid";
 
 export const metadata = {
@@ -199,6 +199,25 @@ export default async function ProductPage({
      * produit n'a qu'un plan vivant — la forme de `vision`, pour la même raison.
      */
     plan?: string;
+    /**
+     * La **liste des repères**. **Une seule valeur d'ouverture, `tout`** :
+     * l'objet visé est le produit de la page — la forme de `vision` et de
+     * `plan`, pour la même raison.
+     */
+    reperes?: string;
+    /**
+     * La **fiche d'un repère d'accompagnement**, en lecture. Sa valeur est
+     * toujours un identifiant d'**activité** — la forme de `fiche` et de
+     * `scenario`. Elle n'a pas de jumeau d'écriture : une activité se corrige
+     * sur la page de son accompagnement.
+     */
+    marque?: string;
+    /**
+     * Le panneau de **saisie d'un repère de contexte**. Une seule clé, dont la
+     * **valeur** porte le cas — la forme d'`indicateur` : `nouveau` ouvre le
+     * panneau vide, un identifiant l'ouvre sur la ligne à corriger.
+     */
+    contexte?: string;
   }>;
 }) {
   const { id } = await params;
@@ -227,7 +246,7 @@ export default async function ProductPage({
     projects,
     productIndicators,
     productReadings,
-    milestones,
+    markers,
     adoptions,
     productPersonas,
     productUseCases,
@@ -237,7 +256,7 @@ export default async function ProductPage({
     listProductProjects(session.db, product.id),
     listProductIndicators(session.db, product.id),
     listProductReadings(session.db, product.id),
-    listProductMilestones(session.db, product.id),
+    listProductMarkers(session.db, product.id),
     listProductAdoptions(session.db, product.id),
     listProductPersonas(session.db, product.id),
     listProductUseCases(session.db, product.id),
@@ -293,6 +312,9 @@ export default async function ProductPage({
     scenario,
     mesure,
     plan,
+    reperes,
+    marque,
+    contexte,
   } = await searchParams;
 
   /* **L'URL reste une adresse, elle n'est plus le mécanisme** (TD.2). Coller
@@ -321,6 +343,9 @@ export default async function ProductPage({
     scenario,
     mesure,
     plan,
+    reperes,
+    marque,
+    contexte,
   };
   const conflict =
     Object.values(keys).filter((value) => value !== undefined).length > 1;
@@ -351,6 +376,8 @@ export default async function ProductPage({
           personas: productPersonas,
           useCases: productUseCases,
           tools: panelTools,
+          markers,
+          projects,
         },
         request,
       )
@@ -538,6 +565,24 @@ export default async function ProductPage({
               ? archiveTaggingPlan.bind(null, product.id)
               : null
           }
+          /* **Les repères**, posés sur l'axe de la North Star. La lecture est
+             celle du `Promise.all` — aucune requête neuve ne s'ajoute ici.
+
+             **Deux adresses jamais nulles** : la liste et la fiche se lisent
+             par tout le domaine (D9), comme celles d'un persona et d'un use
+             case. Seule la saisie tombe avec `canWriteIndicators` — le **même**
+             droit dérivé que les indicateurs et le dispositif de mesure, et
+             aucune condition neuve ne s'écrit. Ce n'est pas ce rendu qui
+             protège : les trois actions redérivent le droit sur l'identifiant
+             reçu, par `openProductWrite`. */
+          markers={markers}
+          markersHref={ROUTES.productMarkers(product.id)}
+          markerHref={(activityId) =>
+            ROUTES.productMarker(product.id, activityId)
+          }
+          addContextHref={
+            canWriteIndicators ? ROUTES.productContextNew(product.id) : null
+          }
         />
         {/* **Le troisième bloc de la page** — le deuxième jusqu'à ce que
               « Indicateurs » quitte le repli du premier, le 28/08/2026 —, et il
@@ -560,7 +605,6 @@ export default async function ProductPage({
               les frises qu'il monte sont rendues ici, sur le serveur. */}
         <Roadmap
           projects={projects}
-          milestones={milestones}
           /* **Le seul point d'entrée d'écriture du bloc**, celui de son état
                vide, et il tombe avec les deux mêmes conditions que « Nouvel
                accompagnement » de l'en-tête (F1-D1, D9, règle 4). Ce n'est pas

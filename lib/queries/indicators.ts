@@ -754,7 +754,7 @@ export type ProductAdoption = {
  * `innerJoin` sur `projects` : la jointure **est** la question. Elle porte le
  * rattachement au produit, le nom de l'accompagnement, et son archivage. **Les
  * accompagnements archivés sont écartés parce que la roadmap les écarte déjà** —
- * `listProductProjects` pour les barres, `listProductMilestones` pour les
+ * `listProductProjects` pour les barres, `listAccompanimentMarkers` pour les
  * repères : une adoption sans accompagnement sous lequel se lire serait un nom
  * orphelin.
  *

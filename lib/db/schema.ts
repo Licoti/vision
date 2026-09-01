@@ -1369,6 +1369,79 @@ export const taggingPlans = pgTable(
 );
 
 /**
+ * Un **repère de contexte** : un fait daté du produit que le centre n'a pas
+ * produit — une mise en production, une campagne, un changement d'équipe.
+ *
+ * **Concept ajouté hors des `docs/`**, comme `products.vision`,
+ * `indicators.is_north_star`, `personas`, `use_cases`, `product_trackings` et
+ * `tagging_plans` avant lui : ni `docs/02` ni `docs/04` ne le nomment. L'écart
+ * est consigné dans `JOURNAL-TECHNIQUE.md` (règle 6).
+ *
+ * **Il complète les repères d'accompagnement, il ne les double pas.** Les
+ * activités terminées se posent déjà sur l'axe de la North Star sans qu'aucune
+ * ligne se saisisse (`listAccompanimentMarkers`) : cette table ne porte que ce
+ * qu'aucune activité ne porte, c'est-à-dire ce qui n'est pas du centre. Les
+ * deux natures se lisent ensemble et se distinguent à l'écran par la forme.
+ *
+ * **`repère`, jamais `événement`** : `events` est le journal système, et
+ * `docs/04` §4 nomme la confusion. Jamais « jalon » non plus, que `docs/02` §8
+ * proscrit.
+ *
+ * **Aucune unicité.** Deux mises en production le même jour sur le même produit
+ * sont deux faits, pas une erreur de saisie — c'est ce qui sépare cette table
+ * de `tagging_plans`, dont l'unicité partielle fait de « renseigner » et
+ * « corriger » un seul geste.
+ *
+ * `on delete cascade` sur le produit, comme `indicators` : un repère n'existe
+ * pas hors du produit qu'il situe. **`on delete set null` sur
+ * l'accompagnement**, et le choix est délibéré : le rattachement est facultatif
+ * — une mise en production n'est pas la nôtre — et supprimer définitivement un
+ * accompagnement (`DeletableTable`, 28/08/2026) ne doit pas effacer un fait du
+ * produit qui, lui, a bien eu lieu.
+ */
+export const contextMarkers = pgTable(
+  "context_markers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    domainId: domainRef(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    /**
+     * L'accompagnement auquel le repère se rattache, **facultatif**.
+     *
+     * Nul est la réponse normale : le fait vient du produit, pas du centre.
+     * Renseigné, il dit « cet accompagnement est le contexte de ce fait » — et
+     * c'est l'action qui vérifie que l'accompagnement appartient bien à ce
+     * produit-ci, un `<select>` bien peuplé n'ayant jamais protégé personne.
+     */
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
+    /**
+     * Le jour où le fait a eu lieu, « YYYY-MM-DD ».
+     *
+     * **Non nul et sans défaut** : l'axe ne porte que ce qui est daté, et dater
+     * d'office ferait mentir la seule information que le repère apporte. C'est
+     * l'arbitrage de `readings.read_on` (T5.3) et de `tagging_plans.updated_on`.
+     *
+     * `date` et non horodatage, la convention du §1 : ce qu'on note est un
+     * jour. L'axe se lit au mois (D13), le jour s'écrit sur la fiche.
+     */
+    happenedOn: date("happened_on").notNull(),
+    label: text("label").notNull(),
+    note: text("note"),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    ...stamps,
+  },
+  (t) => [
+    index("context_markers_domain_id_idx").on(t.domainId),
+    index("context_markers_product_id_idx").on(t.productId),
+    index("context_markers_project_id_idx").on(t.projectId),
+  ],
+);
+
+/**
  * L'adoption d'un indicateur par un projet : le rattachement, et sa valeur de
  * référence. C'est la table qui relie l'accompagnement à son effet supposé. Elle
  * ne calcule rien — Vision juxtapose, elle ne prouve pas.

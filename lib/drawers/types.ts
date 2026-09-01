@@ -28,7 +28,7 @@ import type { ReactNode } from "react";
 import { REFERENTIALS, type Referential } from "@/lib/navigation";
 
 /**
- * Les neuf panneaux de la page produit.
+ * Les panneaux de la page produit.
  *
  * `id` est facultatif là où la valeur portait le cas dans l'URL (`nouvel`
  * contre un identifiant) : son absence dit « créer ». Là où la valeur désignait
@@ -36,9 +36,10 @@ import { REFERENTIALS, type Referential } from "@/lib/navigation";
  * —, il est requis. `archive` et `vision` n'en prennent aucun : l'objet visé est
  * le produit de la page, comme leur clé d'URL le disait déjà.
  *
- * **Les deux derniers sont la paire du use case** (19/08/2026), et ils
- * reprennent la séparation des deux précédents sans l'inventer : la fiche se lit
- * par tout le domaine, la saisie demande le droit d'écrire.
+ * **`useCase` et `useCaseDetail` sont la paire du use case** (19/08/2026), et
+ * ils reprennent la séparation de la paire persona sans l'inventer : la fiche se
+ * lit par tout le domaine, la saisie demande le droit d'écrire. Une place dans
+ * une liste vieillit à chaque ajout ; le nom, non.
  */
 export type ProductDrawerRequest =
   | { kind: "archive" }
@@ -54,7 +55,20 @@ export type ProductDrawerRequest =
   /** `nouvel` ouvre le vide, un identifiant corrige — la forme d'`indicator`. */
   | { kind: "tracking"; id?: string | undefined }
   /** Sans identifiant : un produit n'a qu'un plan vivant. La forme de `vision`. */
-  | { kind: "taggingPlan" };
+  | { kind: "taggingPlan" }
+  /**
+   * Les trois panneaux des **repères**, et ils reprennent la séparation que
+   * cette page tient déjà trois fois : deux lectures que tout le domaine ouvre
+   * (D9), une saisie qui demande le droit d'écrire.
+   *
+   * `markers` ne prend aucun identifiant — l'objet visé est le produit de la
+   * page, la forme de `vision`. `markerDetail` en prend un, **et c'est celui
+   * d'une activité** : la fiche d'un repère d'accompagnement n'a pas de table à
+   * elle. `contextMarker` porte le cas dans sa valeur, la forme d'`indicator`.
+   */
+  | { kind: "markers" }
+  | { kind: "markerDetail"; id: string }
+  | { kind: "contextMarker"; id?: string | undefined };
 
 /**
  * Les panneaux de la page projet, sur la même forme — **sans le compte**, et
@@ -230,6 +244,9 @@ const PRODUCT_KINDS = [
   "useCaseDetail",
   "tracking",
   "taggingPlan",
+  "markers",
+  "markerDetail",
+  "contextMarker",
 ] as const;
 
 const PROJECT_KINDS = [

@@ -9047,3 +9047,144 @@ Deux tests d'action prenaient `[0]` d'un `list` pour désigner une ligne parmi d
 tombaient selon ce que la base rendait ce jour-là. Ils désignent désormais la ligne **par son
 outil**. Le même piège attend tout test qui enchaîne des gestes sur une collection sans clé de
 lecture stable.
+
+---
+
+## Les repères sur l'axe de la North Star — hors ticket, 01/09/2026
+
+Les accompagnements réalisés paraissent sur l'axe de la courbe North Star, sous la forme de six
+marques de 8 px posées sur sa ligne du bas. Tout le reste — la liste, la fiche, la saisie — vit
+derrière deux entrées neuves du menu du bloc, dans trois panneaux latéraux. **La page produit ne
+gagne pas un pixel de hauteur.**
+
+### L'arbitrage (a) de C7 est rompu, et c'est la seconde fois
+
+> **(a) Une seule migration est attendue de tout le chantier** — `starters.activity_type_id`, en
+> T7.10. *Une migration supplémentaire est un signal d'arrêt, pas une étape.*
+
+`context_markers` en demande une (`0014`). Le précédent est celui du dispositif de mesure, la veille :
+deux tables et la `0013`, hors ticket, à la demande. L'arbitrage a donc tenu **zéro** ticket sur les
+deux hors-tickets qui l'ont croisé, et T7.10 aura consommé un troisième numéro avant d'écrire le
+sien. Ce n'est pas un accident de périmètre : c'est que les demandes hors ticket arrivent avec leur
+schéma, et qu'un arbitrage de chantier ne les lie pas. À redire au découpage de C8, qui devrait
+compter ses migrations autrement — ou ne plus les compter.
+
+### `context_markers` n'est nommée dans aucun `docs/`
+
+Sixième table dans ce cas, après `products.vision`, `indicators.is_north_star`, `personas`,
+`use_cases`, et le couple `product_trackings` / `tagging_plans` de la veille. `docs/02` ne connaît
+pas la notion, `docs/04` §4 ne la liste pas, et `docs/03` §7 ne décrit sur l'axe que les *activités
+marquantes* — c'est-à-dire la moitié automatique de la couche. La moitié manuelle est neuve.
+
+Le mot a été choisi contre deux interdits de vocabulaire : `docs/02` §8 proscrit **« jalon »**, et
+`tickets-C7.md` réserve **« événement »** au journal. « Repère » est le mot que le dépôt employait
+déjà (`TimelineMilestone`, `milestoneTitle`), et c'est celui qui reste.
+
+### La ligne morte de la frise a été supprimée, pas déplacée
+
+`components/products/roadmap.tsx` portait `const SHOW_MILESTONES = false` depuis le 17/08/2026 — une
+couche entière, écrite, testée et éteinte par un booléen, avec cette phrase en commentaire : *« Un
+drapeau, et non une suppression : […] la rallumer est ce booléen. »*
+
+Elle n'a jamais été rallumée, et la couche vient de renaître ailleurs. Garder le drapeau aurait laissé
+**deux notions de repère** dans le même dépôt, dont une morte. `SHOW_MILESTONES`, `milestoneTitle`, la
+prop `milestones` de `Timeline` et de `Roadmap`, et le filtre `marks` sont partis avec ;
+`listProductMilestones` a cédé la place à `listAccompanimentMarkers`.
+
+**Leçon** : un drapeau qui éteint une couche « pour le POC » est une dette dont personne ne fixe
+l'échéance. Quinze jours et deux chantiers plus tard, le code était intact et faux — sa date de
+repère (`results.measured_on`) n'était plus celle qu'on aurait choisie.
+
+### La date d'un repère d'accompagnement a changé de colonne
+
+`listProductMilestones` posait le repère sur `results.measured_on`, justifié ainsi : *« elle est
+toujours renseignée, donc aucun repère n'est écarté faute de date »*. C'était vrai **parce que** la
+lecture se bornait aux activités porteuses d'un résultat.
+
+L'élargissement à toutes les activités terminées retire cet argument et en rend un autre :
+`activities_done_requires_period_end` garantit `period_end` sur toute activité `done`. Le repère se
+date donc sur **l'activité**, ce qu'il est ; le résultat garde `measured_on`, écrit sur la fiche.
+
+Conséquence sans lecteur aujourd'hui : les positions de l'ancienne couche auraient bougé. Elle
+n'était pas rendue.
+
+### La jointure gauche porte toute la décision
+
+Une seule ligne sépare « les activités porteuses d'un résultat » de « toutes les activités
+terminées » : `.leftJoin(results, …)` au lieu d'un `innerJoin`. C'est aussi la seule neutralisation du
+lot qui fasse tomber un groupe entier de tests plutôt qu'un test.
+
+Le piège inverse est consigné la veille pour le plan de taggage — *« la neutralisation de la jointure
+gauche en jointure interne a vidé la liste entière »*. Ici elle ne vide rien, elle **rétrécit**, et
+c'est plus discret : la liste garde ses repères à résultat, et perd les cadrages et les ateliers.
+
+### L'infobulle est un composant neuf, et il n'y avait pas de jeton pour elle
+
+Le dépôt n'avait que le `title` natif et des `sr-only`. Une marque de 8 px n'a aucun contenu textuel
+propre : le `title` seul n'est pas exposé de façon fiable, et la date, le type, l'accompagnement et le
+résultat ne tiennent pas dans un attribut lisible.
+
+L'infobulle est donc **en CSS pur** — `group-hover` et `group-focus-visible`, aucun JavaScript, le
+bloc reste rendu sur le serveur. Elle se pose sur `surface-neutral-darkest`, **la seule surface du
+thème qui se détache sans ombre** : `tokens.css` §8 nomme trois élévations sans leur donner de valeur,
+et aucun neuvième jeton ne s'invente. C'est le huitième manque du design system qui se contourne, et
+il se contourne par une surface plutôt que par une ombre.
+
+Au doigt, l'infobulle ne paraît pas : c'est le panneau qui s'ouvre. C'est le meilleur des deux
+comportements tactiles, et il n'a demandé aucune ligne.
+
+### Dette assumée : la cible de clic fait 24 px
+
+La marque visible fait 8 px, sa cible 24. L'usage tactile en demande 44. L'agrandir **n'ajoute aucune
+hauteur** — la cible déborde déjà du tracé sans le pousser — mais les cibles se recouvriraient entre
+deux repères de mois voisins : à 22 mois d'axe sur 670 px, un mois vaut 30 px.
+
+Le point est à reprendre en T7.7 si l'usage au doigt compte. Il ne se referme pas ici : ce serait
+poser un attribut d'accessibilité dans un ticket de fonctionnalité, et les deux se suivent.
+
+### Le récit se lit à l'envers des autres listes de la page
+
+Le panneau « Repères » va du plus ancien au plus récent ; la liste des accompagnements et celle des
+relevés vont du plus récent au plus ancien.
+
+L'écart est délibéré : la bande se lit de gauche à droite, et une liste qui la remonterait obligerait
+l'œil à retourner l'ordre entre les deux lectures. C'est la correspondance qui décide, pas la
+convention.
+
+### ⚠ La lisière de D39 : les relevés voisins
+
+La fiche d'un repère d'accompagnement fait paraître **le relevé d'avant et celui d'après**. C'est le
+geste de tout ce travail qui touche le plus près la frontière du chiffre.
+
+Ce qui l'autorise : `docs/03` §7 dit que la juxtaposition **est** la réponse — *« elle y répond en
+donnant à lire, pas en concluant »* —, et les deux valeurs sont **reportées** avec leurs dates, ce que
+D39 nomme comme autorisé.
+
+Ce qui l'en sépare tient en une phrase, et elle est écrite dans le code comme à l'écran :
+`neighbourReadings` **sélectionne, elle ne calcule pas**. Aucun écart, aucun pourcentage, aucune
+tendance, aucune durée entre les deux. Le jour où l'un des quatre apparaît là, c'est le « +12 % depuis
+l'accompagnement » que `docs/06` §6 refuse en propres termes.
+
+Le panneau le dit lui-même, sous les deux lignes : *« Deux valeurs reportées, avec leurs dates. Vision
+ne calcule pas d'écart et n'attribue pas cette évolution à ce repère. »* Point rouvrable par l'humain,
+jamais par un ticket : il tombe en retirant un bloc.
+
+### Piège d'outillage : `drizzle-kit migrate` n'applique rien sur la branche de test
+
+`npx drizzle-kit migrate`, `DATABASE_URL` pointé sur `TEST_DATABASE_URL`, s'arrête sur
+`applying migrations…`, **sort avec le code 0, et n'applique rien**. Le pilote `@neondatabase/serverless`
+prévient d'ailleurs qu'il *« ne peut se connecter que par websocket »*.
+
+La `0014` a donc été posée à la main sur la branche de test : les instructions du fichier `.sql`
+séparées sur `--> statement-breakpoint`, puis une ligne dans `drizzle.__drizzle_migrations` avec le
+`sha256` **du fichier entier** et le `when` du journal. La forme du hachage a été vérifiée d'abord sur
+la `0013` déjà appliquée, plutôt que supposée : recalculée, elle rend exactement le hachage stocké.
+
+**La base de développement n'a pas été touchée** — `npm run db:migrate` y reste le geste de l'humain,
+et le piège ci-dessus l'attend peut-être aussi.
+
+### Le menu du bloc « Vision produit » se rend désormais toujours
+
+Il se rendait « dès que l'un des deux droits est ouvert ». « Voir les repères » n'en demande aucun
+(D9), si bien qu'il y a toujours au moins une entrée. Les deux conditions n'ont pas disparu : elles ne
+décident plus de l'existence du menu, seulement de son contenu.
