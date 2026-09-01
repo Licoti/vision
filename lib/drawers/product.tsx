@@ -35,6 +35,8 @@ import { PersonaPanel } from "@/components/products/persona-panel";
 import { UseCaseDetail } from "@/components/products/use-case-detail";
 import { UseCasePanel } from "@/components/products/use-case-panel";
 import { ReadingPanel } from "@/components/products/reading-panel";
+import { TaggingPlanPanel } from "@/components/products/tagging-plan-panel";
+import { TrackingPanel } from "@/components/products/tracking-panel";
 import { ReadingsPanel } from "@/components/products/readings-panel";
 import { VisionPanel } from "@/components/products/vision-panel";
 import type { Session } from "@/lib/auth/session";
@@ -42,11 +44,14 @@ import {
   indicatorReadings,
   indicators,
   personas,
+  productTrackings,
   useCases,
 } from "@/lib/db/schema";
 import { toIndicatorFormValues } from "@/lib/forms/indicator";
 import { toPersonaFormValues } from "@/lib/forms/persona";
 import { toReadingFormValues } from "@/lib/forms/reading";
+import { toTaggingPlanFormValues } from "@/lib/forms/tagging-plan";
+import { toTrackingFormValues } from "@/lib/forms/tracking";
 import { toUseCaseFormValues } from "@/lib/forms/use-case";
 import { toVisionFormValues } from "@/lib/forms/vision";
 import {
@@ -60,6 +65,10 @@ import {
   READING_PANEL_PARAM,
   READINGS_PANEL_PARAM,
   ROUTES,
+  TAGGING_PANEL_EDIT,
+  TAGGING_PANEL_PARAM,
+  TRACKING_PANEL_NEW,
+  TRACKING_PANEL_PARAM,
   USE_CASE_DETAIL_PARAM,
   USE_CASE_PANEL_NEW,
   USE_CASE_PANEL_PARAM,
@@ -71,6 +80,11 @@ import type {
   ProductIndicator,
   ProductReading,
 } from "@/lib/queries/indicators";
+import {
+  findProductTaggingPlan,
+  listAnalyticsTools,
+  type AnalyticsTool,
+} from "@/lib/queries/measurement";
 import { listPersonaTraits, listProductPersonas } from "@/lib/queries/personas";
 import type { ProductPersona } from "@/lib/queries/personas";
 import { listProductUseCases, personasOf } from "@/lib/queries/use-cases";
@@ -94,8 +108,11 @@ import {
   createIndicator,
   createPersona,
   createReading,
+  createTracking,
   createUseCase,
+  saveTaggingPlan,
   updateIndicator,
+  updateTracking,
   updatePersona,
   updateReading,
   updateUseCase,
@@ -122,6 +139,15 @@ export type ProductDrawerContext = {
   readings: readonly ProductReading[];
   personas: readonly ProductPersona[];
   useCases: readonly ProductUseCase[];
+  /**
+   * Les outils de genre « Analytics » que le panneau propose (01/09/2026).
+   *
+   * **Seul le panneau d'un outil en a besoin** : la page produit ne les lit
+   * jamais pour son écran — elle affiche le nom porté par la ligne déclarée,
+   * pas le référentiel entier. C'est donc la première collection du contexte que
+   * la page laisse vide **dans tous les cas**, et que seule l'ouverture paie.
+   */
+  tools: readonly AnalyticsTool[];
 };
 
 /** Le droit d'écrire, dérivé une fois pour les deux chemins. */
@@ -159,6 +185,7 @@ export async function loadProductDrawerContext(
       readings: productReadings,
       personas: [],
       useCases: [],
+      tools: [],
     };
   }
 
@@ -169,6 +196,7 @@ export async function loadProductDrawerContext(
       readings: [],
       personas: await listProductPersonas(session.db, product.id),
       useCases: [],
+      tools: [],
     };
   }
 
@@ -187,6 +215,7 @@ export async function loadProductDrawerContext(
       readings: [],
       personas: productPersonas,
       useCases: productUseCases,
+      tools: [],
     };
   }
 
@@ -197,10 +226,31 @@ export async function loadProductDrawerContext(
       readings: [],
       personas: await listProductPersonas(session.db, product.id),
       useCases: [],
+      tools: [],
     };
   }
 
-  return { canWrite, indicators: [], readings: [], personas: [], useCases: [] };
+  /* Le référentiel, et lui seul : le panneau d'un outil relit sa propre ligne
+     par identifiant, comme celui d'un indicateur. */
+  if (request.kind === "tracking") {
+    return {
+      canWrite,
+      indicators: [],
+      readings: [],
+      personas: [],
+      useCases: [],
+      tools: await listAnalyticsTools(session.db),
+    };
+  }
+
+  return {
+    canWrite,
+    indicators: [],
+    readings: [],
+    personas: [],
+    useCases: [],
+    tools: [],
+  };
 }
 
 export async function resolveProductDrawer(
@@ -587,6 +637,77 @@ export async function resolveProductDrawer(
         ),
       };
     }
+
+    /* ------------------------------------------------------------------ */
+    case "tracking": {
+      if (!context.canWrite) return null;
+
+      /* La forme est vérifiée avant la base, puis la ligne est confrontée au
+         produit et à l'archivage — le rang n'affiche aucun lien vers une ligne
+         retirée, mais une demande se forge. La règle d'`indicator`, mot pour
+         mot. */
+      const row =
+        request.id && isUuid(request.id)
+          ? await session.db.find(productTrackings, request.id)
+          : undefined;
+      const tracking =
+        row && row.productId === product.id && row.archivedAt === null
+          ? row
+          : null;
+
+      if (request.id && !tracking) return null;
+
+      return {
+        titleId: "panneau-mesure-titre",
+        title: tracking ? "Modifier l'outil de mesure" : "Ajouter un outil de mesure",
+        subtitles: [product.name],
+        body: (
+          <TrackingPanel
+            action={
+              tracking
+                ? updateTracking.bind(null, product.id, tracking.id)
+                : createTracking.bind(null, product.id)
+            }
+            tools={context.tools}
+            {...(tracking
+              ? {
+                  submitLabel: "Enregistrer les modifications",
+                  initial: toTrackingFormValues(tracking),
+                }
+              : { submitLabel: "Ajouter cet outil" })}
+          />
+        ),
+      };
+    }
+
+    /* ------------------------------------------------------------------ */
+    case "taggingPlan": {
+      if (!context.canWrite) return null;
+
+      /* **Aucun identifiant à vérifier** : l'objet visé est celui de la page, et
+         un produit n'a qu'un plan vivant. La lecture décide seulement de ce que
+         le panneau annonce — renseigner ou corriger —, jamais de ce qu'il
+         écrit : `saveTaggingPlan` refait cette lecture pour son propre compte,
+         et c'est elle qui fait foi. */
+      const plan = await findProductTaggingPlan(session.db, product.id);
+
+      return {
+        titleId: "panneau-plan-titre",
+        title: plan ? "Modifier le plan de taggage" : "Renseigner le plan de taggage",
+        subtitles: [product.name],
+        body: (
+          <TaggingPlanPanel
+            action={saveTaggingPlan.bind(null, product.id)}
+            {...(plan
+              ? {
+                  submitLabel: "Enregistrer les modifications",
+                  initial: toTaggingPlanFormValues(plan),
+                }
+              : { submitLabel: "Enregistrer le plan" })}
+          />
+        ),
+      };
+    }
   }
 }
 
@@ -614,6 +735,8 @@ export function productRequestFromParams(asked: {
   fiche?: string | undefined;
   usecase?: string | undefined;
   scenario?: string | undefined;
+  mesure?: string | undefined;
+  plan?: string | undefined;
 }): ProductDrawerRequest | null {
   if (asked.archiver === ARCHIVE_PANEL_CONFIRM) return { kind: "archive" };
 
@@ -649,6 +772,16 @@ export function productRequestFromParams(asked: {
     return { kind: "useCaseDetail", id: asked.scenario };
   }
 
+  if (asked.mesure !== undefined) {
+    return asked.mesure === TRACKING_PANEL_NEW
+      ? { kind: "tracking" }
+      : { kind: "tracking", id: asked.mesure };
+  }
+
+  /* `plan` suit `vision` et non `mesure` : une seule valeur d'ouverture, parce
+     que l'objet visé est celui de la page. Toute autre valeur n'ouvre rien. */
+  if (asked.plan === TAGGING_PANEL_EDIT) return { kind: "taggingPlan" };
+
   return null;
 }
 
@@ -670,4 +803,6 @@ export const PRODUCT_PANEL_PARAMS = [
   PERSONA_DETAIL_PARAM,
   USE_CASE_PANEL_PARAM,
   USE_CASE_DETAIL_PARAM,
+  TRACKING_PANEL_PARAM,
+  TAGGING_PANEL_PARAM,
 ] as const;

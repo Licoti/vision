@@ -90,7 +90,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { archiveIndicator, setNorthStar } from "./actions";
+import {
+  archiveIndicator,
+  archiveTaggingPlan,
+  archiveTracking,
+  setNorthStar,
+} from "./actions";
 import { restoreProduct } from "../actions";
 import { Audience } from "@/components/products/audience";
 import { Indicators } from "@/components/products/indicators";
@@ -114,6 +119,11 @@ import {
 } from "@/lib/drawers/product";
 import { formatAccompaniments, formatCoverage } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
+import {
+  findProductTaggingPlan,
+  listAnalyticsTools,
+  listProductTrackings,
+} from "@/lib/queries/measurement";
 import {
   listProductAdoptions,
   listProductIndicators,
@@ -177,6 +187,18 @@ export default async function ProductPage({
      * tiennent déjà.
      */
     scenario?: string;
+    /**
+     * Le panneau d'un **outil de mesure** (01/09/2026). Une seule clé, dont la
+     * **valeur** porte le cas — la forme d'`indicateur` : `nouvel` ouvre le
+     * panneau vide, un identifiant l'ouvre sur la ligne à corriger.
+     */
+    mesure?: string;
+    /**
+     * Le panneau du **plan de taggage** (01/09/2026). **Une seule valeur
+     * d'ouverture, `modifier`** : l'objet visé est le produit de la page, et un
+     * produit n'a qu'un plan vivant — la forme de `vision`, pour la même raison.
+     */
+    plan?: string;
   }>;
 }) {
   const { id } = await params;
@@ -209,6 +231,8 @@ export default async function ProductPage({
     adoptions,
     productPersonas,
     productUseCases,
+    trackings,
+    taggingPlan,
   ] = await Promise.all([
     listProductProjects(session.db, product.id),
     listProductIndicators(session.db, product.id),
@@ -217,6 +241,13 @@ export default async function ProductPage({
     listProductAdoptions(session.db, product.id),
     listProductPersonas(session.db, product.id),
     listProductUseCases(session.db, product.id),
+    /* **Deux lectures pour le dispositif de mesure** (01/09/2026), dans le même
+       `Promise.all` que les sept autres : elles partent ensemble, et le rang ne
+       coûte donc pas un aller-retour de plus. Le référentiel des outils, lui,
+       n'est **pas** ici — il ne sert qu'au panneau de saisie, et se lit plus bas
+       seulement quand l'URL l'ouvre. */
+    listProductTrackings(session.db, product.id),
+    findProductTaggingPlan(session.db, product.id),
   ]);
 
   const archived = product.archivedAt !== null;
@@ -260,6 +291,8 @@ export default async function ProductPage({
     fiche,
     usecase,
     scenario,
+    mesure,
+    plan,
   } = await searchParams;
 
   /* **L'URL reste une adresse, elle n'est plus le mécanisme** (TD.2). Coller
@@ -286,12 +319,23 @@ export default async function ProductPage({
     fiche,
     usecase,
     scenario,
+    mesure,
+    plan,
   };
   const conflict =
     Object.values(keys).filter((value) => value !== undefined).length > 1;
   const asked: Partial<typeof keys> = conflict ? {} : keys;
 
   const request = productRequestFromParams(asked);
+
+  /* **La seule lecture que ce chemin paie**, et elle est conditionnée (01/09/2026).
+     Le panneau d'un outil propose le référentiel « Analytics » ; la page, elle,
+     ne le lit jamais pour son écran — le rang affiche le nom porté par chaque
+     ligne déclarée, pas le référentiel entier. La lecture n'a donc lieu que
+     lorsque l'URL ouvre ce panneau-là, et jamais autrement : c'est la
+     discipline de `loadProductDrawerContext`, appliquée au chemin serveur. */
+  const panelTools =
+    request?.kind === "tracking" ? await listAnalyticsTools(session.db) : [];
 
   /* Les collections que la page a **déjà lues** pour son écran : la résolution
      n'en relit aucune. C'est `loadProductDrawerContext` qui paie une lecture,
@@ -306,6 +350,7 @@ export default async function ProductPage({
           readings: productReadings,
           personas: productPersonas,
           useCases: productUseCases,
+          tools: panelTools,
         },
         request,
       )
@@ -457,6 +502,41 @@ export default async function ProductPage({
           }
           setNorthStar={
             canWriteIndicators ? setNorthStar.bind(null, product.id) : null
+          }
+          /* **Le dispositif de mesure** (01/09/2026), second rang de ce bloc.
+             Il tombe avec le **même** `canWriteIndicators` que les indicateurs :
+             le droit dérivé des accompagnements (arbitrage (b) de
+             `tickets-C5.md`, étendu en session), et la lecture seule d'un
+             produit archivé. Aucune condition neuve ne s'écrit ici — c'est la
+             propriété que ce `&&` cherchait, éprouvée une fois de plus.
+
+             Ce n'est pas ce rendu qui protège : les cinq actions redérivent le
+             droit sur l'identifiant reçu, par `openProductWrite`. */
+          trackings={trackings}
+          taggingPlan={taggingPlan}
+          addTrackingHref={
+            canWriteIndicators ? ROUTES.productTrackingNew(product.id) : null
+          }
+          editTrackingHref={
+            canWriteIndicators
+              ? (trackingId) =>
+                  ROUTES.productTrackingEdit(product.id, trackingId)
+              : null
+          }
+          archiveTracking={
+            canWriteIndicators ? archiveTracking.bind(null, product.id) : null
+          }
+          taggingPlanHref={
+            canWriteIndicators ? ROUTES.productTaggingPlan(product.id) : null
+          }
+          /* **Rendu seulement quand le plan existe** — le composant range le
+             geste dans le menu de la ligne du plan, et il n'y a pas de ligne
+             sans plan. Le conditionner ici évite de lier une action à un produit
+             pour un menu que personne n'atteindra. */
+          archiveTaggingPlan={
+            canWriteIndicators && taggingPlan
+              ? archiveTaggingPlan.bind(null, product.id)
+              : null
           }
         />
         {/* **Le troisième bloc de la page** — le deuxième jusqu'à ce que

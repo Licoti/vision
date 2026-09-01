@@ -93,9 +93,11 @@ import {
   indicators,
   personaTraits,
   personas,
+  productTrackings,
   products,
   projectIndicators,
   projects,
+  taggingPlans,
   useCasePersonas,
   useCases,
 } from "@/lib/db/schema";
@@ -117,12 +119,23 @@ import {
   type ReadingFormState,
 } from "@/lib/forms/reading";
 import {
+  parseTaggingPlanForm,
+  readTaggingPlanForm,
+  type TaggingPlanFormState,
+} from "@/lib/forms/tagging-plan";
+import {
+  parseTrackingForm,
+  readTrackingForm,
+  type TrackingFormState,
+} from "@/lib/forms/tracking";
+import {
   parseUseCaseForm,
   readUseCaseForm,
   type UseCaseFormState,
 } from "@/lib/forms/use-case";
 import { objectPhrase } from "@/lib/journal";
 import { ROUTES } from "@/lib/navigation";
+import { findProductTaggingPlan } from "@/lib/queries/measurement";
 import { listProductPersonas } from "@/lib/queries/personas";
 
 /**
@@ -1440,4 +1453,317 @@ export async function archiveUseCase(
   await session.db.archive(useCases, useCaseId);
 
   revalidatePath(ROUTES.product(productId));
+}
+
+/* ==========================================================================
+   Le dispositif de mesure — les outils, et le plan de taggage
+   ==========================================================================
+
+   **Le même droit que les indicateurs, et le même garde.** `openProductWrite`
+   n'a pas été touché : responsable de domaine, ou contributeur désigné d'au
+   moins un accompagnement de ce produit (arbitrage (b) de `tickets-C5.md`,
+   étendu ici en session du 01/09/2026). La conséquence est assumée et
+   consignée : un Web Analyst qui maintient la mesure sans avoir été désigné sur
+   un accompagnement ne peut pas écrire. Un droit dérivé du **métier** est un
+   concept que Vision n'a pas, et l'inventer pour deux tables aurait été un
+   quatrième droit d'écriture sur le même produit.
+
+   **Aucune ligne de journal** — le précédent des indicateurs, qui n'ont pas de
+   `JournalKind`, et du budget, arbitrage (d) de T7.1. `events` ne gagne ni
+   verbe ni cible : ce sont des données de référence du produit, pas des faits
+   d'accompagnement. */
+
+function trackingRefusal(
+  formData: FormData,
+  message: string,
+): TrackingFormState {
+  return { values: readTrackingForm(formData), errors: {}, message };
+}
+
+function trackingScopeRefusal(
+  error: unknown,
+  formData: FormData,
+): TrackingFormState {
+  if (error instanceof DomainScopeError) {
+    return trackingRefusal(
+      formData,
+      "Une référence de ce formulaire n'appartient pas au domaine : la saisie n'a pas été enregistrée.",
+    );
+  }
+  throw error;
+}
+
+function planRefusal(
+  formData: FormData,
+  message: string,
+): TaggingPlanFormState {
+  return { values: readTaggingPlanForm(formData), errors: {}, message };
+}
+
+function planScopeRefusal(
+  error: unknown,
+  formData: FormData,
+): TaggingPlanFormState {
+  if (error instanceof DomainScopeError) {
+    return planRefusal(
+      formData,
+      "Une référence de ce formulaire n'appartient pas au domaine : la saisie n'a pas été enregistrée.",
+    );
+  }
+  throw error;
+}
+
+const TOOL_TAKEN =
+  "Cet outil est déjà déclaré sur ce produit. Corrigez la ligne existante plutôt que d'en ajouter une seconde.";
+
+/**
+ * Les outils **déjà déclarés vivants** sur ce produit — le contrôle d'unicité,
+ * lu avant d'écrire.
+ *
+ * **Le patron de `checkResultActivity` (T4.4, relu en T4bis.6), et sa leçon la
+ * plus fine** : le défaut de `list` exclut les lignes archivées, et
+ * `product_trackings_tool_unique` est un index **partiel** sur les vivants. Les
+ * deux disent donc exactement la même chose — un outil retiré ne bloque pas sa
+ * redéclaration, ni à l'écran ni en base. Le jour où l'un des deux changerait
+ * sans l'autre, c'est cette phrase-là qu'il faudrait relire.
+ *
+ * **Ce contrôle n'est pas la garantie**, il en est la traduction lisible :
+ * l'index reste seul juge, et deux saisies simultanées le rencontreraient. Le
+ * dépôt accepte cette non-atomicité depuis T2.6, faute de transaction dans la
+ * couche d'accès ; ce qui est en jeu ici est un message de champ plutôt qu'une
+ * page d'erreur, pas l'intégrité.
+ */
+async function declaredTools(
+  session: Session,
+  productId: string,
+  except?: string,
+): Promise<Set<string>> {
+  const rows = await session.db.list(productTrackings, {
+    where: eq(productTrackings.productId, productId),
+  });
+  return new Set(
+    rows.filter((row) => row.id !== except).map((row) => row.toolId),
+  );
+}
+
+/**
+ * Le garde d'un outil déjà déclaré — le jumeau d'`openIndicator`.
+ *
+ * Il redérive le droit sur l'identifiant **reçu**, et vérifie que la ligne
+ * appartient bien à ce produit-ci : un identifiant valide du bon domaine mais
+ * d'un autre produit ne doit pas s'écrire depuis cette page.
+ */
+async function openTracking(
+  session: Session,
+  productId: string,
+  trackingId: string,
+  refused: string,
+): Promise<
+  | { product: Row<typeof products>; tracking: Row<typeof productTrackings> }
+  | { message: string }
+> {
+  const gate = await openProductWrite(session, productId, refused);
+  if ("message" in gate) return gate;
+
+  const tracking = await session.db.find(productTrackings, trackingId);
+  if (
+    !tracking ||
+    tracking.productId !== productId ||
+    tracking.archivedAt !== null
+  ) {
+    return { message: "Cet outil de mesure n'existe plus sur ce produit." };
+  }
+
+  return { product: gate.product, tracking };
+}
+
+export async function createTracking(
+  productId: string,
+  _previous: TrackingFormState,
+  formData: FormData,
+): Promise<TrackingFormState> {
+  const session = await requireSession();
+
+  const gate = await openProductWrite(
+    session,
+    productId,
+    "La saisie d'un outil de mesure est réservée au responsable de domaine et aux contributeurs désignés d'un accompagnement de ce produit.",
+  );
+  if ("message" in gate) return trackingRefusal(formData, gate.message);
+
+  const { values, errors, input } = parseTrackingForm(formData);
+  if (!input) return { values, errors };
+
+  const taken = await declaredTools(session, productId);
+  if (taken.has(input.toolId)) return { values, errors: { toolId: TOOL_TAKEN } };
+
+  try {
+    await session.db.insert(productTrackings, { productId, ...input });
+  } catch (error) {
+    return trackingScopeRefusal(error, formData);
+  }
+
+  /* **Cette page-là, et elle seule.** La liste des produits n'affiche aucun
+     outil de mesure — elle ne porte que le plan de taggage. La leçon de T4.2 :
+     revalider davantage ferait croire qu'un outil touche à la liste. */
+  revalidatePath(ROUTES.product(productId));
+
+  return { values, errors: {}, ok: true };
+}
+
+export async function updateTracking(
+  productId: string,
+  trackingId: string,
+  _previous: TrackingFormState,
+  formData: FormData,
+): Promise<TrackingFormState> {
+  const session = await requireSession();
+
+  const gate = await openTracking(
+    session,
+    productId,
+    trackingId,
+    "La modification d'un outil de mesure est réservée au responsable de domaine et aux contributeurs désignés d'un accompagnement de ce produit.",
+  );
+  if ("message" in gate) return trackingRefusal(formData, gate.message);
+
+  const { values, errors, input } = parseTrackingForm(formData);
+  if (!input) return { values, errors };
+
+  /* **La ligne courante est exceptée**, et c'est tout ce qui distingue ce
+     contrôle du précédent : corriger le périmètre d'un outil sans changer
+     l'outil ne doit pas se heurter à sa propre déclaration. */
+  const taken = await declaredTools(session, productId, trackingId);
+  if (taken.has(input.toolId)) return { values, errors: { toolId: TOOL_TAKEN } };
+
+  try {
+    const updated = await session.db.update(
+      productTrackings,
+      trackingId,
+      input,
+    );
+    if (!updated) {
+      return trackingRefusal(
+        formData,
+        "Cet outil de mesure n'existe plus sur ce produit.",
+      );
+    }
+  } catch (error) {
+    return trackingScopeRefusal(error, formData);
+  }
+
+  revalidatePath(ROUTES.product(productId));
+
+  return { values, errors: {}, ok: true };
+}
+
+/**
+ * Retirer un outil du dispositif — un archivage, jamais une suppression
+ * (règle 4).
+ *
+ * La ligne retirée libère la place que tenait l'unicité partielle : redéclarer
+ * le même outil ensuite est un chemin réel, et c'est ce que l'index `where
+ * archived_at is null` garantit.
+ */
+export async function archiveTracking(
+  productId: string,
+  trackingId: string,
+): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openTracking(
+    session,
+    productId,
+    trackingId,
+    // Jamais rendu : ce geste n'affiche aucun refus.
+    "Le retrait d'un outil de mesure est réservé au responsable de domaine et aux contributeurs désignés d'un accompagnement de ce produit.",
+  );
+  if ("message" in gate) return;
+
+  await session.db.archive(productTrackings, trackingId);
+
+  revalidatePath(ROUTES.product(productId));
+}
+
+/**
+ * **Un seul geste pour renseigner et pour corriger.**
+ *
+ * C'est ce que dit `tagging_plans_product_unique` : un produit a au plus un plan
+ * vivant, donc « en ajouter un » et « corriger celui-là » sont la même écriture
+ * vue à deux moments. Deux actions auraient demandé à l'écran de savoir lequel
+ * appeler, c'est-à-dire de relire l'état juste avant le clic — et de se tromper
+ * dès que deux personnes saisissent en même temps.
+ *
+ * La lecture qui décide est faite **ici**, après la garde et dans la même
+ * requête scopée : `findProductTaggingPlan` rend le plan vivant ou `null`.
+ */
+export async function saveTaggingPlan(
+  productId: string,
+  _previous: TaggingPlanFormState,
+  formData: FormData,
+): Promise<TaggingPlanFormState> {
+  const session = await requireSession();
+
+  const gate = await openProductWrite(
+    session,
+    productId,
+    "La saisie du plan de taggage est réservée au responsable de domaine et aux contributeurs désignés d'un accompagnement de ce produit.",
+  );
+  if ("message" in gate) return planRefusal(formData, gate.message);
+
+  const { values, errors, input } = parseTaggingPlanForm(formData);
+  if (!input) return { values, errors };
+
+  const existing = await findProductTaggingPlan(session.db, productId);
+
+  try {
+    if (existing) {
+      const updated = await session.db.update(
+        taggingPlans,
+        existing.id,
+        input,
+      );
+      if (!updated) {
+        return planRefusal(
+          formData,
+          "Ce plan de taggage n'existe plus sur ce produit.",
+        );
+      }
+    } else {
+      await session.db.insert(taggingPlans, { productId, ...input });
+    }
+  } catch (error) {
+    return planScopeRefusal(error, formData);
+  }
+
+  revalidatePath(ROUTES.product(productId));
+  /* **L'exception à « cette page-là, et elle seule ».** Le plan de taggage est
+     la seule donnée de ce fichier qu'un **autre écran** affiche : la cinquième
+     colonne de la liste des produits. Sans cette seconde revalidation, la liste
+     garderait « Aucun plan déclaré » après une saisie réussie — le défaut exact
+     que la leçon de T4.2 demande de peser dans les deux sens. */
+  revalidatePath(ROUTES.products);
+
+  return { values, errors: {}, ok: true };
+}
+
+/** Retirer le plan — archivage, comme partout (règle 4). */
+export async function archiveTaggingPlan(productId: string): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openProductWrite(
+    session,
+    productId,
+    // Jamais rendu : ce geste n'affiche aucun refus.
+    "Le retrait du plan de taggage est réservé au responsable de domaine et aux contributeurs désignés d'un accompagnement de ce produit.",
+  );
+  if ("message" in gate) return;
+
+  const existing = await findProductTaggingPlan(session.db, productId);
+  if (!existing) return;
+
+  await session.db.archive(taggingPlans, existing.id);
+
+  revalidatePath(ROUTES.product(productId));
+  revalidatePath(ROUTES.products);
 }

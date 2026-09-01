@@ -26,10 +26,12 @@ import {
   projectStatusNature,
   projectStatuses,
   projects,
+  taggingPlans,
 } from "@/lib/db/schema";
+import type { TaggingPlanStatus } from "@/lib/queries/measurement";
 import { projectPeriods } from "@/lib/queries/project-period";
 
-/** Une ligne de la liste : les quatre colonnes du ticket, et de quoi lier. */
+/** Une ligne de la liste : les cinq colonnes de l'écran, et de quoi lier. */
 export type ProductRow = {
   id: string;
   name: string;
@@ -39,6 +41,18 @@ export type ProductRow = {
   projectCount: number;
   /** La plus récente des fraîcheurs de ses projets. Nulle si rien n'a bougé. */
   lastActivityAt: Date | null;
+  /**
+   * L'état **déclaré** du plan de taggage, ou `null` quand aucun plan n'est
+   * déclaré (01/09/2026).
+   *
+   * **`null` n'est pas un cinquième état**, c'est l'absence d'état : la
+   * différence est celle entre « personne ne l'a écrit » et « quelqu'un a écrit
+   * qu'il n'y en a pas », et seule la première se produit ici. L'écran l'écrit
+   * en toutes lettres plutôt que de laisser une cellule vide.
+   */
+  taggingPlanStatus: TaggingPlanStatus | null;
+  /** La date du **document**, `YYYY-MM-DD`. Nulle avec l'état, jamais sans lui. */
+  taggingPlanUpdatedOn: string | null;
 };
 
 /**
@@ -64,6 +78,8 @@ export function listProductsWithCounts(
         entityLabel: entities.label,
         projectCount: sql<number>`count(${projects.id})::int`,
         lastActivityAt: sql<Date | null>`max(${projects.lastActivityAt})`,
+        taggingPlanStatus: taggingPlans.status,
+        taggingPlanUpdatedOn: taggingPlans.updatedOn,
       })
       .from(products)
       .innerJoin(
@@ -78,6 +94,25 @@ export function listProductsWithCounts(
           isNull(projects.archivedAt),
         ),
       )
+      /* **Le plan de taggage, sans requête de plus** (01/09/2026) : la liste en
+         faisait déjà une, et le plan y entre par une jointure gauche plutôt que
+         par une seconde lecture. Gauche, parce qu'un produit sans plan est un
+         produit normal — un `innerJoin` ferait disparaître de la liste ceux que
+         le Web Analyst cherche précisément.
+
+         **Une seule ligne peut répondre**, et c'est `tagging_plans_product_unique`
+         qui le garantit : sans cette unicité partielle, deux plans vivants
+         multiplieraient les lignes du produit et fausseraient le `count` des
+         accompagnements juste à côté. La jointure est donc sûre parce que la
+         base l'est, non parce qu'on l'espère. */
+      .leftJoin(
+        taggingPlans,
+        and(
+          eq(taggingPlans.productId, products.id),
+          filter(taggingPlans),
+          isNull(taggingPlans.archivedAt),
+        ),
+      )
       .where(
         and(
           filter(products),
@@ -85,7 +120,9 @@ export function listProductsWithCounts(
           ...(options.entityId ? [eq(products.entityId, options.entityId)] : []),
         ),
       )
-      .groupBy(products.id, entities.id)
+      /* `taggingPlans.id` rejoint le groupe : la clé primaire suffit à
+         PostgreSQL pour le statut et la date qui en dépendent. */
+      .groupBy(products.id, entities.id, taggingPlans.id)
       .orderBy(asc(products.name));
 
     return rows.map((row) => ({

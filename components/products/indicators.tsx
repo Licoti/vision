@@ -122,6 +122,7 @@ import {
   MENU_ITEM_DANGER,
 } from "@/components/ui/action-menu";
 import { Block, BlockHeader } from "@/components/ui/block";
+import { MeasurementRank } from "@/components/products/measurement";
 import { buttonClass } from "@/components/ui/button";
 import { BlockNote } from "@/components/ui/empty-state";
 import { Tag } from "@/components/ui/tag";
@@ -133,6 +134,10 @@ import {
   formatReadings,
   formatResultValue,
 } from "@/lib/format";
+import type {
+  ProductTaggingPlan,
+  ProductTracking,
+} from "@/lib/queries/measurement";
 import {
   axisScale,
   curvePath,
@@ -232,6 +237,13 @@ export function Indicators({
   addReadingHref,
   readingsHref,
   setNorthStar,
+  trackings,
+  taggingPlan,
+  addTrackingHref,
+  editTrackingHref,
+  archiveTracking,
+  taggingPlanHref,
+  archiveTaggingPlan,
 }: {
   /**
    * La raison d'être du produit, telle qu'elle est écrite. `null` quand elle ne
@@ -256,6 +268,17 @@ export function Indicators({
   readingsHref: ((indicatorId: string) => string) | null;
   /** `null` sur un indicateur désigne « aucune North Star ». */
   setNorthStar: ((indicatorId: string | null) => Promise<void>) | null;
+  /* --- Le dispositif de mesure (01/09/2026), rang du second bloc ---------- */
+  /** Les outils vivants du produit, déjà triés par la requête. */
+  trackings: readonly ProductTracking[];
+  /** `null` est un état normal, pas un manque (règle 5). */
+  taggingPlan: ProductTaggingPlan | null;
+  addTrackingHref: string | null;
+  editTrackingHref: ((trackingId: string) => string) | null;
+  archiveTracking: ((trackingId: string) => Promise<void>) | null;
+  /** Une seule adresse pour les deux gestes : le plan est unique par produit. */
+  taggingPlanHref: string | null;
+  archiveTaggingPlan: (() => Promise<void>) | null;
 }) {
   const series = groupByIndicator(readings);
 
@@ -513,7 +536,13 @@ export function Indicators({
       <Block>
         <BlockHeader
           title="Indicateurs"
-          note="Ce que ce produit mesure, en plus de sa North Star. Chaque valeur est reportée d'un outil externe, avec sa date."
+          /* **La note s'élargit le 01/09/2026**, et c'est la seule retouche de
+             cet en-tête. Le bloc a gagné un second rang — le dispositif qui
+             collecte ces valeurs —, et un bloc nommé d'après une seule de ses
+             deux moitiés se lit mal. Le titre, lui, ne bouge pas : les
+             indicateurs restent le sujet, le dispositif répond à la question
+             qu'ils font naître. */
+          note="Ce que ce produit mesure, en plus de sa North Star — et le dispositif qui collecte ces valeurs. Chaque valeur est reportée d'un outil externe, avec sa date."
           /* **Le geste sort de la grille** : il y vivait en carte pointillée,
              ce qui en faisait un dessin de plus pour un geste que les deux
              autres blocs de la page portent en bouton d'en-tête. Un rang, une
@@ -561,6 +590,22 @@ export function Indicators({
               : "Aucun indicateur pour l'instant. Ce bloc réunira ce que ce produit mesure — chaque valeur reportée d'un outil externe, avec sa date."}
           </BlockNote>
         )}
+
+        {/* **Le second rang du bloc** (01/09/2026). Il vient après la grille
+            parce que c'est l'ordre de la question : on lit ce que le produit
+            mesure, puis on demande d'où ces valeurs sortent. Le filet lui est
+            passé comme à tout `BlockDivider` — le bloc est de tonalité neutre,
+            son filet est donc celui de la surface pâle. */}
+        <MeasurementRank
+          trackings={trackings}
+          plan={taggingPlan}
+          addTrackingHref={addTrackingHref}
+          editTrackingHref={editTrackingHref}
+          archiveTracking={archiveTracking}
+          planHref={taggingPlanHref}
+          archivePlan={archiveTaggingPlan}
+          rule="bg-surface-neutral-lighter"
+        />
       </Block>
     </>
   );

@@ -8976,3 +8976,74 @@ impose de mesurer que son `<form>` servi reste identique à l'octet — le geste
 `border-content-neutral-normal.*px-4.*py-2` hors du socle — c'est la signature d'un bouton
 secondaire, et la carte y ressemblerait d'une valeur près.
 
+
+---
+
+## Le dispositif de mesure — hors ticket, 01/09/2026
+
+### Écart documentaire : deux concepts absents de `docs/02` et `docs/04`
+
+`product_trackings` et `tagging_plans` **ne sont nommés nulle part dans les fondations**. `docs/04`
+§2 pose bien le genre `analytics` sur `tools`, mais comme un **outil raccordable**, jamais comme un
+dispositif rattaché à un produit ; `docs/02` ne connaît ni le tracking ni le plan de taggage.
+
+C'est le cinquième écart de cette famille, après `products.vision`, `indicators.is_north_star`,
+`personas` et `use_cases` : la règle 6 demande de le consigner, pas de le discuter. Il est consigné.
+`docs/` reste figé.
+
+### Écart documentaire : `formatDay` avait une borne fausse
+
+Le commentaire disait « la **seule** entorse au mois, pour la **seule** date de mesure d'un
+résultat ». Deux appelants de plus — le constat sur un outil, la mise à jour d'un plan — l'auraient
+rendu faux au moment même où le code le contredisait.
+
+La borne a changé de **nature** plutôt que de compteur : le formateur sert les faits datés
+**ponctuels**, un instant et jamais une durée, et le critère est écrit pour le prochain qui
+hésitera. `formatEventDay` a suivi d'une phrase. Un commentaire qui compte ses appelants se périme
+au troisième ; un commentaire qui énonce un critère ne se périme pas.
+
+### Dette assumée : `TonePill` et `StatusPill` partagent une forme, pas une signature
+
+`socleLock` garde le motif `rounded-full · px-3 · py-0.5 · font-semibold` hors de `components/ui/`.
+Les états du dispositif ne sont pas des natures d'accompagnement, et la table de tons a donc été
+extraite plutôt que dupliquée : `StatusPill` garde sa signature et dérive son ton, `TonePill` reçoit
+le sien. **Aucun des cinq appelants existants n'a bougé.**
+
+Ce que cela laisse ouvert : deux composants exportés pour une seule chaîne de classes. C'est
+délibéré — un `StatusPill` qui prendrait un ton aurait obligé chaque appelant à traduire sa nature
+lui-même, c'est-à-dire à disperser `NATURE_TONE` en cinq copies. Si un troisième vocabulaire d'état
+apparaît, c'est ce fichier qu'il faudra relire, pas un de plus.
+
+### Arbitrage : aucune ligne de journal
+
+`events` ne gagne ni verbe ni cible. Le précédent est double — les indicateurs n'ont pas de
+`JournalKind` depuis T5.1, et le budget n'en a pas non plus (arbitrage (d) de T7.1) : ce sont des
+**données de référence du produit**, pas des faits d'accompagnement. Le point ouvert des « sept
+objets non journalisés » promis à C8 en compte désormais neuf.
+
+### Exception justifiée : `revalidatePath(ROUTES.products)`
+
+Les actions de ce fichier revalident « cette page-là, et elle seule » — la leçon de T4.2. Le plan de
+taggage est la **seule** donnée de `produits/[id]/actions.ts` qu'un autre écran affiche : la
+cinquième colonne de la liste. Sans cette seconde revalidation, la liste garderait « Aucun plan
+déclaré » après une saisie réussie. Les gestes du dispositif de mesure, eux, ne revalident que la
+page produit — la liste ne porte aucun outil.
+
+### Piège d'outillage : le nettoyage d'un fichier de tests fait tomber le suivant
+
+`actions.test.ts` a gagné `tools` dans sa fixture sans que sa liste de nettoyage la connaisse. La clé
+`tools_domain_id_domains_id_fk` est en `RESTRICT` : la suppression du domaine échoue, le domaine
+résiduel reste, et le fichier **suivant** tombe par la résolution « premier domaine actif par nom ».
+
+**La panne se lit alors sur des tests antérieurs au ticket**, ce qui envoie chercher une régression
+là où il n'y en a pas. Le symptôme est reconnaissable : une dizaine de tests d'un fichier qu'on n'a
+pas touché s'effondrent ensemble. Le remède est un script de balayage des domaines `__test__%`, et la
+règle est celle que le fichier écrivait déjà — enfants d'abord, parents ensuite —, étendue à toute
+table qu'une fixture fait entrer.
+
+### Piège de test : `list` ne promet aucun ordre
+
+Deux tests d'action prenaient `[0]` d'un `list` pour désigner une ligne parmi deux, et passaient ou
+tombaient selon ce que la base rendait ce jour-là. Ils désignent désormais la ligne **par son
+outil**. Le même piège attend tout test qui enchaîne des gestes sur une collection sans clé de
+lecture stable.

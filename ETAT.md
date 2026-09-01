@@ -2,13 +2,17 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 31/08/2026, après le mode de planification d'une activité.
+**Dernière mise à jour :** 01/09/2026, après le dispositif de mesure.
 Dernier balayage : découpage de C7. **Le fichier dépasse les 250 lignes de la règle 5 — 553 au
-31/08/2026, 642 après le mode de planification** ; le balayage appartient à la session de
-découpage de C8.
+31/08/2026, 642 après le mode de planification, 660 après le dispositif de mesure** ; le balayage
+appartient à la session de découpage de C8.
 **Chantier en cours :** **C7 — Finitions**, dix tickets, découpés dans `tickets-C7.md`. **Dernier
 chantier du POC** — `docs/05` §5 n'en a pas de huitième.
 **Ticket suivant :** **T7.7 — Accessibilité : clavier, focus, contraste, titres.**
+**À vérifier par l'humain :** `npm run db:migrate` a tourné sur la base de développement le
+01/09/2026 pour appliquer la `0013`, et a **rattrapé au passage la `0010` et la `0012`** — dont la
+seconde est destructive. Le point ouvert qui les attendait est refermé, sa condition de perte étant
+réputée vide (`HISTORIQUE-TICKETS.md`). Le geste n'avait pas été redemandé.
 
 ---
 
@@ -295,6 +299,22 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   trouvé par l'une d'elles**. Droit frappé en HTTP sans JavaScript **trois fois**, `updated_at` en
   étape témoin ; six couples mesurés, aucune teinte de sélection. **25 tests neufs** (1 409 → 1 434),
   dont le premier `describe` de `formatActivityPeriod`.
+- **Le dispositif de mesure — hors ticket, 01/09/2026.** Demande de l'humain, précédée d'une session
+  de design : les Web Analysts ne pouvaient savoir quels produits portent un tracking ni un plan de
+  taggage sans ouvrir chaque fiche. **Deux tables neuves** — `product_trackings`, `tagging_plans` —,
+  migration `0013` additive, et **pas une colonne touchée sur les tables existantes** : le
+  `short_label` de `tools` a été retiré de la proposition avec la colonne « Outils » de la liste,
+  faute de lecteur. **Aucun bloc de plus** : le dispositif entre en **rang nommé** au pied du bloc
+  « Indicateurs », qui était plat, et l'architecture d'information tient en trois tailles distinctes
+  — 20 px le bloc, 12 px capitales le rang, 10 px capitales les légendes. Seule la **note** du bloc
+  s'élargit ; son en-tête, son bouton et sa grille ne bougent pas. **Une seule colonne** sur la liste
+  des produits, « Plan de taggage », et **aucun filtre** — l'arbitrage de la session. **Tous les
+  états sont déclarés, aucun n'est calculé** : c'est ce qui rend « À revoir » compatible avec les
+  interdits d'interface, là où un écart de dates aurait produit un badge de retard. Deux clés d'URL
+  de plus (dix et onze), **décompte d'exclusivité inchangé pour la huitième fois**. Le socle gagne
+  `TonePill` et un ton `warning` — 7,64:1 mesuré —, et `BlockDivider` un `action`. **Quatorze
+  neutralisations, quatorze chutes exactes** ; droit éprouvé par les cinq actions, sur un membre non
+  contributeur et sur un produit archivé. **90 tests neufs** (1 434 → 1 524).
 
 ---
 
@@ -312,13 +332,6 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   dans l'URL**. `docs/05` §5 s'arrête à sept chantiers : **C8 est hors POC et reste entièrement à
   découper.** → **session de découpage de C8.**
 
-- **La base de développement doit deux migrations : `0010` et `0012`.** Toutes deux sont appliquées
-  à la branche de test ; la commande a été refusée à l'agent sur la base de développement. Sans
-  conséquence d'exécution — plus rien n'écrit `persons.availability` ni `projects.started_on` /
-  `expected_end_on`, et les colonnes survivantes sont nullables ou acceptent le `null` —, mais schéma
-  et base divergent tant que `npm run db:migrate` n'a pas tourné. **La `0012` est destructive** :
-  elle emporte la période saisie des accompagnements **dont aucune activité ne porte de date**, et
-  aucun des sept de cette base n'est dans ce cas. → **action humaine.**
 - **Les secrets Neon n'ont jamais été tournés.** Deux chaînes ont transité en clair le 12/08/2026.
   Hors dépôt — `.env.local` seul —, mais valides. **Reportées deux fois** : au découpage de C6, puis
   à celui de C7, qui n'en dépendaient ni l'un ni l'autre. → **action humaine.**

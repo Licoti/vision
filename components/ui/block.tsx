@@ -157,6 +157,7 @@ export function BlockDivider({
   title,
   note,
   rule,
+  action,
   as = "div",
 }: {
   /**
@@ -170,6 +171,22 @@ export function BlockDivider({
   note?: string;
   /** La classe de fond du filet, accordée à la tonalité du bloc. */
   rule: string;
+  /**
+   * Le geste du rang, **après le filet** (01/09/2026, rang « Dispositif de
+   * mesure »).
+   *
+   * Il est arrivé le jour où un rang a porté ses propres gestes plutôt que ceux
+   * de son bloc : deux objets — un outil de mesure, un plan de taggage — que le
+   * menu d'en-tête aurait mélangés aux indicateurs. **Après le filet et non
+   * avant**, à l'inverse de la note : la note qualifie le titre et le suit, le
+   * geste appartient au rang entier et se pose à son bout, là où le regard
+   * cherche déjà l'action d'un en-tête.
+   *
+   * **Jamais sur un `<summary>`** : un bouton dans un résumé cliquable ouvre le
+   * `<details>` en même temps qu'il agit. Rien ne l'interdit ici — c'est
+   * l'appelant qui ne doit pas les combiner, et aucun ne le fait.
+   */
+  action?: ReactNode;
   /** `summary` quand l'intertitre ouvre et referme le rang qu'il annonce. */
   as?: "div" | "summary";
 }) {
@@ -193,6 +210,7 @@ export function BlockDivider({
         <p className="text-xs text-content-neutral-dark">{note}</p>
       ) : null}
       <span aria-hidden="true" className={`h-px flex-1 ${rule}`} />
+      {action}
     </Wrapper>
   );
 }

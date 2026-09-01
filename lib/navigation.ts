@@ -306,6 +306,39 @@ export const USE_CASE_PANEL_NEW = "nouveau";
 export const USE_CASE_DETAIL_PARAM = "scenario";
 
 /**
+ * Le panneau d'un **outil de mesure** (01/09/2026), dixième clé d'ouverture de
+ * la page produit.
+ *
+ * **Une seule clé, dont la valeur porte le cas** — la forme d'`indicateur` :
+ * `nouvel` ouvre le panneau vide, un identifiant de ligne l'ouvre sur l'outil à
+ * corriger, tout le reste n'ouvre rien.
+ *
+ * **Le droit qui la garde est celui des indicateurs**, dérivé des
+ * accompagnements du produit (arbitrage (b) de `tickets-C5.md`, étendu au
+ * dispositif de mesure le 01/09/2026). Ce n'est pas cette route qui protège,
+ * mais les trois actions, qui redérivent le droit sur l'identifiant reçu.
+ */
+export const TRACKING_PANEL_PARAM = "mesure";
+
+/** La valeur d'ouverture du panneau vide. Un identifiant corrige. */
+export const TRACKING_PANEL_NEW = "nouvel";
+
+/**
+ * Le panneau du **plan de taggage** (01/09/2026), onzième et dernière clé
+ * d'ouverture de la page produit.
+ *
+ * **Une seule valeur d'ouverture**, comme `vision` et pour la même raison :
+ * l'objet visé est celui de la page, et un produit n'a qu'un plan vivant —
+ * l'unicité partielle `tagging_plans_product_unique` le garantit en base. La
+ * valeur n'a donc rien à désigner, et « renseigner » comme « corriger »
+ * ouvrent la même adresse.
+ */
+export const TAGGING_PANEL_PARAM = "plan";
+
+/** La seule valeur d'ouverture. Toute autre n'ouvre rien. */
+export const TAGGING_PANEL_EDIT = "modifier";
+
+/**
  * Le panneau de la **fiche d'une personne** (T5bis.4), seule clé d'ouverture de
  * la page Équipe — et la première d'une page qui n'a pas d'objet à elle.
  *
@@ -757,6 +790,24 @@ export const ROUTES = {
    * demande aucun droit : c'est le détail que la carte résume, et il se lit par
    * tout le domaine (D9). Les gestes *dans* la fiche tombent avec le droit.
    */
+  /**
+   * La page du produit, panneau d'un outil de mesure ouvert sur le vide. Même
+   * mécanique que `productIndicatorNew` jusqu'au nom de la clé.
+   */
+  productTrackingNew: (id: string) =>
+    `/produits/${id}?${TRACKING_PANEL_PARAM}=${TRACKING_PANEL_NEW}`,
+  /**
+   * Le même panneau, ouvert sur un outil déjà déclaré : la valeur porte le cas.
+   */
+  productTrackingEdit: (id: string, trackingId: string) =>
+    `/produits/${id}?${TRACKING_PANEL_PARAM}=${trackingId}`,
+  /**
+   * La page du produit, panneau du plan de taggage. **Une seule entrée pour les
+   * deux gestes**, renseigner et corriger : c'est l'existence du plan qui décide
+   * de ce que le panneau annonce, jamais l'URL — la forme de `productVision`.
+   */
+  productTaggingPlan: (id: string) =>
+    `/produits/${id}?${TAGGING_PANEL_PARAM}=${TAGGING_PANEL_EDIT}`,
   productUseCase: (id: string, useCaseId: string) =>
     `/produits/${id}?${USE_CASE_DETAIL_PARAM}=${useCaseId}`,
   projects: "/projets",

@@ -50,7 +50,11 @@ export type ProductDrawerRequest =
   | { kind: "persona"; id?: string | undefined }
   | { kind: "personaDetail"; id: string }
   | { kind: "useCase"; id?: string | undefined }
-  | { kind: "useCaseDetail"; id: string };
+  | { kind: "useCaseDetail"; id: string }
+  /** `nouvel` ouvre le vide, un identifiant corrige — la forme d'`indicator`. */
+  | { kind: "tracking"; id?: string | undefined }
+  /** Sans identifiant : un produit n'a qu'un plan vivant. La forme de `vision`. */
+  | { kind: "taggingPlan" };
 
 /**
  * Les panneaux de la page projet, sur la même forme — **sans le compte**, et
@@ -224,6 +228,8 @@ const PRODUCT_KINDS = [
   "personaDetail",
   "useCase",
   "useCaseDetail",
+  "tracking",
+  "taggingPlan",
 ] as const;
 
 const PROJECT_KINDS = [

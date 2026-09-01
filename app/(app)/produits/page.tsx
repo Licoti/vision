@@ -29,7 +29,12 @@ import { List, ListHeader, ListRow } from "@/components/ui/list";
 import { Page, PageHeader } from "@/components/ui/page";
 import { requireSession } from "@/lib/auth/provider";
 import { entities } from "@/lib/db/schema";
-import { formatAccompaniments, formatMonth } from "@/lib/format";
+import {
+  formatAccompaniments,
+  formatDay,
+  formatMonth,
+  formatTaggingPlanStatus,
+} from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
 import {
   listProductEntities,
@@ -58,10 +63,23 @@ export const metadata = {
  *  carte, pas rétrécies. Le nom prend alors sa propre ligne (`w-full`), les
  *  trois autres se rangent à sa suite à la largeur de leur contenu. Aucune
  *  valeur n'est inventée : les mêmes nombres passent derrière un palier. */
+/**
+ * **Cinq colonnes depuis le 01/09/2026**, et une seule est neuve.
+ *
+ * « Plan de taggage » arrive pour les Web Analysts, qui n'avaient aucun moyen de
+ * savoir quels produits en portent un sans ouvrir chaque fiche. Les outils de
+ * mesure, eux, **restent sur la page produit** : une seconde colonne aurait
+ * porté la densité à six, et l'arbitrage de la session de design a tranché pour
+ * une.
+ *
+ * Les largeurs des colonnes existantes se resserrent d'un cran pour lui faire sa
+ * place — `entity` de 40 à 36, `count` de 52 à 44 —, et aucune ne disparaît.
+ */
 const COLUMN = {
   name: "w-full min-w-0 truncate xl:w-auto xl:flex-1",
-  entity: "flex-none truncate xl:w-40",
-  count: "flex-none whitespace-nowrap xl:w-52",
+  entity: "flex-none truncate xl:w-36",
+  count: "flex-none whitespace-nowrap xl:w-44",
+  plan: "flex-none xl:w-44",
   freshness: "flex-none text-right whitespace-nowrap xl:w-36",
 } as const;
 
@@ -105,6 +123,7 @@ export default async function ProductsPage({
             <span className={COLUMN.name}>Produit</span>
             <span className={COLUMN.entity}>Entité</span>
             <span className={COLUMN.count}>Accompagnements</span>
+            <span className={COLUMN.plan}>Plan de taggage</span>
             <span className={COLUMN.freshness}>Dernière activité</span>
           </ListHeader>
 
@@ -118,6 +137,36 @@ export default async function ProductsPage({
               <span className={COLUMN.entity}>{product.entityLabel}</span>
               <span className={COLUMN.count}>
                 {formatAccompaniments(product.projectCount)}
+              </span>
+              {/* **L'état déclaré, puis la date du document.** Deux faits sur
+                  deux lignes plutôt qu'un seul en une : « À revoir » sans date
+                  ne se juge pas, et une date sans état ne dit pas ce que
+                  quelqu'un en pense. Aucun des deux n'est calculé — ni ici, ni
+                  ailleurs : la règle du dispositif tient jusque dans cette
+                  cellule.
+
+                  L'en-tête de colonne est décoratif ; la cellule dit elle-même
+                  de quoi elle parle, comme « Dernière activité » à côté. */}
+              <span className={COLUMN.plan}>
+                <span className="sr-only">Plan de taggage : </span>
+                {product.taggingPlanStatus && product.taggingPlanUpdatedOn ? (
+                  <span className="flex flex-col">
+                    <span className="font-semibold text-content-neutral-dark">
+                      {formatTaggingPlanStatus(product.taggingPlanStatus)}
+                    </span>
+                    <span className="text-xs text-content-neutral-base">
+                      {formatDay(product.taggingPlanUpdatedOn)}
+                    </span>
+                  </span>
+                ) : (
+                  /* **« Aucun plan déclaré » et non une cellule vide** : la
+                     différence entre « personne ne l'a écrit » et « il n'y en a
+                     pas » ne se lit pas dans du blanc, et c'est précisément la
+                     ligne que le Web Analyst cherche. */
+                  <span className="text-content-neutral-base">
+                    Aucun plan déclaré
+                  </span>
+                )}
               </span>
               <span className={`${COLUMN.freshness} text-content-neutral-base`}>
                 {product.lastActivityAt ? (
@@ -153,7 +202,7 @@ export default async function ProductsPage({
       ) : (
         <EmptyState
           title="Aucun produit accompagné pour l'instant"
-          description="Cette liste réunira les objets sur lesquels le centre intervient — pas le catalogue de l'entreprise. Chaque produit y portera son entité, le nombre d'accompagnements qu'il a reçus et la date de sa dernière activité."
+          description="Cette liste réunira les objets sur lesquels le centre intervient — pas le catalogue de l'entreprise. Chaque produit y portera son entité, le nombre d'accompagnements qu'il a reçus, l'état de son plan de taggage et la date de sa dernière activité."
           {...(session.can.manageDomain
             ? { action: <NewProductLink /> }
             : {})}

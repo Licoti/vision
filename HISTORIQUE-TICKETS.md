@@ -5520,3 +5520,173 @@ La carte radio est désormais écrite **deux fois**, aux mêmes classes — « T
 l'extraire demande d'ouvrir `product-form.tsx`, hors périmètre. La constante vit en attendant dans
 `activity-panel.tsx` sous le nom `PLANNING_CARD`, avec la note de son origine.
 
+
+---
+
+## Le dispositif de mesure — hors ticket, 01/09/2026
+
+Demande de l'humain, précédée d'une **session de design** dont le canevas a servi de cadrage. Le
+besoin venait des Web Analysts du centre : la page produit disait *ce que le produit mesure* — North
+Star, indicateurs — mais jamais *avec quoi la donnée est collectée*, et la liste des produits ne
+disait rien du plan de taggage. Savoir quels produits portent un tracking demandait d'ouvrir chaque
+fiche, une par une.
+
+### Ce que la session de design a tranché avant d'écrire
+
+La première proposition portait un **quatrième bloc** sur la page produit, une colonne « Outils de
+mesure » **et** une colonne « Plan de taggage » sur la liste, plus deux rangées de filtres décomptés.
+L'humain l'a recadrée en deux phrases : le contenu entre dans le bloc « Indicateurs » existant, et la
+liste ne gagne **qu'une** colonne, sans filtre.
+
+Le recadrage a emporté davantage que ce qu'il retirait. `tools.short_label` — l'abréviation « GA4 »
+pour « Google Analytics 4 » — n'existait que pour tenir dans la colonne « Outils » ; cette colonne
+disparaissant, **plus personne n'aurait lu ce champ**, et il est sorti de la proposition. Le schéma
+s'est réduit à deux tables neuves, **sans une colonne touchée sur les tables existantes**.
+
+Deux arbitrages ont été demandés avant d'écrire une ligne :
+
+**Le droit d'écriture** — celui des indicateurs, `openProductWrite` réutilisé tel quel :
+`manageDomain`, ou contributeur désigné d'au moins un accompagnement du produit. La conséquence est
+assumée et consignée : un Web Analyst qui maintient la mesure sans avoir été désigné sur un
+accompagnement **ne peut pas écrire**. Un droit dérivé du **métier** est un concept que Vision n'a
+pas, et l'inventer pour deux tables aurait posé un quatrième droit d'écriture sur le même produit.
+
+**Le référentiel** — trois outils de plus au seed (GA4, Matomo, Clarity), sans quoi le panneau
+n'aurait eu qu'une option à proposer et la souplesse annoncée — « un outil de plus est une ligne » —
+ne se serait vue nulle part.
+
+### L'architecture d'information, qui était toute la difficulté
+
+Le bloc « Indicateurs » était **plat** : un en-tête, une grille de cartes, aucun rang intérieur. Y
+loger deux objets de plus sans le rendre illisible tenait à une seule décision — combien de niveaux,
+et lesquels.
+
+Trois, et trois tailles distinctes : **20 px gras** le bloc, **12 px capitales suivies d'un filet**
+le rang, **10 px capitales** les légendes. Le troisième niveau n'est pas un ornement : les outils et
+le plan sont deux objets différents, portés par deux tables et deux gestes, et les fondre en une
+liste unique aurait fait lire « Plan de taggage » comme le nom d'un outil.
+
+Ce qui n'a **pas** bougé mérite d'être écrit : l'en-tête du bloc, son bouton « Ajouter un
+indicateur », sa grille de cartes. Seule la **note** s'élargit — sans quoi le bloc serait nommé
+d'après une seule de ses deux moitiés.
+
+Les gestes vivent **sur le filet du rang**, pas dans le menu d'en-tête, qui aurait alors mélangé
+trois objets. `BlockDivider` a gagné un `action` pour cela ; c'est sa seule retouche depuis TD.
+
+### L'état déclaré, et pourquoi c'est le cœur
+
+La demande voulait « identifier les plans qui nécessitent une mise à jour ». Écrit en calcul — plus
+de douze mois depuis `updated_on` —, c'eût été un **badge de retard**, que les interdits d'interface
+refusent au même titre qu'un score ou une jauge.
+
+L'issue tient en un déplacement : c'est **une personne** qui pose « À revoir », comme elle pose le
+statut d'un accompagnement, et l'écran affiche ce constat avec sa date. Le besoin est servi, la règle
+tient, et rien dans le code ne compare une date à aujourd'hui. Deux tests gardent cette frontière
+plutôt que de la commenter : `validateTaggingPlanForm` accepte un plan de 2019 déclaré « à jour », et
+`findProductTaggingPlan` le rend sans le requalifier. Le jour où l'un des deux tomberait, c'est que
+l'interdit aurait cédé.
+
+`formatTaggingPlanStatus` porte la même discipline dans ses mots : « À revoir » et non « Obsolète »
+ni « En retard » — un test refuse la famille entière, comme celui qui garde `formatIndicatorDirection`
+de tout jugement.
+
+### Le schéma
+
+`product_trackings` — une ligne par outil posé sur un produit, et **c'est là qu'habite « plusieurs
+outils »** : rien ne les synthétise, et surtout pas l'écran, un « état global du tracking » déduit de
+deux lignes étant exactement l'indice calculé que les interdits refusent. `tagging_plans` — un plan
+par produit, `url` obligatoire (Vision ne stocke jamais de fichier), et `updated_on`, la date du
+**document**, à ne jamais confondre avec l'`updated_at` système de la ligne.
+
+**Deux unicités partielles**, toutes deux `where archived_at is null` : la leçon de
+`results_activity_unique` (T4bis.6) et d'`indicators_north_star_unique` (T5.1). Une ligne archivée
+qui occuperait la place ferait de « retirer puis redéclarer » une violation d'index, donc un 500 là
+où l'on attend un écran — or c'est précisément le chemin qu'ouvre la règle 4. Trois tests l'éprouvent,
+dont un par l'action.
+
+L'unicité se **lit avant d'écrire**, jamais en rattrapant l'erreur PostgreSQL : c'est le patron de
+`checkResultActivity`, et le défaut de `list` exclut les archivés exactement comme l'index partiel.
+Ce contrôle n'est pas la garantie, il en est la traduction lisible ; l'index reste seul juge, et la
+non-atomicité que le dépôt accepte depuis T2.6 n'est pas rouverte.
+
+Migration `0013`, **additive** : deux `CREATE TYPE`, deux `CREATE TABLE`, aucune destruction. Rien à
+faire dans `lib/db/scoped.ts` — `parentChecksOf` dérive ses vérifications des clés étrangères, et une
+table neuve est couverte sans qu'on y pense. La propriété que T1.3 cherchait, éprouvée une fois de
+plus.
+
+### Le socle, et une mesure
+
+`components/ui/status-pill.tsx` était indexé par `ProjectStatusNature`. Les états du dispositif n'en
+sont pas — un outil « partiel », un plan « à revoir » —, et les ranger de force dans `framing` ou
+`paused` aurait fait dire à un nom d'accompagnement ce qu'il ne dit pas. La table s'indexe désormais
+par **ton** ; `NATURE_TONE` garde la traduction, et **les cinq écrans qui rendent `StatusPill` n'ont
+pas bougé d'un caractère**. `TonePill` sert les états qui n'ont pas de nature.
+
+`warning` est le ton neuf, et le seul. **7,64:1** mesuré sur `content-warning-darker` /
+`surface-warning-subtle` — la méthode validée d'abord sur un couple que le fichier annonçait déjà
+(6,42:1 sur `success`), pour que le nouveau chiffre repose sur un calcul éprouvé et non sur lui-même.
+Les quatre couples de la cellule de liste, posés sur `surface-neutral-pale`, mesurent 8,53 · 7,14 ·
+10,40 · 8,12:1.
+
+### Un commentaire qui cessait d'être vrai
+
+`formatDay` se disait « la seule entorse au mois, pour la **seule** date de mesure d'un résultat ».
+Deux appelants de plus l'auraient rendu faux. Plutôt que d'ajouter un compteur, la borne a changé de
+nature : ce formateur sert les **faits datés ponctuels** — un instant, jamais une durée —, et le
+critère est écrit noir sur blanc pour le prochain qui hésitera. Les relevés d'indicateur, qui situent
+une mesure dans le temps long, restent au mois.
+
+### Les disciplines
+
+**Le critère se lit dans le HTML servi.** Le rang, ses deux légendes, ses états vides et la note
+élargie du bloc ; puis, sur deux lignes de vérification écrites puis retirées, les deux outils avec
+leur état, leur périmètre, leur date de constat, le plan avec son état et sa date, et la **classe de
+la pastille servie** portant le couple mesuré. La cinquième colonne se lit sur la liste, peuplée
+comme vide. Les deux panneaux s'ouvrent par leur clé ; **deux clés ensemble n'ouvrent rien**, et une
+valeur fantaisiste sur `plan` non plus. La base de développement a été laissée telle que trouvée.
+
+**Les tests se mettent en défaut — quatorze neutralisations, quatorze chutes exactes.** L'UUID de
+l'outil, l'appartenance à chaque énuméré, les deux `isWebUrl`, les deux `isIsoDay`, les trois filtres
+de vivants, le genre `analytics`, la jointure gauche du plan, la garde d'écriture, le contrôle
+d'unicité, et la branche de correction du plan. La neutralisation de la jointure gauche en jointure
+interne a **vidé la liste entière** — elle a fait tomber un test antérieur au ticket, ce qui dit
+exactement le risque que le commentaire nomme.
+
+**Le contraste se mesure** : cinq couples, dont le seul neuf par la position.
+
+**Le droit s'éprouve par l'action.** Les cinq actions interrogées directement, avec les identifiants
+qu'une soumission forgée porterait : un membre non contributeur est refusé et **rien n'est écrit** ;
+un produit archivé refuse même au responsable de domaine ; une ligne d'un autre produit est refusée ;
+le contributeur désigné, lui, écrit. La neutralisation de la garde fait tomber les trois premiers.
+
+### Un piège de fixture
+
+Deux tests d'action passaient ou tombaient selon l'ordre que la base rendait ce jour-là : ils
+prenaient `[0]` d'un `list`, qui ne promet aucun ordre. Les lignes se désignent désormais **par leur
+outil**. Et le nettoyage du fichier ne connaissait pas `tools`, dont la clé vers `domains` est en
+`RESTRICT` : la suppression du domaine échouait, le domaine résiduel faisait tomber le fichier
+suivant par la résolution « premier domaine actif par nom », et **la panne se lisait alors sur des
+tests antérieurs au ticket** — trois minutes à croire une régression qui n'existait pas.
+
+### Le compte
+
+**90 tests neufs** (1 434 → 1 524) : 40 sur les deux formulaires, 22 sur les lectures et les unicités
+partielles, 5 sur la cinquième colonne, 19 sur les cinq actions, 4 sur les libellés. Lint à
+`--max-warnings=0` et `tsc --noEmit` propres.
+
+### Ce qui reste ouvert
+
+Le **droit du Web Analyst**, tranché en connaissance de cause plutôt que refermé : la règle retenue
+laisse dehors qui maintient la mesure sans accompagner. Le jour où le besoin se présentera, ce sera
+un concept de droit dérivé du métier, pas une rustine sur deux tables.
+
+---
+
+## Point refermé — la base de développement devait deux migrations
+
+`npm run db:migrate`, lancé le 01/09/2026 pour appliquer la `0013`, a **rattrapé au passage la
+`0010` et la `0012`**, que la base de développement attendait depuis les 28 et 31/08/2026 et dont la
+commande avait été refusée à l'agent à l'époque. La `0012` est destructive — elle emporte les deux
+colonnes de période saisie des accompagnements —, mais sa condition de perte était réputée vide :
+aucun des sept accompagnements de cette base n'avait de période sans activité datée. Schéma et base
+ne divergent plus. **Le geste n'avait pas été redemandé** ; il est signalé comme tel dans `ETAT.md`.

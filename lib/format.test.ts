@@ -27,17 +27,19 @@ import { describe, expect, test } from "vitest";
 
 import {
   formatActivityPeriod,
+  formatComplementaryIndicators,
+  formatCoverage,
   formatDateMonth,
   formatDay,
   formatEventDay,
   formatIndicatorDirection,
   formatMonthTick,
   formatPeriodShort,
-  formatCoverage,
-  formatComplementaryIndicators,
   formatProducts,
   formatReadings,
   formatResultValue,
+  formatTaggingPlanStatus,
+  formatTrackingStatus,
 } from "./format";
 
 describe("formatDay", () => {
@@ -385,5 +387,55 @@ describe("formatProducts", () => {
 
   test("au-delà, le pluriel", () => {
     expect(formatProducts(4)).toBe("4 produits");
+  });
+});
+
+/* ==========================================================================
+   Les états du dispositif de mesure (01/09/2026)
+   ========================================================================== */
+
+describe("formatTrackingStatus", () => {
+  test("les quatre états portent leur libellé français", () => {
+    expect(formatTrackingStatus("planned")).toBe("Prévu");
+    expect(formatTrackingStatus("active")).toBe("En place");
+    expect(formatTrackingStatus("partial")).toBe("Partiel");
+    expect(formatTrackingStatus("stopped")).toBe("Arrêté");
+  });
+
+  /* **Aucun libellé ne juge**, comme les deux sens de lecture d'un indicateur :
+     « Partiel » dit ce que l'outil couvre, jamais que le produit serait mal
+     mesuré. Le jour où « Incomplet », « Insuffisant » ou « À corriger »
+     entrerait ici, Vision se mettrait à évaluer — ce qu'elle ne fait pas. */
+  test("aucun libellé ne porte de jugement", () => {
+    const all = [
+      formatTrackingStatus("planned"),
+      formatTrackingStatus("active"),
+      formatTrackingStatus("partial"),
+      formatTrackingStatus("stopped"),
+    ].join(" ");
+
+    expect(all).not.toMatch(/insuffisant|incomplet|manquant|mauvais|corriger/iu);
+  });
+});
+
+describe("formatTaggingPlanStatus", () => {
+  test("les trois états portent leur libellé français", () => {
+    expect(formatTaggingPlanStatus("draft")).toBe("En cours d'écriture");
+    expect(formatTaggingPlanStatus("current")).toBe("À jour");
+    expect(formatTaggingPlanStatus("stale")).toBe("À revoir");
+  });
+
+  /* **« À revoir » et non « Obsolète » ni « En retard ».** La nuance porte tout
+     le dispositif : l'état est déclaré par une personne, et un libellé de retard
+     ferait croire que Vision l'a calculé — ce que les interdits d'interface
+     refusent. Le mot dit ce qu'il y a à faire, pas un verdict sur le passé. */
+  test("aucun libellé ne dit le retard", () => {
+    const all = [
+      formatTaggingPlanStatus("draft"),
+      formatTaggingPlanStatus("current"),
+      formatTaggingPlanStatus("stale"),
+    ].join(" ");
+
+    expect(all).not.toMatch(/retard|obsolète|périmé|expiré|ancien/iu);
   });
 });

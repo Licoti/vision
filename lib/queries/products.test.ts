@@ -26,6 +26,7 @@ import {
   projectMembers,
   projectStatuses,
   projects,
+  taggingPlans,
 } from "@/lib/db/schema";
 
 import {
@@ -37,6 +38,7 @@ import {
 
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
 const teardownOrder = [
+  taggingPlans,
   activities,
   activityTypes,
   projectMembers,
@@ -279,6 +281,111 @@ describe("findProductDetail", () => {
     const rows = await listProductsWithCounts(a.scope);
     expect(rows.map((row) => row.id)).not.toContain(a.archivedProductId);
     expect(rows.map((row) => row.id)).toContain(a.productId);
+  });
+
+  /* ---------------------------------------------------------------------- */
+  /* La cinquième colonne — le plan de taggage (01/09/2026)                  */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * **La jointure gauche ne doit rien casser de ce qui existait.** C'est le
+   * risque propre à cette colonne : un `innerJoin` aurait fait disparaître de la
+   * liste tous les produits sans plan — précisément ceux que le Web Analyst
+   * cherche —, et deux plans vivants sur un produit multiplieraient sa ligne,
+   * donc son décompte d'accompagnements. Les deux se mesurent ici.
+   */
+  describe("le plan de taggage", () => {
+    test("rend l'état et la date du plan vivant", async () => {
+      const plan = await a.scope.insert(taggingPlans, {
+        productId: a.productId,
+        url: "https://exemple.test/plan",
+        status: "stale",
+        updatedOn: "2026-03-03",
+        note: null,
+      });
+
+      const row = (await listProductsWithCounts(a.scope)).find(
+        (candidate) => candidate.id === a.productId,
+      );
+      expect(row?.taggingPlanStatus).toBe("stale");
+      expect(row?.taggingPlanUpdatedOn).toBe("2026-03-03");
+
+      await a.scope.archive(taggingPlans, plan.id);
+    });
+
+    /* **`null` sur les deux colonnes, jamais une ligne absente** : la jointure
+       est gauche, et un produit sans plan reste dans la liste. */
+    test("rend `null` sans faire disparaître le produit", async () => {
+      const rows = await listProductsWithCounts(a.scope);
+      const row = rows.find((candidate) => candidate.id === a.productId);
+
+      expect(row).toBeDefined();
+      expect(row?.taggingPlanStatus).toBeNull();
+      expect(row?.taggingPlanUpdatedOn).toBeNull();
+    });
+
+    /* Un plan retiré ne doit pas ressusciter dans la colonne : le filtre des
+       vivants vaut ici comme dans `findProductTaggingPlan`. */
+    test("ignore un plan retiré", async () => {
+      const plan = await a.scope.insert(taggingPlans, {
+        productId: a.productId,
+        url: "https://exemple.test/plan-retire",
+        status: "current",
+        updatedOn: "2026-01-01",
+        note: null,
+      });
+      await a.scope.archive(taggingPlans, plan.id);
+
+      const row = (await listProductsWithCounts(a.scope)).find(
+        (candidate) => candidate.id === a.productId,
+      );
+      expect(row?.taggingPlanStatus).toBeNull();
+    });
+
+    /* **Le décompte d'accompagnements ne bouge pas d'un cran.** C'est le défaut
+       qu'une jointure gauche mal groupée introduit en silence, et il ne se voit
+       que sur un produit qui a les deux. */
+    test("ne fausse pas le décompte d'accompagnements", async () => {
+      const before = (await listProductsWithCounts(a.scope)).find(
+        (row) => row.id === a.productId,
+      )?.projectCount;
+
+      const plan = await a.scope.insert(taggingPlans, {
+        productId: a.productId,
+        url: "https://exemple.test/plan-compte",
+        status: "draft",
+        updatedOn: "2026-05-05",
+        note: null,
+      });
+
+      const after = (await listProductsWithCounts(a.scope)).find(
+        (row) => row.id === a.productId,
+      )?.projectCount;
+
+      expect(after).toBe(before);
+
+      await a.scope.archive(taggingPlans, plan.id);
+    });
+
+    /* L'étanchéité : le plan d'un autre domaine ne remonte pas, quand bien même
+       il porterait le même identifiant de produit — ce qui n'arrive pas, mais
+       c'est le filtre qui le garantit, pas l'improbabilité. */
+    test("ne fait pas remonter le plan d'un autre domaine", async () => {
+      const plan = await b.scope.insert(taggingPlans, {
+        productId: b.productId,
+        url: "https://exemple.test/plan-voisin",
+        status: "current",
+        updatedOn: "2026-07-07",
+        note: null,
+      });
+
+      const rows = await listProductsWithCounts(a.scope);
+      expect(
+        rows.every((row) => row.taggingPlanStatus === null),
+      ).toBe(true);
+
+      await b.scope.archive(taggingPlans, plan.id);
+    });
   });
 });
 

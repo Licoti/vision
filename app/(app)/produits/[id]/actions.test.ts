@@ -47,14 +47,19 @@ import {
   personaTraits,
   personas,
   persons,
+  productTrackings,
   products,
   projectMembers,
   projectStatuses,
   projects,
+  taggingPlans,
+  tools,
   useCasePersonas,
   useCases,
 } from "@/lib/db/schema";
 import { EMPTY_PERSONA_VALUES } from "@/lib/forms/persona";
+import { EMPTY_TAGGING_PLAN_VALUES } from "@/lib/forms/tagging-plan";
+import { EMPTY_TRACKING_VALUES } from "@/lib/forms/tracking";
 import { EMPTY_USE_CASE_VALUES } from "@/lib/forms/use-case";
 
 /** Qui la requête prétend être. Chaque test la pose avant d'appeler l'action. */
@@ -105,13 +110,18 @@ vi.mock("next/navigation", () => ({
 const {
   archivePersona,
   archiveReading,
+  archiveTaggingPlan,
+  archiveTracking,
   archiveUseCase,
   createPersona,
   createReading,
+  createTracking,
   createUseCase,
+  saveTaggingPlan,
   setNorthStar,
   updatePersona,
   updateReading,
+  updateTracking,
   updateUseCase,
 } = await import("./actions");
 
@@ -139,6 +149,11 @@ type Fixture = {
   siblingId: string;
   otherProductIndicatorId: string;
   archivedIndicatorId: string;
+  /* --- Le dispositif de mesure (01/09/2026) ------------------------------- */
+  /** Un outil de genre analytics, à déclarer. */
+  toolId: string;
+  /** Un second, pour éprouver l'unicité sans toucher au premier. */
+  otherToolId: string;
 };
 
 let f: Fixture;
@@ -231,6 +246,19 @@ beforeAll(async () => {
   });
   await scope.archive(indicators, archivedIndicator.id);
 
+  /* Deux outils de genre analytics : le référentiel dans lequel un dispositif
+     puise (01/09/2026). */
+  const tool = await scope.insert(tools, {
+    name: `Analytics ${suffix}`,
+    kind: "analytics",
+    baseUrl: null,
+  });
+  const otherTool = await scope.insert(tools, {
+    name: `Clarity ${suffix}`,
+    kind: "analytics",
+    baseUrl: null,
+  });
+
   f = {
     domainId: domain.id,
     scope,
@@ -244,6 +272,8 @@ beforeAll(async () => {
     siblingId: sibling.id,
     otherProductIndicatorId: otherProductIndicator.id,
     archivedIndicatorId: archivedIndicator.id,
+    toolId: tool.id,
+    otherToolId: otherTool.id,
   };
 }, 180_000);
 
@@ -253,6 +283,8 @@ afterAll(async () => {
      ce ticket écrit, et que ce nettoyage ne connaissait pas. */
   const tables = [
     events,
+    productTrackings,
+    taggingPlans,
     indicatorReadings,
     useCasePersonas,
     useCases,
@@ -265,6 +297,12 @@ afterAll(async () => {
     products,
     entities,
     persons,
+    /* `tools` en dernier, et après `product_trackings` qui le référence : la
+       règle « enfants d'abord, parents ensuite » du fichier, étendue à la table
+       que le dispositif de mesure a fait entrer ici (01/09/2026). Sans elle, la
+       suppression du domaine viole le `RESTRICT` de `tools_domain_id_…`, et le
+       domaine résiduel fait tomber le fichier suivant. */
+    tools,
   ];
   for (const table of tables) {
     await db.delete(table).where(eq(table.domainId, createdDomainId));
@@ -1456,5 +1494,325 @@ describe("un refus n'écrit ni le relevé ni l'événement", () => {
       .from(indicatorReadings)
       .where(eq(indicatorReadings.id, stranger.id));
     expect(row?.value).toBe("12.0000");
+  });
+});
+
+/* ==========================================================================
+   Le dispositif de mesure — le droit s'éprouve par l'action (01/09/2026)
+
+   **Le rang perd son ⋮ pour qui n'a pas le droit, et cela ne prouve rien.** Les
+   identifiants liés d'une action serveur sont sérialisés en clair dans un champ
+   `$ACTION_…`, réécrivable : ce fichier interroge donc les cinq actions
+   elles-mêmes, avec les identifiants qu'une soumission forgée porterait.
+
+   Les cinq passent par `openProductWrite`, la porte des indicateurs — l'arbitrage
+   retenu en session. Ce qui est éprouvé ici vaut donc pour elles autant que pour
+   les gestes de T5.2, et le mesure sur des actions neuves.
+   ========================================================================== */
+
+const EMPTY_TRACKING = { values: EMPTY_TRACKING_VALUES, errors: {} };
+const EMPTY_PLAN = { values: EMPTY_TAGGING_PLAN_VALUES, errors: {} };
+
+function trackingForm(overrides: Record<string, string> = {}): FormData {
+  const data = new FormData();
+  data.set("toolId", f.toolId);
+  data.set("status", "active");
+  data.set("scope", "");
+  data.set("propertyUrl", "");
+  data.set("verifiedOn", "");
+  data.set("note", "");
+  for (const [key, value] of Object.entries(overrides)) data.set(key, value);
+  return data;
+}
+
+function planForm(overrides: Record<string, string> = {}): FormData {
+  const data = new FormData();
+  data.set("url", "https://exemple.test/plan");
+  data.set("status", "current");
+  data.set("updatedOn", "2026-06-01");
+  data.set("note", "");
+  for (const [key, value] of Object.entries(overrides)) data.set(key, value);
+  return data;
+}
+
+/** Les lignes vivantes du dispositif d'un produit, lues en base sans passer par l'écran. */
+async function trackingsOf(productId: string) {
+  return f.scope.list(productTrackings, {
+    where: eq(productTrackings.productId, productId),
+  });
+}
+
+async function plansOf(productId: string) {
+  return f.scope.list(taggingPlans, {
+    where: eq(taggingPlans.productId, productId),
+  });
+}
+
+describe("createTracking — le droit", () => {
+  test("un membre non contributeur est refusé, et rien n'est écrit", async () => {
+    currentPerson = f.outsiderId;
+
+    const state = await createTracking(f.productId, EMPTY_TRACKING, trackingForm());
+
+    expect(state.ok).toBeUndefined();
+    expect(state.message).toContain("réservée au responsable de domaine");
+    expect(await trackingsOf(f.productId)).toHaveLength(0);
+  });
+
+  /* Le droit **dérivé des accompagnements** : le contributeur n'est ni
+     responsable de domaine, ni propriétaire de quoi que ce soit — il est
+     désigné sur un accompagnement de ce produit, et cela suffit. */
+  test("un contributeur désigné écrit", async () => {
+    currentPerson = f.contributorId;
+
+    const state = await createTracking(f.productId, EMPTY_TRACKING, trackingForm());
+
+    expect(state.ok).toBe(true);
+    expect(await trackingsOf(f.productId)).toHaveLength(1);
+  });
+
+  /* **Un produit archivé ne reçoit plus de saisie**, et ce n'est pas le rendu
+     qui le refuse : `openProductWrite` refuse le produit archivé **reçu**. */
+  test("un produit archivé refuse la saisie, même au responsable", async () => {
+    currentPerson = f.managerId;
+
+    const state = await createTracking(
+      f.archivedProductId,
+      EMPTY_TRACKING,
+      trackingForm(),
+    );
+
+    expect(state.ok).toBeUndefined();
+    expect(state.message).toContain("archivé");
+    expect(await trackingsOf(f.archivedProductId)).toHaveLength(0);
+  });
+
+  /* Le contrôle d'unicité, en message de champ plutôt qu'en violation d'index. */
+  test("le même outil déclaré deux fois est refusé sur le champ", async () => {
+    currentPerson = f.managerId;
+
+    const state = await createTracking(f.productId, EMPTY_TRACKING, trackingForm());
+
+    expect(state.ok).toBeUndefined();
+    expect(state.errors.toolId).toContain("déjà déclaré");
+    expect(await trackingsOf(f.productId)).toHaveLength(1);
+  });
+
+  test("un autre outil s'ajoute sans difficulté", async () => {
+    currentPerson = f.managerId;
+
+    const state = await createTracking(
+      f.productId,
+      EMPTY_TRACKING,
+      trackingForm({ toolId: f.otherToolId }),
+    );
+
+    expect(state.ok).toBe(true);
+    expect(await trackingsOf(f.productId)).toHaveLength(2);
+  });
+});
+
+describe("updateTracking — le droit et l'appartenance", () => {
+  test("un membre non contributeur est refusé", async () => {
+    const [row] = await trackingsOf(f.productId);
+    currentPerson = f.outsiderId;
+
+    const state = await updateTracking(
+      f.productId,
+      row!.id,
+      EMPTY_TRACKING,
+      trackingForm({ status: "stopped" }),
+    );
+
+    expect(state.ok).toBeUndefined();
+    const [after] = await trackingsOf(f.productId);
+    expect(after!.status).toBe("active");
+  });
+
+  /* **L'appartenance se vérifie sur l'identifiant reçu** : une ligne valide du
+     bon domaine, mais d'un autre produit, ne s'écrit pas depuis cette page. */
+  test("une ligne d'un autre produit est refusée", async () => {
+    currentPerson = f.managerId;
+    const [row] = await trackingsOf(f.productId);
+
+    const state = await updateTracking(
+      f.otherProductId,
+      row!.id,
+      EMPTY_TRACKING,
+      trackingForm({ status: "stopped" }),
+    );
+
+    expect(state.ok).toBeUndefined();
+    expect(state.message).toContain("n'existe plus sur ce produit");
+  });
+
+  /* **La ligne courante est exceptée du contrôle d'unicité** : corriger le
+     périmètre sans changer d'outil ne doit pas se heurter à sa propre
+     déclaration. */
+  test("corriger sans changer d'outil ne bute pas sur l'unicité", async () => {
+    currentPerson = f.managerId;
+    const [row] = await trackingsOf(f.productId);
+
+    const state = await updateTracking(
+      f.productId,
+      row!.id,
+      EMPTY_TRACKING,
+      trackingForm({ scope: "Site public" }),
+    );
+
+    expect(state.errors.toolId).toBeUndefined();
+    expect(state.ok).toBe(true);
+  });
+
+  test("reprendre l'outil d'une autre ligne est refusé", async () => {
+    currentPerson = f.managerId;
+    /* **La ligne est désignée par son outil, jamais par sa position** : `list`
+       ne promet aucun ordre, et un `[0]` ferait dépendre le test de ce que la
+       base rend ce jour-là. C'est bien la ligne du premier outil qu'on tente de
+       faire basculer sur le second. */
+    const rows = await trackingsOf(f.productId);
+    const row = rows.find((candidate) => candidate.toolId === f.toolId);
+
+    const state = await updateTracking(
+      f.productId,
+      row!.id,
+      EMPTY_TRACKING,
+      trackingForm({ toolId: f.otherToolId }),
+    );
+
+    expect(state.ok).toBeUndefined();
+    expect(state.errors.toolId).toContain("déjà déclaré");
+  });
+});
+
+describe("archiveTracking — le retrait", () => {
+  /* **Les lignes se désignent par leur outil, jamais par leur position** :
+     `list` ne promet aucun ordre, et les trois tests qui suivent s'enchaînent —
+     un `[0]` en ferait dépendre l'issue de ce que la base rend ce jour-là. */
+  const firstTool = async () => {
+    const rows = await trackingsOf(f.productId);
+    return rows.find((row) => row.toolId === f.toolId)!;
+  };
+
+  test("un membre non contributeur ne retire rien", async () => {
+    const row = await firstTool();
+    currentPerson = f.outsiderId;
+
+    await archiveTracking(f.productId, row.id);
+
+    expect(await trackingsOf(f.productId)).toHaveLength(2);
+  });
+
+  /* **Archivage, jamais suppression** (règle 4) : la ligne quitte la lecture,
+     elle ne quitte pas la base. */
+  test("le responsable retire, et la ligne reste en base", async () => {
+    const row = await firstTool();
+    currentPerson = f.managerId;
+
+    await archiveTracking(f.productId, row.id);
+
+    expect(await trackingsOf(f.productId)).toHaveLength(1);
+    const [kept] = await db
+      .select({ archivedAt: productTrackings.archivedAt })
+      .from(productTrackings)
+      .where(eq(productTrackings.id, row.id));
+    expect(kept?.archivedAt).not.toBeNull();
+  });
+
+  /* Ce que l'unicité **partielle** autorise, et qu'une unicité totale
+     interdirait — la leçon de T4bis.6, éprouvée par l'action. */
+  test("l'outil retiré se redéclare aussitôt", async () => {
+    currentPerson = f.managerId;
+
+    const state = await createTracking(f.productId, EMPTY_TRACKING, trackingForm());
+
+    expect(state.ok).toBe(true);
+  });
+});
+
+describe("saveTaggingPlan — un seul geste pour deux moments", () => {
+  test("un membre non contributeur est refusé, et rien n'est écrit", async () => {
+    currentPerson = f.outsiderId;
+
+    const state = await saveTaggingPlan(f.productId, EMPTY_PLAN, planForm());
+
+    expect(state.ok).toBeUndefined();
+    expect(state.message).toContain("réservée au responsable de domaine");
+    expect(await plansOf(f.productId)).toHaveLength(0);
+  });
+
+  test("un produit archivé refuse la saisie", async () => {
+    currentPerson = f.managerId;
+
+    const state = await saveTaggingPlan(
+      f.archivedProductId,
+      EMPTY_PLAN,
+      planForm(),
+    );
+
+    expect(state.ok).toBeUndefined();
+    expect(await plansOf(f.archivedProductId)).toHaveLength(0);
+  });
+
+  test("le premier appel insère", async () => {
+    currentPerson = f.contributorId;
+
+    const state = await saveTaggingPlan(f.productId, EMPTY_PLAN, planForm());
+
+    expect(state.ok).toBe(true);
+    expect(await plansOf(f.productId)).toHaveLength(1);
+  });
+
+  /* **Le second appel corrige, il n'insère pas** : c'est ce que l'unicité
+     partielle dit, et ce qui fait de « renseigner » et « corriger » un seul
+     geste. Sans cette branche, la seconde saisie lèverait une violation d'index. */
+  test("le second appel corrige la même ligne", async () => {
+    currentPerson = f.managerId;
+
+    const state = await saveTaggingPlan(
+      f.productId,
+      EMPTY_PLAN,
+      planForm({ status: "stale", updatedOn: "2026-03-03" }),
+    );
+
+    expect(state.ok).toBe(true);
+    const rows = await plansOf(f.productId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.status).toBe("stale");
+    expect(rows[0]?.updatedOn).toBe("2026-03-03");
+  });
+
+  test("une adresse qui n'en est pas une est refusée sur le champ", async () => {
+    currentPerson = f.managerId;
+
+    const state = await saveTaggingPlan(
+      f.productId,
+      EMPTY_PLAN,
+      planForm({ url: "sharepoint/plan" }),
+    );
+
+    expect(state.ok).toBeUndefined();
+    expect(state.errors.url).toBeDefined();
+  });
+});
+
+describe("archiveTaggingPlan — le retrait", () => {
+  test("un membre non contributeur ne retire rien", async () => {
+    currentPerson = f.outsiderId;
+
+    await archiveTaggingPlan(f.productId);
+
+    expect(await plansOf(f.productId)).toHaveLength(1);
+  });
+
+  test("le responsable retire, et un nouveau plan peut être déclaré", async () => {
+    currentPerson = f.managerId;
+
+    await archiveTaggingPlan(f.productId);
+    expect(await plansOf(f.productId)).toHaveLength(0);
+
+    const state = await saveTaggingPlan(f.productId, EMPTY_PLAN, planForm());
+    expect(state.ok).toBe(true);
+    expect(await plansOf(f.productId)).toHaveLength(1);
   });
 });

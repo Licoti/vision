@@ -179,6 +179,22 @@ const TOOLS: { name: string; kind: ToolKind; baseUrl?: string }[] = [
     kind: "analytics",
     baseUrl: "https://analytics.example.com",
   },
+  /* **Trois outils de mesure**, ajoutés le 01/09/2026 avec le dispositif de
+     mesure : sans eux, son panneau n'aurait qu'une option à proposer, et la
+     souplesse annoncée — « un outil de plus est une ligne » — ne se verrait
+     nulle part. Ils n'ont rien de particulier : ce sont des lignes du
+     référentiel, saisissables en administration comme les quatre autres. */
+  {
+    name: "Google Analytics 4",
+    kind: "analytics",
+    baseUrl: "https://analytics.google.com",
+  },
+  { name: "Matomo", kind: "analytics", baseUrl: "https://matomo.example.com" },
+  {
+    name: "Microsoft Clarity",
+    kind: "analytics",
+    baseUrl: "https://clarity.microsoft.com",
+  },
   { name: "Outil budget", kind: "budget" },
 ];
 

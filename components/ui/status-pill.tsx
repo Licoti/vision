@@ -38,33 +38,60 @@ export const BAND_BG: Record<ProjectStatusNature, string> = {
 };
 
 /**
- * Les quatre tons de la pastille : un fond teinté, un texte lisible dessus.
+ * Les tons de la pastille : un fond teinté, un texte lisible dessus.
  *
- * La maquette n'en dessine que deux — « En cours » et « Terminé ». Les quatre se
- * déduisent de la nature, comme la table au-dessus : un domaine renomme
- * « En cours », il ne renomme pas `active`. Les deux teintes manquantes suivent
- * la même règle — info pour le cadrage, neutre pour la pause.
+ * **Le ton est devenu le vocabulaire, la nature n'en est plus qu'un cas**
+ * (01/09/2026). La table était indexée par `ProjectStatusNature` ; le dispositif
+ * de mesure a des états déclarés qui n'en sont pas — un outil « partiel », un
+ * plan « à revoir » —, et les ranger de force dans `framing` ou `paused` aurait
+ * fait dire à un nom d'accompagnement ce qu'il ne dit pas. La table s'indexe
+ * donc par **ton**, et `NATURE_TONE` ci-dessous garde la traduction : les cinq
+ * écrans qui rendent `StatusPill` n'ont pas bougé d'un caractère.
  *
- * **Les quatre couples sont mesurés** : un texte sur fond teinté est un couple
+ * `warning` est le ton neuf, et le seul — les quatre autres portaient déjà les
+ * quatre natures.
+ *
+ * **Les cinq couples sont mesurés** : un texte sur fond teinté est un couple
  * neuf par la position, et le contraste se mesure avant d'être cru.
  * `content-info-dark` sur `surface-info-subtle` 9,17:1 ·
  * `content-primary-dark` sur `surface-primary-lighter` 11,83:1 ·
  * `content-neutral-dark` sur `surface-neutral-lighter` 6,52:1 ·
- * `content-success-dark` sur `surface-success-subtle` 6,42:1.
+ * `content-success-dark` sur `surface-success-subtle` 6,42:1 ·
+ * `content-warning-darker` sur `surface-warning-subtle` **7,64:1** (01/09/2026).
  *
- * Elle ne s'exporte pas : son seul consommateur est le composant ci-dessous, et
- * une table exportée est une pastille qu'on récrit. `socleLock` garde la
- * signature, celle-ci en garde les couleurs.
+ * Elle ne s'exporte pas : ses seuls consommateurs sont les deux composants
+ * ci-dessous, et une table exportée est une pastille qu'on récrit. `socleLock`
+ * garde la signature, celle-ci en garde les couleurs.
  *
- * Les deux `Record` sont **exhaustifs à la compilation** : le jour où l'énuméré
- * s'allonge, ce fichier ne compile plus tant qu'on n'a pas complété les deux.
+ * Les `Record` sont **exhaustifs à la compilation** : le jour où un énuméré
+ * s'allonge, ce fichier ne compile plus tant qu'on ne l'a pas complété.
  */
-const PILL: Record<ProjectStatusNature, string> = {
-  framing: "bg-surface-info-subtle text-content-info-dark",
-  active: "bg-surface-primary-lighter text-content-primary-dark",
-  paused: "bg-surface-neutral-lighter text-content-neutral-dark",
-  done: "bg-surface-success-subtle text-content-success-dark",
+export type PillTone = "info" | "primary" | "neutral" | "success" | "warning";
+
+const PILL: Record<PillTone, string> = {
+  info: "bg-surface-info-subtle text-content-info-dark",
+  primary: "bg-surface-primary-lighter text-content-primary-dark",
+  neutral: "bg-surface-neutral-lighter text-content-neutral-dark",
+  success: "bg-surface-success-subtle text-content-success-dark",
+  warning: "bg-surface-warning-subtle text-content-warning-darker",
 };
+
+/**
+ * La traduction d'une nature d'accompagnement en ton.
+ *
+ * Elle porte ce que la table portait avant le 01/09/2026, et rien de plus : le
+ * cadrage est bleu, l'actif est primaire, la pause est neutre, le terminé est
+ * vert. Aucune nature ne réclame `warning` — Vision n'alerte sur aucun
+ * accompagnement.
+ */
+const NATURE_TONE: Record<ProjectStatusNature, PillTone> = {
+  framing: "info",
+  active: "primary",
+  paused: "neutral",
+  done: "success",
+};
+
+const PILL_SHAPE = "flex-none rounded-full px-3 py-0.5 text-xs font-semibold";
 
 /**
  * Un `<span>`, pas un lien : rien ne filtre par statut depuis les cinq écrans
@@ -81,11 +108,21 @@ export function StatusPill({
   nature: ProjectStatusNature;
   label: string;
 }) {
-  return (
-    <span
-      className={`flex-none rounded-full px-3 py-0.5 text-xs font-semibold ${PILL[nature]}`}
-    >
-      {label}
-    </span>
-  );
+  return <TonePill tone={NATURE_TONE[nature]} label={label} />;
+}
+
+/**
+ * La même pastille, pour un état qui n'est pas une nature d'accompagnement.
+ *
+ * **Le ton est reçu, jamais deviné** : le composant ne connaît ni les états d'un
+ * outil de mesure ni ceux d'un plan de taggage, et c'est ce qui lui permet de
+ * servir le suivant sans changer. L'appelant tient sa propre traduction, comme
+ * `NATURE_TONE` tient la sienne.
+ *
+ * Le libellé reste **écrit dans la pastille** : ici comme ailleurs, la couleur
+ * ne porte jamais seule une information (`docs/06` §11). C'est la raison pour
+ * laquelle il n'existe pas de variante sans texte.
+ */
+export function TonePill({ tone, label }: { tone: PillTone; label: string }) {
+  return <span className={`${PILL_SHAPE} ${PILL[tone]}`}>{label}</span>;
 }

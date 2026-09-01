@@ -92,6 +92,13 @@
       "when": 1788198856158,
       "tag": "0012_stale_squadron_sinister",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788248811386,
+      "tag": "0013_wealthy_cardiac",
+      "breakpoints": true
     }
   ]
 }

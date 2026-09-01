@@ -9,6 +9,10 @@
 import type { Referential } from "@/lib/navigation";
 import type { ActivityFamily } from "@/lib/queries/activities";
 import type { IndicatorDirection } from "@/lib/queries/indicators";
+import type {
+  TaggingPlanStatus,
+  TrackingStatus,
+} from "@/lib/queries/measurement";
 import type { ProjectStatusNature } from "@/lib/queries/projects";
 import type { ToolKind } from "@/lib/queries/referentials";
 import type { ResourceType } from "@/lib/queries/resources";
@@ -56,15 +60,25 @@ function parseDay(value: string): Date {
 }
 
 /**
- * Le jour, pour la seule date de mesure d'un résultat (T4.3).
+ * Le jour, pour les **faits datés ponctuels** : la date de mesure d'un résultat
+ * (T4.3), et depuis le 01/09/2026 les deux dates du dispositif de mesure — le
+ * constat porté sur un outil, la mise à jour portée par un plan de taggage.
  *
- * **C'est la seule entorse au mois, et elle est bornée.** D13 pose « le mois »
- * comme unité de temps *de la roadmap*, et `formatActivityPeriod` la respecte :
- * une période d'accompagnement ne gagne rien à devenir un horodatage. Une date
- * de mesure n'est pas une période — c'est le fait daté qu'un outil externe a
- * produit, et D39 autorise « toute valeur reportée d'un outil externe, **avec
- * sa date** ». Un audit rendu le 31 mai perdrait son sens en « mai 2024 », qui
- * laisserait croire à un travail étalé sur tout le mois.
+ * **C'est l'entorse au mois, et elle est bornée par une nature, non par un
+ * décompte.** D13 pose « le mois » comme unité de temps *de la roadmap*, et
+ * `formatActivityPeriod` la respecte : une période d'accompagnement ne gagne
+ * rien à devenir un horodatage. Ce que ce formateur sert n'est jamais une
+ * période — c'est un fait qui a eu lieu un jour précis, et D39 autorise « toute
+ * valeur reportée d'un outil externe, **avec sa date** ». Un audit rendu le 31
+ * mai perdrait son sens en « mai 2024 », qui laisserait croire à un travail
+ * étalé sur tout le mois ; un plan de taggage mis à jour « en mars » ne dit pas
+ * s'il est antérieur ou postérieur à la refonte de mars.
+ *
+ * **Le critère qui décide, et qui a permis d'ouvrir sans desserrer** : la date
+ * décrit-elle une **durée** ou un **instant** ? Durée, c'est le mois ; instant,
+ * c'est le jour. Les trois appelants sont des instants ; les relevés
+ * d'indicateur, qui situent une mesure dans le temps long, restent au mois par
+ * `formatDateMonth`.
  *
  * Le fuseau explicite a la raison de `MONTH`, en plus serré encore : au jour,
  * un serveur à l'ouest reculerait **toute** date d'une journée, pas seulement
@@ -90,10 +104,10 @@ export function formatDay(value: string): string {
  * `formatDay`. D'où cette seconde porte sur le **même** formateur — la règle du
  * fuseau ne se réécrit pas, elle se partage.
  *
- * **Au jour, et c'est la seconde entorse bornée au mois de D13.** La première
- * est `formatDay` — la date de mesure d'un résultat. Celle-ci a la même nature
- * et la même limite : un événement de journal est un **fait daté ponctuel**,
- * pas une période d'accompagnement. Et le mois lui retirerait sa raison d'être
+ * **Au jour, et c'est la seconde porte sur l'entorse bornée au mois de D13.** La
+ * première est `formatDay` — les faits datés ponctuels. Celle-ci a la même
+ * nature et la même limite : un événement de journal est un **instant**, pas une
+ * période d'accompagnement. Et le mois lui retirerait sa raison d'être
  * — dix lignes disant « août 2026 » ne retrouvent l'origine d'aucune saisie,
  * quand le bloc existe pour cela (`docs/06` §5 : *une information de
  * contrôle*).
@@ -769,6 +783,50 @@ const TOOL_KINDS: Record<ToolKind, string> = {
 
 export function formatToolKind(kind: ToolKind): string {
   return TOOL_KINDS[kind];
+}
+
+/**
+ * L'état d'un outil de mesure sur un produit : « Prévu » · « En place » ·
+ * « Partiel » · « Arrêté » (01/09/2026).
+ *
+ * **Les quatre sont des constats, pas des jugements.** « Partiel » ne dit pas
+ * qu'un produit est mal mesuré, il dit que l'outil ne couvre pas tout — et le
+ * périmètre écrit à côté dit quoi. « Arrêté » ne se cache pas et ne s'efface
+ * pas : un outil qui a collecté puis s'est tu est de la mémoire, et c'est ce que
+ * Vision garde.
+ *
+ * Aucune de ces valeurs n'est déduite d'un délai, d'une sonde ou d'un calcul :
+ * une personne les écrit, `verified_on` les date.
+ */
+const TRACKING_STATUSES: Record<TrackingStatus, string> = {
+  planned: "Prévu",
+  active: "En place",
+  partial: "Partiel",
+  stopped: "Arrêté",
+};
+
+export function formatTrackingStatus(status: TrackingStatus): string {
+  return TRACKING_STATUSES[status];
+}
+
+/**
+ * L'état d'un plan de taggage : « En cours d'écriture » · « À jour » ·
+ * « À revoir » (01/09/2026).
+ *
+ * **« À revoir » est déclaré, et c'est tout l'enjeu.** La demande voulait
+ * repérer les plans à mettre à jour ; le déduire d'un écart de dates aurait
+ * produit un badge de retard, que les interdits d'interface refusent. C'est donc
+ * quelqu'un qui constate que le plan a décroché du produit, et l'écran affiche
+ * ce constat à côté de la date du document.
+ */
+const TAGGING_PLAN_STATUSES: Record<TaggingPlanStatus, string> = {
+  draft: "En cours d'écriture",
+  current: "À jour",
+  stale: "À revoir",
+};
+
+export function formatTaggingPlanStatus(status: TaggingPlanStatus): string {
+  return TAGGING_PLAN_STATUSES[status];
 }
 
 /**

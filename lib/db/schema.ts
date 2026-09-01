@@ -164,6 +164,42 @@ export const indicatorDirection = pgEnum("indicator_direction", [
 
 export const budgetUnit = pgEnum("budget_unit", ["days"]);
 
+/**
+ * L'état d'un outil de mesure **sur un produit** — jamais sur l'outil lui-même :
+ * GA4 n'est pas « partiel », c'est sa pose sur ce produit-ci qui l'est.
+ *
+ * **Les quatre valeurs sont déclarées, aucune n'est déduite.** Vision ne sonde
+ * rien, ne mesure aucun délai et ne conclut rien : une personne écrit l'état
+ * qu'elle a constaté, comme elle pose le statut d'un accompagnement. C'est ce
+ * qui rend « partiel » compatible avec les interdits d'interface, qui refusent
+ * tout indice **calculé par Vision** pour qualifier quoi que ce soit.
+ *
+ * `stopped` n'efface pas la ligne : un outil qui a collecté puis s'est arrêté
+ * est de la mémoire, et la mémoire est la raison d'être de Vision (règle 4).
+ */
+export const trackingStatus = pgEnum("tracking_status", [
+  "planned",
+  "active",
+  "partial",
+  "stopped",
+]);
+
+/**
+ * L'état d'un plan de taggage, déclaré lui aussi.
+ *
+ * **`stale` est le cœur de la demande, et le piège qu'elle portait.** « Repérer
+ * les plans à mettre à jour » se serait volontiers écrit en calcul — « plus de
+ * douze mois depuis `updated_on` » —, et ce calcul aurait été un badge de
+ * retard, c'est-à-dire un interdit d'interface. C'est donc **quelqu'un** qui
+ * constate qu'un plan a décroché du produit, et l'écran affiche ce constat avec
+ * sa date. Le besoin est servi, la règle tient.
+ */
+export const taggingPlanStatus = pgEnum("tagging_plan_status", [
+  "draft",
+  "current",
+  "stale",
+]);
+
 export const eventVerb = pgEnum("event_verb", [
   "created",
   "updated",
@@ -1199,6 +1235,136 @@ export const indicatorReadings = pgTable(
   (t) => [
     index("indicator_readings_domain_id_idx").on(t.domainId),
     index("indicator_readings_indicator_id_idx").on(t.indicatorId),
+  ],
+);
+
+/**
+ * Un **outil de mesure posé sur un produit** : ce qui collecte la donnée que les
+ * indicateurs affichent.
+ *
+ * **Concept ajouté hors des `docs/`** (01/09/2026), comme `products.vision`,
+ * `indicators.is_north_star`, `personas` et `use_cases` avant lui : ni `docs/02`
+ * ni `docs/04` ne le nomment. `docs/04` §2 pose bien le genre `analytics` sur
+ * `tools`, mais comme un **outil raccordable**, jamais comme un dispositif
+ * rattaché à un produit. L'écart est consigné dans `JOURNAL-TECHNIQUE.md`
+ * (règle 6).
+ *
+ * **Une ligne par outil, et c'est là qu'habite « plusieurs outils »** : un
+ * produit mesuré par GA4 *et* Clarity a deux lignes, chacune avec son état et
+ * son périmètre. Rien ne les synthétise, et surtout pas l'écran — un « état
+ * global du tracking » déduit de deux lignes serait exactement l'indice calculé
+ * que les interdits refusent.
+ *
+ * **L'outil vient du référentiel, l'état vient d'ici.** `tools` dit ce que
+ * l'outil est ; cette table dit ce qu'il fait sur ce produit-ci. C'est ce
+ * partage qui rend le prochain outil gratuit : Piano, Amplitude ou une sonde
+ * maison sont **une ligne de référentiel**, saisie en administration, et aucun
+ * code.
+ *
+ * `on delete cascade` sur le produit, comme `indicators` : un dispositif
+ * n'existe pas hors du produit qu'il mesure. `on delete restrict` sur l'outil,
+ * comme partout ailleurs : un référentiel s'archive, il ne s'efface pas.
+ */
+export const productTrackings = pgTable(
+  "product_trackings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    domainId: domainRef(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    toolId: uuid("tool_id")
+      .notNull()
+      .references(() => tools.id, { onDelete: "restrict" }),
+    status: trackingStatus("status").notNull(),
+    /**
+     * Ce que l'outil couvre, en toutes lettres : « site public et espace
+     * connecté », « tunnel de souscription seulement ».
+     *
+     * **C'est ce champ qui donne son sens à `partial`.** Un état « partiel »
+     * sans périmètre est une inquiétude sans objet ; avec lui, c'est un fait
+     * qu'on peut reprendre. Nullable malgré tout : l'imposer ferait mentir la
+     * saisie de qui ne sait pas encore.
+     */
+    scope: text("scope"),
+    /** Le lien profond vers la propriété dans l'outil. Vision renvoie, elle ne remplace pas. */
+    propertyUrl: text("property_url"),
+    /**
+     * La date du **dernier constat humain**, et non celle de la saisie.
+     *
+     * `date` et non horodatage, la convention du §1 : ce qu'on note est un jour,
+     * pas un instant. C'est elle qui donne son âge à l'état déclaré — et l'âge
+     * se lit, il ne se traduit jamais en alerte.
+     */
+    verifiedOn: date("verified_on"),
+    note: text("note"),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    ...stamps,
+  },
+  (t) => [
+    index("product_trackings_domain_id_idx").on(t.domainId),
+    index("product_trackings_product_id_idx").on(t.productId),
+    index("product_trackings_tool_id_idx").on(t.toolId),
+    /* **Un même outil ne se déclare pas deux fois sur un produit**, et l'unicité
+       est *partielle* pour la raison de `results_activity_unique` (T4bis.6) et
+       d'`indicators_north_star_unique` (T5.1) : une ligne archivée qui
+       occuperait la place ferait de « retirer puis ressaisir » une violation
+       d'unicité, donc un 500 là où l'on attend un écran. Or c'est précisément le
+       chemin qu'ouvre la règle 4 — on retire, on ne supprime pas. */
+    uniqueIndex("product_trackings_tool_unique")
+      .on(t.productId, t.toolId)
+      .where(sql`${t.archivedAt} is null`),
+  ],
+);
+
+/**
+ * Le **plan de taggage** d'un produit : le document qui dit ce que le produit
+ * envoie, où il vit, et de quand il date.
+ *
+ * **Concept ajouté hors des `docs/`** (01/09/2026), comme `product_trackings`
+ * ci-dessus. L'écart est consigné dans `JOURNAL-TECHNIQUE.md`.
+ *
+ * **Une table plutôt que trois colonnes sur `products`** : le plan porte son
+ * état, sa date propre et son cycle de vie — il s'archive —, là où `products` ne
+ * porte que ce qui identifie le produit. C'est la lecture que `docs/02` §10 fait
+ * de l'indicateur, appliquée ici : « un objet à part entière, relié à un
+ * produit, et non une propriété de celui-ci ».
+ *
+ * **Jamais de fichier stocké**, seulement son adresse : c'est ce que Vision
+ * n'est pas, et `resources` tient déjà la même ligne.
+ */
+export const taggingPlans = pgTable(
+  "tagging_plans",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    domainId: domainRef(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    status: taggingPlanStatus("status").notNull(),
+    /**
+     * La date de dernière mise à jour **du document**.
+     *
+     * **À ne jamais confondre avec l'`updated_at` de cette ligne** : l'un dit
+     * quand le plan a bougé, l'autre quand quelqu'un a corrigé sa fiche dans
+     * Vision. Les deux divergent dès la première correction de coquille, et
+     * c'est le premier qui répond à la question posée.
+     */
+    updatedOn: date("updated_on").notNull(),
+    note: text("note"),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    ...stamps,
+  },
+  (t) => [
+    index("tagging_plans_domain_id_idx").on(t.domainId),
+    /* **Un seul plan vivant par produit** — l'unicité qui fait de « renseigner »
+       et « corriger » un seul geste, et non deux. Partielle, pour la raison des
+       deux index voisins : un plan retiré ne doit pas empêcher d'en déclarer un
+       autre. */
+    uniqueIndex("tagging_plans_product_unique")
+      .on(t.productId)
+      .where(sql`${t.archivedAt} is null`),
   ],
 );
 
