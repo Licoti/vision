@@ -5913,3 +5913,73 @@ fait tomber exactement la clause attendue, l'ancienne signature ne déclenche pl
 porte sur le socle d'interface : ce n'est pas une preuve, c'est une absence de régression ailleurs.
 **Le droit n'a pas été éprouvé, et n'avait pas à l'être** : aucun point d'entrée HTTP, aucune
 requête, aucun droit n'est touché.
+
+---
+
+## Le bouton icône seule aligné à son tour — hors ticket, 02/09/2026
+
+**La demande** : *« En gardant la même source CSS, je te donne aussi le HTML sur les boutons avec
+juste une seule icône »* — trois apparences et trois tailles, en balisage.
+
+**Ce que le produit gagne** : `iconButtonClass()`, le pendant de `buttonClass()` pour le geste sans
+mot. Et la réparation d'un défaut introduit la veille.
+
+### Le kebab avait perdu son survol
+
+L'alignement du bouton à texte avait donné au tertiaire un survol qui ne change **que la couleur du
+texte**. Les trois points du kebab sont des `<span>` peints en `bg-surface-primary-dark` : ils ne
+suivent aucune couleur de texte. **Le kebab a passé une journée sans état de survol visible**, sans
+que rien ne puisse le signaler — la classe attendue était bien dans le HTML servi, et les contrastes
+mesurés portaient sur un texte qui n'existe pas ici.
+
+Le tertiaire icône du design system prend, lui, un **fond** au survol. L'alignement répare.
+
+### Deux tables sans rien en commun, donc deux fonctions
+
+| | `xs` | `small` | `medium` | `large` |
+|---|---|---|---|---|
+| plein (primaire, secondaire) | 24 px | 32 px | 36 px | 40 px |
+| tertiaire, **rond** | 16 px | 20 px | 24 px | 32 px |
+
+Base, échelle, rayon, comportement du survol : rien ne se partage. Le design system sépare en deux
+composants ; ce fichier sépare en deux fonctions, et `buttonClass()` perd son option `iconOnly`.
+
+Le kebab tertiaire tient ses **32 px** (palier `large` de son échelle), le kebab secondaire et la
+croix du tiroir passent à **36 px** (`medium`, arbitrage humain). `ActionMenu` choisit donc son
+palier **par rang** — écrit d'abord `large` pour tous, ce qui a sorti un kebab secondaire à 40 px
+dans le HTML servi. Un palier nommé n'est pas une taille.
+
+### Trois arbitrages humains
+
+1. **Le vrai `tertiary` du design system**, rond et à survol gris — et non le `reversed` que les
+   exemples fournis nommaient « tertiary ». Le `data-ds-id` du balisage le disait ; `reversed`
+   dessinerait un carré blanc sur la surface bleue du bloc « Vision produit ».
+2. **36 px pour le rang plein**, la croix du tiroir grandissant de quatre pixels.
+3. **Deux jetons de durée**, fidèles au design system qui anime l'icône en 200 ms et le texte en 300.
+   `--duration-control` est la **neuvième** valeur posée faute de mieux dans `app/tokens.css`.
+
+### Une prose qui cite une classe l'émet dans la feuille servie
+
+Trois classes ont été trouvées dans le CSS de production sans qu'aucun code ne les emploie : elles
+venaient de deux phrases du journal citant le design system et d'un commentaire de `button.tsx`.
+Tailwind 4 extrait ses candidats du texte des fichiers qu'il balaie, Markdown compris. Récrites sans
+les nommer — **131 octets de CSS mort en moins**, mesurés avant et après.
+
+### Vérification
+
+**Six couples mesurés, tous les seuils tenus**, résolus depuis `app/tokens.css` : fond primaire
+12,97:1 sur la page, filet secondaire 13,65:1 sur la carte, les trois points du kebab 15,72:1 sur la
+carte et **15,14:1 sur la surface bleue** — la valeur que `indicators.tsx` citait déjà —, la croix du
+tiroir 13,65:1.
+
+**Un fait rapporté** : le survol du tertiaire icône vaut **1,00:1** sur la page — son
+`surface-neutral-lightest` en est la couleur exacte. C'est une **perte** sur les 1,18:1 du fond qu'il
+remplace, et le changement d'un seul jeton la rendrait. L'appui se voit partout à 1,28:1.
+
+**Lu dans le HTML servi** : quatre formes, croix du tiroir comprise (atteinte par
+`?activite=nouvelle`). Kebab tertiaire `size-8 rounded-full p-1`, kebab secondaire et croix
+`size-9 rounded-lg p-2`. **Et dans le CSS servi** : chaque palier des deux échelles, le rayon rond,
+le voile d'appui, et les **trois** jetons de durée coupés ensemble sous `prefers-reduced-motion`.
+
+`npm run lint`, `npx tsc --noEmit` et **1 582 tests** au vert. **Aucun motif ESLint ajouté** : il n'y
+a aucune duplication constatée de cette forme, et un cliquet sans duplication ne garde rien.

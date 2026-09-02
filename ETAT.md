@@ -2,10 +2,11 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 01/09/2026, après l'alignement du bouton sur le design system.
+**Dernière mise à jour :** 02/09/2026, après l'alignement du bouton icône sur le design system.
 Dernier balayage : découpage de C7. **Le fichier dépasse les 250 lignes de la règle 5 — 553 au
 31/08/2026, 642 après le mode de planification, 660 après le dispositif de mesure** ; le balayage
-appartient à la session de découpage de C8. **674 après les repères, 693 après le bouton.**
+appartient à la session de découpage de C8. **674 après les repères, 693 après le bouton à texte,
+708 après le bouton icône.**
 **Chantier en cours :** **C7 — Finitions**, dix tickets, découpés dans `tickets-C7.md`. **Dernier
 chantier du POC** — `docs/05` §5 n'en a pas de huitième.
 **Ticket suivant :** **T7.7 — Accessibilité : clavier, focus, contraste, titres.**
@@ -339,6 +340,19 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   tous les seuils tenus** ; les trois motifs anti-recopie d'ESLint remis à la nouvelle signature,
   **mis en défaut et remis au vert**. **Aucun appelant touché** : les trente restent au défaut
   `medium`. Aucun test neuf (1 582).
+- **Le bouton icône seule aligné à son tour — hors ticket (02/09).** `iconButtonClass()` naît à côté
+  de `buttonClass()`, **parce que les deux tables n'ont plus rien en commun** : le tertiaire icône
+  est **rond**, porte une échelle à lui (16/20/24/32 px contre 24/32/36/40) et **prend un fond au
+  survol** là où le tertiaire à texte ne change qu'une couleur. Ce fond **répare un défaut introduit
+  la veille** : les trois points du kebab sont des `<span>` en `bg-*`, ils ne suivent aucune couleur
+  de texte, et le kebab avait perdu tout survol visible. Le kebab tertiaire tient ses 32 px
+  (palier `large` de son échelle), le kebab secondaire et la croix du tiroir passent à 36 px
+  (`medium`) — **`ActionMenu` choisit son palier par rang**, les deux échelles ne se recouvrant pas.
+  `--duration-control: 200ms`, **neuvième valeur posée faute de mieux**, l'écart de vitesse du design
+  system repris et non arbitré. `reversed` non écrit. **Six couples mesurés, tous les seuils tenus** ;
+  quatre formes lues dans le HTML servi, croix du tiroir comprise. **Trois classes échappées de ma
+  propre prose** — un nom de classe écrit dans un `.md` ou un commentaire entre dans la feuille
+  servie — retirées, 131 octets de CSS mort en moins. Aucun test neuf (1 582).
 
 ---
 
@@ -588,7 +602,8 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 - **Le design system a huit manques, et aucun n'a été inventé.** Trois élévations et deux gradients
   nommés sans valeur ; aucun jeton de bordure de contrôle, de bordure d'erreur, d'interlettrage, de
   voile au-delà de 40 %, de séparateur, de mouvement (`--duration-drawer`, `--easing-drawer` et,
-  depuis le 01/09, `--duration-state` sont dans `app/tokens.css` faute de mieux) ; **`--number-*`
+  depuis le 01/09, `--duration-state` et `--duration-control` sont dans `app/tokens.css` faute de
+  mieux — quatre jetons de mouvement pour un document qui n'en nomme aucun) ; **`--number-*`
   s'arrête à 100 px** pour dix-neuf valeurs légitimes au-delà. **Six substituts mesurés**, de 3,05:1
   à 5,19:1. Le manque de **bordure de contrôle** ne porte plus sur le bouton depuis que son
   secondaire a pris `border-primary-base` (13,65:1) ; il reste entier sur `form-field.tsx`, où

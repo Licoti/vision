@@ -388,10 +388,18 @@
      `--duration-state` est le troisième, et il vient du bouton : le design
      system de référence fait fondre le fond, le filet et le texte d'un
      geste sur 300 ms au survol comme à l'appui. La valeur est la sienne,
-     le nom est d'ici — il porte les deux états, pas le seul survol. Le
-     manque du design system s'aggrave donc d'une valeur, à faire remonter
-     avec les sept autres (ETAT.md). */
+     le nom est d'ici — il porte les deux états, pas le seul survol.
+
+     `--duration-control` est le quatrième, et il vient du **bouton icône
+     seule**, que le design system anime en 200 ms là où il en met 300 sur
+     le bouton à texte. Le document ne justifie nulle part cet écart ; il
+     est repris tel quel plutôt qu'arbitré ici, et les deux vitesses se
+     verront quand les deux boutons se côtoieront.
+
+     Le manque du design system s'aggrave donc de deux valeurs, à faire
+     remonter avec les sept autres (ETAT.md). */
   --duration-instant: 0ms;
+  --duration-control: 200ms;
   --duration-drawer: 220ms;
   --duration-state: 300ms;
   --easing-drawer: cubic-bezier(0.32, 0.72, 0, 1);
@@ -399,7 +407,7 @@
 
 /* Qui a demandé moins de mouvement n'en reçoit aucun : les durées tombent à
    zéro, le tiroir paraît au lieu de glisser et un bouton change d'état d'un
-   coup. Un seul endroit à couper, parce que deux jetons portent tout le
+   coup. Un seul endroit à couper, parce que trois jetons portent tout le
    mouvement du produit.
 
    Le fondu d'un bouton n'est pas un déplacement, et aucun critère WCAG ne
@@ -407,6 +415,7 @@
    obligation. */
 @media (prefers-reduced-motion: reduce) {
   :root {
+    --duration-control: var(--duration-instant);
     --duration-drawer: var(--duration-instant);
     --duration-state: var(--duration-instant);
   }

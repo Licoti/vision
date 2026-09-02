@@ -56,7 +56,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
-import { buttonClass, type ButtonVariant } from "@/components/ui/button";
+import { iconButtonClass, type ButtonVariant } from "@/components/ui/button";
 
 export function ActionMenu({
   label,
@@ -78,9 +78,13 @@ export function ActionMenu({
    *
    * La roadmap demande `tertiary`, et la raison est le **nombre** : quinze
    * carrés à filet dans une même liste dessinent une colonne de boîtes que rien
-   * ne justifie. Le gabarit ne bouge pas d'un pixel entre les deux rangs —
-   * chacun porte le même `border` d'un pixel, transparent pour le tertiaire —,
-   * si bien que l'échange ne déplace aucune entrée.
+   * ne justifie.
+   *
+   * **Le gabarit bouge désormais entre les deux rangs** (01/09/2026) : le
+   * tertiaire icône est rond et porte une échelle à lui, plus serrée. Trente-deux
+   * pixels contre trente-six — le tertiaire est le plus petit des deux, ce qui va
+   * dans le sens du rang, et l'écart se voit sur les écrans qui mêlent les deux.
+   * L'argument d'origine — « l'échange ne déplace aucune entrée » — ne tient plus.
    */
   variant?: ButtonVariant;
   /** Les gestes, décidés par le serveur : des liens et des formulaires. */
@@ -134,7 +138,16 @@ export function ActionMenu({
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen((was) => !was)}
-        className={buttonClass({ variant, iconOnly: true })}
+        /* **Les deux échelles ne se recouvrent pas, et le palier se choisit
+           donc par rang.** Sur le rang plein, `medium` vaut 36 px — celui du
+           design system, et celui de la croix du tiroir. Sur le tertiaire, qui
+           a l'échelle plus serrée d'un bouton rond, `medium` ne vaudrait que
+           24 px : c'est `large` qui rend les 32 px mesurés que le kebab portait
+           déjà. Un palier nommé n'est pas une taille ; lu dans le HTML servi. */
+        className={iconButtonClass({
+          variant,
+          size: variant === "tertiary" ? "large" : "medium",
+        })}
       >
         {/* Les trois points sont **décoratifs** : le bouton est nommé par son
             `aria-label`, et la couleur ne porte jamais seule (docs/06 §11). */}

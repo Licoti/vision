@@ -94,6 +94,49 @@
  *   contre 4,04:1 à l'`opacity-60` d'avant. WCAG 1.4.3 exempte explicitement les
  *   composants inactifs ; la valeur est celle du design system.
  *
+ * ## Le bouton icône seule, un composant à part
+ *
+ * Le design system en fait un composant séparé, et ce fichier en fait une seconde
+ * fonction pour la même raison : **les deux tables n'ont plus rien en commun.**
+ *
+ * | | `xs` | `small` | `medium` | `large` |
+ * |---|---|---|---|---|
+ * | primaire, secondaire | 24 px | 32 px | 36 px | 40 px |
+ * | tertiaire, **rond** | 16 px | 20 px | 24 px | 32 px |
+ *
+ * **Le tertiaire icône prend un fond au survol**, gris et non teinté, là où le
+ * tertiaire à texte ne change que la couleur de son libellé. Ce n'est pas une
+ * incohérence du design system : les trois points du kebab sont des `<span>`
+ * dessinés en `bg-surface-primary-dark`, ils **ne suivent aucune couleur de
+ * texte**, et un survol qui ne toucherait qu'elle ne se verrait pas.
+ *
+ * | Couple | Ratio |
+ * |---|---|
+ * | PRIMAIRE fond `surface-primary-base` sur la page | 12,97:1 |
+ * | SECONDAIRE filet `border-primary-base` sur la carte | 13,65:1 |
+ * | TERTIAIRE les trois points `surface-primary-dark` sur la carte | 15,72:1 |
+ * | TERTIAIRE les trois points sur la surface bleue du bloc | 15,14:1 |
+ * | CROIX du tiroir `content-primary-base` sur `surface-neutral-pale` | 13,65:1 |
+ *
+ * **Le survol du tertiaire icône ne se voit pas non plus** : son
+ * `surface-neutral-lightest` **est** la couleur du fond de page — **1,00:1** —,
+ * 1,05:1 sur une carte, 1,01:1 sur la surface bleue du bloc. C'est le
+ * `greyscale-100` du design system, repris tel quel. Le rang portait auparavant
+ * `surface-neutral-lighter`, à 1,18:1 sur la page : **c'est une perte**, et le
+ * changement d'un seul jeton la rendrait. L'appui, lui, se voit partout à
+ * **1,28:1** — c'est un voile noir à 12 %, il ne dépend pas du fond. Rapporté,
+ * non masqué, comme les deux autres survols de ce fichier.
+ *
+ * **`reversed` n'est pas écrit.** Le design system a quatre apparences ; la
+ * quatrième — carrée, fond blanc, filet transparent — n'a aucun appelant, et
+ * c'est le tertiaire que le kebab demande : `reversed` dessinerait une boîte
+ * blanche sur la surface bleue du bloc « Vision produit ».
+ *
+ * **Deux vitesses à l'écran.** Le design system anime l'icône en 200 ms et le
+ * texte en 300, sans justifier l'écart nulle part. Les deux jetons sont posés —
+ * `--duration-control` et `--duration-state` —, l'écart est repris plutôt
+ * qu'arbitré ici, et il se verra quand les deux boutons se côtoieront.
+ *
  * ## Ce qui n'existe pas, et pourquoi
  *
  * Pas de `danger`, pas de `ghost`, pas de `reversed` : aucun appelant n'en a. La
@@ -201,16 +244,59 @@ const SIZE_TERTIARY: Record<ButtonSize, string> = {
 };
 
 /**
- * Le carré de 32 px des boutons icône seule — le calibre que le kebab et la croix
- * du tiroir portaient déjà tous les deux, mesuré avant d'être repris. Il est
- * **hors de l'échelle** : `size` ne l'atteint pas, et le design system fait de
- * même en confiant l'icône seule à un autre composant.
+ * Ce que tous les boutons icône seule ont en commun.
  *
- * `text-sm` y est écrit **explicitement**, parce que `BASE` ne le donne plus : le
- * kebab et la croix sont des caractères, et sans cette classe ils hériteraient la
- * taille de leur contexte. C'est exactement ce qu'ils rendaient auparavant.
+ * **Le rayon n'est pas ici**, et c'est un piège évité : le tertiaire est rond, les
+ * autres non. Deux classes de rayon dans la même chaîne se départageraient par
+ * l'ordre du CSS et non par celui de la chaîne — c'est exactement la collision que
+ * `tailwind-merge` sert à arbitrer, et que ce dépôt n'a pas. Le rayon vit donc
+ * dans les tables de gabarit, où chaque palier n'en nomme qu'un.
+ *
+ * **`text-sm` et non la table de tailles d'icône du design system.** La sienne
+ * dimensionne un `<svg>` (`w-3` à `w-6`) ; nos deux icônes sont un caractère (`✕`)
+ * et trois `<span>` dessinés. Transposer une boîte de SVG en corps de glyphe
+ * demanderait un rapport que rien ne justifie ; `text-sm` est ce qui était servi,
+ * et il est conservé. **Le jour où une librairie d'icônes entre, c'est cette table
+ * qu'il faut aller lire.**
+ *
+ * `inline-flex` contre le `flex` du design system, pour la raison de `BASE`.
  */
-const ICON_ONLY = "size-8 text-sm";
+const ICON_BASE =
+  "inline-flex cursor-pointer items-center justify-center border text-sm " +
+  "transition-colors duration-[var(--duration-control)] " +
+  "disabled:cursor-not-allowed disabled:opacity-40";
+
+/**
+ * Le gabarit du bouton icône plein — celui qui a un fond ou un filet.
+ *
+ * Le design system l'écrit en deux classes, largeur puis hauteur ; `size-9` est
+ * la même chose en une, et le dépôt l'employait déjà. **Le nom qu'il emploie
+ * n'est pas recopié ici** — voir la note du journal sur les classes qu'une prose
+ * fait entrer dans la feuille servie.
+ */
+const ICON_SIZE: Record<ButtonSize, string> = {
+  xs: "size-6 rounded-lg p-1.5",
+  small: "size-8 rounded-lg p-2",
+  medium: "size-9 rounded-lg p-2",
+  large: "size-10 rounded-lg p-2",
+};
+
+/**
+ * Le gabarit du tertiaire icône, et il n'a rien de commun avec le précédent : il
+ * est **rond**, et son échelle est bien plus petite — seize, vingt, vingt-quatre
+ * et trente-deux pixels contre vingt-quatre, trente-deux, trente-six et quarante.
+ * Les creux sont ceux du design system, y compris son irrégularité : deux paliers
+ * portent un `p-1`, les deux autres aucun.
+ *
+ * **C'est `large` qui vaut 32 px**, le calibre que le kebab et la croix portaient
+ * tous deux avant ce jour.
+ */
+const ICON_SIZE_TERTIARY: Record<ButtonSize, string> = {
+  xs: "size-4 rounded-full",
+  small: "size-5 rounded-full p-1",
+  medium: "size-6 rounded-full",
+  large: "size-8 rounded-full p-1",
+};
 
 /**
  * Le rang, sur le patron de `TONE` dans `block.tsx` : un objet nommé, une
@@ -235,6 +321,38 @@ const VARIANT: Record<ButtonVariant, string> = {
 };
 
 /**
+ * Le rang du bouton icône seule, **et il ne se confond pas avec celui du bouton à
+ * texte**. Le design system en fait un composant séparé, avec ses propres règles,
+ * et deux d'entre elles ne se déduisent pas de l'autre table :
+ *
+ * - **le tertiaire icône prend un fond au survol**, gris et non teinté, là où le
+ *   tertiaire à texte ne change que la couleur de son libellé. C'est ce qu'il faut
+ *   ici : les trois points du kebab sont des `<span>` dessinés en
+ *   `bg-surface-primary-dark`, ils ne suivent aucune couleur de texte, et un
+ *   survol qui ne toucherait qu'elle **ne se verrait pas du tout** ;
+ * - l'appui pose un voile noir à 12 % (`surface-neutral-opacity-faint`), qui est
+ *   exactement le `functional-grey-12` du design system.
+ *
+ * La couleur de texte reste posée pour la croix du tiroir, qui est un caractère et
+ * l'hérite. Elle ne sert à rien au kebab, et ne lui coûte rien.
+ *
+ * **Le `reversed` du design system n'est pas écrit** — carré, fond blanc, filet
+ * transparent : il n'a aucun appelant, et c'est le tertiaire que le kebab demande.
+ */
+const ICON_VARIANT: Record<ButtonVariant, string> = {
+  primary:
+    "border-border-primary-base bg-surface-primary-base text-content-neutral-pale " +
+    "hover:border-border-primary-normal hover:bg-surface-primary-normal " +
+    "active:border-border-primary-dark active:bg-surface-primary-dark",
+  secondary:
+    "border-border-primary-base bg-surface-neutral-pale text-content-primary-base " +
+    "hover:bg-surface-primary-lightest active:bg-surface-primary-lighter",
+  tertiary:
+    "border-transparent bg-transparent text-content-primary-base " +
+    "hover:bg-surface-neutral-lightest active:bg-surface-neutral-opacity-faint",
+};
+
+/**
  * Les classes d'un bouton, pour **toute** balise.
  *
  * **Une fonction et non trois constantes**, et le critère est celui
@@ -247,14 +365,13 @@ const VARIANT: Record<ButtonVariant, string> = {
  * ```tsx
  * <Link href={href} className={buttonClass()}>Nouveau produit</Link>
  * <DrawerLink href={href} className={buttonClass({ variant: "secondary" })}>Archiver</DrawerLink>
- * <a className={buttonClass({ variant: "secondary", iconOnly: true })} aria-label="…" />
+ * <a className={buttonClass({ variant: "secondary", size: "small" })}>Archiver</a>
  * ```
  *
- * **`iconOnly` l'emporte sur `size`, en silence.** Les deux ne se composent pas :
- * le carré de 32 px est hors de l'échelle, et une taille posée avec lui n'a aucun
- * effet. Le cas ne se présente pas — les deux appelants d'`iconOnly` ne posent
- * pas de taille —, et le rendre impossible à écrire coûterait une union
- * discriminée de plus sur une fonction que quatre balises appellent.
+ * **Un bouton icône seule ne passe plus par ici** : il a sa fonction,
+ * `iconButtonClass()`. Les deux tables n'ont plus rien en commun — ni la base, ni
+ * l'échelle, ni le rayon —, et le design system les sépare de la même façon, en
+ * deux composants.
  *
  * L'ordre des morceaux est fixe — forme, gabarit, rang — pour que l'attribut
  * `class` servi soit stable d'un appel à l'autre : c'est ce qui rend un diff de
@@ -263,19 +380,36 @@ const VARIANT: Record<ButtonVariant, string> = {
 export function buttonClass(options?: {
   variant?: ButtonVariant;
   size?: ButtonSize;
-  iconOnly?: boolean;
 }): string {
-  const {
-    variant = "primary",
-    size = "medium",
-    iconOnly = false,
-  } = options ?? {};
-  const gauge = iconOnly
-    ? ICON_ONLY
-    : variant === "tertiary"
-      ? SIZE_TERTIARY[size]
-      : SIZE[size];
+  const { variant = "primary", size = "medium" } = options ?? {};
+  const gauge = variant === "tertiary" ? SIZE_TERTIARY[size] : SIZE[size];
   return `${BASE} ${gauge} ${VARIANT[variant]}`;
+}
+
+/**
+ * Les classes d'un bouton icône seule, pour **toute** balise.
+ *
+ * Le pendant d'`buttonClass()` pour le geste qui n'a pas de mot. Deux appelants :
+ * le kebab d'`action-menu.tsx` et la croix de `drawer.tsx`.
+ *
+ * ```tsx
+ * <button className={iconButtonClass({ variant: "tertiary", size: "large" })} aria-label="…" />
+ * <DrawerClose className={iconButtonClass({ variant: "secondary" })} aria-label="…" />
+ * ```
+ *
+ * **Le nom accessible n'est pas garanti ici**, et il ne peut pas l'être : la
+ * fonction rend une chaîne, elle ne voit pas la balise. C'est `Button` qui le rend
+ * obligatoire par son type ; les deux appelants directs portent leur `aria-label`
+ * à la main, et l'un d'eux le reçoit en prop obligatoire.
+ */
+export function iconButtonClass(options?: {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+}): string {
+  const { variant = "primary", size = "medium" } = options ?? {};
+  const gauge =
+    variant === "tertiary" ? ICON_SIZE_TERTIARY[size] : ICON_SIZE[size];
+  return `${ICON_BASE} ${gauge} ${ICON_VARIANT[variant]}`;
 }
 
 /**
@@ -344,7 +478,9 @@ export function Button({
       label: string;
     })) {
   const iconOnly = children === undefined;
-  const shell = buttonClass({ variant, size, iconOnly });
+  const shell = iconOnly
+    ? iconButtonClass({ variant, size })
+    : buttonClass({ variant, size });
   return (
     <button
       {...props}

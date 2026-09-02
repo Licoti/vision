@@ -9215,8 +9215,9 @@ La correspondance a donc été posée sur la couche sémantique, sans qu'aucune 
 choisie : `primary-500` → `surface-primary-base`, `primary-400` → `surface-primary-normal`,
 `primary-300` → `content-primary-light`, `primary-700` → `surface-primary-dark`, `primary-200` →
 `surface-primary-lighter`, `primary-100` → `surface-primary-lightest`, `greyscale-50` →
-`content-neutral-pale`. Idem pour la typographie : le `text-[0.625rem]` du design system est
-`text-2xs` (10 px), son `text-base` est `text-md` (16 px). **La règle 2 n'a jamais été approchée.**
+`content-neutral-pale`. Idem pour la typographie : la taille arbitraire de 0,625 rem du design
+system est `text-2xs` (10 px), et son `text-base` est `text-md` (16 px). **La règle 2 n'a jamais été
+approchée.**
 
 Un détail relevé sans conséquence : les paliers `midnight-50` et `midnight-100` sont **intervertis**
 entre les deux dépôts (`#f6f8fe` / `#f5f9ff`). Les deux sont des blancs bleutés à 1,01:1 l'un de
@@ -9266,8 +9267,8 @@ relevé. **À retenir : une preflight qui change ne casse rien de visible et ne 
 
 ### Le huitième manque du design system : `--duration-state`
 
-Le fondu de 300 ms du design system ne peut pas s'écrire `duration-300` — c'est une valeur en dur
-(règle 2), et l'échelle `duration-*` de Tailwind dérive d'un nombre, pas d'un jeton. Le document ne
+Le fondu de 300 ms du design system ne peut pas s'écrire en utilitaire numérique — c'est une valeur
+en dur (règle 2), et l'échelle `duration-*` de Tailwind dérive d'un nombre, pas d'un jeton. Le document ne
 nomme toujours aucune durée. `--duration-state: 300ms` rejoint donc `--duration-drawer` et
 `--easing-drawer` dans `app/tokens.css`, **à la place des autres**, et le manque s'aggrave d'une
 valeur.
@@ -9351,3 +9352,127 @@ tiroir. Faute de pouvoir le lire, deux preuves d'une autre nature :
   appelant** : Tailwind 4 n'émet que ce qu'il trouve dans les sources, et une classe absente de la
   feuille ne rend rien, sans erreur. Toutes sont là, y compris la coupure de `--duration-state` sous
   `prefers-reduced-motion`.
+
+---
+
+## Le bouton icône seule aligné à son tour — hors ticket, 02/09/2026
+
+### Un défaut introduit la veille, et pourquoi rien ne l'a signalé
+
+L'alignement du bouton à texte avait donné au tertiaire un survol qui **ne change que la couleur du
+texte** (`hover:text-content-primary-light`), en remplacement du fond gris qu'il portait. Or le
+déclencheur d'`ActionMenu` — le kebab, cinq emplois — dessine ses trois points en
+`bg-surface-primary-dark` : ce sont des `<span>` colorés au fond, **ils ne suivent aucune couleur de
+texte**. Le kebab a donc passé une journée **sans aucun état de survol visible**.
+
+Rien ne pouvait le dire : `tsc` et `eslint` sont muets sur une classe qui s'applique à un élément
+dont aucun descendant ne l'hérite, le HTML servi contenait bien la classe attendue, et les contrastes
+mesurés portaient sur le texte — qui, ici, n'existe pas. **À retenir : un `hover:text-*` sur un bouton
+dont l'icône est peinte au fond ne fait rien, et cela se lit dans le composant appelant, pas dans le
+socle.** C'est l'alignement du bouton icône qui le répare, son tertiaire prenant un fond.
+
+### Deux tables qui n'ont plus rien en commun, donc deux fonctions
+
+`iconButtonClass()` naît à côté de `buttonClass()`, et non comme une option de plus. La raison est
+qu'il ne reste rien à partager :
+
+| | `xs` | `small` | `medium` | `large` |
+|---|---|---|---|---|
+| plein (primaire, secondaire) | 24 px | 32 px | 36 px | 40 px |
+| tertiaire, **rond** | 16 px | 20 px | 24 px | 32 px |
+
+La base diffère (pas d'écart entre icône et texte, pas de graisse, une autre durée), l'échelle
+diffère, le rayon diffère, et le tertiaire prend un fond au survol quand celui du bouton à texte n'en
+prend pas. Le design system tranche de la même façon, en deux composants. `buttonClass()` perd donc
+son option `iconOnly`, et ses deux appelants passent à la nouvelle fonction.
+
+### Le rayon ne peut pas vivre dans la base
+
+Le design system pose son rayon dans la chaîne de base et laisse le tertiaire l'écraser par
+`rounded-full`. **Cela ne se transpose pas ici** : ce dépôt n'a pas `tailwind-merge`, et deux classes
+de rayon dans la même chaîne se départagent par l'ordre du **CSS servi**, pas par celui de la chaîne
+— l'en-tête de `button.tsx` explique justement pourquoi ce dépôt peut se passer de l'arbitre, la
+palette étant fermée. C'est le cas limite où l'absence d'arbitre se paie.
+
+Le rayon vit donc dans les tables de gabarit, où chaque palier n'en nomme qu'un. **Aucun conflit
+possible plutôt qu'un conflit correctement arbitré.**
+
+### `ActionMenu` choisit son palier par rang
+
+Écrit d'abord `size: "large"` pour tous les rangs, en ne raisonnant que sur le tertiaire — dont le
+`large` vaut bien les 32 px du kebab. **Le HTML servi a montré un kebab secondaire à 40 px** : sur
+l'échelle pleine, `large` est le dernier palier, pas celui qui conserve le calibre.
+
+`variant === "tertiary" ? "large" : "medium"`. **À retenir : un palier nommé n'est pas une taille.**
+Deux échelles qui portent les mêmes quatre noms sans se recouvrir sont un piège que seul le rendu
+révèle — ni le type ni le lint ne voient qu'un `large` en vaut un autre.
+
+### L'écart de vitesse du design system est repris, pas arbitré
+
+Il anime le bouton icône en **200 ms** et le bouton à texte en **300**, sans justifier l'écart nulle
+part. `--duration-control: 200ms` rejoint donc `--duration-state`, et le mouvement du produit compte
+désormais **quatre jetons** posés faute de mieux — pour un document qui n'en nomme aucun.
+
+Les deux vitesses se verront quand les deux boutons se côtoieront ; c'est un choix humain, pris en
+connaissance de cause. Les trois durées sont coupées ensemble sous `prefers-reduced-motion`.
+
+### Le survol du tertiaire icône est plus faible que celui qu'il remplace
+
+`hover:bg-greyscale-100` du design system est notre `surface-neutral-lightest` — **qui est la couleur
+du fond de page**. Le survol y mesure donc **1,00:1**, 1,05:1 sur une carte, 1,01:1 sur la surface
+bleue du bloc « Vision produit ». Le rang portait auparavant `surface-neutral-lighter`, à 1,18:1 :
+**c'est une perte, et le changement d'un seul jeton la rendrait.**
+
+L'appui, lui, se voit partout à **1,28:1** — c'est un voile noir à 12 %
+(`surface-neutral-opacity-faint`, exactement le `functional-grey-12` du design system), il ne dépend
+pas du fond. Aucun seuil WCAG ne porte sur un survol, et le focus clavier ne dépend pas de lui.
+**Troisième survol trop faible rapporté par ce fichier**, après celui de la maquette à 1,24:1 et celui
+du secondaire à 1,04:1 : ce n'est plus un accident, c'est une propriété de la palette.
+
+### Le troisième exemple fourni était `reversed`, pas `tertiary`
+
+La demande présentait trois apparences en les nommant primary / secondary / tertiary. Le
+`data-ds-id` du troisième dit `DNA-reversed-icon-button` : c'est la **quatrième** apparence du design
+system — carrée, fond blanc, filet transparent. Son vrai `tertiary` est rond, sans fond, à survol
+gris, et porte l'échelle serrée ci-dessus.
+
+L'écart a été relevé et tranché par l'humain en faveur du vrai `tertiary`, pour une raison
+mesurable : `reversed` dessinerait un carré blanc sur la surface bleue du bloc « Vision produit », où
+le kebab se pose. `reversed` **n'est pas écrit** — il n'a aucun appelant.
+
+**À retenir : un exemple de balisage porte son nom d'apparence dans un attribut de données**, et il
+faut le lire plutôt que le titre qui l'accompagne.
+
+### Une prose qui écrit des noms de classes les fait entrer dans la feuille servie
+
+Une durée numérique, une largeur numérique et une taille de texte en valeur arbitraire ont été
+trouvées **dans le CSS de production**, sans qu'aucun code ne les emploie. Elles venaient de trois
+endroits : deux phrases de ce journal citant le design system, et un commentaire de `button.tsx`.
+Elles ne sont pas nommées ici — **la première rédaction de ce paragraphe les nommait, et les a
+réintroduites toutes les trois.**
+
+Tailwind 4 extrait ses candidats du **texte** des fichiers qu'il balaie, et la détection de contenu
+de Next inclut le Markdown du dépôt. Un nom de classe cité en prose est donc un nom de classe émis.
+Les trois ont été récrites sans le nom — **131 octets de CSS mort en moins**, mesurés avant et après.
+
+Ce n'est pas grave et ce n'est pas nouveau : c'est le mécanisme même de Tailwind. Mais il rend
+**`--color-*: initial` d'autant plus précieux** — l'espace des couleurs étant fermé, une couleur citée
+en prose n'émet rien, là où une dimension citée en prose émet. Et il vaut un réflexe : **ne pas
+recopier une classe étrangère dans un commentaire ou un journal**, la décrire.
+
+Le dépôt n'a pas été balayé au-delà de ces trois-là ; d'autres fuites plus anciennes existent
+probablement, et ce n'était pas le périmètre.
+
+### Ce qui n'a pas été fait, et pourquoi
+
+- **Aucun motif ESLint anti-recopie pour le bouton icône.** Le fichier des règles dit de lui-même
+  qu'il est « un cliquet sur la duplication constatée » : il n'y a aucune duplication de cette forme
+  dans le dépôt, et l'ancienne coquille `size-8` n'en avait pas non plus.
+- **`action-menu.tsx` garde ses trois points en `bg-surface-primary-dark`.** Les passer en
+  `bg-current` les ferait suivre le rang, ce qui serait plus juste — mais le survol ne dépend plus
+  d'eux depuis qu'il porte un fond, et la règle 3 borne le périmètre.
+- **La table de tailles d'icône du design system n'est pas transposée.** Elle dimensionne un `<svg>`
+  de 12 à 24 px ; nos deux icônes sont un caractère et trois `<span>` dessinés. Passer d'une boîte de
+  SVG à un corps de glyphe demanderait un rapport que rien ne justifie. `text-sm` est ce qui était
+  servi, il est conservé — **et c'est cette table qu'il faudra lire le jour où une librairie d'icônes
+  entre.**
