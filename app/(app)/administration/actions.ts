@@ -102,12 +102,12 @@ import {
   type Row,
 } from "@/lib/db/scoped";
 import {
+  formatAccompaniments,
   formatActivities,
   formatActivityTypes,
   formatDeclarations,
   formatPersons,
   formatProducts,
-  formatProjects,
   formatStarters,
 } from "@/lib/format";
 import {
@@ -604,10 +604,10 @@ function revalidateReferential(referential: Referential): void {
 
 function refusalOfJobUsage(usage: ReferentialUsage): string | null {
   if (usage.projects > 1) {
-    return `${formatProjects(usage.projects)} vivants déclarent encore ce métier. Retirez-le de leur fiche ou archivez-les d'abord : ranger le métier les laisserait dans la liste sans leur filtre.`;
+    return `${formatAccompaniments(usage.projects)} vivants déclarent encore ce métier. Retirez-le de leur fiche ou archivez-les d'abord : ranger le métier les laisserait dans la liste sans leur filtre.`;
   }
   if (usage.projects === 1) {
-    return `${formatProjects(1)} vivant déclare encore ce métier. Retirez-le de sa fiche ou archivez-le d'abord : ranger le métier le laisserait dans la liste sans son filtre.`;
+    return `${formatAccompaniments(1)} vivant déclare encore ce métier. Retirez-le de sa fiche ou archivez-le d'abord : ranger le métier le laisserait dans la liste sans son filtre.`;
   }
   if (usage.persons > 1) {
     return `${formatPersons(usage.persons)} portent encore ce métier. Donnez-leur un autre métier ou archivez-les d'abord : ranger le métier laisserait leur fiche sans filtre.`;
@@ -620,10 +620,10 @@ function refusalOfJobUsage(usage: ReferentialUsage): string | null {
 
 function refusalOfApproachUsage(usage: ReferentialUsage): string | null {
   if (usage.projects > 1) {
-    return `${formatProjects(usage.projects)} vivants déclarent encore cette approche. Retirez-la de leur fiche ou archivez-les d'abord : ranger l'approche les laisserait dans la liste sans leur filtre.`;
+    return `${formatAccompaniments(usage.projects)} vivants déclarent encore cette approche. Retirez-la de leur fiche ou archivez-les d'abord : ranger l'approche les laisserait dans la liste sans leur filtre.`;
   }
   if (usage.projects === 1) {
-    return `${formatProjects(1)} vivant déclare encore cette approche. Retirez-la de sa fiche ou archivez-le d'abord : ranger l'approche le laisserait dans la liste sans son filtre.`;
+    return `${formatAccompaniments(1)} vivant déclare encore cette approche. Retirez-la de sa fiche ou archivez-le d'abord : ranger l'approche le laisserait dans la liste sans son filtre.`;
   }
   if (usage.activities > 1) {
     return `${formatActivities(usage.activities)} vivantes portent encore cette approche. Corrigez-les ou archivez-les d'abord : ranger l'approche les laisserait sur la roadmap sans leur manière.`;
@@ -1107,10 +1107,10 @@ export async function restoreSkillLevel(levelId: string): Promise<void> {
 
 function refusalOfStatusUsage(usage: ReferentialUsage): string | null {
   if (usage.projects > 1) {
-    return `${formatProjects(usage.projects)} vivants portent encore ce statut. Donnez-leur un autre statut ou archivez-les d'abord : ranger le statut les laisserait dans la liste sans leur filtre.`;
+    return `${formatAccompaniments(usage.projects)} vivants portent encore ce statut. Donnez-leur un autre statut ou archivez-les d'abord : ranger le statut les laisserait dans la liste sans leur filtre.`;
   }
   if (usage.projects === 1) {
-    return `${formatProjects(1)} vivant porte encore ce statut. Donnez-lui un autre statut ou archivez-le d'abord : ranger le statut le laisserait dans la liste sans son filtre.`;
+    return `${formatAccompaniments(1)} vivant porte encore ce statut. Donnez-lui un autre statut ou archivez-le d'abord : ranger le statut le laisserait dans la liste sans son filtre.`;
   }
   return null;
 }

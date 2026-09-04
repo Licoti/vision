@@ -364,7 +364,7 @@ export function ProjectForm({
             l'affichage, indépendamment de ceux que porte l'équipe. */}
         <CheckboxGroup
           legend="Métiers mobilisés"
-          note="Les métiers déclarés ici font foi pour la liste des projets. Ils peuvent différer de ceux de l'équipe."
+          note="Les métiers déclarés ici font foi pour la liste des accompagnements. Ils peuvent différer de ceux de l'équipe."
           name="jobIds"
           idFor={id}
           options={jobs}

@@ -149,7 +149,7 @@ export default async function DevSessionPage() {
             </h2>
             <ul className="flex flex-col gap-2">
               <Right granted={session.can.manageDomain}>
-                Crée et modifie produits, projets et référentiels
+                Crée et modifie produits, accompagnements et référentiels
               </Right>
               <Right granted={session.can.writeAnyProject}>
                 Saisit activités, ressources, résultats et relevés
@@ -157,12 +157,12 @@ export default async function DevSessionPage() {
             </ul>
             <p className="text-sm leading-200 text-content-neutral-dark">
               {session.can.manageDomain
-                ? "Portée de saisie : tous les projets du domaine."
+                ? "Portée de saisie : tous les accompagnements du domaine."
                 : contributorProjects.length > 0
-                  ? `Portée de saisie : les projets où cette personne est contributrice désignée — ${contributorProjects
+                  ? `Portée de saisie : les accompagnements où cette personne est contributrice désignée — ${contributorProjects
                       .map((project) => project.name)
                       .join(", ")}.`
-                  : "Portée de saisie : aucun projet. Cette personne lit tout le domaine et n'y écrit rien."}
+                  : "Portée de saisie : aucun accompagnement. Cette personne lit tout le domaine et n'y écrit rien."}
             </p>
           </section>
         </>

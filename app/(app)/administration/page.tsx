@@ -71,11 +71,11 @@ import {
   formatActivities,
   formatActivityFamily,
   formatActivityTypes,
+  formatAccompaniments,
   formatDeclarations,
   formatMonth,
   formatPersons,
   formatProducts,
-  formatProjects,
   formatProjectStatusNature,
   formatStarterKind,
   formatStarters,
@@ -166,7 +166,7 @@ const USAGE_SOURCES: Record<
 /** L'en-tête de colonne — décoratif : la ligne dit elle-même ce qu'elle compte. */
 const SOURCE_HEADING: Record<keyof ReferentialUsage, string> = {
   products: "Produits",
-  projects: "Projets",
+  projects: "Accompagnements",
   persons: "Personnes",
   activities: "Activités",
   activityTypes: "Types",
@@ -592,7 +592,7 @@ function formatSource(source: keyof ReferentialUsage, count: number): string {
     case "products":
       return formatProducts(count);
     case "projects":
-      return formatProjects(count);
+      return formatAccompaniments(count);
     case "persons":
       return formatPersons(count);
     case "activities":
@@ -656,7 +656,7 @@ const EMPTY_TITLE: Record<Referential, string> = {
   approches: "Aucune approche dans ce domaine",
   competences: "Aucune compétence dans ce domaine",
   niveaux: "Aucun niveau de maîtrise dans ce domaine",
-  statuts: "Aucun statut de projet dans ce domaine",
+  statuts: "Aucun statut d'accompagnement dans ce domaine",
   types: "Aucun type d'activité dans ce domaine",
   outils: "Aucun outil raccordé à ce domaine",
   pistes: "Aucune piste de démarrage dans ce domaine",

@@ -238,7 +238,7 @@ export function listRecentEvents(
  *
  * **Le nombre est un décompte de lignes, jamais un indice.** C'est la frontière
  * de D39 : Vision n'a rien calculé pour qualifier qui que ce soit — elle a
- * compté ce que le filtre de `/projets` rendra. D'où le contrat que le ticket
+ * compté ce que le filtre de `/accompagnements` rendra. D'où le contrat que le ticket
  * pose et que le test mesure : **suivre le lien rend exactement ce nombre de
  * lignes**. Un décompte qui ne tiendrait pas cette promesse serait un mensonge
  * qu'aucun autre constat ne détecte.
@@ -259,7 +259,7 @@ export type StatusDistributionEntry = DistributionEntry & {
  * statut, par entité, par approche.
  *
  * L'entité a manqué d'un chantier, et c'était la lettre de la fiche T6.7 :
- * *« un chiffre dont le filtre n'existe pas n'est pas rendu »*. `/projets` ne
+ * *« un chiffre dont le filtre n'existe pas n'est pas rendu »*. `/accompagnements` ne
  * portait aucune clé d'entité, et rendre le chiffre aurait donné un nombre qui
  * ne mène nulle part. T7.2 pose le filtre d'abord, le chiffre ensuite — dans
  * cet ordre, et c'est le seul qui tienne le contrat.
@@ -486,7 +486,7 @@ export const STALE_AFTER_MONTHS = 1;
  * courte est celle qu'on lit d'un regard. **La conséquence est nommée** :
  * au-delà de dix projets dormants, les suivants ne sont pas affichés. Le bloc
  * attire le regard sur ce qui s'endort, il ne tient pas l'inventaire de ce qui
- * dort — c'est la page `/projets`, triée par activité récente, qui le fait.
+ * dort — c'est la page `/accompagnements`, triée par activité récente, qui le fait.
  *
  * **Le plafond porte sur les accompagnements en cours seuls** depuis le
  * 31/08/2026 : les terminés ne le consomment plus, et dix places rendent donc
@@ -540,7 +540,7 @@ export function staleBefore(now: Date = new Date()): Date {
  * **Ni statut, ni équipe, ni produit** : le bloc dit un nom et une date, et
  * `docs/06` §3 le veut *« sans alerte ni badge »*. Trois colonnes de plus
  * feraient une seconde liste des projets sur la vue d'ensemble, quand
- * `/projets` existe et porte le tri par fraîcheur.
+ * `/accompagnements` existe et porte le tri par fraîcheur.
  */
 export type StaleProject = {
   id: string;
@@ -654,7 +654,7 @@ export function listStaleProjects(
  * **Ce sont des décomptes de lignes, et le lien le prouve** : chacun mène à la
  * liste sans filtre, qui rend exactement ce nombre. C'est le contrat de la
  * répartition, appliqué à l'entrée qui n'en pose aucun — et les deux pages de
- * destination affichent déjà ces mêmes nombres (`formatProjects`,
+ * destination affichent déjà ces mêmes nombres (`formatAccompaniments`,
  * `formatProducts`).
  *
  * **Ce n'est pas la taille du centre.** Un décompte de lignes ne qualifie

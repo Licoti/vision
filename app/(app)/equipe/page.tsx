@@ -9,7 +9,7 @@
  * **Les filtres passent par l'URL** et non par un état client : ils se
  * partagent, ils survivent à un rechargement, et l'écran reste un composant
  * serveur. Le formulaire fonctionne sans JavaScript. C'est le patron de
- * `ProjectFilters` (`app/(app)/projets/page.tsx`), **repris et non généralisé** :
+ * `ProjectFilters` (`app/(app)/accompagnements/page.tsx`), **repris et non généralisé** :
  * une barre de recherche appartient à sa liste (D32), elle n'est pas un
  * composant de socle.
  *
@@ -53,7 +53,7 @@
  *    variait de 58 à 122 px, et c'est la comparaison ligne à ligne — celle qui
  *    fonde la liste dense (`components/ui/list.tsx`) — qui tombait.
  * 7. **Un chevron annonce que la ligne ouvre un panneau**, et non un écran :
- *    sur `/projets`, une ligne du même dessin emmène ailleurs.
+ *    sur `/accompagnements`, une ligne du même dessin emmène ailleurs.
  *
  * **Ce que la direction coûte, et qui était nommé au canevas** : le rail prend
  * 320 px à une liste dont les colonnes étaient déjà serrées, et « +3 » cache ce
@@ -661,7 +661,7 @@ function PersonLine({
         )}
       </span>
 
-      {/* **Ce que la ligne ouvre, dit à l'œil.** Sur `/projets`, une ligne du
+      {/* **Ce que la ligne ouvre, dit à l'œil.** Sur `/accompagnements`, une ligne du
           même dessin emmène sur un écran ; ici elle ouvre un tiroir, et rien ne
           les distinguait. Il sort de l'arbre d'accessibilité : le lien porte
           déjà le nom de la personne, et un chevron lu à la voix n'ajouterait

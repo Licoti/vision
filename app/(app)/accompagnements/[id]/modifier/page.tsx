@@ -1,5 +1,5 @@
 /**
- * Modifier un accompagnement — le miroir de `/projets/nouveau`, pré-rempli.
+ * Modifier un accompagnement — le miroir de `/accompagnements/nouveau`, pré-rempli.
  *
  * Même garde de droit, même formulaire, même action ; seule change la
  * fonction d'écriture, **liée à l'identifiant côté serveur**. L'identifiant ne
@@ -85,7 +85,7 @@ export default async function EditProjectPage({
     <>
       <Breadcrumb
         items={[
-          { href: ROUTES.projects, label: "Projets" },
+          { href: ROUTES.projects, label: "Accompagnements" },
           { href: ROUTES.project(project.id), label: project.name },
           { label: "Modifier" },
         ]}

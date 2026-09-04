@@ -59,7 +59,7 @@ import { RecentActivity } from "@/components/overview/feed";
 import { StaleProjects } from "@/components/overview/stale";
 import { Page, PageHeader } from "@/components/ui/page";
 import { requireSession } from "@/lib/auth/provider";
-import { formatProducts, formatProjects } from "@/lib/format";
+import { formatAccompaniments, formatProducts } from "@/lib/format";
 import {
   countProducts,
   countProjects,
@@ -95,7 +95,7 @@ export default async function OverviewPage() {
            accompagnements ; le produit n'apparaît qu'en origine d'une ligne de
            flux. Le point médian est le séparateur de la ligne de faits de la
            page produit, et il n'y en a pas deux. */
-        facts={`${formatProjects(projectCount)} · ${formatProducts(productCount)}`}
+        facts={`${formatAccompaniments(projectCount)} · ${formatProducts(productCount)}`}
       />
 
       {/* Le gabarit de la page projet, repris tel quel : `1fr 320px` au-delà du

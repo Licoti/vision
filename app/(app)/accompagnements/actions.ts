@@ -640,7 +640,7 @@ export async function updateProject(
 /**
  * Le droit, puis l'accompagnement, sur l'identifiant **reçu**.
  *
- * **Le nom la distingue d'`openProject`** (`projets/[id]/actions.ts`), et ce
+ * **Le nom la distingue d'`openProject`** (`accompagnements/[id]/actions.ts`), et ce
  * n'est pas une coquetterie : l'une exige `manageDomain`, l'autre
  * `writeProject`, et les confondre serait le seul moyen d'ouvrir l'archivage à
  * un contributeur désigné. D9 pose deux niveaux ; le partage est celui de T2.6,
@@ -695,7 +695,7 @@ function refreshAround(projectId: string, productId: string): void {
  * Un accompagnement archivé est **la mémoire du centre** (F1-D3) : sa page se
  * lit entière — en-tête, roadmap, ressources, résultats. Ce qui disparaît est
  * l'écriture, et elle disparaît **dans les deux portes** de
- * `projets/[id]/actions.ts`, pas ici.
+ * `accompagnements/[id]/actions.ts`, pas ici.
  *
  * Aucune cascade — arbitrage (f) : les activités gardent leur `archived_at` nul
  * et cessent de s'afficher parce que leur projet ne s'affiche plus. Une cascade

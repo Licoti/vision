@@ -43,7 +43,7 @@ import { Page, PageHeader } from "@/components/ui/page";
 import { StatusPill } from "@/components/ui/status-pill";
 import { requireSession } from "@/lib/auth/provider";
 import { approaches, entities, jobs, projectStatuses } from "@/lib/db/schema";
-import { formatMonth, formatProjects } from "@/lib/format";
+import { formatAccompaniments, formatMonth } from "@/lib/format";
 import { PROJECT_FILTER_PARAM, ROUTES } from "@/lib/navigation";
 import {
   listProjectFilterOptions,
@@ -54,7 +54,7 @@ import {
 import { isUuid } from "@/lib/uuid";
 
 export const metadata = {
-  title: "Projets — Vision",
+  title: "Accompagnements — Vision",
 };
 
 /** Les gabarits de colonne, tenus en un seul endroit pour que l'en-tête et
@@ -160,7 +160,7 @@ export default async function ProjectsPage({
   return (
     <Page>
       <PageHeader
-        title="Projets"
+        title="Accompagnements"
         lead="Quels accompagnements existent en ce moment, tous produits confondus ?"
         action={session.can.manageDomain ? <NewProjectLink /> : null}
       />
@@ -185,7 +185,7 @@ export default async function ProjectsPage({
             className="flex flex-wrap items-center gap-2 text-sm text-content-neutral-dark"
           >
             <span className="font-semibold text-content-neutral-darkest">
-              {formatProjects(rows.length)}
+              {formatAccompaniments(rows.length)}
             </span>
             {applied.map((filter) => (
               <span key={filter.field} className="flex items-center gap-2">
@@ -211,7 +211,7 @@ export default async function ProjectsPage({
       {rows.length > 0 ? (
         <List label="Accompagnements, tous produits confondus">
           <ListHeader>
-            <span className={COLUMN.name}>Projet</span>
+            <span className={COLUMN.name}>Accompagnement</span>
             <span className={COLUMN.product}>Produit</span>
             <span className={COLUMN.status}>Statut</span>
             <span className={COLUMN.team}>Équipe</span>
@@ -261,14 +261,14 @@ export default async function ProjectsPage({
         </List>
       ) : applied.length > 0 ? (
         <EmptyState
-          title="Aucun projet ne répond à ces critères"
+          title="Aucun accompagnement ne répond à ces critères"
           description="Les filtres se combinent : chacun restreint le résultat du précédent. En retirer un suffit peut-être à retrouver ce que vous cherchez."
           action={
             <Link
               href={ROUTES.projects}
               className={ACTION_LINK_SM}
             >
-              Voir tous les projets
+              Voir tous les accompagnements
             </Link>
           }
         />
@@ -333,7 +333,7 @@ function ProjectFilters({
       method="get"
       action={ROUTES.projects}
       className="flex flex-wrap items-end gap-3"
-      aria-label="Filtrer les projets"
+      aria-label="Filtrer les accompagnements"
     >
       <Field label="Rechercher" htmlFor="filtre-recherche" className="min-w-60 flex-1">
         <input

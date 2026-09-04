@@ -61,7 +61,7 @@
  * nulle part.
  *
  * `transitionActivity`, `archiveActivity` et `archiveResult` sont les actions
- * serveur de `projets/[id]/actions.ts`, **non liées** : c'est ici, à l'intérieur
+ * serveur de `accompagnements/[id]/actions.ts`, **non liées** : c'est ici, à l'intérieur
  * de la boucle sur les entrées, qu'elles sont liées à l'activité concernée — le
  * composant reçoit ce qu'il faut pour agir, jamais un droit à interpréter.
  * `cancelActivity` a quitté cette liste : son motif obligatoire l'a envoyée dans

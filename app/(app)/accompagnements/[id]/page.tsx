@@ -181,7 +181,7 @@ import { listStarters } from "@/lib/queries/starters";
 import { isUuid } from "@/lib/uuid";
 
 export const metadata = {
-  title: "Projet — Vision",
+  title: "Accompagnement — Vision",
 };
 
 export default async function ProjectPage({
@@ -369,7 +369,7 @@ export default async function ProjectPage({
           <ArchivedNotice
             label="Accompagnement archivé"
             archivedAt={project.archivedAt}
-            sentence="Il n'apparaît plus dans la liste des projets ni sur la page de son produit, et ne reçoit plus de saisie ; sa page, sa roadmap et ses ressources restent lisibles."
+            sentence="Il n'apparaît plus dans la liste des accompagnements ni sur la page de son produit, et ne reçoit plus de saisie ; sa page, sa roadmap et ses ressources restent lisibles."
           />
         ) : null}
 

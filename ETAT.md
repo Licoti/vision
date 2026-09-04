@@ -2,11 +2,11 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 02/09/2026, après l'alignement du bouton icône sur le design system.
+**Dernière mise à jour :** 02/09/2026, après le renommage de la navigation et l'entrée « Macro-parcours ».
 Dernier balayage : découpage de C7. **Le fichier dépasse les 250 lignes de la règle 5 — 553 au
 31/08/2026, 642 après le mode de planification, 660 après le dispositif de mesure** ; le balayage
 appartient à la session de découpage de C8. **674 après les repères, 693 après le bouton à texte,
-708 après le bouton icône.**
+708 après le bouton icône, 743 après la navigation.**
 **Chantier en cours :** **C7 — Finitions**, dix tickets, découpés dans `tickets-C7.md`. **Dernier
 chantier du POC** — `docs/05` §5 n'en a pas de huitième.
 **Ticket suivant :** **T7.7 — Accessibilité : clavier, focus, contraste, titres.**
@@ -353,6 +353,17 @@ dans `HISTORIQUE-TICKETS.md` ; les pièges et dettes dans `JOURNAL-TECHNIQUE.md`
   quatre formes lues dans le HTML servi, croix du tiroir comprise. **Trois classes échappées de ma
   propre prose** — un nom de classe écrit dans un `.md` ou un commentaire entre dans la feuille
   servie — retirées, 131 octets de CSS mort en moins. Aucun test neuf (1 582).
+- **La navigation renommée, et la place prise pour les macro-parcours — hors ticket (02/09).**
+  « Projets » devient **« Accompagnements »** au menu, dans les titres, le fil d'Ariane, les états
+  vides et le référentiel d'administration, et `/projets` devient `/accompagnements` — **308 mesuré,
+  chaîne de requête reportée**. Cela **rouvre `docs/07` D35**, sur demande humaine explicite : la
+  décision avait déjà cédé dans les faits, le menu était le dernier endroit à dire l'autre mot. Code
+  et base restent en `projects`. `formatProjects` **disparaît, absorbée par `formatAccompaniments`**
+  — le renommage les avait rendues identiques au caractère près ; six appelants redirigés. Septième
+  entrée de menu, **« Macro-parcours »**, écran vide sans objet ni table, concept absent de `docs/02`
+  §2 mais annoncé par son §10. Sept entrées lues dans le HTML servi. Aucun test neuf, et **la suite
+  était déjà rouge avant la session** : 63 échecs sur 3 fichiers relevés sur `HEAD` intact, **les
+  mêmes 63 après**, nominativement.
 
 ---
 
@@ -363,6 +374,19 @@ qui se referme part dans `HISTORIQUE-TICKETS.md` — il ne reste pas barré ici.
 et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
 
 ### a. À trancher — sinon les tickets suivants héritent du problème
+
+- **La suite de tests est rouge, et elle l'était déjà avant la session du 02/09.** Relevé sur
+  `HEAD` intact : **63 échecs sur 3 fichiers** — `projets/actions.test.ts`,
+  `projets/[id]/actions.test.ts`, `equipe/actions.test.ts` — sur 1 582. Tant qu'elle dure, « les
+  tests passent » ne veut plus rien dire et chaque session doit relever sa propre référence avant de
+  croire un vert. Cause non cherchée ; la piste première est **l'état de migration de la branche de
+  test**, `ETAT.md` ne connaissant que la `0013` quand la `0014` existe. → **à trancher avant tout
+  autre ticket.**
+
+- **La table de vocabulaire de `CLAUDE.md` porte encore « Statut de projet »** quand l'écran
+  d'administration dit maintenant « Statuts d'accompagnement », et son entrée « Projet » ne dit pas
+  que le menu affiche « Accompagnements ». La règle 7 réserve ce fichier à l'humain : je ne peux ni
+  l'aligner, ni y inscrire la réouverture de D35. → **action humaine.**
 
 - **Cinq points ont perdu leur chantier quand C7 s'est découpé, et C8 les reprend** : le **SSO**
   (D37), les **sept objets non journalisés** promis à C7 par la fiche de C6, les **six clés
@@ -377,6 +401,18 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   27/08/2026, **écart à D37** consigné au journal technique. Le stub reste, `/dev/session` reste, et
   `lib/auth/provider.ts` attend toujours son seul réécrivain. Ce qui manque n'est pas du code : un
   tenant, un client, un secret, une URI de redirection. → **action humaine, puis C8.**
+
+- **« Macro-parcours » est une entrée de menu et un écran vide, rien d'autre.** Ni table, ni objet,
+  ni droit. Le chantier doit définir ce qu'un macro-parcours relie — produits et *use cases* —, et
+  **arbitrer « macro-parcours » contre le « Réseau de liens entre produits » de `docs/02` §10**, qui
+  décrit la même direction sous un autre nom. Le concept devra entrer dans `docs/02` §2, qu'il ne
+  respecte pas aujourd'hui. → **session de découpage de C8.**
+
+- **Deux redirections 308 tiennent `/projets` en vie**, dans `next.config.ts`. Elles sont du code
+  mort le jour où plus personne ne détient d'ancienne adresse, et **rien ne dira ce jour-là**. Elles
+  couvrent la route, **pas le fragment** : l'ancre `projets-lies` est devenue `accompagnements-lies`
+  sans filet — le bloc étant masqué depuis le 28/08/2026, le risque est faible, pas nul.
+  → **C8, à réexaminer plutôt qu'à reconduire.**
 
 ### b. Assignés à un ticket
 

@@ -7,7 +7,7 @@
  *
  * D9 : **saisir dans un projet est ouvert au contributeur désigné**, pas
  * seulement au responsable de domaine. C'est ce qui distingue ce fichier de
- * `projets/actions.ts`, qui exige `manageDomain` : modifier l'identité d'un
+ * `accompagnements/actions.ts`, qui exige `manageDomain` : modifier l'identité d'un
  * accompagnement et y saisir une activité ne demandent pas le même droit.
  *
  * **Le droit se vérifie ici, et pas à l'écran.** Le panneau n'apparaît qu'à qui
@@ -375,7 +375,7 @@ function scopeRefusal(error: unknown, formData: FormData): ActivityFormState {
 
    Le diff, pas un remplacement : `insertMany` ajoute ce qui manque,
    `unlink` défait ce qui a disparu — sur le modèle de `syncMembers` dans
-   `projets/actions.ts`, en plus simple, puisqu'une ligne d'`activity_participants`
+   `accompagnements/actions.ts`, en plus simple, puisqu'une ligne d'`activity_participants`
    ne porte aucun rôle à mettre à jour. Une re-soumission à l'identique ne
    touche donc jamais la table : les deux ensembles sont égaux, ni l'un ni
    l'autre ne trouve quoi que ce soit à faire.

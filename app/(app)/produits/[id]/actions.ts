@@ -8,7 +8,7 @@
  * `produits/actions.ts` porte les écritures de l'**identité** du produit, qui
  * exigent `manageDomain` (F1-D1, D9) ; celles-ci portent ce que le produit
  * **mesure**, et le droit n'est pas le même. La séparation est celle de
- * `projets/actions.ts` et `projets/[id]/actions.ts` depuis T3.3.
+ * `accompagnements/actions.ts` et `accompagnements/[id]/actions.ts` depuis T3.3.
  *
  * **Le droit d'écrire un indicateur se dérive des accompagnements du produit**
  * (arbitrage (b) de `tickets-C5.md`) : `manageDomain`, ou contributeur désigné
@@ -902,7 +902,7 @@ async function openPersona(
  * Le second temps de l'écriture : les traits du persona, mis à jour **par
  * différence**.
  *
- * C'est `syncJobs` (`app/(app)/projets/actions.ts`) transposé, et le choix du
+ * C'est `syncJobs` (`app/(app)/accompagnements/actions.ts`) transposé, et le choix du
  * diff plutôt que du remplacement n'est pas une économie de requêtes : c'est ce
  * qui garde l'**identifiant d'un trait stable** d'une correction à l'autre. Un
  * remplacement récrirait des lignes neuves à chaque enregistrement, et le jour

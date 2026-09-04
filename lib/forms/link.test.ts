@@ -9,7 +9,7 @@
  * l'accompagnement visé, son domaine, son archivage, l'auto-lien et le doublon.
  * Ces cinq questions appartiennent au domaine, donc à l'action et à
  * `lib/db/scoped.ts` — les rejouer ici poserait une seconde autorité, qui
- * divergerait un jour de la première. `app/(app)/projets/[id]/actions.test.ts`
+ * divergerait un jour de la première. `app/(app)/accompagnements/[id]/actions.test.ts`
  * les couvre, sur la vraie base et les vraies portes.
  *
  * **Le module est le plus petit du dossier, et ce n'est pas un accident** :

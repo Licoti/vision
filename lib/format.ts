@@ -336,6 +336,12 @@ export function initials(fullName: string): string {
  *
  * Zéro s'écrit en toutes lettres : une colonne pleine de « 0 » se lit comme
  * un manque, alors qu'un produit sans accompagnement est un produit normal.
+ *
+ * **Elle a absorbé `formatProjects`** au renommage du vocabulaire. Les deux
+ * disaient déjà la même phrase à un mot près ; le mot ayant convergé, deux
+ * fonctions au corps identique n'auraient plus été qu'un piège. Elle sert donc
+ * aussi bien le compteur de la liste transverse et les refus d'archivage de
+ * l'administration que la colonne de la liste des produits.
  */
 export function formatAccompaniments(count: number): string {
   if (count === 0) return "Aucun accompagnement";
@@ -352,17 +358,6 @@ export function formatAccompaniments(count: number): string {
 export function formatRank(rank: number): string {
   const ordinal = rank === 1 ? "1er" : `${rank}ᵉ`;
   return `${ordinal} accompagnement de ce produit`;
-}
-
-/**
- * « 3 projets » · « 1 projet » · « Aucun projet ».
- *
- * Le compteur de la liste transverse, qui dit ce que les filtres ont retenu.
- * Zéro s'écrit en toutes lettres, pour la même raison que ci-dessus.
- */
-export function formatProjects(count: number): string {
-  if (count === 0) return "Aucun projet";
-  return `${count} projet${count > 1 ? "s" : ""}`;
 }
 
 /**
@@ -630,7 +625,7 @@ export const REFERENTIAL_NOUN: Record<Referential, ReferentialNoun> = {
     archived: "Archivé",
   },
   statuts: {
-    plural: "Statuts de projet",
+    plural: "Statuts d'accompagnement",
     indefinite: "un statut",
     demonstrative: "ce statut",
     of: "du statut",

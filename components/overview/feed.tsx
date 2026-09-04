@@ -266,7 +266,7 @@ function Entry({ event }: { event: RecentEvent }) {
  * serait invisible à qui ne la perçoit pas (`docs/06` §11).
  *
  * **La nature de l'origine n'est pas dite à l'écran**, et c'est un choix : le
- * nom et l'adresse la disent déjà — `/projets/…` ou `/produits/…` —, et une
+ * nom et l'adresse la disent déjà — `/accompagnements/…` ou `/produits/…` —, et une
  * pastille « Produit » sur une ligne de flux ajouterait une taxonomie là où l'on
  * attend une phrase.
  */

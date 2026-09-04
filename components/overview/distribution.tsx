@@ -18,7 +18,7 @@
  * est le nombre lui-même, porté par le lien qui va le vérifier.
  *
  * **Chaque chiffre est un lien, et le lien est le contrat.** Suivre
- * `/projets?statut=…` doit rendre exactement le nombre de lignes annoncé — c'est
+ * `/accompagnements?statut=…` doit rendre exactement le nombre de lignes annoncé — c'est
  * ce que le décompte promet, et la seule preuve qu'il ne ment pas. La clé du
  * filtre vient de `lib/navigation.ts` et non d'ici : le chiffre et la liste
  * partagent une **seule** source, faute de quoi un renommage de clé laisserait
@@ -27,7 +27,7 @@
  * **Les trois dimensions du document depuis T7.2** — statut, entité, approche —
  * et dans son ordre. L'entité a manqué le temps d'un chantier, parce que la
  * fiche T6.7 avait tranché qu'*« un chiffre dont le filtre n'existe pas n'est
- * pas rendu »* : `/projets` n'avait aucune clé d'entité, et un chiffre sans son
+ * pas rendu »* : `/accompagnements` n'avait aucune clé d'entité, et un chiffre sans son
  * lien est un nombre qui ne se vérifie pas. T7.2 a posé le filtre d'abord.
  *
  * **Il n'y a pas de quatrième dimension, et le métier n'en fera pas une.** Il a
@@ -37,7 +37,7 @@
  * **Un zéro se rend, et il s'écrit en toutes lettres.** « Aucun projet » est un
  * fait du domaine — un statut de son référentiel que personne n'emploie — et le
  * taire ferait lire la répartition comme si ce statut n'existait pas. Le lien
- * reste : `/projets` sait dire qu'il n'a rien trouvé, et c'est un écran à part
+ * reste : `/accompagnements` sait dire qu'il n'a rien trouvé, et c'est un écran à part
  * entière (règle 5).
  *
  * **Aucun total, aucune somme, aucun pourcentage** — pas même « 3 projets sur
@@ -58,7 +58,7 @@ import type { ReactNode } from "react";
 import { BlockNote } from "@/components/ui/empty-state";
 import { Section, SectionHeader } from "@/components/ui/section";
 import { StatusPill } from "@/components/ui/status-pill";
-import { formatProjects } from "@/lib/format";
+import { formatAccompaniments } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
 import type { ProjectDistribution } from "@/lib/queries/overview";
 
@@ -216,7 +216,7 @@ function Dimension({
  * **La colonne du nombre est un minimum, pas une largeur.** `min-w-24` aligne
  * les libellés sur une même verticale tant que le décompte tient dedans, et
  * cède quand « Aucun projet » dépasse — plutôt que de tronquer le seul cas que
- * `formatProjects` écrit en toutes lettres.
+ * `formatAccompaniments` écrit en toutes lettres.
  *
  * **Le nombre porte le lien, et pas seulement le libellé** : la fiche demande
  * *des chiffres cliquables qui filtrent*, et un chiffre qu'il faudrait viser à
@@ -229,7 +229,7 @@ function Dimension({
  * le couple servi dans cette position depuis T4.1, repris par le flux voisin —
  * et l'inversion ne le change pas : elle déplace le mot, pas ses couleurs.
  *
- * **Zéro s'écrit « Aucun projet »**, par `formatProjects` — la fonction du
+ * **Zéro s'écrit « Aucun projet »**, par `formatAccompaniments` — la fonction du
  * compteur de la liste transverse, celle-là même que le lien va rendre. Deux
  * façons d'écrire le même nombre finiraient par en dire deux choses.
  */
@@ -254,7 +254,7 @@ function Entry({
           nombre. */}
       <Link href={href} className="flex items-baseline gap-3 py-2">
         <span className="min-w-24 flex-none text-right text-sm font-semibold text-content-info-base underline">
-          {formatProjects(count)}
+          {formatAccompaniments(count)}
         </span>
         {children}
       </Link>

@@ -55,7 +55,7 @@ export function StaleProjects({ projects }: { projects: StaleProject[] }) {
   return (
     <Section>
       <SectionHeader
-        title="Projets sans activité récente"
+        title="Accompagnements sans activité récente"
         /* **« en cours » dit l'exclusion sans nommer un statut** (31/08/2026) :
            la note doit rendre compte de ce que la liste ne montre pas, sinon
            l'absence d'un accompagnement terminé se lit comme un défaut. Elle

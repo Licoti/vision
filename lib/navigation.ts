@@ -145,7 +145,7 @@ export const CANCEL_PANEL_PARAM = "annuler";
  * projet : `archiver` et `indicateur` présentes ensemble n'ouvrent **rien**.
  * Deux `role="dialog"` ou deux `inert` concurrents ne se rattrapent pas après
  * coup, et aucune préséance ne s'invente entre deux gestes de même rang. La
- * forme est celle d'`app/(app)/projets/[id]/page.tsx`, choisie pour rester juste
+ * forme est celle d'`app/(app)/accompagnements/[id]/page.tsx`, choisie pour rester juste
  * quand T5.3 ajoutera `releve`.
  *
  * **T5.4 reprendra cette même clé sur la page projet**, pour l'adoption : ce
@@ -710,7 +710,7 @@ export const PROJECT_FILTER_PARAM = {
  * construit le lien.
  *
  * `productNew` et `projectNew` sont des segments statiques sous `/produits` et
- * `/projets`, là où `product` et `project` sont dynamiques : Next donne la
+ * `/accompagnements`, là où `product` et `project` sont dynamiques : Next donne la
  * priorité au statique, et `isUuid` rattraperait de toute façon en 404. Les
  * formulaires ne figurent pas dans `MAIN_NAV` — un formulaire n'est pas une
  * destination de navigation.
@@ -879,7 +879,7 @@ export const ROUTES = {
     `/produits/${id}?${CONTEXT_PANEL_PARAM}=${markerId}`,
   productUseCase: (id: string, useCaseId: string) =>
     `/produits/${id}?${USE_CASE_DETAIL_PARAM}=${useCaseId}`,
-  projects: "/projets",
+  projects: "/accompagnements",
   /**
    * La liste transverse, **filtrée sur un statut** (T6.7). Ce n'est pas un
    * écran de plus : c'est le même, avec un paramètre — la forme des routes de
@@ -890,10 +890,10 @@ export const ROUTES = {
    * ici qu'elles la partagent.
    */
   projectsByStatus: (statusId: string) =>
-    `/projets?${PROJECT_FILTER_PARAM.status}=${statusId}`,
+    `/accompagnements?${PROJECT_FILTER_PARAM.status}=${statusId}`,
   /** La même, **filtrée sur une approche** (T6.7). Même forme, même raison. */
   projectsByApproach: (approachId: string) =>
-    `/projets?${PROJECT_FILTER_PARAM.approach}=${approachId}`,
+    `/accompagnements?${PROJECT_FILTER_PARAM.approach}=${approachId}`,
   /**
    * La même, **filtrée sur une entité** (T7.2) — la troisième dimension de la
    * répartition, celle que `docs/06` §3 demandait et que T6.7 n'a pas rendue
@@ -909,9 +909,9 @@ export const ROUTES = {
    * jour sans savoir pourquoi.
    */
   projectsByEntity: (entityId: string) =>
-    `/projets?${PROJECT_FILTER_PARAM.entity}=${entityId}`,
-  project: (id: string) => `/projets/${id}`,
-  projectNew: "/projets/nouveau",
+    `/accompagnements?${PROJECT_FILTER_PARAM.entity}=${entityId}`,
+  project: (id: string) => `/accompagnements/${id}`,
+  projectNew: "/accompagnements/nouveau",
   /**
    * La même route, le produit pré-sélectionné. Un accompagnement se crée
    * depuis le produit qu'il accompagne : le rattachement est alors connu, et
@@ -919,8 +919,8 @@ export const ROUTES = {
    * — l'écran le confronte au domaine avant de le croire.
    */
   projectNewForProduct: (productId: string) =>
-    `/projets/nouveau?produit=${productId}`,
-  projectEdit: (id: string) => `/projets/${id}/modifier`,
+    `/accompagnements/nouveau?produit=${productId}`,
+  projectEdit: (id: string) => `/accompagnements/${id}/modifier`,
   /**
    * La page du projet, panneau de confirmation d'archivage ouvert (T4bis.3).
    * **Ce n'est pas un écran de plus** : c'est le même, avec un paramètre — et la
@@ -928,7 +928,7 @@ export const ROUTES = {
    * forme que `productArchive`, jusqu'au nom de la clé.
    */
   projectArchive: (id: string) =>
-    `/projets/${id}?${ARCHIVE_PANEL_PARAM}=${ARCHIVE_PANEL_CONFIRM}`,
+    `/accompagnements/${id}?${ARCHIVE_PANEL_PARAM}=${ARCHIVE_PANEL_CONFIRM}`,
   /**
    * La page du projet, panneau de **confirmation de suppression** ouvert
    * (28/08/2026) — dixième et dernière clé d'ouverture de cette page.
@@ -942,14 +942,14 @@ export const ROUTES = {
    * étrangères qui pointent `projects.id` sont `cascade`. Voir `DeletableTable`.
    */
   projectDelete: (id: string) =>
-    `/projets/${id}?${DELETE_PANEL_PARAM}=${DELETE_PANEL_CONFIRM}`,
+    `/accompagnements/${id}?${DELETE_PANEL_PARAM}=${DELETE_PANEL_CONFIRM}`,
   /**
    * La page du projet, panneau de saisie ouvert. **Ce n'est pas un écran de
    * plus** : c'est le même, avec un paramètre — et la fermeture est donc
    * `project(id)`, qui n'a pas besoin d'entrée à elle.
    */
   projectActivityNew: (id: string) =>
-    `/projets/${id}?${ACTIVITY_PANEL_PARAM}=${ACTIVITY_PANEL_NEW}`,
+    `/accompagnements/${id}?${ACTIVITY_PANEL_PARAM}=${ACTIVITY_PANEL_NEW}`,
   /**
    * Le même panneau, sur une activité existante (T3.4) : un seul formulaire,
    * deux points d'entrée. La fermeture reste `project(id)` — corriger une
@@ -957,14 +957,14 @@ export const ROUTES = {
    * une.
    */
   projectActivityEdit: (id: string, activityId: string) =>
-    `/projets/${id}?${ACTIVITY_PANEL_PARAM}=${activityId}`,
+    `/accompagnements/${id}?${ACTIVITY_PANEL_PARAM}=${activityId}`,
   /**
    * La page du projet, panneau de ressource ouvert (T4.2). Toujours depuis son
    * projet — la règle de D17 transposée : ni la vue d'ensemble ni la liste
    * transverse n'ont d'entrée vers ce geste. La fermeture reste `project(id)`.
    */
   projectResourceNew: (id: string) =>
-    `/projets/${id}?${RESOURCE_PANEL_PARAM}=${RESOURCE_PANEL_NEW}`,
+    `/accompagnements/${id}?${RESOURCE_PANEL_PARAM}=${RESOURCE_PANEL_NEW}`,
   /**
    * Le même panneau, sur une ressource existante (T4bis.5) : un seul
    * formulaire, deux points d'entrée — la forme de `projectActivityEdit`
@@ -973,14 +973,14 @@ export const ROUTES = {
    * une.
    */
   projectResourceEdit: (id: string, resourceId: string) =>
-    `/projets/${id}?${RESOURCE_PANEL_PARAM}=${resourceId}`,
+    `/accompagnements/${id}?${RESOURCE_PANEL_PARAM}=${resourceId}`,
   /**
    * La page du projet, panneau de résultat ouvert sur une activité donnée
    * (T4.4). Le geste part de l'entrée de roadmap de l'activité terminée qui a
    * produit le résultat — jamais d'ailleurs. La fermeture reste `project(id)`.
    */
   projectResultNew: (id: string, activityId: string) =>
-    `/projets/${id}?${RESULT_PANEL_PARAM}=${activityId}`,
+    `/accompagnements/${id}?${RESULT_PANEL_PARAM}=${activityId}`,
   /**
    * La page du projet, panneau d'annulation ouvert sur une activité donnée. Le
    * geste part du menu de l'entrée de roadmap — jamais d'ailleurs. La fermeture
@@ -988,7 +988,7 @@ export const ROUTES = {
    * l'accompagnement, pas plus qu'en saisir une.
    */
   projectActivityCancel: (id: string, activityId: string) =>
-    `/projets/${id}?${CANCEL_PANEL_PARAM}=${activityId}`,
+    `/accompagnements/${id}?${CANCEL_PANEL_PARAM}=${activityId}`,
   /**
    * La page du projet, panneau d'adoption ouvert (T5.4). **La même clé que la
    * page produit**, comme la note d'`INDICATOR_PANEL_PARAM` l'annonçait : ce
@@ -996,7 +996,7 @@ export const ROUTES = {
    * fermeture reste `project(id)`.
    */
   projectIndicatorNew: (id: string) =>
-    `/projets/${id}?${INDICATOR_PANEL_PARAM}=${INDICATOR_PANEL_NEW}`,
+    `/accompagnements/${id}?${INDICATOR_PANEL_PARAM}=${INDICATOR_PANEL_NEW}`,
   /**
    * Le même panneau, sur une adoption existante (T5.4) : un seul formulaire,
    * deux points d'entrée — la forme de `projectResourceEdit` jusqu'au nom de la
@@ -1010,7 +1010,7 @@ export const ROUTES = {
    * `releve` en change entre ses deux cas.
    */
   projectIndicatorEdit: (id: string, adoptionId: string) =>
-    `/projets/${id}?${INDICATOR_PANEL_PARAM}=${adoptionId}`,
+    `/accompagnements/${id}?${INDICATOR_PANEL_PARAM}=${adoptionId}`,
   /**
    * La page du projet, panneau d'une **piste de démarrage** ouvert
    * (20/08/2026).
@@ -1020,14 +1020,14 @@ export const ROUTES = {
    * `project(id)`.
    */
   projectStarter: (id: string, starterId: string) =>
-    `/projets/${id}?${STARTER_PANEL_PARAM}=${starterId}`,
+    `/accompagnements/${id}?${STARTER_PANEL_PARAM}=${starterId}`,
   /**
    * La page du projet, panneau de **déclaration d'un lien** ouvert sur le vide
    * (T6.5). Même mécanique que les quatorze adresses d'ouverture qui précèdent :
    * un paramètre, pas un écran de plus, et la fermeture reste `project(id)`.
    */
   projectLinkNew: (id: string) =>
-    `/projets/${id}?${LINK_PANEL_PARAM}=${LINK_PANEL_NEW}`,
+    `/accompagnements/${id}?${LINK_PANEL_PARAM}=${LINK_PANEL_NEW}`,
   /**
    * Le même panneau, sur un lien déjà déclaré : la valeur porte le cas, et c'est
    * la seule différence avec l'entrée ci-dessus — la forme de
@@ -1039,7 +1039,7 @@ export const ROUTES = {
    * porte la raison.
    */
   projectLinkEdit: (id: string, linkId: string) =>
-    `/projets/${id}?${LINK_PANEL_PARAM}=${linkId}`,
+    `/accompagnements/${id}?${LINK_PANEL_PARAM}=${linkId}`,
   /**
    * La page du projet, panneau de **budget** ouvert (T7.1). Même mécanique que
    * toutes les adresses d'ouverture qui précèdent : un paramètre, pas un écran
@@ -1051,7 +1051,7 @@ export const ROUTES = {
    * l'action décide seule si elle crée ou si elle corrige.
    */
   projectBudget: (id: string) =>
-    `/projets/${id}?${BUDGET_PANEL_PARAM}=${BUDGET_PANEL_ENTRY}`,
+    `/accompagnements/${id}?${BUDGET_PANEL_PARAM}=${BUDGET_PANEL_ENTRY}`,
   /**
    * Le référentiel des personnes (T5bis.2).
    *
@@ -1193,26 +1193,47 @@ export const ROUTES = {
   adminEntityDelete: (entityId: string) =>
     `/administration?${DELETE_PANEL_PARAM}=${entityId}`,
   about: "/a-propos",
+  /**
+   * Les macro-parcours — la lecture qui traverse les produits.
+   *
+   * L'écran est vide et le restera jusqu'à son chantier : il n'a ni objet, ni
+   * table, ni route dérivée. La clé existe pour que le menu ne porte pas une
+   * adresse littérale, comme les cinq autres.
+   */
+  journeys: "/macro-parcours",
 } as const;
 
 /**
  * Navigation principale, dans l'ordre attendu par le ticket.
  *
- * **Cinq entrées depuis T5bis.2**, quand `docs/06` §8 en écrit quatre : l'écart
- * est décidé par la fiche du ticket et consigné au journal technique. Équipe se
- * place après « Projets » et avant « À propos » — le chemin canonique reste
- * Produits › Projets, et une personne n'est pas un chemin vers un
+ * **Six entrées**, quand `docs/06` §8 en écrit quatre : l'écart est décidé
+ * hors ticket et consigné au journal technique. Équipe se place après les
+ * accompagnements et avant « À propos » — le chemin canonique reste
+ * Produits › Accompagnements, et une personne n'est pas un chemin vers un
  * accompagnement.
+ *
+ * **« Accompagnements » et non « Projets ».** Le renommage rouvre `docs/07`
+ * D35, par décision humaine explicite. Le mot avait de toute façon déjà gagné
+ * l'interface — la colonne de la liste des produits, l'état vide de cette
+ * liste-ci, le panneau d'archivage — et le menu était le dernier endroit à
+ * dire l'autre. Le code et la base restent en `projects` : seul le mot rendu
+ * change.
+ *
+ * **« Macro-parcours » vient juste après**, parce que l'ordre va du canonique
+ * au transverse : un produit, puis ce qu'on fait dessus, puis ce qui traverse
+ * plusieurs produits. Son écran est vide et n'a pas d'objet ; il tient la
+ * place d'un chantier à venir plutôt que de la laisser prendre ailleurs.
  */
 export const MAIN_NAV: readonly NavEntry[] = [
   { href: ROUTES.overview, label: "Vue d'ensemble" },
   { href: ROUTES.products, label: "Produits" },
-  { href: ROUTES.projects, label: "Projets" },
+  { href: ROUTES.projects, label: "Accompagnements" },
+  { href: ROUTES.journeys, label: "Macro-parcours" },
   { href: ROUTES.team, label: "Équipe" },
   { href: ROUTES.about, label: "À propos" },
 ];
 
-/** La sixième entrée, celle que `docs/06` §8 réserve au responsable de domaine. */
+/** La septième entrée, celle que `docs/06` §8 réserve au responsable de domaine. */
 const ADMIN_NAV_ENTRY: NavEntry = {
   href: ROUTES.admin,
   label: "Administration",

@@ -9476,3 +9476,114 @@ probablement, et ce n'était pas le périmètre.
   SVG à un corps de glyphe demanderait un rapport que rien ne justifie. `text-sm` est ce qui était
   servi, il est conservé — **et c'est cette table qu'il faudra lire le jour où une librairie d'icônes
   entre.**
+
+---
+
+## La navigation renommée, et la place prise pour les macro-parcours — hors ticket, 02/09/2026
+
+Deux gestes dans la même session : l'entrée « Projets » du menu devient « Accompagnements », et une
+entrée « Macro-parcours » entre au menu avec un écran vide. Aucun objet, aucune table, aucun droit.
+
+### `docs/07` D35 est rouverte, et c'est le point le plus lourd de la session
+
+D35 tranche : *« Le terme retenu est **Projet**. "Accompagnement" ne subsiste que comme mot de
+lecture sur la page produit. »* La règle 6 du `CLAUDE.md` interdit de rouvrir une décision de
+`docs/07` ; elle a été rouverte **par décision humaine explicite, sollicitée avant d'écrire une
+ligne**, ce qui est le seul chemin qui existe.
+
+Ce qui rend la réouverture moins brutale qu'elle n'en a l'air : **la décision avait déjà cédé dans
+les faits, sans que personne l'écrive.** Avant cette session, l'interface disait déjà
+« Accompagnements » en colonne de la liste des produits, « Aucun accompagnement pour l'instant » en
+état vide de la liste transverse, « Nouvel accompagnement » sur son bouton d'action, « Accompagnement
+archivé » sur le bandeau de la fiche, et `formatAccompaniments` en clair dans `lib/format.ts`. Le
+menu, le titre de cette même liste et son en-tête de colonne étaient les derniers endroits à dire
+l'autre mot. **La cohérence a donc été rétablie dans le sens où l'usage avait déjà penché**, pas
+imposée contre lui.
+
+Le code et la base ne bougent pas : `projects`, `project_statuses`, `projectId`, et les clés de
+`ROUTES` restent en anglais. Seul le mot rendu change, plus l'adresse.
+
+**Reste une incohérence que je ne peux pas lever** : la table de vocabulaire de `CLAUDE.md` porte
+encore « Statut de projet » quand l'écran d'administration dit maintenant « Statuts
+d'accompagnement ». La règle 7 réserve ce fichier à l'humain.
+
+### « Macro-parcours » est un concept absent de `docs/02`, mais pas une direction neuve
+
+`docs/02` pose qu'*« un concept absent de ce document ne doit pas apparaître »*. Macro-parcours en
+est absent. L'écart est cependant faible : `docs/02` §10 consigne déjà la direction parmi les pistes
+écartées du POC, sous le nom **« Réseau de liens entre produits »**, en disant qu'elle *« ouvrirait
+la lecture par famille de produits ou par parcours client »*. C'est la même chose sous un autre nom
+— et §10 existe précisément pour que les décisions du POC ne rendent pas ces pistes impossibles.
+
+Ce qui entre ici n'est donc pas un concept, c'est **une adresse et un libellé**. Le concept se
+définira dans `docs/02` quand le chantier s'ouvrira, et c'est à ce moment que « macro-parcours » et
+« use case » devront être arbitrés l'un par rapport à l'autre.
+
+### La navigation compte sept entrées quand `docs/06` §8 en écrit quatre
+
+L'écart n'est pas neuf : il valait cinq entrées depuis T5bis.2, six avec l'administration. La
+septième le prolonge sans changer sa nature. Le rang que `docs/06` §8 fixe vraiment est tenu :
+Produits précède les accompagnements, l'administration ferme la marche. Macro-parcours s'insère
+après les accompagnements, l'ordre allant du canonique au transverse — un produit, ce qu'on fait
+dessus, puis ce qui traverse plusieurs produits.
+
+### `formatProjects` a disparu, absorbée par `formatAccompaniments`
+
+Les deux fonctions disaient la même phrase à un mot près. Le mot ayant convergé, la réécriture les a
+rendues **identiques au caractère près** : même corps, même retour. Deux fonctions exportées au corps
+identique sont un piège — la suivante qui change l'une laisse l'autre derrière. `formatProjects` a
+donc été retirée et ses six appelants renvoyés sur `formatAccompaniments`.
+
+Ce n'était pas au périmètre annoncé. C'était une duplication **créée par le renommage lui-même**, pas
+une dette trouvée sur place : la laisser aurait été livrer le défaut avec le correctif.
+
+### La redirection est une dette assumée, pas une politesse
+
+`/projets` et `/projets/:path*` redirigent en 308 vers `/accompagnements`. Next reporte la chaîne de
+requête de lui-même, ce qui a été **mesuré et non supposé** : `/projets?statut=x` arrive bien sur
+`/accompagnements?statut=x`.
+
+Ces deux règles sont du code mort le jour où plus personne ne détient d'ancienne adresse. Rien ne
+dira ce jour-là. Elles sont conservées parce qu'une page d'accompagnement se copie et se colle dans
+un fil de discussion, et que `docs/06` §7 fait de la remontée une garantie — mais **c'est une entrée
+à réexaminer, pas un acquis.**
+
+### L'ancre `projets-lies` a été renommée en `accompagnements-lies`
+
+`components/ui/section.tsx` dit que les ancres de la page d'accompagnement *« sont des cibles de
+fragment qu'on copie et qu'on partage »*. Celle-ci change donc de valeur, et un lien profond posé
+vers l'ancien fragment atterrira sur la page sans descendre au bloc. Le bloc « Accompagnements liés »
+est masqué depuis le 28/08/2026 : la probabilité qu'un tel lien existe est faible, mais elle n'est
+pas nulle, et **la redirection de route ne protège pas un fragment** — un `#` ne quitte jamais le
+navigateur.
+
+### Ce qui n'a pas été fait, et pourquoi
+
+- **Les commentaires qui emploient « projet » comme mot ne sont pas récrits.** Ils sont plus de cent
+  vingt. Seuls ont été repris ceux qui nommaient un **chemin de fichier** ou une **URL** : ceux-là
+  désignaient une cible qui n'existe plus, c'est un défaut ; les autres sont de la prose, et les
+  toucher aurait noyé la revue.
+- **`components/products/use-case-panel.tsx` garde « Démarrer, reprendre un projet ».** C'est un
+  exemple de nom de use case écrit du point de vue de l'utilisateur final du produit accompagné, pas
+  le concept Vision. Le renommer aurait été une faute de sens.
+- **`components/projects/link-panel.tsx` garde ses identifiants `lien-projet`.** Ce sont des cibles
+  de `htmlFor`, jamais rendues à l'œil.
+- **Les dossiers `components/projects/` et `lib/queries/projects.ts` ne sont pas renommés.** Le code
+  parle anglais, et `projects` y est le nom de la table.
+- **Aucun test de navigation n'a été ajouté.** `lib/navigation.ts` n'en a jamais eu, Vitest tourne en
+  environnement `node` et `components/**` est hors de son `include` : un test de menu demanderait
+  d'ouvrir le rendu React aux tests, ce qui est un chantier et non un ajout.
+
+### La suite de tests était déjà rouge avant cette session
+
+Relevé **sur `HEAD` intact, avant la première modification** : `Test Files 3 failed | 52 passed`,
+`Tests 63 failed | 1519 passed (1582)`, sur `app/(app)/projets/actions.test.ts`,
+`app/(app)/projets/[id]/actions.test.ts` et `app/(app)/equipe/actions.test.ts`.
+
+C'est une dette **antérieure et étrangère à ce travail**, mais elle mérite d'être ici parce qu'elle
+retire au dépôt son filet : tant qu'elle dure, « les tests passent » ne veut plus rien dire, et
+chaque session suivante devra relever sa propre référence avant de croire un vert ou un rouge. La
+cause n'a pas été cherchée — ce n'était pas le périmètre —, mais les échecs portent sur les budgets,
+les liens et l'équipe, et `ETAT.md` signale une base de développement migrée le 01/09/2026 quand une
+migration `0014` existe depuis. **La piste à ouvrir en premier est l'état de migration de la branche
+de test.**

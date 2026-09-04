@@ -70,11 +70,11 @@ export default async function NewProjectPage({
         }
       : options.statuses.length === 0
         ? {
-            title: "Aucun statut de projet dans ce domaine",
+            title: "Aucun statut d'accompagnement dans ce domaine",
             description:
               "Un accompagnement porte toujours un statut — en cours, terminé, en pause. Le référentiel des statuts est vide : il doit être alimenté avant qu'un accompagnement puisse être créé.",
             href: ROUTES.projects,
-            label: "Revenir aux projets",
+            label: "Revenir aux accompagnements",
           }
         : null;
 
@@ -82,7 +82,7 @@ export default async function NewProjectPage({
     <>
       <Breadcrumb
         items={[
-          { href: ROUTES.projects, label: "Projets" },
+          { href: ROUTES.projects, label: "Accompagnements" },
           { label: "Nouvel accompagnement" },
         ]}
       />

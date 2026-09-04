@@ -81,9 +81,9 @@ export function RelatedProjects({
   const empty = related.length === 0 && declared.length === 0;
 
   return (
-    <Section id="projets-lies">
+    <Section id="accompagnements-lies">
       <SectionHeader
-        title="Projets liés"
+        title="Accompagnements liés"
         {...(addHref ? { action: <DeclareLink href={addHref} variant="secondary" /> } : {})}
       />
 

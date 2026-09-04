@@ -1046,7 +1046,7 @@ describe("listProjectDistribution", () => {
 
     // **Le constat central du ticket.** Il ne compare pas à un nombre écrit
     // ici — un nombre écrit à la main ne dirait que ce que l'auteur croyait —
-    // mais à ce que `/projets?statut=…` rendra vraiment.
+    // mais à ce que `/accompagnements?statut=…` rendra vraiment.
     for (const entry of statuses) {
       const rows = await listProjects(a.scope, { statusId: entry.id });
       expect(entry.count).toBe(rows.length);
@@ -1101,7 +1101,7 @@ describe("listProjectDistribution", () => {
 
     // Le contrat du ticket. Il ne compare à aucun nombre écrit ici — un nombre
     // écrit à la main ne dirait que ce que l'auteur croyait — mais à ce que
-    // `/projets?entite=…` rendra vraiment. Un décompte juste sur un filtre qui
+    // `/accompagnements?entite=…` rendra vraiment. Un décompte juste sur un filtre qui
     // ne l'est pas est un mensonge que rien d'autre ne détecte.
     for (const entry of rows) {
       const projectRows = await listProjects(a.scope, { entityId: entry.id });

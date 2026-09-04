@@ -7,7 +7,7 @@
  * qui se relit ici est la **règle**, que le `switch` tient branche par branche.
  *
  * **Jumeau de `lib/drawers/product.tsx`, et pour les mêmes raisons.** Rien
- * n'est inventé ici : tout vient de `app/(app)/projets/[id]/page.tsx`, où la
+ * n'est inventé ici : tout vient de `app/(app)/accompagnements/[id]/page.tsx`, où la
  * logique vivait entre le décompte d'exclusivité et le rendu. Elle en sort
  * parce que **deux chemins doivent y passer** — l'URL, qui reste une adresse
  * valide, et le clic, qui ne l'écrit plus.
@@ -101,7 +101,7 @@ import {
 } from "@/lib/queries/starters";
 import { isUuid } from "@/lib/uuid";
 
-import { archiveProject, deleteProject } from "@/app/(app)/projets/actions";
+import { archiveProject, deleteProject } from "@/app/(app)/accompagnements/actions";
 import {
   cancelActivity,
   createActivity,
@@ -115,7 +115,7 @@ import {
   updateProjectLink,
   updateResource,
   updateResult,
-} from "@/app/(app)/projets/[id]/actions";
+} from "@/app/(app)/accompagnements/[id]/actions";
 
 /**
  * Ce que la résolution a besoin de savoir, et que la page a déjà lu.
@@ -194,7 +194,7 @@ export async function resolveProjectDrawer(
           >
             <div className="flex flex-col gap-3 text-sm text-content-neutral-dark">
               <p>
-                Cet accompagnement disparaît de la liste des projets et de la
+                Cet accompagnement disparaît de la liste transverse et de la
                 page de son produit. Rien n&apos;est supprimé.
               </p>
               <p>

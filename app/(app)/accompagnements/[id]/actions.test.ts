@@ -8,7 +8,7 @@
  * l'accompagnement, et cela ne prouve rien : les identifiants liés d'une action
  * serveur sont sérialisés en clair dans un champ `$ACTION_…`, réécrivable.
  *
- * **Premier fichier de tests d'action de `projets/`**, et il arrive avec la
+ * **Premier fichier de tests d'action de `accompagnements/`**, et il arrive avec la
  * colonne `activities.external_url` — un champ de plus sur un point d'entrée
  * qui existait déjà. C'est précisément ce que ces tests éprouvent : le champ
  * neuf n'ouvre aucune porte, il passe par `openProject` comme les sept autres.
@@ -397,7 +397,7 @@ async function journal(): Promise<EventRow[]> {
  *
  * **C'est le critère de la fiche, rendu réutilisable** : « une ligne d'`events`
  * et une seule ». Aucune branche de redirection, à la différence de
- * `projets/actions.test.ts` : aucune de ces onze actions ne redirige (TD.2).
+ * `accompagnements/actions.test.ts` : aucune de ces onze actions ne redirige (TD.2).
  */
 async function written(gesture: () => Promise<unknown>): Promise<EventRow[]> {
   const before = await journal();
