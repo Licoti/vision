@@ -9587,3 +9587,181 @@ cause n'a pas été cherchée — ce n'était pas le périmètre —, mais les �
 les liens et l'équipe, et `ETAT.md` signale une base de développement migrée le 01/09/2026 quand une
 migration `0014` existe depuis. **La piste à ouvrir en premier est l'état de migration de la branche
 de test.**
+
+---
+
+## C8 (découpage) — 04/09/2026
+
+### L'écart à `docs/05` §6 : C7 est mis en pause, et C8 s'ouvre avant sa fermeture
+
+`docs/05` §6 pose une règle de conduite en toutes lettres : ***un chantier à la fois, fermé avant
+d'ouvrir le suivant.*** C7 compte quatre tickets non livrés — T7.7 accessibilité, T7.8 états vides
+et note « À propos », T7.9 colonnes saisies non lues, T7.10 gestes qui n'atteignent pas leur cible.
+**L'humain a tranché de mettre C7 en pause et d'ouvrir C8**, la reprise étant prévue après. Règle 6 :
+la décision se consigne ici, et le travail continue.
+
+**Ce que l'écart coûte, nommé.** `tickets-C7.md` se termine sur *« et le POC est complet — `docs/05`
+§5 n'a pas de huitième chantier »* : la phrase reste vraie le jour où C7 se referme, elle est fausse
+tant qu'il est en pause, et **ce fichier n'a pas été touché** — un chantier en pause garde sa fiche
+intacte, faute de quoi la reprise lirait un document récrit par l'attente. La huitième ligne du
+tableau d'avancement d'`ETAT.md` porte l'état, et c'est le seul endroit où il vit.
+
+**Ce que l'écart ne coûte pas.** Les **huit points ouverts assignés à T7.7 → T7.10 n'entrent pas
+dans C8** et gardent leur ticket : l'accessibilité n'est pas repoussée sans destination, elle est
+repoussée avec la sienne. Aucun ticket de C8 n'ouvre un fichier du périmètre de ces quatre-là, à une
+exception près, traitée plus bas.
+
+**Ce que l'écart rend visible, en revanche** : un chantier qui s'interrompt à 6/10 laisse quatre
+fiches écrites contre un dépôt qui aura bougé. Les périmètres de T7.7 → T7.10 se relisent à la
+reprise plutôt qu'ils ne se rejouent — c'est la contrepartie de la pause, et elle est acceptée.
+
+### Deux recouvrements trouvés en relisant les points ouverts, et non en les découpant
+
+**(1) « Démarrage » était compté deux fois.** Le point *« la liste close de `docs/06` §5 porte trois
+écarts […] ce qui reste à faire est le point d'entrée annoncé de Démarrage — le geste d'ajout d'une
+activité »* portait la destination **C8**. Or T7.10 écrit déjà, mot pour mot : *« la piste de
+démarrage mène à l'activité qu'elle suggère […] le panneau de piste ouvre `?activite=nouvelle` avec
+son type »*. **C'est le même geste**, et `components/projects/starters.tsx` le dit lui-même depuis le
+28/08 : *« `?piste=<id>` ouvre encore son panneau, et c'est par là que le geste d'ajout d'une
+activité viendra le rouvrir »*. La destination était périmée ; elle est récrite → **T7.10**.
+
+**La leçon est de méthode** : un point ouvert écrit avant un découpage ne sait pas ce que le
+découpage a mis dans les fiches. Le relire *contre les fiches* — et pas seulement contre le code —
+est ce qui a trouvé celui-ci. Deux tickets auraient sinon écrit le même `?activite=nouvelle`.
+
+**(2) Deux des cinq orphelins de C7 ne pouvaient pas entrer dans C8.** Le point *« cinq points ont
+perdu leur chantier quand C7 s'est découpé, et C8 les reprend »* nommait le SSO, les objets non
+journalisés, les clés naturelles de l'amorçage, **la carte qui ne se détache d'aucun fond** et **le
+filtre de roadmap dans l'URL**. Les trois premiers font des tickets (T8.6, T8.3, T8.4). Les deux
+derniers ne le peuvent pas :
+
+- **la carte sans fond** demande un jeton que le design system ne porte pas. Le plus franc des
+  `surface-neutral-*` mesure **2,22:1**, sous le seuil de 3:1 d'un composant. Le dépôt tient huit
+  manques du design system **sans en avoir inventé un seul**, et un ticket qui poserait le neuvième
+  détruirait ce qui fait la valeur des huit : leur inventaire. → **design system** ;
+- **le filtre de roadmap** a été repassé côté client sur arbitrage humain le 21/08/2026. Un ticket
+  qui le remettrait dans l'URL rouvrirait une décision humaine sans la main qui l'a rendue.
+  → **arbitrage humain**.
+
+**« C8 les reprend » n'était donc pas une destination, c'était un vœu.** Le geste correct était de
+leur en rendre une chacun, avec sa raison — ce qui est fait.
+
+### L'arbitrage d'énuméré de C6 et C7 bascule, et il faut dire pourquoi
+
+L'arbitrage (b) de `tickets-C6.md` puis (d) de `tickets-C7.md` refusaient d'élargir
+`event_target_type` : *« ce serait une migration d'énuméré pour un seul objet, quand six autres n'en
+ont pas »*. **L'argument portait sur le nombre, et le nombre a changé** : persona, use case,
+indicateur, personne, entité, vision produit, budget, dispositif de mesure, plan de taggage, repère
+de contexte — **dix objets**, plus la suppression d'un accompagnement, qui est d'une autre nature.
+
+Ce n'est pas une décision rouverte : c'est la **même** décision, appliquée à un fait différent.
+Refermer à un objet aurait laissé les autres dehors sans plus savoir pourquoi ; refermer à onze
+referme le point entier, ce que le point exigeait depuis C6 (*« il ne se referme pas à moitié »*).
+
+**Un fait qui ne produira aucune ligne de code, et qui doit être écrit.** La suppression d'un
+accompagnement **ne peut pas** être journalisée : `events.project_id` est `cascade`, une trace écrite
+juste avant serait effacée par l'instruction suivante. **Il n'y a pas de ligne à écrire, il y a une
+disparition à admettre** — et la fiche T8.3 demande qu'elle soit écrite dans le commentaire du geste,
+faute de quoi elle se redécouvrira une troisième fois.
+
+### Le ticket bloqué s'écrit quand même, et il porte sa condition d'ouverture
+
+L'humain a demandé que C8 porte **la dette et le SSO**, et a confirmé dans la même session que
+l'inscription d'application Entra ID **n'existe toujours pas** — tenant, client, secret, URI de
+redirection. Les deux réponses ne se contredisent pas, elles décrivent un ticket écrit et bloqué.
+
+**T8.6 est donc écrit, placé en dernier, et sa fiche s'ouvre sur sa condition** : sans les quatre, le
+ticket ne s'ouvre pas et le point reprend sa destination « action humaine ». C'est la première fois
+qu'une fiche du dépôt porte une condition d'ouverture, et la forme mérite d'être notée : elle évite
+l'alternative, qui était d'écrire une préparation — une couche d'abstraction du fournisseur d'identité
+sans fournisseur. **Ce serait la colonne sans lecteur de T5.2, en plus gros** : du code écrit contre
+un protocole qu'on n'a jamais frappé, et qu'aucun test ne peut mettre en défaut.
+
+### Un point d'arbitrage qui n'a pas été rendu, et c'est délibéré
+
+**Les macro-parcours sont reportés hors C8** (décision humaine). L'entrée de menu et l'écran vide
+restent tels quels — le commentaire d'`app/(app)/macro-parcours/page.tsx` les annonce correctement et
+sans mentir, ce qui est la seule raison pour laquelle un écran vide sans objet peut rester servi.
+
+Le point garde deux arbitrages à rendre, et une destination : **C9**. Ce qu'un macro-parcours relie —
+produits et *use cases* —, et **« macro-parcours » contre le « Réseau de liens entre produits » de
+`docs/02` §10**, qui décrit la même direction sous un autre nom. Le second n'est pas cosmétique :
+`docs/02` §2 pose **onze concepts** et dit qu'*un concept absent de ce document ne doit pas
+apparaître dans une maquette*. Le concept est déjà dans le menu ; il n'est dans aucun document. C'est
+un écart qui existe depuis le 02/09/2026, et **seul l'humain peut le refermer**, `docs/` étant figé.
+
+### Le balayage, et ce qu'il a coûté
+
+`ETAT.md` faisait **744 lignes** pour un seuil de 250 — la règle 5 du protocole, contrôlée pour la
+première fois depuis le balayage du 14/08/2026. Le fichier rend **249 lignes** après.
+
+**Ce ne sont pas les chantiers qui l'ont fait grossir** : les neuf chantiers clos tenaient déjà en
+une ligne chacun, comme la règle l'exige. Ce sont les **entrées hors ticket** — quinze, du 17/08 au
+02/09, de quinze à vingt-cinq lignes pièce — et la **rédaction longue des points ouverts**, où
+chaque point portait son raisonnement complet plutôt que son fait et sa destination.
+
+**Le geste a été celui du 14/08 : rien n'a été résumé, tout a été déplacé.** Le « Journal des
+tickets » et les « Points ouverts » d'avant balayage sont dans `HISTORIQUE-TICKETS.md`, **verbatim, à
+la ligne près**, sous un titre qui dit ce qu'ils sont — un instantané de rédaction, où **les points
+cités ne sont pas tous refermés**. La forme brève d'`ETAT.md` renvoie là-bas.
+
+**La leçon, et elle est mesurable** : un hors-ticket coûte au fichier de contexte autant qu'un
+ticket, et il n'a pas de chantier pour le replier. Neuf chantiers en trois semaines ont produit onze
+lignes ; vingt-neuf hors-tickets en dix-sept jours en avaient produit près de trois cents. **Ce n'est
+pas le rythme des tickets qui fait déborder `ETAT.md`, c'est celui des gestes hors ticket.**
+
+### Le SSO ressort de C8, et forme C9 avec l'administration multi-domaine — 04/09/2026
+
+Le découpage ci-dessus plaçait le SSO en **T8.6**, écrit mais bloqué, avec sa condition d'ouverture
+en tête de fiche. **L'humain a demandé, le même jour, d'en faire un chantier à part entière avec
+l'écran d'administration au-dessus des domaines.** C8 retombe à **cinq tickets** et devient une dette
+pure ; C9 porte l'identité, et les macro-parcours passent en **C10**.
+
+**Ce que la question a mis au jour, et c'est le vrai apport de l'échange.** La demande était : *« la
+partie admin en amont du produit — gérer les entreprises et leurs admins, pour que chacun n'accède
+qu'à la sienne »*. Trois faits ont été vérifiés avant de répondre, et deux étaient inconnus du
+dépôt :
+
+1. **L'étanchéité demandée existe déjà**, et elle n'est pas le sujet. Règle 1, `lib/db/scoped.ts`,
+   `domains` seule table sans `domain_id` (`scoped.ts:885`), éprouvée par lignes forgées à chaque
+   chantier. Ce qui manque n'est pas l'isolation, c'est ce qui la **pilote**.
+2. **Le rôle de super administrateur est dans les documents et pas dans le schéma.** `docs/02` §3 le
+   définit — *créer, suspendre, archiver un domaine ; désigner ses responsables* — et `docs/04`
+   écrit *« seul le super administrateur écrit dans cette table »*. Or `domain_role`
+   (`schema.ts:63`) ne porte que `domain_manager` et `member`. **Aucune personne ne peut être super
+   administrateur aujourd'hui**, et cet écart n'était **nulle part** dans `ETAT.md` — trouvé en
+   vérifiant la question, pas en découpant.
+3. **Et il y a un arbitrage de modèle derrière, pas seulement un écran.** `persons.domain_id` est
+   obligatoire (`domainRef()`) : **une personne appartient à un domaine.** Un super administrateur
+   est *au-dessus* des domaines — il ne peut donc pas être une ligne de `persons` telle qu'elle est.
+   Table à part, colonne nullable, ou identité vivant hors du modèle métier : c'est une décision
+   humaine, jamais celle d'un ticket.
+
+**Ce qui existe déjà et qu'il ne faut pas confondre avec un rôle** : `superAdmin` dans `scoped.ts`
+est un objet de **couche d'accès**, nommé pour ce qu'il est par son propre commentaire — trois
+fonctions (`createDomain`, `findDomain`, `listDomains`), **aucune authentification**, deux appelants
+hors tests (`lib/auth/session.ts:117` et `:179`). Il n'y a **ni écran, ni droit, ni rôle**. La table
+`domains`, elle, est prête : `status` porte déjà `active` / `suspended`, `archived_at` existe.
+
+**Pourquoi les deux sujets tiennent dans le même chantier, et pas dans deux.** `lib/auth/session.ts`
+retient **le premier domaine actif trouvé en base**. Tant que l'authentification est un stub, rien ne
+peut dire *« cette personne appartient à cette entreprise »* : un sélecteur d'entreprise sans
+fournisseur d'identité est une liste déroulante que n'importe qui change, **c'est-à-dire l'inverse de
+l'étanchéité qu'il prétend servir**. L'écran sans le SSO produirait une étanchéité de façade — le
+défaut exact que la règle 1 a passé huit chantiers à ne pas commettre.
+
+**Pourquoi ce n'est pas resté un T8.7.** Deux tickets bloqués sur la même main extérieure, dans un
+chantier de dette dont les cinq autres ne dépendent de rien, rendraient son critère de fin illisible :
+« C8 est terminé » ne voudrait plus dire la même chose selon qu'une inscription d'application est
+arrivée ou non. La condition d'ouverture qu'une fiche portait **remonte au chantier** — C9 ne se
+découpe pas avant que le tenant, le client, le secret et l'URI de redirection existent.
+
+**Deux gestes humains avant qu'une ligne de C9 s'écrive**, et ni l'un ni l'autre n'est un ticket :
+**lever l'exclusion de `docs/05` §4** — *« interface d'administration multi-domaine : un seul domaine
+au POC, amorçage par script »* —, et **trancher où vit un super administrateur**. `docs/` est figé
+(règle 6), et la règle 7 me tient hors de `CLAUDE.md`.
+
+**La leçon, et elle vaut au-delà de ce cas.** Un chantier dont un ticket est bloqué sur une main
+extérieure n'est pas un chantier « avec un ticket en attente » : c'est **deux chantiers qui n'ont pas
+encore été séparés**. Le signe se lit à la question « qu'est-ce que "terminé" veut dire ici ? » — si
+la réponse dépend de quelque chose qui n'est pas dans le dépôt, la séparation est déjà due.
