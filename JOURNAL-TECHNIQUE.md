@@ -9993,3 +9993,121 @@ zéro. Une sonde qui n'a jamais rien trouvé n'est pas une sonde, c'est une inte
 plutôt que corrigé (règle 3). Sa destination est le seau *« au prochain ticket qui ouvre le
 fichier »* — celui-là même dont la fiche T8.4 démontre qu'il **a déjà échoué une fois**. Le fait est
 écrit à côté du point : il mériterait un ticket plutôt qu'un événement.
+
+---
+
+## T8.3 — Un énuméré qui passe de six à seize, et un `git checkout` qui coûte une session (05/09/2026)
+
+### L'écart à `docs/04` §4, et il est frontal
+
+`docs/04` §4 énumère les six `event_target_type` **en toutes lettres**, dans un tableau : `project`,
+`activity`, `resource`, `result`, `indicator_reading`, `member`. La migration `0015` en pose seize.
+`docs/` est figé (règle 6) : **l'écart se consigne ici, il ne se corrige pas dans le document.**
+
+Ce n'est pas une décision rouverte, et c'est ce qui autorise le geste. L'arbitrage (b) de
+`tickets-C6.md` puis (d) de `tickets-C7.md` refusaient *« une migration d'énuméré pour un seul objet,
+quand six autres n'en ont pas »* — **l'argument portait sur le nombre**, et le nombre a changé. La
+même décision, appliquée à un fait différent, donne la réponse inverse.
+
+**Le document avait raison sur un point qu'on n'avait jamais employé** : il écrit `project_id`
+*« null pour les événements de niveau produit **ou domaine** »*. Le niveau domaine — `person` et
+`entity`, ni projet ni produit — est arrivé avec ce ticket, cinq chantiers après que la phrase a été
+écrite.
+
+### Le périmètre de la fiche était faux sur deux fichiers, et incomplet sur un module
+
+La fiche listait quatre fichiers d'actions et `lib/format.ts`. Trois corrections :
+
+- l'**entité** s'écrit dans `app/(app)/administration/actions.ts`, absent de la liste ;
+- le commentaire de la **suppression d'un accompagnement** vit dans
+  `app/(app)/accompagnements/actions.ts`, absent lui aussi ;
+- **`lib/format.ts` ne porte aucun libellé de journal** — ni `objectPhrase`, ni `NOUNS`, ni
+  `targetType`. Il porte `formatEventDay`, qui ne bouge pas. Tout le vocabulaire vit dans
+  `lib/journal.ts`.
+
+Les trois ont été portées à l'humain **avant** la première ligne, avec leurs options, et tranchées.
+Sans les deux fichiers, le point se refermait à moitié — ce que sa rédaction interdisait depuis C6.
+
+### La liste des onze était périmée, et elle l'était depuis T7.4
+
+Elle datait de C6, complétée nom par nom à chaque hors-ticket. Elle n'a **jamais été relue en
+entier**. Quatre familles écrivent encore sans trace après T8.3 :
+
+| Ce qui manque | Où | Pourquoi ce n'était pas vu |
+|---|---|---|
+| le **produit** | `produits/actions.ts` | jamais nommé, alors que sa **vision** l'était |
+| l'**adoption** d'indicateur | `accompagnements/[id]/actions.ts` | **rien ne l'écrivait**, et l'en-tête affirmait le contraire |
+| la **compétence portée** | `equipe/actions.ts` | la liste disait « personne », pas `person_skills` |
+| les **huit référentiels** | `administration/actions.ts` | l'entité était seule en C6 ; T7.3 et T7.4 en ont ajouté huit |
+
+**Le cas de l'adoption est le plus instructif** : l'en-tête d'`accompagnements/[id]/actions.ts`
+écrivait que le budget était *« la seule écriture de ce fichier dont l'absence de `record` soit
+voulue »*. C'était faux, et cette phrase est précisément ce qui a empêché de le voir — un commentaire
+qui affirme une exhaustivité est un commentaire qui dispense de compter. La phrase est corrigée, et
+la leçon rejoint celle des chiffres écrits en prose.
+
+**Aucune n'a été prise** (règle 3), mais chacune est **fixée par un test qui tombera** le jour où on
+la journalisera. C'est ce qui distingue un point ouvert d'un oubli : le premier a un témoin.
+
+### Le prix nommé de l'interdit de sixième verbe
+
+`deletePerson` et `deleteEntity` **peuvent** être journalisés — `events` ne cascade ni sur `persons`
+ni sur `entities`, une ligne survivrait, anonyme, ce qu'un test d'`equipe/` prouve déjà. Ce qui
+manque n'est pas la possibilité, c'est le **verbe** : les cinq sont `created`, `updated`,
+`state_changed`, `linked`, `archived`, et écrire `archived` ferait dire à la colonne « rangée » d'un
+geste qui efface — quand le panneau de confirmation prend soin de distinguer les deux avant le clic.
+
+**C'est une dette assumée, pas un arbitrage confortable.** La fiche interdit un sixième verbe ; le
+ticket s'y tient et écrit la raison aux deux gestes. `deleteProject` est dehors pour une **autre**
+raison, et il fallait la distinguer : sa cascade lui retire jusqu'à la possibilité.
+
+### Le critère de la fiche n'était pas atteignable, et il a été constaté plutôt que contourné
+
+La fiche demandait chaque objet neuf relu *« dans le bloc Journal de la page d'accompagnement **et**
+dans le flux de la vue d'ensemble »*. **Seul le budget est de niveau accompagnement** :
+`listProjectJournal` filtre sur `project_id`, et les neuf autres sont de niveau produit ou domaine.
+Poser un `project_id` sur l'événement d'un persona ou d'une entité pour satisfaire le critère aurait
+été choisir arbitrairement un accompagnement parmi ceux du produit — et la frise aurait affiché ce
+mensonge fidèlement. Le critère a donc été lu **là où chaque objet peut l'être**, et l'écart est
+écrit ici.
+
+### Un `git checkout --` a effacé cinq fichiers de travail non indexés
+
+Le harnais de mise en défaut neutralisait les appels à `record()` puis restaurait les fichiers par
+`git checkout -- <fichiers>`. Les cinq fichiers d'actions **n'étaient pas indexés** : la commande les
+a rendus à `HEAD`, et **tout le travail d'écriture de T8.3 sur ces cinq fichiers a disparu d'un
+coup** — vingt-sept appels, six en-têtes récrits, `toolName`, les commentaires d'arbitrage. Ni
+`stash`, ni commit, ni index : aucun chemin de récupération.
+
+Il a été réécrit intégralement, et la suite est repassée à **1 646 sur 55**, à l'identique.
+
+**La règle qui en sort** : *un harnais qui restaure ne restaure jamais depuis `git` quand le travail
+n'est pas commité.* Le harnais copie désormais les fichiers hors dépôt avant de les toucher, et
+restaure depuis cette copie. C'est le pendant exact de la leçon de T8.1 sur `db:reset` — un outil qui
+« remet à zéro » ne sait pas ce qu'il efface.
+
+### `ETAT.md` reste au-dessus de son seuil, et ce ticket ne le balaie pas
+
+Le fichier faisait **252 lignes** avant T8.3 et en fait **257** après, pour un seuil de 250. Le point
+refermé de T8.3 en a rendu sept ; la ligne de journal, l'en-tête et le point ouvert neuf en ont pris
+douze, resserrés deux fois.
+
+**Le protocole se contredit sur ce point, et c'est l'incohérence documentaire que ce ticket
+consigne** : l'étape 5 dit *« au-delà, le balayer avant de continuer »*, quand la session de
+découpage dit qu'elle *« est le seul moment où `ETAT.md` se balaie »*. Balayer ici aurait voulu dire
+récrire les points ouverts d'autres tickets au milieu de celui-ci. Le choix a donc été de **borner
+strictement ses propres ajouts** et de laisser le reste intact. → **prochaine session de découpage.**
+
+### Deux détails de mise en œuvre qui méritent d'être écrits
+
+**TypeScript réduit l'union d'un ternaire par sous-typage.** Dans `setNorthStar`, la porte est
+`openIndicator` ou `openProductWrite` selon qu'un indicateur est visé. L'union inférée perd
+`{ product, indicator }` — sous-type de `{ product }` — si bien que `"indicator" in gate` ne narrowe
+plus rien et rend `unknown`. Le type est donc **annoté**, avec `indicator` facultatif : c'est ce que
+les deux portes ont réellement en commun.
+
+**Deux fichiers de tests n'avaient pas `events` dans leur nettoyage** — `produits/actions.test.ts` et
+`administration/actions.test.ts` —, parce qu'ils n'en écrivaient aucun. Depuis T8.3 ils en écrivent,
+et `events.domain_id` est `restrict` : sans le geste, la suppression du domaine échouait et laissait
+le **résidu** dont T8.1 a diagnostiqué qu'il fait tomber tout fichier suivant. Le défaut n'a pas eu
+lieu — il a été vu en lisant les six `afterAll` avant de lancer quoi que ce soit.

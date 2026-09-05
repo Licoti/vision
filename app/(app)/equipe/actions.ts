@@ -44,11 +44,17 @@
  * « **Retirer** », la règle de T5.4. Cela ne contredit pas la règle 4 : une
  * liaison n'est pas une donnée métier, c'est un lien entre deux qui restent.
  *
- * **Aucune suppression de personne, jamais** (règle 4) : l'archivage la retire
- * du référentiel Équipe et des choix du formulaire de projet, rien de plus. Elle
+ * **L'archivage ne supprime rien** (règle 4) : il retire la personne du
+ * référentiel Équipe et des choix du formulaire de projet, rien de plus. Elle
  * reste affichée dans l'équipe des accompagnements qu'elle a menés (arbitrage
  * (e)) — `filter()` ne porte que le domaine, et `findProjectDetail` continue de
  * la rendre.
+ *
+ * **Une suppression définitive existe pourtant depuis le 28/08/2026**, et cet
+ * en-tête a écrit « jamais » sept jours de plus qu'il n'était vrai (corrigé en
+ * T8.3, le fichier étant ouvert). `deletePerson` est un écart à la règle 4,
+ * humain et daté, borné à la ligne créée par erreur : deux clés `restrict` font
+ * qu'une personne qui a accompagné ne peut pas disparaître.
  *
  * **Aucun rétablissement** : arbitrage (b) de C4bis — il existe pour les deux
  * objets qui ont une page, et une personne n'en a pas (D29).
@@ -56,6 +62,19 @@
  * **Aucun recalcul de `last_activity_at`** : ni un profil ni une compétence
  * n'est un fait d'accompagnement, et appeler `refreshLastActivity` ferait croire
  * le contraire à qui lit ce fichier — la leçon de T4.2.
+ *
+ * **Trois écritures laissent une trace depuis T8.3, et trois seulement** :
+ * créer, corriger et archiver une **personne**. Leur événement ne porte ni
+ * `project_id` ni `product_id` — ce sont les premiers du dépôt à être de niveau
+ * **domaine**, le cas que `docs/04` §4 prévoit.
+ *
+ * **Ce qui n'en laisse pas, et pourquoi ce sont deux raisons différentes.** La
+ * **suppression** n'a aucun `event_verb` qui la dise : les cinq sont `created`,
+ * `updated`, `state_changed`, `linked`, `archived`, `archived` dirait « rangé »
+ * d'un geste qui efface, et T8.3 s'interdit un sixième verbe — la raison est
+ * écrite au geste. La **compétence portée** n'est pas dans la liste des dix
+ * objets que la fiche T8.3 autorise : c'est un périmètre, pas un arbitrage, et
+ * le point ouvert le porte dans `ETAT.md`.
  *
  * Aucune écriture directe : tout passe par `session.db`, déjà scopé sur le
  * domaine courant et sur la personne courante — `domain_id` et `created_by` sont
@@ -75,6 +94,7 @@ import {
   projectMembers,
 } from "@/lib/db/schema";
 import { DomainScopeError, IntegrityError, type Row } from "@/lib/db/scoped";
+import { objectPhrase } from "@/lib/journal";
 import {
   parsePersonForm,
   readPersonForm,
@@ -309,12 +329,34 @@ export async function createPerson(
   if (!input) return { values, errors };
 
   try {
-    await session.db.insert(persons, {
+    const created = await session.db.insert(persons, {
       source: "manual",
       hasAccess: false,
       domainRole: null,
       isActive: true,
       ...input,
+    });
+
+    /* **Ni `project_id` ni `product_id`** — les premiers événements de niveau
+       **domaine** du dépôt, avec ceux de l'entité. `docs/04` §4 les prévoit en
+       toutes lettres : *« null pour les événements de niveau produit ou
+       domaine »*. Une personne existe sans aucun accompagnement (D29), et lui en
+       attribuer un serait choisir arbitrairement parmi ceux qu'elle mène — le
+       raisonnement exact du relevé d'indicateur, un cran plus haut.
+
+       **La conséquence se lit d'avance et elle est voulue** : ces lignes ne
+       paraissent dans aucune frise de page projet, seulement dans le flux global
+       (T6.6), qui les rend **sans origine** — `originOf` n'a rien à quoi les
+       rattacher, et `Entry` sait déjà taire un lien qu'il n'a pas.
+
+       **`member` n'aurait pas convenu** : il dit la composition d'une équipe
+       d'accompagnement, un rattachement de `project_members`. Ici c'est la fiche
+       de la personne elle-même. Deux objets, deux `target_type`. */
+    await session.db.record({
+      verb: "created",
+      targetType: "person",
+      targetId: created.id,
+      summary: objectPhrase("person", "created", created.fullName),
     });
   } catch (error) {
     return scopeRefusal(error, formData);
@@ -360,6 +402,22 @@ export async function updatePerson(
     if (!updated) {
       return refusal(formData, "Cette personne n'existe plus dans ce domaine.");
     }
+
+    /* **Une ligne pour le geste, jamais une par colonne** : `updatePerson`
+       écrit cinq champs, et la frise en deviendrait illisible. Le nom figé est
+       celui **d'après** — écrire celui d'avant serait la « valeur avant » que
+       D22 refuse, et une personne renommée reste la même personne.
+
+       **La phrase ne s'accorde sur aucun genre**, et c'est déjà la règle de
+       `teamPhrase` : `persons` n'en porte pas, et il n'en portera pas. Ici
+       l'accord est celui de « Personne », le mot, jamais celui de qui elle
+       désigne. */
+    await session.db.record({
+      verb: "updated",
+      targetType: "person",
+      targetId: personId,
+      summary: objectPhrase("person", "updated", updated.fullName),
+    });
   } catch (error) {
     return scopeRefusal(error, formData);
   }
@@ -403,6 +461,13 @@ export async function archivePerson(
   if ("message" in gate) return { message: gate.message };
 
   await session.db.archive(persons, personId);
+
+  await session.db.record({
+    verb: "archived",
+    targetType: "person",
+    targetId: personId,
+    summary: objectPhrase("person", "archived", gate.person.fullName),
+  });
 
   revalidatePath(ROUTES.team);
 
@@ -457,6 +522,17 @@ function refusalOfAnyTrace(members: number, participations: number): string {
  * `cascade`). **Ce qui reste sans son nom** : tout ce qu'elle a créé —
  * `created_by` et `events.actor_id` sont `set null`, les phrases du journal
  * survivent, leur auteur devient anonyme. Le panneau le dit avant le geste.
+ *
+ * **Aucune ligne de journal, et l'arbitrage est rendu** (T8.3) : `event_verb`
+ * n'a pas de verbe qui dise l'effacement. Les cinq sont `created`, `updated`,
+ * `state_changed`, `linked` et `archived` ; écrire `archived` ferait dire à la
+ * colonne « rangée » d'un geste qui efface, et la frise mêlerait alors deux
+ * choses que le panneau prend soin de distinguer avant le clic. La fiche T8.3
+ * s'interdit un sixième verbe, et **la trace qui manque ici n'est donc pas un
+ * oubli : c'est le prix nommé de cet interdit.** Rien n'empêchait techniquement
+ * de l'écrire — `events` ne cascade pas sur `persons`, une ligne survivrait,
+ * anonyme —, et c'est précisément ce qui la distingue de `deleteProject`, à qui
+ * la cascade retire jusqu'à la possibilité.
  *
  * **Aucun rétablissement**, et c'est la nature du geste.
  */

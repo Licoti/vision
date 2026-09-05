@@ -8,11 +8,17 @@
  * **Une fonction par forme de phrase, jamais une par point d'appel.** C'est ce
  * qui empêche deux gestes voisins de dire la même chose de deux manières :
  * `createProject` et `archiveProject` traversent la même fonction, et le seul
- * moyen qu'ils divergent serait de changer la table des participes. **Quatre
- * formes depuis T6.5** : les gestes qui disent « ceci a été créé, corrigé ou
- * archivé » passent tous par `objectPhrase`, ceux qui font *atteindre un état*
- * par `statePhrase`, ceux qui touchent la composition d'une équipe par
- * `teamPhrase`, et ceux qui relient deux accompagnements par `linkPhrase`.
+ * moyen qu'ils divergent serait de changer la table des participes. **Cinq
+ * formes depuis T8.3** : les gestes qui disent « ceci a été créé, corrigé,
+ * archivé ou rétabli » passent tous par `objectPhrase`, ceux qui font *atteindre
+ * un état* par `statePhrase`, ceux qui touchent la composition d'une équipe par
+ * `teamPhrase`, ceux qui relient deux accompagnements par `linkPhrase`, et la
+ * désignation de la North Star par `northStarPhrase`.
+ *
+ * **T8.3 n'a ajouté aucune forme pour les dix objets neufs**, et c'est la
+ * mesure de ce que `objectPhrase` porte : dix noms de plus dans `NOUNS`, zéro
+ * fonction de plus. La cinquième forme n'est pas venue d'un objet, elle est
+ * venue d'un **geste** que les quatre participes ne savaient pas dire.
  *
  * **`summary` est figé à l'écriture** (D22, arbitrage (e)) : le libellé de
  * l'objet est recopié dans la phrase parce que c'est lui qui disparaîtrait
@@ -40,13 +46,20 @@ import type { ActivityState } from "@/lib/forms/activity";
 const NBSP = "\u00A0";
 
 /**
- * Les objets dont le journal sait parler — **les six d'`event_target_type`**.
+ * Les objets dont le journal sait parler — **les seize d'`event_target_type`**.
  *
- * Ils sont deux depuis T6.1 et six depuis T6.2, **chacun arrivé avec le geste
- * qui l'écrit** : un nom sans appelant est celui que le ticket suivant
- * emploierait de travers. L'énuméré est désormais couvert entier, et il ne
- * s'étend pas — persona, use case, indicateur, personne, entité et vision
- * produit ne sont pas journalisés (arbitrage (b) de `tickets-C6.md`).
+ * Ils sont deux depuis T6.1, six depuis T6.2 et seize depuis T8.3, **chacun
+ * arrivé avec le geste qui l'écrit** : un nom sans appelant est celui que le
+ * ticket suivant emploierait de travers. L'énuméré reste couvert entier, et
+ * l'union se tient à la main plutôt que de se dériver de `eventTargetType` —
+ * `lib/journal.ts` est **pur**, il n'importe pas le schéma, et c'est ce qui lui
+ * permet de se tester sans base.
+ *
+ * **Ce qui n'y est toujours pas, et pourquoi.** Le produit lui-même, l'adoption
+ * d'indicateur, la compétence portée et les huit référentiels d'administration
+ * écrivent encore sans laisser de trace : ils n'étaient pas dans la liste des
+ * onze que la fiche T8.3 autorise, et un objet ajouté « pendant qu'on y est »
+ * est exactement ce que la règle 3 refuse. Point ouvert, récrit dans `ETAT.md`.
  */
 export type JournalKind =
   | "project"
@@ -54,7 +67,18 @@ export type JournalKind =
   | "activity"
   | "resource"
   | "result"
-  | "indicator_reading";
+  | "indicator_reading"
+  /* Les dix de T8.3, dans l'ordre de l'énuméré. */
+  | "persona"
+  | "use_case"
+  | "indicator"
+  | "person"
+  | "entity"
+  | "product_vision"
+  | "budget"
+  | "tracking"
+  | "tagging_plan"
+  | "context_marker";
 
 /**
  * Ce qu'un geste a fait de l'objet.
@@ -63,10 +87,19 @@ export type JournalKind =
  * `restoreProject` écrit le verbe `updated` — rétablir *est* une modification
  * pour la base. Ce que la phrase distingue, la colonne n'a pas à le distinguer.
  *
- * **Les quatre suffisent aux six objets, et T6.2 n'en ajoute aucun.** Un
+ * **Les quatre suffisent aux seize objets, et T8.3 n'en ajoute aucun.** Un
  * cinquième participe pour le rétablissement d'une ressource ou d'un résultat
  * n'aurait pas d'appelant : ces objets se **ressaisissent** plutôt qu'ils ne se
- * rétablissent (arbitrage (b) de `tickets-C4bis.md`).
+ * rétablissent (arbitrage (b) de `tickets-C4bis.md`). `restored` a gagné un
+ * second appelant en T8.3 — `restoreEntity` —, et c'est le seul mouvement.
+ *
+ * **Aucun participe pour l'effacement**, et ce n'est pas un oubli : ni
+ * `deletePerson`, ni `deleteEntity`, ni `deleteProject` n'écrivent au journal.
+ * Les deux premiers n'ont aucun `event_verb` qui les dise — `archived` dirait
+ * « rangé » d'un geste qui efface, et T8.3 s'interdit un sixième verbe ; le
+ * troisième ne le peut pas, `events.project_id` étant `cascade`. Un participe
+ * sans verbe et sans appelant serait le nom que le ticket suivant emploierait de
+ * travers.
  */
 export type JournalDeed = "created" | "updated" | "archived" | "restored";
 
@@ -82,6 +115,18 @@ export type JournalDeed = "created" | "updated" | "archived" | "restored";
  * `member` porte « Équipe » et non « Membre » : la fiche pose **une seule
  * ligne** pour tout le diff, jamais une par personne. C'est la composition qui
  * a changé, pas un membre.
+ *
+ * **`person` et `member` ne sont pas le même objet, et ce n'est pas une
+ * redondance** (T8.3). `member` dit la composition d'une équipe
+ * d'accompagnement — un rattachement, porté par `project_members` ; `person`
+ * dit la fiche d'une personne du référentiel Équipe, qui existe sans aucun
+ * accompagnement. Deux `target_type`, deux libellés, et le second ne porte
+ * jamais de projet.
+ *
+ * **`product_vision` est un objet du journal sans être une table** : la vision
+ * est une colonne de `products`, écrite par son seul geste. Elle a son
+ * `target_type` parce que c'est le geste qui se journalise, jamais la colonne —
+ * et le produit lui-même, qui n'est pas dans la liste des dix, n'en a pas.
  *
  * **`activity` porte « Activité », et le mot reste au fait d'accompagnement.**
  * `docs/04` §4 pose le piège en toutes lettres : à l'écran on dit *journal* et
@@ -100,6 +145,24 @@ const NOUNS: Record<JournalKind, { label: string; feminine: boolean }> = {
   resource: { label: "Ressource", feminine: true },
   result: { label: "Résultat", feminine: false },
   indicator_reading: { label: "Relevé", feminine: false },
+
+  /* Les dix de T8.3. **Chaque libellé est celui de l'écran**, jamais celui de
+     la table : « Use case » est le titre du bloc et le mot de tous ses
+     `aria-label`, « Vision produit » celui de l'en-tête du bloc de tête, et
+     « Outil de mesure » celui des messages de refus de `produits/[id]` — le
+     bloc s'appelle « Dispositif de mesure », mais c'est le **bloc**, quand la
+     ligne journalisée est un outil parmi ceux qu'il réunit. Un journal qui
+     nommerait les objets autrement que l'écran obligerait à traduire. */
+  persona: { label: "Persona", feminine: false },
+  use_case: { label: "Use case", feminine: false },
+  indicator: { label: "Indicateur", feminine: false },
+  person: { label: "Personne", feminine: true },
+  entity: { label: "Entité", feminine: true },
+  product_vision: { label: "Vision produit", feminine: true },
+  budget: { label: "Budget", feminine: false },
+  tracking: { label: "Outil de mesure", feminine: false },
+  tagging_plan: { label: "Plan de taggage", feminine: false },
+  context_marker: { label: "Repère de contexte", feminine: false },
 };
 
 /** Les quatre participes. Leur féminin est régulier — un `e` suffit. */
@@ -194,6 +257,61 @@ export function statePhrase(
 ): string {
   const clause = `${NOUNS.activity.label} ${STATES[state]}${NBSP}: ${label}`;
   return reason ? `${clause}${NBSP}— ${reason}` : clause;
+}
+
+/**
+ * Ce qu'un geste a fait de la **North Star** — T8.3.
+ *
+ * **Deux, et pas quatre** : `setNorthStar` désigne un indicateur, ou retire la
+ * désignation sans en poser d'autre (`indicatorId` à `null`). Rien ne l'archive
+ * ni ne la rétablit — c'est un drapeau sur `indicators.is_north_star`, pas une
+ * ligne.
+ */
+export type JournalNorthStarDeed = "designated" | "removed";
+
+/**
+ * Les deux participes, accordés au féminin de « North Star ».
+ *
+ * **Ils ne passent pas par `DEEDS`**, et pour la raison qui écarte déjà les
+ * trois états de `STATES` : « désigné » n'est pas dans la table des quatre, et
+ * « retiré » y dirait autre chose — `LINK_DEEDS.removed` parle d'un lien
+ * déclaré. Les écrire accordés ici évite d'inventer une seconde règle d'accord
+ * pour deux valeurs.
+ *
+ * L'écran dit « Aucune North Star désignée » : le journal reprend son mot.
+ */
+const NORTH_STAR_DEEDS: Record<JournalNorthStarDeed, string> = {
+  designated: "désignée",
+  removed: "retirée",
+};
+
+/**
+ * La cinquième forme : la North Star qu'un produit vient de se donner, ou de
+ * reprendre.
+ *
+ * « North Star désignée : Autonomie » · « North Star retirée : Autonomie ».
+ *
+ * **C'est le gabarit d'`objectPhrase`, le nom de l'objet en moins** — et c'est
+ * voulu : « Indicateur désigné : Autonomie » ne dirait pas *ce qui* a été
+ * désigné, quand le seul geste de désignation du produit porte ce nom-là à
+ * l'écran. Le `target_type` reste `indicator`, qui est l'objet touché ; la
+ * phrase dit le geste. C'est exactement la dissociation de `linkPhrase`, et les
+ * deux sont vraies — c'est la phrase qui se lit.
+ *
+ * **`objectPhrase` n'aurait pas pu la porter** : ses quatre participes disent
+ * ce qui est *arrivé à un objet*, jamais ce qu'un objet est *devenu pour un
+ * autre*. Le verbe de la colonne le dit d'ailleurs aussi — `state_changed`, le
+ * seul des cinq qui nomme un état atteint.
+ *
+ * **Le libellé est celui de l'indicateur, et il est figé** (D22) : au retrait,
+ * c'est celui qui **cesse** d'être North Star — sans lui, la ligne dirait qu'on
+ * a retiré quelque chose sans dire quoi.
+ */
+export function northStarPhrase(
+  deed: JournalNorthStarDeed,
+  label: string,
+): string {
+  return `North Star ${NORTH_STAR_DEEDS[deed]}${NBSP}: ${label}`;
 }
 
 /** Les trois mouvements qu'une composition d'équipe peut avoir subis. */

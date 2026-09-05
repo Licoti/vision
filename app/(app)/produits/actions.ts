@@ -26,6 +26,21 @@
  *
  * Aucune suppression, jamais (règle 4) : la couche n'expose pas de `delete`, et
  * ce qui est archivé se rétablit.
+ *
+ * **Une seule écriture de ce fichier laisse une trace, et c'est la vision**
+ * (T8.3). `product_vision` est l'un des dix `event_target_type` que la migration
+ * `0015` a ajoutés ; l'événement porte `product_id`, jamais `project_id` — la
+ * vision est une propriété du produit, c'est d'ailleurs ce qui lui a donné
+ * `manageDomain` le 18/08/2026 quand le budget a pris `writeProject`.
+ *
+ * **Les quatre gestes du produit lui-même n'en laissent aucune, et c'est un
+ * périmètre, pas un arbitrage.** Créer, corriger, archiver et rétablir un
+ * produit écrivent sans trace ; `product` n'est pas dans l'énuméré, et il
+ * n'était pas dans la liste des dix objets que la fiche T8.3 autorise —
+ * l'ajouter aurait été le geste « pendant que j'y suis » que la règle 3 refuse.
+ * **C'est un point ouvert, écrit comme tel dans `ETAT.md`**, et non un état
+ * qu'on aurait choisi : la vision d'un produit laisse désormais une trace que
+ * son archivage ne laisse pas, et l'asymétrie se voit depuis ce fichier.
  */
 
 import { eq } from "drizzle-orm";
@@ -37,6 +52,7 @@ import { requireSession } from "@/lib/auth/provider";
 import { products, projects } from "@/lib/db/schema";
 import { DomainScopeError, type Row } from "@/lib/db/scoped";
 import { formatAccompaniments } from "@/lib/format";
+import { objectPhrase } from "@/lib/journal";
 import {
   parseProductForm,
   type ProductFormState,
@@ -382,6 +398,27 @@ export async function updateProductVision(
       message: "Ce produit n'existe plus dans ce domaine.",
     };
   }
+
+  /* **Une ligne, et le champ vidé en écrit une aussi** : retirer la vision est
+     une correction du champ, pas une suppression (la note du panneau le dit),
+     et le journal ne distingue pas les deux — `updated` est le seul verbe qui
+     convienne, et D22 interdit de porter la valeur, avant comme après.
+
+     **La phrase nomme le produit**, qui *est* la désignation de sa vision :
+     `products.vision` est une colonne, un produit en porte au plus une, et
+     « Vision produit modifiée : Espace client » dit tout ce que la ligne sait.
+     C'est la règle du plan de taggage, et la raison qui écarte le nom du
+     produit pour un outil de mesure — là, plusieurs lignes se partagent le
+     produit ; ici, non.
+
+     **`target_id` est le produit**, faute d'une ligne à désigner. */
+  await session.db.record({
+    productId,
+    verb: "updated",
+    targetType: "product_vision",
+    targetId: productId,
+    summary: objectPhrase("product_vision", "updated", updated.name),
+  });
 
   revalidatePath(ROUTES.product(productId));
 

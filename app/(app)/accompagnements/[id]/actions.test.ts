@@ -63,8 +63,10 @@ import {
   domains,
   entities,
   events,
+  indicators,
   persons,
   products,
+  projectIndicators,
   projectLinks,
   projectMembers,
   projectStatuses,
@@ -334,6 +336,12 @@ afterAll(async () => {
     resources,
     activities,
     projectLinks,
+    /* `project_indicators` avant `indicators`, et les deux avant `projects` :
+       le constat « l'adoption n'écrit aucune ligne » les remplit depuis T8.3, et
+       `indicators.domain_id` est `restrict`. Le nettoyage ne s'en remet pas à
+       une cascade — ce qui est écrit ici s'efface ici. */
+    projectIndicators,
+    indicators,
     budgets,
     projectMembers,
     projects,
@@ -1644,11 +1652,20 @@ describe("saveProjectBudget — saisir et corriger la même ligne", () => {
     });
   });
 
-  test("le geste n'écrit aucune ligne de journal", async () => {
-    /* Arbitrage (d) : `budget` n'est pas l'un des six `event_target_type`, et
-       l'ouvrir pour un seul objet demanderait une migration d'énuméré. Cette
-       absence ne se lit dans aucun écran — seul le décompte la porte, et sans ce
-       test elle ne se distinguerait pas d'un oubli. */
+  /**
+   * **Ce constat disait l'inverse jusqu'à T8.3, et il est renversé plutôt que
+   * retiré.** Il portait l'arbitrage (d) de `tickets-C7.md` — *« `budget` n'est
+   * pas l'un des six `event_target_type`, et l'ouvrir pour un seul objet
+   * demanderait une migration d'énuméré »* — et il a tenu tant que l'argument a
+   * tenu. Il ne tient plus : ils étaient dix à écrire sans trace quand C8 s'est
+   * découpé, et l'argument, qui portait sur le nombre, a basculé avec lui.
+   *
+   * **Une décision qui change fait tomber le test qui la portait**, et c'est ce
+   * qu'on lui demandait. Le remplacer par son contraire au même endroit garde la
+   * trace du renversement là où il se lit ; le détail — les deux verbes, le
+   * rattachement, l'absence de chiffre — vit dans le bloc suivant.
+   */
+  test("le geste écrit une ligne de journal, et une seule", async () => {
     await clearBudgets();
     currentPerson = f.contributorId;
 
@@ -1657,6 +1674,148 @@ describe("saveProjectBudget — saisir et corriger la même ligne", () => {
     });
 
     expect(await budgetRow(f.projectId)).not.toBeNull();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.targetType).toBe("budget");
+  });
+});
+
+describe("le journal du budget — deux branches, deux verbes", () => {
+  /**
+   * **Le geste est un, la trace dit lequel des deux moments a eu lieu.**
+   * `budgets_project_unique` fait qu'un accompagnement porte au plus un budget :
+   * « en saisir un » et « corriger celui-là » sont la même écriture vue à deux
+   * moments, et l'écran ne les distingue pas. La frise, elle, le doit.
+   */
+  test("la saisie écrit `created`, la correction `updated`", async () => {
+    await clearBudgets();
+    currentPerson = f.contributorId;
+
+    const created = await written(() =>
+      saveProjectBudget(f.projectId, EMPTY, budgetForm()),
+    );
+
+    expect(created).toHaveLength(1);
+    expect(created[0]?.verb).toBe("created");
+    expect(created[0]?.targetType).toBe("budget");
+    expect(created[0]?.actorId).toBe(f.contributorId);
+    expect(created[0]?.summary).toBe(`Budget créé${NBSP}: Ouvert ${suffix}`);
+
+    /* **`project_id` posé, `product_id` nul** : le budget est une propriété de
+       l'**accompagnement** — c'est ce qui lui a donné `writeProject` plutôt que
+       `manageDomain` (arbitrage (e) de `tickets-C7.md`). C'est aussi la seule
+       ligne des dix objets de T8.3 qui paraisse dans la frise de la page
+       projet. */
+    expect(created[0]?.projectId).toBe(f.projectId);
+    expect(created[0]?.productId).toBeNull();
+
+    const [row] = await db
+      .select({ id: budgets.id })
+      .from(budgets)
+      .where(eq(budgets.projectId, f.projectId));
+    expect(created[0]?.targetId).toBe(row?.id);
+
+    const updated = await written(() =>
+      saveProjectBudget(f.projectId, EMPTY, budgetForm({ consumed: "95" })),
+    );
+
+    expect(updated).toHaveLength(1);
+    expect(updated[0]?.verb).toBe("updated");
+    expect(updated[0]?.targetType).toBe("budget");
+    expect(updated[0]?.targetId).toBe(row?.id);
+    expect(updated[0]?.summary).toBe(`Budget modifié${NBSP}: Ouvert ${suffix}`);
+  });
+
+  /**
+   * **Aucune valeur dans la phrase** (D22) : ni le montant, ni le nombre de
+   * jours, ni avant, ni après. Un budget porté par une ligne de journal serait
+   * la « valeur avant » que le journal refuse — et un montant lu dans une frise
+   * inviterait à comparer les accompagnements entre eux, ce que D39 exclut.
+   */
+  test("la phrase ne porte jamais un chiffre du budget", async () => {
+    await clearBudgets();
+    currentPerson = f.contributorId;
+
+    const created = await written(() =>
+      saveProjectBudget(f.projectId, EMPTY, budgetForm({ allocated: "120" })),
+    );
+    const updated = await written(() =>
+      saveProjectBudget(f.projectId, EMPTY, budgetForm({ allocated: "999" })),
+    );
+
+    for (const line of [...created, ...updated]) {
+      expect(line.summary).not.toContain("120");
+      expect(line.summary).not.toContain("999");
+      expect(line.summary).not.toContain("87");
+    }
+  });
+
+  /**
+   * **La soumission entièrement vide écrit `updated`**, et c'est juste : les
+   * cinq colonnes repassent à `null`, la ligne reste. C'est le geste qui défait
+   * une saisie erronée, et il se lit comme la correction qu'il est — jamais
+   * comme un archivage, `budgets` n'ayant pas d'`archived_at`.
+   */
+  test("le formulaire vidé écrit une correction, jamais un rangement", async () => {
+    await clearBudgets();
+    currentPerson = f.contributorId;
+    await saveProjectBudget(f.projectId, EMPTY, budgetForm());
+
+    const emptied = await written(() =>
+      saveProjectBudget(f.projectId, EMPTY, form({})),
+    );
+
+    expect(emptied).toHaveLength(1);
+    expect(emptied[0]?.verb).toBe("updated");
+    expect(emptied[0]?.verb).not.toBe("archived");
+  });
+
+  /**
+   * **Le droit s'éprouve par l'action** : un refus n'écrit ni le budget ni sa
+   * ligne de journal. C'est le cas que la fiche demande de viser, et non
+   * seulement celui qui réussit — un `record` posé avant la garde passerait les
+   * trois constats ci-dessus sans que rien ne le signale.
+   */
+  test("un refus n'écrit ni le budget ni l'événement", async () => {
+    await clearBudgets();
+    currentPerson = f.outsiderId;
+
+    const lines = await written(async () => {
+      const state = await saveProjectBudget(f.projectId, EMPTY, budgetForm());
+      expect(state.message).toBeDefined();
+      expect(state.ok).toBeUndefined();
+    });
+
+    expect(lines).toHaveLength(0);
+    expect(await budgetCount()).toBe(0);
+  });
+
+  /**
+   * **L'adoption d'indicateur n'entre pas au journal**, et ce constat fixe une
+   * asymétrie que rien n'écrivait : l'en-tête de ce fichier affirmait même que
+   * le budget était « la seule écriture dont l'absence de `record` soit
+   * voulue », ce qui était faux. `project_indicators` n'était pas dans la liste
+   * des dix objets que la fiche T8.3 autorise — c'est un périmètre, pas un
+   * arbitrage, et le point ouvert le porte dans `ETAT.md`.
+   *
+   * **Le jour où un ticket la journalisera, c'est ce test qui tombera**, et
+   * c'est ce qu'on lui demande.
+   */
+  test("l'adoption d'un indicateur n'écrit aucune ligne", async () => {
+    currentPerson = f.contributorId;
+
+    const indicator = await f.scope.insert(indicators, {
+      productId: (await f.scope.find(projects, f.projectId))!.productId,
+      label: `Sans trace ${suffix}`,
+      direction: "higher_is_better",
+    });
+
+    const lines = await written(async () => {
+      await f.scope.insert(projectIndicators, {
+        projectId: f.projectId,
+        indicatorId: indicator.id,
+      });
+    });
+
     expect(lines).toHaveLength(0);
   });
 });

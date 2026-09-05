@@ -25,6 +25,13 @@
  *
  * Rien d'autre n'est simulé : la base est réelle, la porte est la vraie, et
  * `requireSession` fait son travail entier.
+ *
+ * **T8.3 y ajoute la trace du geste.** La vision est le premier objet de ce
+ * fichier à laisser une ligne au journal — `product_vision`, l'un des dix
+ * `target_type` de la migration `0015` —, et **elle est la seule** : créer,
+ * corriger, archiver et rétablir un **produit** n'écrivent toujours rien.
+ * L'asymétrie est un périmètre, pas un arbitrage, et le dernier bloc de ce
+ * fichier la mesure plutôt que de la laisser se supposer.
  */
 
 import { eq } from "drizzle-orm";
@@ -36,6 +43,7 @@ import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
 import {
   domains,
   entities,
+  events,
   persons,
   products,
   projectMembers,
@@ -224,7 +232,13 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (!createdDomainId) return;
+  /* **`events` en tête depuis T8.3**, et son absence aurait été une cascade de
+     63 : `events.domain_id` est `restrict`, si bien que la suppression du
+     domaine aurait échoué et laissé un résidu que `resolveDomainId` sert au
+     fichier suivant. C'est exactement la panne que T8.1 a diagnostiquée, et
+     `updateProductVision` est ce qui la rendait atteignable ici. */
   const tables = [
+    events,
     projectMembers,
     projects,
     projectStatuses,
@@ -365,5 +379,144 @@ describe("updateProductVision — ce que le geste refuse", () => {
     const state = await call("3f2504e0-4f89-11d3-9a0c-0305e82c3301", "Une direction.");
 
     expect(state.message).toContain("n'existe plus dans ce domaine");
+  });
+});
+
+/* ==========================================================================
+   Le journal de la vision — T8.3
+   ========================================================================== */
+
+type EventRow = {
+  verb: string;
+  targetType: string;
+  targetId: string | null;
+  actorId: string | null;
+  projectId: string | null;
+  productId: string | null;
+  summary: string;
+};
+
+/** Toutes les lignes du journal du domaine, de la plus ancienne à la dernière. */
+async function journal(): Promise<EventRow[]> {
+  return db
+    .select({
+      verb: events.verb,
+      targetType: events.targetType,
+      targetId: events.targetId,
+      actorId: events.actorId,
+      projectId: events.projectId,
+      productId: events.productId,
+      summary: events.summary,
+    })
+    .from(events)
+    .where(eq(events.domainId, f.domainId))
+    .orderBy(events.occurredAt, events.createdAt);
+}
+
+/** Les lignes qu'un geste vient d'écrire — le décompte avant, le décompte après. */
+async function lines(gesture: () => Promise<unknown>): Promise<EventRow[]> {
+  const before = await journal();
+  await gesture();
+  return (await journal()).slice(before.length);
+}
+
+/**
+ * L'insécable de `lib/journal.ts`, **en échappement**.
+ *
+ * Écrit en caractère, il est indiscernable d'une espace ordinaire dans un
+ * fichier source : un test qui attendrait la seconde passerait le jour où la
+ * règle sauterait, et celui qui le lirait ne saurait pas lequel il attend.
+ * C'est la forme de `lib/format.test.ts` et des deux autres fichiers de tests
+ * d'action qui lisent une phrase de journal.
+ */
+const NBSP = "\u00A0";
+
+describe("le journal de la vision produit", () => {
+  test("la saisie écrit une ligne, et une seule", async () => {
+    await clear();
+    currentPerson = f.managerId;
+
+    const traced = await lines(() =>
+      call(f.productId, "Devenir le point d'entrée unique du réseau."),
+    );
+
+    expect(traced).toHaveLength(1);
+    expect(traced[0]?.verb).toBe("updated");
+    expect(traced[0]?.targetType).toBe("product_vision");
+    expect(traced[0]?.actorId).toBe(f.managerId);
+    expect(traced[0]?.summary).toBe(
+      `Vision produit modifiée${NBSP}: Produit ${suffix}`,
+    );
+
+    /* **`project_id` nul, `product_id` posé** : la vision est une propriété du
+       produit — c'est ce qui lui a donné `manageDomain` quand le budget a pris
+       `writeProject`. Aucun écran ne dira ce point. */
+    expect(traced[0]?.projectId).toBeNull();
+    expect(traced[0]?.productId).toBe(f.productId);
+
+    /* `target_id` est le produit, faute d'une ligne à désigner : la vision est
+       une colonne. */
+    expect(traced[0]?.targetId).toBe(f.productId);
+  });
+
+  /**
+   * **Vider le champ écrit une ligne, et c'est `updated`.** Retirer la vision
+   * est la correction d'un champ de texte, pas une suppression (la note du
+   * panneau le dit) : le journal ne distingue pas les deux, et il n'a aucun
+   * verbe pour le faire.
+   */
+  test("le champ vidé écrit lui aussi, et le journal ne porte aucune valeur", async () => {
+    await clear();
+    currentPerson = f.managerId;
+    await written(call(f.productId, "Une direction à retirer."));
+
+    const emptied = await lines(() => call(f.productId, ""));
+
+    expect(emptied).toHaveLength(1);
+    expect(emptied[0]?.verb).toBe("updated");
+    expect(await visionOf(f.productId)).toBeNull();
+
+    /* Ni la valeur d'avant ni celle d'après : le journal n'est pas un
+       historique (D22), et la phrase désigne ce qui a été touché. */
+    expect(emptied[0]?.summary).not.toContain("Une direction à retirer");
+  });
+
+  /**
+   * **Le droit s'éprouve par l'action** : un refus n'écrit ni la donnée ni sa
+   * ligne de journal. Le contributeur est le cas qui compte — il écrit les
+   * indicateurs du même produit, et pas sa vision.
+   */
+  test("un contributeur refusé n'écrit ni la vision ni l'événement", async () => {
+    await clear();
+    currentPerson = f.contributorId;
+
+    const traced = await lines(async () => {
+      const state = await call(f.productId, "Vision forgée.");
+      expect(state.message).toBeDefined();
+      expect(state.ok).toBeUndefined();
+    });
+
+    expect(traced).toHaveLength(0);
+    expect(await visionOf(f.productId)).toBeNull();
+  });
+
+  /**
+   * **Le produit lui-même n'entre pas au journal**, et ce constat est là pour
+   * que l'asymétrie se lise plutôt qu'elle ne se découvre : la fiche T8.3
+   * autorisait dix objets, `product` n'en était pas, et l'ajouter aurait été le
+   * geste « pendant que j'y suis » que la règle 3 refuse. Le jour où un ticket
+   * le journalisera, **c'est ce test qui tombera** — et c'est ce qu'on lui
+   * demande.
+   */
+  test("archiver un produit n'écrit aucune ligne", async () => {
+    currentPerson = f.managerId;
+
+    const traced = await lines(async () => {
+      await f.scope.archive(products, f.archivedProductId);
+      await f.scope.restore(products, f.archivedProductId);
+      await f.scope.archive(products, f.archivedProductId);
+    });
+
+    expect(traced).toHaveLength(0);
   });
 });

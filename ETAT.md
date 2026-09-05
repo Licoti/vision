@@ -2,14 +2,14 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 05/09/2026, **T8.2 livré** — le contrat des décomptes redevient vrai et
-**mesuré sur une ligne forgée**, la liste transverse rend ses sept colonnes, `/produits` son nombre.
+**Dernière mise à jour :** 05/09/2026, **T8.3 livré** — l'énuméré du journal passe de **six à
+seize**, vingt-sept points d'appel, et **dix chutes isolées** à la mise en défaut.
 **Chantier en cours :** **C8 — Dette**, cinq tickets, dans `tickets-C8.md`. **C7 est en pause, pas
 clos** — T7.7 → T7.10 reprennent après C8 (décision humaine du 04/09) ; écart à `docs/05` §6 consigné
 au journal technique. **Le SSO est sorti de C8 et forme C9 avec l'administration multi-domaine.**
 **Référence du chantier, relevée par T8.1 : 1 582 tests sur 55 fichiers, `lint` et `tsc` au vert** —
-chaque ticket de C8 y compare son vert, jamais à un souvenir. **T8.2 la porte à 1 589 sur 55.**
-**Ticket suivant : T8.3 — onze objets entrent au journal.**
+chaque ticket y compare son vert, jamais à un souvenir. **T8.2 : 1 589 · T8.3 : 1 646, sur 55.**
+**Ticket suivant : T8.4 — les garde-fous du dépôt.**
 
 ---
 
@@ -27,7 +27,7 @@ chaque ticket de C8 y compare son vert, jamais à un souvenir. **T8.2 la porte �
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
 | C7 — Finitions | T7.1 → T7.10 | **en pause** — T7.1 → T7.6 livrés, reprise après C8 |
-| C8 — Dette | T8.1 → T8.5 | **en cours** — T8.1, T8.2 livrés |
+| C8 — Dette | T8.1 → T8.5 | **en cours** — T8.1 → T8.3 livrés |
 | C9 — SSO et administration multi-domaine | à découper | bloqué sur l'inscription Entra ID |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
 
@@ -64,6 +64,11 @@ chaque ticket de C8 y compare son vert, jamais à un souvenir. **T8.2 la porte �
   d'une jointure** sur trois lectures : les constats d'égalité passaient faute de cas, et une ligne
   forgée — projet du domaine, **statut d'un autre** — les a fait tomber avant qu'on les croie. Plus
   les deux colonnes de `docs/06` §4 et le décompte de `/produits`. **Sept chutes isolées.**
+- **C8 — Dette — T8.3, 05/09.** *« Onze objets »* était un compte **périmé** : dix reçoivent leur
+  `event_target_type` (migration `0015`, six → **seize**), le onzième — supprimer un accompagnement —
+  ne le peut pas. **Vingt-sept appels à `record()`**, cinq verbes réemployés, une cinquième forme de
+  phrase pour la North Star. **Quatre familles hors liste**, intactes, fixées par des tests qui
+  tomberont. **Dix chutes isolées.**
 - **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, tous détaillés dans
   `HISTORIQUE-TICKETS.md` et `JOURNAL-TECHNIQUE.md`. Cinq portent une migration : **`0010`**
   disponibilité déduite et suppression définitive · **`0011`** une seule cible par indicateur, portée
@@ -106,13 +111,6 @@ refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le
 
 ### b. Assignés à un ticket
 
-**T8.3 — le journal.** **Onze objets écrivent sans laisser de trace** : persona, use case,
-indicateur, personne, entité, vision produit, budget, dispositif de mesure, plan de taggage, repère
-de contexte, et la suppression d'un accompagnement — cette dernière d'une autre nature,
-`events.project_id` étant `cascade` : pas de ligne à écrire, une disparition à admettre ·
-**l'en-tête de `schema.ts` dit « les 26 tables métier », elles sont 33** — cinquième
-chiffre faux d'une même famille, le geste est de **retirer** (était destiné à T7.10, C8 passe avant).
-
 **T8.4 — les garde-fous du dépôt.** **`uiLayerSeal` ne scelle ni `shell/`, ni `overview/`, ni
 `admin/`**, et la destination « au prochain qui l'ouvre » a **déjà échoué** le 29/08 · **l'amorçage
 rapproche par clé naturelle, donc un renommage recrée — et c'est arrivé** ; refermé pour les entités
@@ -148,6 +146,13 @@ annoncé du bloc « Démarrage »** qu'un point distinct destinait à C8 : le re
 au découpage, il n'y a qu'un geste · `default_tool_id` ne présélectionne rien · le groupe « Annulé »
 n'est plus replié par défaut (`docs/03` §6) · rétablir un accompagnement sous un produit archivé le
 laisse invisible.
+
+**Le journal reste incomplet : la liste des onze était périmée** (T8.3, laissé intact — règle 3).
+**Quatre familles écrivent sans trace** — le **produit**, dans le fichier même où sa vision en laisse
+une · l'**adoption**, dont l'absence n'était écrite nulle part et que l'en-tête
+d'`accompagnements/[id]/` niait · la **compétence portée** · les **huit référentiels** autres que
+l'entité, trente-deux gestes. Chacune est **fixée par un test qui tombera**. L'énuméré et
+`lib/journal.ts` sont prêts ; il manque un ticket. → **prochaine session de découpage.**
 
 **Au prochain ticket qui ouvre le fichier** — **destination qui a déjà échoué une fois** (fiche T8.4).
 **`listProductsWithCounts` ne rejoue pas la jointure de statut** (`lib/queries/products.ts`) : sa

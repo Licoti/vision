@@ -138,8 +138,10 @@
  * est celle d'`updateActivity`, et elle existait déjà sous un autre nom — c'est
  * celle qui décide de `refresh`.
  *
- * **`product_id` reste nul sur les onze** : le produit se déduit du projet, et
- * le figer serait faux le jour où l'accompagnement change de produit (D20).
+ * **`product_id` reste nul sur toutes les lignes de ce fichier** — le chiffre
+ * est retiré plutôt que corrigé, la famille des comptes écrits en prose ayant
+ * déjà coûté cinq faux (T8.3). Le produit se déduit du projet, et le figer
+ * serait faux le jour où l'accompagnement change de produit (D20).
  *
  * **Saisir le budget (T7.1)** est la dernière écriture de ce fichier, et la
  * seule qui ne soit ni tout à fait une création ni tout à fait une correction :
@@ -149,13 +151,25 @@
  * page — et pas de porte de plus : `openProject` suffit, là où la ressource,
  * l'adoption et le lien en demandaient une seconde.
  *
- * **Elle ne laisse aucune trace au journal**, et c'est un arbitrage, pas un
- * oubli (arbitrage (d) de `tickets-C7.md`) : `budget` n'est pas l'un des six
- * `event_target_type`, et l'ouvrir pour un seul objet demanderait une migration
- * d'énuméré quand six autres objets écrivent déjà sans trace. Le point ouvert
- * d'`ETAT.md` se récrit avec un septième nom ; il ne se referme pas à moitié.
- * C'est la seule écriture de ce fichier dont l'absence de `record` soit voulue,
- * et elle est écrite ici pour qu'on ne la prenne pas pour un manque.
+ * **Elle laisse une trace depuis T8.3**, et l'arbitrage (d) de `tickets-C7.md`
+ * qui la lui refusait n'a pas été rouvert : c'est **la même décision appliquée à
+ * un fait différent**. Elle disait *« une migration d'énuméré pour un seul
+ * objet, quand six autres n'en ont pas »* ; ils étaient dix quand C8 s'est
+ * découpé, et l'argument, qui portait sur le nombre, a basculé avec lui.
+ * `budget` est donc l'un des dix `event_target_type` de la migration `0015`, et
+ * son événement porte `project_id` — le budget est une propriété de
+ * l'**accompagnement**, ce qui lui donnait déjà `writeProject` plutôt que
+ * `manageDomain`.
+ *
+ * **Une écriture de ce fichier ne laisse toujours aucune trace : l'adoption
+ * d'indicateur.** `createAdoption`, `updateAdoption` et `removeAdoption`
+ * écrivent sans `record`, et **ce n'était écrit nulle part** — ni ici, ni au
+ * geste, ni dans aucune fiche. Ce commentaire affirmait même que le budget était
+ * *« la seule écriture de ce fichier dont l'absence de `record` soit voulue »*,
+ * ce qui était faux. L'adoption n'était pas dans la liste des dix objets que la
+ * fiche T8.3 autorise, et l'y ajouter aurait été le geste hors périmètre que la
+ * règle 3 refuse : **c'est un point ouvert, écrit comme tel dans `ETAT.md`**,
+ * pas un arbitrage rendu.
  */
 
 import { and, eq } from "drizzle-orm";
@@ -2577,9 +2591,47 @@ export async function saveProjectBudget(
        déjà tranché — et si une soumission concurrente la posait entre les deux,
        la contrainte refuserait plutôt que de créer un doublon. */
     if (current) {
-      await session.db.update(budgets, current.id, input);
+      const updated = await session.db.update(budgets, current.id, input);
+
+      /* **Deux branches, deux verbes** : le geste est un — un seul formulaire,
+         une seule adresse —, mais la trace dit lequel des deux a eu lieu. Sans
+         cette distinction, la frise ne saurait pas séparer la saisie initiale
+         d'une correction, alors que la colonne, elle, sait les porter. C'est la
+         forme de `saveTaggingPlan`.
+
+         **La soumission entièrement vide écrit `updated`**, et c'est juste : les
+         cinq colonnes repassent à `null`, la ligne reste. C'est le geste qui
+         défait une saisie erronée, et il se lit comme la correction qu'il est —
+         **jamais comme un archivage**, `budgets` n'ayant pas d'`archived_at`
+         (arbitrage (c) de `tickets-C7.md`).
+
+         **Aucune valeur dans la phrase** (D22) : ni le montant, ni le nombre de
+         jours, ni avant, ni après. Un budget porté par une ligne de journal
+         serait la « valeur avant » que le journal refuse — et un montant lu dans
+         une frise inviterait à comparer les accompagnements entre eux. */
+      if (updated) {
+        await session.db.record({
+          projectId,
+          verb: "updated",
+          targetType: "budget",
+          targetId: updated.id,
+          summary: objectPhrase("budget", "updated", gate.project.name),
+        });
+      }
     } else {
-      await session.db.insert(budgets, { projectId, ...input });
+      const created = await session.db.insert(budgets, { projectId, ...input });
+
+      /* **La phrase nomme l'accompagnement**, qui *est* la désignation de son
+         budget : `budgets_project_unique` fait qu'un projet en porte au plus un,
+         et un budget n'a ni nom ni libellé. C'est la règle du plan de taggage,
+         un niveau plus bas dans la hiérarchie. */
+      await session.db.record({
+        projectId,
+        verb: "created",
+        targetType: "budget",
+        targetId: created.id,
+        summary: objectPhrase("budget", "created", gate.project.name),
+      });
     }
   } catch (error) {
     if (error instanceof DomainScopeError) {

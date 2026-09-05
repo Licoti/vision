@@ -69,18 +69,30 @@
  * **Aucune suppression, jamais** (règle 4) : la couche n'expose pas de `delete`,
  * et ce fichier ne lui en demande pas. Ce qui se retire s'archive.
  *
- * **Trois écritures laissent une trace depuis T6.2, et trois seulement** : les
- * relevés. Ce sont les seuls événements du produit — `project_id` nul,
- * `product_id` posé, le cas que `docs/04` §4 prévoit par « nul pour les
- * événements de niveau produit ».
+ * **Toutes les écritures de ce fichier laissent une trace depuis T8.3.** Trois
+ * venaient de T6.2 — les relevés ; les autres sont arrivées ensemble avec six
+ * `event_target_type` neufs : `indicator`, `persona`, `use_case`, `tracking`,
+ * `tagging_plan`, `context_marker`. **Aucun compte n'est écrit ici** : un
+ * nombre posé dans une prose est un nombre qui redeviendra faux, et le dépôt en
+ * a payé cinq (T8.3).
  *
- * **Les cinq autres objets de ce fichier n'en laissent aucune**, et ce n'est pas
- * un oubli : l'indicateur, la North Star, le persona, ses traits et le use case
- * ne sont pas dans les six `event_target_type` (arbitrage (b) de
- * `tickets-C6.md`). Le journal est la trace des objets de l'**accompagnement**,
- * pas du référentiel ni de la définition d'un produit. Point ouvert pour C7 —
- * pas un manque de ce chantier, et surtout pas quelque chose qu'un ticket
- * voisin ajoute « pendant qu'il y est » (règle 3).
+ * **Toutes portent `product_id` et jamais `project_id`** — le cas que `docs/04`
+ * §4 prévoit par « nul pour les événements de niveau produit ». C'est vrai même
+ * du repère de contexte, qui peut *citer* un accompagnement : le rattachement de
+ * la ligne de journal suit l'objet touché, jamais le champ qu'il cite. La
+ * conséquence est celle des relevés, et elle est voulue — ces lignes ne
+ * paraissent pas dans la frise de la page projet (T6.3), elles paraissent dans
+ * le flux global (T6.6), qui nomme le produit quand `project_id` manque.
+ *
+ * **L'arbitrage qui les tenait dehors est le même, appliqué à un fait
+ * différent.** (b) de `tickets-C6.md` puis (d) de `tickets-C7.md` refusaient
+ * « une migration d'énuméré pour un seul objet, quand six autres n'en ont
+ * pas » ; à dix objets, l'argument bascule. Ce n'est pas une décision rouverte.
+ *
+ * **Ce que ce fichier ne journalise toujours pas** : rien. Les traits d'un
+ * persona et les personae d'un use case sont des liaisons **dans** le geste de
+ * leur parent — une ligne par geste, jamais une par liaison —, et la North Star
+ * passe par le verbe `state_changed` plutôt que par un sixième verbe.
  */
 
 import { and, eq } from "drizzle-orm";
@@ -99,6 +111,7 @@ import {
   projectIndicators,
   projects,
   taggingPlans,
+  tools,
   useCasePersonas,
   useCases,
 } from "@/lib/db/schema";
@@ -139,7 +152,7 @@ import {
   readUseCaseForm,
   type UseCaseFormState,
 } from "@/lib/forms/use-case";
-import { objectPhrase } from "@/lib/journal";
+import { northStarPhrase, objectPhrase } from "@/lib/journal";
 import { ROUTES } from "@/lib/navigation";
 import { findProductTaggingPlan } from "@/lib/queries/measurement";
 import { listProductPersonas } from "@/lib/queries/personas";
@@ -385,7 +398,19 @@ export async function createIndicator(
   if (!input) return { values, errors };
 
   try {
-    await session.db.insert(indicators, { productId, ...input });
+    const created = await session.db.insert(indicators, { productId, ...input });
+
+    /* **`project_id` nul, `product_id` posé** — un indicateur mesure le
+       **produit** dans le temps long (D11), il n'appartient à aucun
+       accompagnement. C'est le rattachement des relevés depuis T6.2, et il vaut
+       pour les sept objets du produit que T8.3 journalise. */
+    await session.db.record({
+      productId,
+      verb: "created",
+      targetType: "indicator",
+      targetId: created.id,
+      summary: objectPhrase("indicator", "created", created.label),
+    });
   } catch (error) {
     return scopeRefusal(error, formData);
   }
@@ -455,6 +480,16 @@ export async function updateIndicator(
     if (!updated) {
       return refusal(formData, "Cet indicateur n'existe plus sur ce produit.");
     }
+
+    /* Le nom figé est celui **d'après** le geste : écrire celui d'avant serait
+       une « valeur avant », que D22 refuse. La règle d'`updateProject`. */
+    await session.db.record({
+      productId,
+      verb: "updated",
+      targetType: "indicator",
+      targetId: indicatorId,
+      summary: objectPhrase("indicator", "updated", updated.label),
+    });
   } catch (error) {
     return scopeRefusal(error, formData);
   }
@@ -533,6 +568,14 @@ export async function archiveIndicator(
 
   await session.db.archive(indicators, indicatorId);
 
+  await session.db.record({
+    productId,
+    verb: "archived",
+    targetType: "indicator",
+    targetId: indicatorId,
+    summary: objectPhrase("indicator", "archived", gate.indicator.label),
+  });
+
   revalidatePath(ROUTES.product(productId));
 }
 
@@ -575,7 +618,14 @@ export async function setNorthStar(
      d'entrée HTTP. Quand un indicateur est visé, `openIndicator` vérifie en
      outre qu'il appartient à ce produit et qu'il n'est pas archivé — sans quoi
      une soumission forgée désignerait l'indicateur d'un autre produit. */
-  const gate = indicatorId
+  /* **Le type est annoté, et c'est nécessaire.** Sans lui, TypeScript réduit
+     l'union du ternaire par sous-typage — `{ product, indicator }` disparaît
+     derrière `{ product }`, dont il est un sous-type — et `"indicator" in gate`
+     ne narrowe plus rien : le libellé de l'indicateur devient `unknown`. Le
+     rendre facultatif dit ce que les deux portes ont réellement en commun. */
+  const gate:
+    | { product: Row<typeof products>; indicator?: Row<typeof indicators> }
+    | { message: string } = indicatorId
     ? await openIndicator(session, productId, indicatorId, refused)
     : await openProductWrite(session, productId, refused);
   if ("message" in gate) return;
@@ -596,13 +646,65 @@ export async function setNorthStar(
      redésigner la North Star en place l'éteindrait puis la rallumerait, et
      l'état final serait le même. La mise en défaut du 17/08/2026 l'a montré —
      le retirer ne fait tomber aucun test, et c'est exact. Consigné. */
+  const extinguished: { id: string; label: string }[] = [];
   for (const previous of current) {
     if (previous.id === indicatorId) continue;
     await session.db.update(indicators, previous.id, { isNorthStar: false });
+    extinguished.push({ id: previous.id, label: previous.label });
   }
 
   if (indicatorId) {
     await session.db.update(indicators, indicatorId, { isNorthStar: true });
+  }
+
+  /* **Une ligne pour le geste, et rien quand rien n'a bougé** — T8.3.
+     Redésigner la North Star en place n'éteint rien et rallume ce qui brûlait :
+     `extinguished` est vide et l'indicateur visé est déjà celui-là. Écrire une
+     ligne y ferait dire au journal qu'un geste a eu lieu, quand il n'a fait que
+     réécrire `true` sur `true`. C'est la règle mesurée d'`updateActivity` — une
+     soumission sans changement n'écrit **aucun** événement.
+
+     **`state_changed`, et c'est le seul des cinq verbes qui convienne** : la
+     North Star n'est ni créée ni corrigée, c'est un état qu'un indicateur
+     atteint ou quitte. Le verbe est celui de `transitionActivity`, et T8.3
+     s'interdit un sixième.
+
+     **`target_type` reste `indicator`** — l'objet touché *est* l'indicateur,
+     celui que `target_id` désigne — quand la phrase dit « North Star », qui est
+     ce que le geste a fait. C'est la dissociation de `linkPhrase`, et les deux
+     sont vraies ; c'est la phrase qui se lit.
+
+     **Le retrait nomme l'indicateur qui cesse de l'être** : sans lui, la ligne
+     dirait qu'on a retiré quelque chose sans dire quoi. Le libellé est figé
+     (D22), comme partout ailleurs dans ce fichier. */
+  const arriving = current.every((previous) => previous.id !== indicatorId);
+
+  if (indicatorId && arriving && gate.indicator) {
+    /* **Le libellé vient de la porte**, jamais d'une lecture ajoutée :
+       `openIndicator` a déjà rapproché l'indicateur reçu de ce produit, et
+       c'est lui qui le rend. La règle de `createReading` (T6.2). */
+    await session.db.record({
+      productId,
+      verb: "state_changed",
+      targetType: "indicator",
+      targetId: gate.indicator.id,
+      summary: northStarPhrase("designated", gate.indicator.label),
+    });
+  } else if (!indicatorId) {
+    /* **Une ligne par indicateur éteint, et la boucle ne suppose pas qu'il y en
+       a un seul** : l'index unique partiel le garantit, mais la boucle
+       ci-dessus rattraperait une base entrée en désordre avant lui, et le
+       journal doit dire ce qui a réellement été écrit — pas ce que l'index
+       promet. Aucun tour, aucune ligne : c'est le cas « rien n'a bougé ». */
+    for (const previous of extinguished) {
+      await session.db.record({
+        productId,
+        verb: "state_changed",
+        targetType: "indicator",
+        targetId: previous.id,
+        summary: northStarPhrase("removed", previous.label),
+      });
+    }
   }
 
   revalidatePath(ROUTES.product(productId));
@@ -1003,6 +1105,18 @@ export async function createPersona(
       ...input.persona,
     });
     await syncTraits(session, created.id, input.traits);
+
+    /* **Une ligne pour le geste, jamais une par trait.** `syncTraits` écrit une
+       liaison par ligne du formulaire ; le geste, lui, est « un persona a été
+       créé », et ses traits en font partie. C'est la règle de `createProject`,
+       dont la création lie pourtant toute une équipe. */
+    await session.db.record({
+      productId,
+      verb: "created",
+      targetType: "persona",
+      targetId: created.id,
+      summary: objectPhrase("persona", "created", created.name),
+    });
   } catch (error) {
     return personaScopeRefusal(error, formData);
   }
@@ -1063,6 +1177,18 @@ export async function updatePersona(
       );
     }
     await syncTraits(session, personaId, input.traits);
+
+    /* **Une ligne, quel que soit le nombre de traits déplacés.** L'équipe d'un
+       accompagnement fait exception dans `accompagnements/actions.ts` parce
+       qu'elle porte un **autre objet** — `member` —, pas parce qu'elle a
+       changé ; les traits d'un persona n'en portent aucun. */
+    await session.db.record({
+      productId,
+      verb: "updated",
+      targetType: "persona",
+      targetId: personaId,
+      summary: objectPhrase("persona", "updated", updated.name),
+    });
   } catch (error) {
     return personaScopeRefusal(error, formData);
   }
@@ -1114,6 +1240,14 @@ export async function archivePersona(
   if ("message" in gate) return;
 
   await session.db.archive(personas, personaId);
+
+  await session.db.record({
+    productId,
+    verb: "archived",
+    targetType: "persona",
+    targetId: personaId,
+    summary: objectPhrase("persona", "archived", gate.persona.name),
+  });
 
   revalidatePath(ROUTES.product(productId));
 }
@@ -1351,6 +1485,16 @@ export async function createUseCase(
       ...input.useCase,
     });
     await syncUseCasePersonas(session, created.id, attachable.personaIds);
+
+    /* **Une ligne pour le geste, jamais une par persona rattaché** : la règle
+       de `createPersona` et de `createProject`, pour la même raison. */
+    await session.db.record({
+      productId,
+      verb: "created",
+      targetType: "use_case",
+      targetId: created.id,
+      summary: objectPhrase("use_case", "created", created.title),
+    });
   } catch (error) {
     return refuseUseCaseScope(error, formData);
   }
@@ -1414,6 +1558,16 @@ export async function updateUseCase(
       return refuseUseCase(formData, "Ce use case n'existe plus sur ce produit.");
     }
     await syncUseCasePersonas(session, useCaseId, attachable.personaIds);
+
+    /* **Le titre figé est celui d'après le geste** (D22) : écrire celui d'avant
+       serait une « valeur avant », que le journal refuse. */
+    await session.db.record({
+      productId,
+      verb: "updated",
+      targetType: "use_case",
+      targetId: useCaseId,
+      summary: objectPhrase("use_case", "updated", updated.title),
+    });
   } catch (error) {
     return refuseUseCaseScope(error, formData);
   }
@@ -1457,6 +1611,14 @@ export async function archiveUseCase(
   if ("message" in gate) return;
 
   await session.db.archive(useCases, useCaseId);
+
+  await session.db.record({
+    productId,
+    verb: "archived",
+    targetType: "use_case",
+    targetId: useCaseId,
+    summary: objectPhrase("use_case", "archived", gate.useCase.title),
+  });
 
   revalidatePath(ROUTES.product(productId));
 }
@@ -1553,6 +1715,35 @@ async function declaredTools(
 }
 
 /**
+ * Le nom de l'outil que porte une ligne du dispositif — T8.3.
+ *
+ * **Une ligne de `product_trackings` n'a pas de nom propre**, et c'est ce qui
+ * la rapproche du relevé d'indicateur : « Outil de mesure ajouté : Espace
+ * client » nommerait le **produit**, que le flux de la vue d'ensemble nomme
+ * déjà en origine, et qui ne distingue pas une ligne de sa voisine. Ce que le
+ * lecteur cherche est *lequel* — et `product_trackings_product_tool_unique` en
+ * fait le discriminant réel : un produit porte au plus une ligne par outil.
+ *
+ * **C'est la seule lecture que T8.3 ajoute à ce fichier**, et elle est nommée
+ * comme telle. La règle de `createReading` est que la porte rende déjà la
+ * désignation ; ici aucune porte ne la rend, `openTracking` s'arrêtant à la
+ * ligne et au produit. Une lecture scopée d'une ligne connue est le prix d'une
+ * phrase juste, et il est plus faible que celui d'une phrase creuse.
+ *
+ * Rend `null` sur un outil introuvable — archivé, ou d'un autre domaine, que la
+ * couche scopée écarte. L'appelant n'écrit alors pas de ligne plutôt que d'en
+ * écrire une qui ne désigne rien : c'est un cas que l'écriture elle-même aurait
+ * refusé, `assertPreconditions` confrontant `tool_id` au domaine.
+ */
+async function toolName(
+  session: Session,
+  toolId: string,
+): Promise<string | null> {
+  const tool = await session.db.find(tools, toolId);
+  return tool?.name ?? null;
+}
+
+/**
  * Le garde d'un outil déjà déclaré — le jumeau d'`openIndicator`.
  *
  * Il redérive le droit sur l'identifiant **reçu**, et vérifie que la ligne
@@ -1604,7 +1795,23 @@ export async function createTracking(
   if (taken.has(input.toolId)) return { values, errors: { toolId: TOOL_TAKEN } };
 
   try {
-    await session.db.insert(productTrackings, { productId, ...input });
+    const created = await session.db.insert(productTrackings, {
+      productId,
+      ...input,
+    });
+
+    /* La désignation vient de l'outil, pas du produit — voir `toolName`. Une
+       ligne muette vaut mieux qu'une ligne qui ne désigne rien. */
+    const named = await toolName(session, created.toolId);
+    if (named) {
+      await session.db.record({
+        productId,
+        verb: "created",
+        targetType: "tracking",
+        targetId: created.id,
+        summary: objectPhrase("tracking", "created", named),
+      });
+    }
   } catch (error) {
     return trackingScopeRefusal(error, formData);
   }
@@ -1654,6 +1861,20 @@ export async function updateTracking(
         "Cet outil de mesure n'existe plus sur ce produit.",
       );
     }
+
+    /* **L'outil d'après le geste**, jamais celui d'avant : `tool_id` est un
+       champ du formulaire, et une correction peut le changer. Écrire l'ancien
+       serait la « valeur avant » que D22 refuse. */
+    const named = await toolName(session, updated.toolId);
+    if (named) {
+      await session.db.record({
+        productId,
+        verb: "updated",
+        targetType: "tracking",
+        targetId: trackingId,
+        summary: objectPhrase("tracking", "updated", named),
+      });
+    }
   } catch (error) {
     return trackingScopeRefusal(error, formData);
   }
@@ -1687,6 +1908,17 @@ export async function archiveTracking(
   if ("message" in gate) return;
 
   await session.db.archive(productTrackings, trackingId);
+
+  const named = await toolName(session, gate.tracking.toolId);
+  if (named) {
+    await session.db.record({
+      productId,
+      verb: "archived",
+      targetType: "tracking",
+      targetId: trackingId,
+      summary: objectPhrase("tracking", "archived", named),
+    });
+  }
 
   revalidatePath(ROUTES.product(productId));
 }
@@ -1735,8 +1967,36 @@ export async function saveTaggingPlan(
           "Ce plan de taggage n'existe plus sur ce produit.",
         );
       }
+
+      /* **Deux branches, deux verbes** : le geste est un, la trace dit lequel
+         des deux a eu lieu. C'est la forme que `saveProjectBudget` reprend, et
+         la seule façon qu'une frise distingue une saisie d'une correction quand
+         l'écran, lui, ne les distingue pas. */
+      await session.db.record({
+        productId,
+        verb: "updated",
+        targetType: "tagging_plan",
+        targetId: updated.id,
+        summary: objectPhrase("tagging_plan", "updated", gate.product.name),
+      });
     } else {
-      await session.db.insert(taggingPlans, { productId, ...input });
+      const created = await session.db.insert(taggingPlans, {
+        productId,
+        ...input,
+      });
+
+      /* **La phrase nomme le produit**, et c'est exact ici quand ce ne l'était
+         pas pour un outil de mesure : `tagging_plans_product_unique` fait qu'un
+         produit porte **au plus un** plan vivant, si bien que le produit *est*
+         sa désignation. Un plan n'a ni nom ni titre — « Plan de taggage
+         modifié : https://… » aurait mis une adresse dans une frise. */
+      await session.db.record({
+        productId,
+        verb: "created",
+        targetType: "tagging_plan",
+        targetId: created.id,
+        summary: objectPhrase("tagging_plan", "created", gate.product.name),
+      });
     }
   } catch (error) {
     return planScopeRefusal(error, formData);
@@ -1770,6 +2030,14 @@ export async function archiveTaggingPlan(productId: string): Promise<void> {
 
   await session.db.archive(taggingPlans, existing.id);
 
+  await session.db.record({
+    productId,
+    verb: "archived",
+    targetType: "tagging_plan",
+    targetId: existing.id,
+    summary: objectPhrase("tagging_plan", "archived", gate.product.name),
+  });
+
   revalidatePath(ROUTES.product(productId));
   revalidatePath(ROUTES.products);
 }
@@ -1789,11 +2057,12 @@ export async function archiveTaggingPlan(productId: string): Promise<void> {
    activités terminées, qui ont déjà leur écran et leur droit sur la page
    projet. Ce fichier ne porte donc que la moitié manuelle de la couche.
 
-   **Aucune ligne de journal** — le précédent des indicateurs, du budget
-   (arbitrage (d) de T7.1) et du dispositif de mesure. `events` ne gagne ni
-   verbe ni cible : ce sont des faits du **produit**, pas des faits
-   d'accompagnement. Le point ouvert des objets non journalisés reçoit un nom de
-   plus, il ne se referme pas à moitié.
+   **Trois lignes de journal depuis T8.3**, là où ce commentaire annonçait qu'il
+   n'y en aurait aucune. `event_target_type` a gagné `context_marker` avec neuf
+   autres, et l'argument qui les tenait dehors — « une migration d'énuméré pour
+   un seul objet » — est celui-là même qui a basculé quand ils ont été dix. Ce
+   sont bien des faits du **produit** : leur événement porte `product_id` et
+   jamais `project_id`, y compris quand le repère cite un accompagnement.
 
    **Une seule revalidation.** Aucun autre écran ne lit ces lignes — c'est ce
    qui sépare ce geste de celui du plan de taggage, dont la liste des produits
@@ -1902,7 +2171,28 @@ export async function createContextMarker(
   }
 
   try {
-    await session.db.insert(contextMarkers, { productId, ...input });
+    const created = await session.db.insert(contextMarkers, {
+      productId,
+      ...input,
+    });
+
+    /* **`project_id` reste nul sur la ligne de journal, même quand le repère en
+       porte un.** Un repère est un fait du **produit** — c'est ce que
+       `context_markers.product_id` non nul dit, quand son `project_id` est
+       facultatif et `set null`. Poser le projet sur l'événement le ferait entrer
+       dans la frise d'un accompagnement, à côté de ses activités et de ses
+       ressources, alors qu'il n'appartient pas à cet accompagnement : le
+       rattachement de la ligne de journal suit l'objet, jamais le champ qu'il
+       cite. C'est le raisonnement de `createReading` (T6.2), et sa conséquence
+       est la même — le repère paraît dans le flux global, sous le nom du
+       produit. */
+    await session.db.record({
+      productId,
+      verb: "created",
+      targetType: "context_marker",
+      targetId: created.id,
+      summary: objectPhrase("context_marker", "created", created.label),
+    });
   } catch (error) {
     return markerScopeRefusal(error, formData);
   }
@@ -1942,6 +2232,14 @@ export async function updateContextMarker(
   try {
     const updated = await session.db.update(contextMarkers, markerId, input);
     if (!updated) return markerRefusal(formData, MARKER_GONE);
+
+    await session.db.record({
+      productId,
+      verb: "updated",
+      targetType: "context_marker",
+      targetId: markerId,
+      summary: objectPhrase("context_marker", "updated", updated.label),
+    });
   } catch (error) {
     return markerScopeRefusal(error, formData);
   }
@@ -1968,6 +2266,14 @@ export async function archiveContextMarker(
   if ("message" in gate) return;
 
   await session.db.archive(contextMarkers, markerId);
+
+  await session.db.record({
+    productId,
+    verb: "archived",
+    targetType: "context_marker",
+    targetId: markerId,
+    summary: objectPhrase("context_marker", "archived", gate.marker.label),
+  });
 
   revalidatePath(ROUTES.product(productId));
 }

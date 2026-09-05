@@ -31,6 +31,14 @@
  * produit du dépôt. Le critère se compte en base — une ligne, une seule —, et
  * l'un de ses points **ne se lira jamais nulle part ailleurs** : `project_id`
  * nul et `product_id` posé. Aucun écran ne le dira.
+ *
+ * **T8.3 y ajoute dix-huit points d'écriture et six `target_type`** — indicateur,
+ * persona, use case, outil de mesure, plan de taggage, repère de contexte. Le
+ * relevé n'est plus le seul événement de niveau produit : ils le sont tous, et
+ * c'est ce que le dernier bloc de ce fichier mesure, geste par geste. **Aucune
+ * des dix-huit ne se lit dans la frise de la page projet** : elle filtre sur
+ * `project_id`, qui reste nul — y compris pour un repère de contexte qui *cite*
+ * un accompagnement, ce qui est le seul cas où la tentation existait.
  */
 
 import { and, eq, isNull } from "drizzle-orm";
@@ -58,6 +66,7 @@ import {
   useCasePersonas,
   useCases,
 } from "@/lib/db/schema";
+import { EMPTY_INDICATOR_VALUES } from "@/lib/forms/indicator";
 import { EMPTY_PERSONA_VALUES } from "@/lib/forms/persona";
 import { EMPTY_CONTEXT_MARKER_VALUES } from "@/lib/forms/context-marker";
 import { EMPTY_TAGGING_PLAN_VALUES } from "@/lib/forms/tagging-plan";
@@ -111,12 +120,14 @@ vi.mock("next/navigation", () => ({
 
 const {
   archiveContextMarker,
+  archiveIndicator,
   archivePersona,
   archiveReading,
   archiveTaggingPlan,
   archiveTracking,
   archiveUseCase,
   createContextMarker,
+  createIndicator,
   createPersona,
   createReading,
   createTracking,
@@ -124,6 +135,7 @@ const {
   saveTaggingPlan,
   setNorthStar,
   updateContextMarker,
+  updateIndicator,
   updatePersona,
   updateReading,
   updateTracking,
@@ -2192,5 +2204,705 @@ describe("archiveContextMarker — le retrait", () => {
         .delete(contextMarkers)
         .where(eq(contextMarkers.productId, f.productId));
     }
+  });
+});
+
+/* ==========================================================================
+   Le journal des six objets du produit — T8.3
+
+   **Ce que ce bloc mesure, et ce qu'il ne mesure pas.** Il compte les lignes
+   qu'un geste écrit — le décompte avant, le décompte après, par `written` — et
+   il lit ce que la base porte : le verbe, la cible, l'acteur, la phrase, et les
+   deux colonnes de rattachement. Il ne lit aucun écran : les seize `target_type`
+   se rendent par la même ligne de flux, et T6.6 l'a déjà éprouvée.
+
+   **Le rattachement est le point qu'aucun écran ne dira** : `project_id` nul,
+   `product_id` posé, sur les six objets. C'est ce qui les envoie dans le flux de
+   la vue d'ensemble et jamais dans la frise d'un accompagnement, et c'est un
+   choix — pas une conséquence subie.
+   ========================================================================== */
+
+/** Un formulaire d'indicateur complet, dont seul le libellé varie d'ordinaire. */
+function indicatorForm(overrides: Record<string, string> = {}): FormData {
+  const data = new FormData();
+  const values: Record<string, string> = {
+    label: `Adoption ${suffix}`,
+    unit: "%",
+    direction: "higher_is_better",
+    source: "",
+    targetValue: "",
+    ...overrides,
+  };
+  for (const [key, value] of Object.entries(values)) data.set(key, value);
+  return data;
+}
+
+const EMPTY_INDICATOR = { values: EMPTY_INDICATOR_VALUES, errors: {} };
+
+/** Les indicateurs vivants d'un produit, lus en base. */
+async function indicatorsOf(productId: string) {
+  return f.scope.list(indicators, {
+    where: eq(indicators.productId, productId),
+  });
+}
+
+describe("le journal de l'indicateur", () => {
+  test("la saisie écrit une ligne, et une seule", async () => {
+    currentPerson = f.managerId;
+
+    const lines = await written(() =>
+      createIndicator(
+        f.productId,
+        EMPTY_INDICATOR,
+        indicatorForm({ label: `Neuf ${suffix}` }),
+      ),
+    );
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("created");
+    expect(lines[0]?.targetType).toBe("indicator");
+    expect(lines[0]?.actorId).toBe(f.managerId);
+    expect(lines[0]?.summary).toBe(`Indicateur créé${NBSP}: Neuf ${suffix}`);
+
+    /* **`project_id` nul, `product_id` posé** — le point qu'aucun écran ne
+       dira, et le même que celui du relevé depuis T6.2. */
+    expect(lines[0]?.projectId).toBeNull();
+    expect(lines[0]?.productId).toBe(f.productId);
+
+    const rows = await indicatorsOf(f.productId);
+    const created = rows.find((row) => row.label === `Neuf ${suffix}`);
+    expect(lines[0]?.targetId).toBe(created?.id);
+  });
+
+  test("la correction écrit `updated`, avec le nom d'après le geste", async () => {
+    currentPerson = f.managerId;
+    await expectWritten(
+      createIndicator(
+        f.productId,
+        EMPTY_INDICATOR,
+        indicatorForm({ label: `Avant ${suffix}` }),
+      ),
+    );
+    const before = (await indicatorsOf(f.productId)).find(
+      (row) => row.label === `Avant ${suffix}`,
+    )!;
+
+    const lines = await written(() =>
+      updateIndicator(
+        f.productId,
+        before.id,
+        EMPTY_INDICATOR,
+        indicatorForm({ label: `Après ${suffix}` }),
+      ),
+    );
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("updated");
+    expect(lines[0]?.targetType).toBe("indicator");
+    expect(lines[0]?.targetId).toBe(before.id);
+    /* Le nom **d'après** : écrire celui d'avant serait la « valeur avant » que
+       D22 refuse. */
+    expect(lines[0]?.summary).toBe(`Indicateur modifié${NBSP}: Après ${suffix}`);
+    expect(lines[0]?.summary).not.toContain(`Avant ${suffix}`);
+  });
+
+  test("le rangement écrit `archived`", async () => {
+    currentPerson = f.managerId;
+    await expectWritten(
+      createIndicator(
+        f.productId,
+        EMPTY_INDICATOR,
+        indicatorForm({ label: `À ranger ${suffix}` }),
+      ),
+    );
+    const target = (await indicatorsOf(f.productId)).find(
+      (row) => row.label === `À ranger ${suffix}`,
+    )!;
+
+    const lines = await written(() => archiveIndicator(f.productId, target.id));
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("archived");
+    expect(lines[0]?.targetType).toBe("indicator");
+    expect(lines[0]?.targetId).toBe(target.id);
+    expect(lines[0]?.summary).toBe(
+      `Indicateur archivé${NBSP}: À ranger ${suffix}`,
+    );
+  });
+
+  /**
+   * **Le droit s'éprouve par l'action** : un refus n'écrit ni la donnée ni sa
+   * ligne de journal. C'est le cas que la fiche demande de viser, et non
+   * seulement celui qui réussit — un `record` posé **avant** la garde passerait
+   * les trois constats ci-dessus sans que rien ne le signale.
+   */
+  test("un refus n'écrit ni l'indicateur ni l'événement", async () => {
+    currentPerson = f.outsiderId;
+
+    const before = await indicatorsOf(f.productId);
+    const lines = await written(async () => {
+      const state = await createIndicator(
+        f.productId,
+        EMPTY_INDICATOR,
+        indicatorForm({ label: `Forgé ${suffix}` }),
+      );
+      expect(state.message).toBeDefined();
+      expect(state.ok).toBeUndefined();
+    });
+
+    expect(lines).toHaveLength(0);
+    expect(await indicatorsOf(f.productId)).toHaveLength(before.length);
+  });
+});
+
+describe("le journal de la North Star", () => {
+  /**
+   * **Le verbe est `state_changed`, et la phrase dit « North Star ».** La
+   * colonne porte `indicator` — l'objet touché *est* l'indicateur —, et les deux
+   * sont vraies : c'est la dissociation de `linkPhrase`, et c'est la phrase qui
+   * se lit.
+   */
+  test("la désignation écrit une ligne, et le verbe n'est pas `updated`", async () => {
+    currentPerson = f.managerId;
+    await clear();
+
+    const lines = await written(() => setNorthStar(f.productId, f.indicatorId));
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("state_changed");
+    expect(lines[0]?.targetType).toBe("indicator");
+    expect(lines[0]?.targetId).toBe(f.indicatorId);
+    expect(lines[0]?.productId).toBe(f.productId);
+    expect(lines[0]?.projectId).toBeNull();
+    expect(lines[0]?.summary).toBe(
+      `North Star désignée${NBSP}: Autonomie ${suffix}`,
+    );
+  });
+
+  /**
+   * **Une ligne pour le geste, même quand il en éteint une autre.** Remplacer
+   * une North Star écrit deux `update` en base ; le geste, lui, est « celle-ci
+   * est désignée », et la frise n'a pas à porter l'extinction que la
+   * désignation implique.
+   */
+  test("le remplacement écrit une ligne, pas deux", async () => {
+    currentPerson = f.managerId;
+    await clear();
+    await setNorthStar(f.productId, f.indicatorId);
+
+    const lines = await written(() => setNorthStar(f.productId, f.siblingId));
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.targetId).toBe(f.siblingId);
+    expect(lines[0]?.summary).toBe(
+      `North Star désignée${NBSP}: Délai ${suffix}`,
+    );
+  });
+
+  test("le retrait nomme l'indicateur qui cesse de l'être", async () => {
+    currentPerson = f.managerId;
+    await clear();
+    await setNorthStar(f.productId, f.indicatorId);
+
+    const lines = await written(() => setNorthStar(f.productId, null));
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.verb).toBe("state_changed");
+    expect(lines[0]?.targetId).toBe(f.indicatorId);
+    expect(lines[0]?.summary).toBe(
+      `North Star retirée${NBSP}: Autonomie ${suffix}`,
+    );
+    expect(await northStarOf(f.productId)).toBeNull();
+  });
+
+  /**
+   * **Rien n'a bougé, rien ne s'écrit** — la règle mesurée d'`updateActivity`.
+   * Redésigner la North Star en place réécrit `true` sur `true` ; une ligne y
+   * ferait dire au journal qu'un geste a eu lieu.
+   */
+  test("redésigner la même n'écrit aucune ligne", async () => {
+    currentPerson = f.managerId;
+    await clear();
+    await setNorthStar(f.productId, f.indicatorId);
+
+    const lines = await written(() => setNorthStar(f.productId, f.indicatorId));
+
+    expect(lines).toHaveLength(0);
+    expect(await northStarOf(f.productId)).toBe(f.indicatorId);
+  });
+
+  test("retirer quand il n'y en a aucune n'écrit aucune ligne", async () => {
+    currentPerson = f.managerId;
+    await clear();
+
+    const lines = await written(() => setNorthStar(f.productId, null));
+
+    expect(lines).toHaveLength(0);
+  });
+
+  test("un refus n'écrit ni le drapeau ni l'événement", async () => {
+    currentPerson = f.outsiderId;
+    await clear();
+
+    const lines = await written(() => setNorthStar(f.productId, f.indicatorId));
+
+    expect(lines).toHaveLength(0);
+    expect(await northStarOf(f.productId)).toBeNull();
+  });
+});
+
+describe("le journal du persona", () => {
+  test("les trois gestes écrivent une ligne chacun", async () => {
+    try {
+      currentPerson = f.managerId;
+
+      const created = await written(() =>
+        createPersona(
+          f.productId,
+          NO_STATE,
+          personaForm({ name: `Le pressé ${suffix}` }),
+        ),
+      );
+      expect(created).toHaveLength(1);
+      expect(created[0]?.verb).toBe("created");
+      expect(created[0]?.targetType).toBe("persona");
+      expect(created[0]?.productId).toBe(f.productId);
+      expect(created[0]?.projectId).toBeNull();
+      expect(created[0]?.summary).toBe(
+        `Persona créé${NBSP}: Le pressé ${suffix}`,
+      );
+
+      const personaId = (await personasOf(f.productId)).find(
+        (row) => row.name === `Le pressé ${suffix}`,
+      )!.id;
+      expect(created[0]?.targetId).toBe(personaId);
+
+      const updated = await written(() =>
+        updatePersona(
+          f.productId,
+          personaId,
+          NO_STATE,
+          personaForm({ name: `Le posé ${suffix}` }),
+        ),
+      );
+      expect(updated).toHaveLength(1);
+      expect(updated[0]?.verb).toBe("updated");
+      expect(updated[0]?.summary).toBe(`Persona modifié${NBSP}: Le posé ${suffix}`);
+
+      const archived = await written(() =>
+        archivePersona(f.productId, personaId),
+      );
+      expect(archived).toHaveLength(1);
+      expect(archived[0]?.verb).toBe("archived");
+      expect(archived[0]?.targetId).toBe(personaId);
+      expect(archived[0]?.summary).toBe(
+        `Persona archivé${NBSP}: Le posé ${suffix}`,
+      );
+    } finally {
+      await clearPersonas();
+    }
+  });
+
+  /**
+   * **Une ligne par geste, jamais une par trait.** `syncTraits` écrit une
+   * liaison par ligne du formulaire — deux objectifs et une difficulté
+   * ci-dessous —, et le geste reste « un persona a été créé ».
+   */
+  test("les traits n'ajoutent aucune ligne au journal", async () => {
+    try {
+      currentPerson = f.managerId;
+
+      const lines = await written(() =>
+        createPersona(
+          f.productId,
+          NO_STATE,
+          personaForm({
+            name: `Chargé ${suffix}`,
+            goals: "Ouvrir vite\nRetrouver un client",
+            pains: "Ressaisir trois fois",
+          }),
+        ),
+      );
+
+      expect(lines).toHaveLength(1);
+      const personaId = (await personasOf(f.productId))[0]!.id;
+      expect(await traitsOf(personaId)).toHaveLength(3);
+    } finally {
+      await clearPersonas();
+    }
+  });
+
+  test("un refus n'écrit ni le persona ni l'événement", async () => {
+    try {
+      currentPerson = f.outsiderId;
+
+      const lines = await written(async () => {
+        const state = await createPersona(f.productId, NO_STATE, personaForm());
+        expect(state.message).toBeDefined();
+      });
+
+      expect(lines).toHaveLength(0);
+      expect(await personasOf(f.productId)).toHaveLength(0);
+    } finally {
+      await clearPersonas();
+    }
+  });
+});
+
+describe("le journal du use case", () => {
+  test("les trois gestes écrivent une ligne chacun", async () => {
+    try {
+      currentPerson = f.managerId;
+
+      const created = await written(() =>
+        createUseCase(
+          f.productId,
+          NO_USE_CASE_STATE,
+          formForUseCase({ title: `Payer en trois fois ${suffix}` }),
+        ),
+      );
+      expect(created).toHaveLength(1);
+      expect(created[0]?.verb).toBe("created");
+      expect(created[0]?.targetType).toBe("use_case");
+      expect(created[0]?.productId).toBe(f.productId);
+      expect(created[0]?.projectId).toBeNull();
+      expect(created[0]?.summary).toBe(
+        `Use case créé${NBSP}: Payer en trois fois ${suffix}`,
+      );
+
+      const useCaseId = (await liveUseCasesOf(f.productId))[0]!.id;
+      expect(created[0]?.targetId).toBe(useCaseId);
+
+      const updated = await written(() =>
+        updateUseCase(
+          f.productId,
+          useCaseId,
+          NO_USE_CASE_STATE,
+          formForUseCase({ title: `Payer plus tard ${suffix}` }),
+        ),
+      );
+      expect(updated).toHaveLength(1);
+      expect(updated[0]?.verb).toBe("updated");
+      expect(updated[0]?.summary).toBe(
+        `Use case modifié${NBSP}: Payer plus tard ${suffix}`,
+      );
+
+      const archived = await written(() =>
+        archiveUseCase(f.productId, useCaseId),
+      );
+      expect(archived).toHaveLength(1);
+      expect(archived[0]?.verb).toBe("archived");
+      expect(archived[0]?.summary).toBe(
+        `Use case archivé${NBSP}: Payer plus tard ${suffix}`,
+      );
+    } finally {
+      await clearUseCases();
+    }
+  });
+
+  /** Le rattachement de personae est une liaison **dans** le geste. */
+  test("les personae rattachés n'ajoutent aucune ligne", async () => {
+    try {
+      currentPerson = f.managerId;
+      const personaId = await givenPersonaOn(f.productId);
+
+      const lines = await written(() =>
+        createUseCase(
+          f.productId,
+          NO_USE_CASE_STATE,
+          formForUseCase({ personaIds: [personaId] }),
+        ),
+      );
+
+      expect(lines).toHaveLength(1);
+      const useCaseId = (await liveUseCasesOf(f.productId))[0]!.id;
+      expect(await attachedTo(useCaseId)).toEqual([personaId]);
+    } finally {
+      await clearUseCases();
+    }
+  });
+
+  test("un refus n'écrit ni le use case ni l'événement", async () => {
+    try {
+      currentPerson = f.outsiderId;
+
+      const lines = await written(async () => {
+        const state = await createUseCase(
+          f.productId,
+          NO_USE_CASE_STATE,
+          formForUseCase(),
+        );
+        expect(state.message).toBeDefined();
+      });
+
+      expect(lines).toHaveLength(0);
+      expect(await liveUseCasesOf(f.productId)).toHaveLength(0);
+    } finally {
+      await clearUseCases();
+    }
+  });
+});
+
+/**
+ * Remet le dispositif à zéro — **la fixture est partagée, et l'unicité mord**.
+ *
+ * `product_trackings_product_tool_unique` refuse un second outil déjà déclaré,
+ * et `tagging_plans_product_unique` fait basculer `saveTaggingPlan` de la
+ * création vers la correction : les blocs qui précèdent laissent leurs lignes,
+ * et un constat qui attendrait `created` lirait `updated`. C'est la forme de
+ * `clearPersonas` et de `clearUseCases`, pour la même raison.
+ */
+async function clearMeasurement(): Promise<void> {
+  await db
+    .delete(productTrackings)
+    .where(eq(productTrackings.domainId, f.domainId));
+  await db.delete(taggingPlans).where(eq(taggingPlans.domainId, f.domainId));
+}
+
+describe("le journal de l'outil de mesure", () => {
+  /**
+   * **La phrase nomme l'outil, pas le produit**, et c'est le raisonnement du
+   * relevé d'indicateur : une ligne de `product_trackings` n'a pas de nom
+   * propre, et ce que le lecteur cherche est *lequel*. Le produit ne
+   * distinguerait pas une ligne de sa voisine — l'unicité partielle en fait une
+   * par outil.
+   */
+  test("les trois gestes nomment l'outil", async () => {
+    try {
+      await clearMeasurement();
+      currentPerson = f.managerId;
+
+      const created = await written(() =>
+        createTracking(f.productId, EMPTY_TRACKING, trackingForm()),
+      );
+      expect(created).toHaveLength(1);
+      expect(created[0]?.verb).toBe("created");
+      expect(created[0]?.targetType).toBe("tracking");
+      expect(created[0]?.productId).toBe(f.productId);
+      expect(created[0]?.projectId).toBeNull();
+      expect(created[0]?.summary).toBe(
+        `Outil de mesure créé${NBSP}: Analytics ${suffix}`,
+      );
+
+      const trackingId = (await trackingsOf(f.productId))[0]!.id;
+      expect(created[0]?.targetId).toBe(trackingId);
+
+      /* La correction change d'outil : la phrase doit dire celui **d'après**,
+         `tool_id` étant un champ du formulaire. */
+      const updated = await written(() =>
+        updateTracking(
+          f.productId,
+          trackingId,
+          EMPTY_TRACKING,
+          trackingForm({ toolId: f.otherToolId }),
+        ),
+      );
+      expect(updated).toHaveLength(1);
+      expect(updated[0]?.verb).toBe("updated");
+      expect(updated[0]?.summary).toBe(
+        `Outil de mesure modifié${NBSP}: Clarity ${suffix}`,
+      );
+      expect(updated[0]?.summary).not.toContain(`Analytics ${suffix}`);
+
+      const archived = await written(() =>
+        archiveTracking(f.productId, trackingId),
+      );
+      expect(archived).toHaveLength(1);
+      expect(archived[0]?.verb).toBe("archived");
+      expect(archived[0]?.summary).toBe(
+        `Outil de mesure archivé${NBSP}: Clarity ${suffix}`,
+      );
+    } finally {
+      await clearMeasurement();
+    }
+  });
+
+  test("un refus n'écrit ni la ligne ni l'événement", async () => {
+    await clearMeasurement();
+    currentPerson = f.outsiderId;
+
+    const lines = await written(async () => {
+      const state = await createTracking(
+        f.productId,
+        EMPTY_TRACKING,
+        trackingForm(),
+      );
+      expect(state.message).toBeDefined();
+    });
+
+    expect(lines).toHaveLength(0);
+    expect(await trackingsOf(f.productId)).toHaveLength(0);
+  });
+});
+
+describe("le journal du plan de taggage", () => {
+  /**
+   * **Deux branches, deux verbes.** Le geste est un — un seul formulaire, une
+   * seule adresse —, et c'est le journal qui dit lequel des deux moments a eu
+   * lieu. Sans cette distinction, la frise ne saurait pas séparer la saisie
+   * initiale d'une correction.
+   *
+   * **La phrase nomme le produit**, et c'est exact ici quand ce ne l'était pas
+   * pour un outil de mesure : `tagging_plans_product_unique` fait qu'un produit
+   * porte au plus un plan vivant, si bien que le produit *est* sa désignation.
+   */
+  test("la saisie écrit `created`, la correction `updated`", async () => {
+    try {
+      await clearMeasurement();
+      currentPerson = f.managerId;
+
+      const created = await written(() =>
+        saveTaggingPlan(f.productId, EMPTY_PLAN, planForm()),
+      );
+      expect(created).toHaveLength(1);
+      expect(created[0]?.verb).toBe("created");
+      expect(created[0]?.targetType).toBe("tagging_plan");
+      expect(created[0]?.productId).toBe(f.productId);
+      expect(created[0]?.projectId).toBeNull();
+      expect(created[0]?.summary).toBe(
+        `Plan de taggage créé${NBSP}: Produit ${suffix}`,
+      );
+
+      const planId = (await plansOf(f.productId))[0]!.id;
+      expect(created[0]?.targetId).toBe(planId);
+
+      const updated = await written(() =>
+        saveTaggingPlan(f.productId, EMPTY_PLAN, planForm({ status: "stale" })),
+      );
+      expect(updated).toHaveLength(1);
+      expect(updated[0]?.verb).toBe("updated");
+      expect(updated[0]?.targetId).toBe(planId);
+      expect(updated[0]?.summary).toBe(
+        `Plan de taggage modifié${NBSP}: Produit ${suffix}`,
+      );
+
+      const archived = await written(() => archiveTaggingPlan(f.productId));
+      expect(archived).toHaveLength(1);
+      expect(archived[0]?.verb).toBe("archived");
+      expect(archived[0]?.targetId).toBe(planId);
+      expect(archived[0]?.summary).toBe(
+        `Plan de taggage archivé${NBSP}: Produit ${suffix}`,
+      );
+    } finally {
+      await clearMeasurement();
+    }
+  });
+
+  test("un refus n'écrit ni le plan ni l'événement", async () => {
+    await clearMeasurement();
+    currentPerson = f.outsiderId;
+
+    const lines = await written(async () => {
+      const state = await saveTaggingPlan(f.productId, EMPTY_PLAN, planForm());
+      expect(state.message).toBeDefined();
+    });
+
+    expect(lines).toHaveLength(0);
+    expect(await plansOf(f.productId)).toHaveLength(0);
+  });
+});
+
+describe("le journal du repère de contexte", () => {
+  test("les trois gestes écrivent une ligne chacun", async () => {
+    try {
+      currentPerson = f.managerId;
+
+      const created = await written(() =>
+        createContextMarker(
+          f.productId,
+          EMPTY_MARKER,
+          markerForm({ label: `Refonte du SI ${suffix}` }),
+        ),
+      );
+      expect(created).toHaveLength(1);
+      expect(created[0]?.verb).toBe("created");
+      expect(created[0]?.targetType).toBe("context_marker");
+      expect(created[0]?.summary).toBe(
+        `Repère de contexte créé${NBSP}: Refonte du SI ${suffix}`,
+      );
+
+      const markerId = (await markersOf(f.productId))[0]!.id;
+      expect(created[0]?.targetId).toBe(markerId);
+
+      const updated = await written(() =>
+        updateContextMarker(
+          f.productId,
+          markerId,
+          EMPTY_MARKER,
+          markerForm({ label: `Bascule ${suffix}` }),
+        ),
+      );
+      expect(updated).toHaveLength(1);
+      expect(updated[0]?.verb).toBe("updated");
+      expect(updated[0]?.summary).toBe(
+        `Repère de contexte modifié${NBSP}: Bascule ${suffix}`,
+      );
+
+      const archived = await written(() =>
+        archiveContextMarker(f.productId, markerId),
+      );
+      expect(archived).toHaveLength(1);
+      expect(archived[0]?.verb).toBe("archived");
+      expect(archived[0]?.summary).toBe(
+        `Repère de contexte archivé${NBSP}: Bascule ${suffix}`,
+      );
+    } finally {
+      await db
+        .delete(contextMarkers)
+        .where(eq(contextMarkers.domainId, f.domainId));
+    }
+  });
+
+  /**
+   * **Le repère cite un accompagnement, et son événement ne le porte pas.**
+   * `context_markers.project_id` est renseigné ; `events.project_id` reste nul.
+   * Le rattachement de la ligne de journal suit l'**objet** — un fait du
+   * produit —, jamais le champ qu'il cite : poser le projet ferait entrer le
+   * repère dans la frise d'un accompagnement, à côté de ses activités.
+   *
+   * **C'est le seul des dix-huit points d'écriture de ce fichier où la
+   * tentation existait**, et c'est pourquoi il a son constat à lui.
+   */
+  test("un repère rattaché à un accompagnement écrit quand même `project_id` nul", async () => {
+    try {
+      currentPerson = f.managerId;
+
+      const lines = await written(() =>
+        createContextMarker(
+          f.productId,
+          EMPTY_MARKER,
+          markerForm({ projectId: f.projectId }),
+        ),
+      );
+
+      expect(lines).toHaveLength(1);
+      expect(lines[0]?.projectId).toBeNull();
+      expect(lines[0]?.productId).toBe(f.productId);
+
+      /* La ligne du repère, elle, porte bien l'accompagnement : c'est la
+         différence que ce constat éprouve, et non l'absence des deux. */
+      const marker = (await markersOf(f.productId))[0]!;
+      expect(marker.projectId).toBe(f.projectId);
+    } finally {
+      await db
+        .delete(contextMarkers)
+        .where(eq(contextMarkers.domainId, f.domainId));
+    }
+  });
+
+  test("un refus n'écrit ni le repère ni l'événement", async () => {
+    currentPerson = f.outsiderId;
+
+    const lines = await written(async () => {
+      const state = await createContextMarker(
+        f.productId,
+        EMPTY_MARKER,
+        markerForm(),
+      );
+      expect(state.message).toBeDefined();
+    });
+
+    expect(lines).toHaveLength(0);
+    expect(await markersOf(f.productId)).toHaveLength(0);
   });
 });

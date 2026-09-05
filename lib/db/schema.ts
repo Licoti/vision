@@ -10,10 +10,17 @@
  *   — created_at, updated_at, created_by partout ;
  *   — les périodes sont des `date`, jamais des horodatages.
  *
- * Le domain_id est présent sur les 26 tables métier, y compris les tables
- * de liaison que le document ne détaille pas. C'est lui qui permettra à la
- * couche d'accès de T1.3 d'exiger un domaine sur toute requête, sans avoir
+ * Le domain_id est présent sur **toutes** les tables métier, y compris les
+ * tables de liaison que le document ne détaille pas. C'est lui qui permettra à
+ * la couche d'accès de T1.3 d'exiger un domaine sur toute requête, sans avoir
  * à remonter par jointure.
+ *
+ * **Le chiffre a été retiré, il n'a pas été corrigé** (T8.3). Cet en-tête
+ * annonçait « les 26 tables métier » quand elles étaient 33 — cinquième chiffre
+ * faux d'une même famille, après `scoped.ts`, la fiche de C6 deux fois et
+ * `drawers/project.tsx`. Un compte écrit dans une prose est un compte qui
+ * redeviendra faux au prochain hors-ticket qui ajoute une table ; `pgTable` les
+ * énumère déjà, et lui ne ment pas.
  */
 
 import { sql } from "drizzle-orm";
@@ -208,6 +215,33 @@ export const eventVerb = pgEnum("event_verb", [
   "archived",
 ]);
 
+/**
+ * Les objets dont le journal sait parler — **seize depuis T8.3**.
+ *
+ * Les six premiers sont ceux de T1.2, écrits d'après `docs/04` §4 : la trace des
+ * objets de l'**accompagnement**, celle qui nourrit la frise de la page projet.
+ * Les dix suivants sont arrivés ensemble, et l'arbitrage qui les tenait dehors
+ * est **le même**, appliqué à un fait différent : (b) de `tickets-C6.md` puis
+ * (d) de `tickets-C7.md` refusaient « une migration d'énuméré pour un seul
+ * objet, quand six autres n'en ont pas ». L'argument portait sur le nombre, et
+ * le nombre a changé — à dix, il bascule, et le point se referme entier plutôt
+ * qu'à moitié.
+ *
+ * **C'est un écart à `docs/04` §4**, dont la table énumère les six en toutes
+ * lettres. `docs/` est figé (règle 6) : l'écart se consigne dans
+ * `JOURNAL-TECHNIQUE.md`, il ne se corrige pas dans le document.
+ *
+ * **Trois niveaux de rattachement, et le document les prévoyait déjà.** `docs/04`
+ * §4 écrit `project_id` « null pour les événements de niveau produit **ou
+ * domaine** » : `budget` est de niveau accompagnement, les sept objets du produit
+ * portent `product_id` seul, et `person` comme `entity` ne portent ni l'un ni
+ * l'autre — ce sont les premiers événements de niveau domaine du dépôt.
+ *
+ * **Aucun sixième `event_verb` ne s'invente**, et c'est ce qui laisse les
+ * suppressions définitives hors du journal : `deletePerson` et `deleteEntity`
+ * n'ont aucun verbe qui les dise, `archived` mentirait, et la raison est écrite
+ * au geste. `deleteProject` est dehors pour une autre raison encore — sa cascade.
+ */
 export const eventTargetType = pgEnum("event_target_type", [
   "project",
   "activity",
@@ -215,6 +249,17 @@ export const eventTargetType = pgEnum("event_target_type", [
   "result",
   "indicator_reading",
   "member",
+  /* Les dix de T8.3, dans l'ordre où le point ouvert les nommait. */
+  "persona",
+  "use_case",
+  "indicator",
+  "person",
+  "entity",
+  "product_vision",
+  "budget",
+  "tracking",
+  "tagging_plan",
+  "context_marker",
 ]);
 
 /* ==========================================================================

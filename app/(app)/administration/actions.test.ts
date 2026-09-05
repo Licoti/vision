@@ -29,6 +29,14 @@
  * actions ne redirige — le panneau se referme sur `ok` depuis TD.2, et
  * `restoreEntity` ne rend rien. Rien d'autre n'est simulé : la base est réelle,
  * la porte est la vraie, et `requireSession` fait son travail entier.
+ *
+ * **T8.3 ajoute le journal de l'entité**, et d'elle seule : `entity` est l'un
+ * des dix `target_type` de la migration `0015`, quand les huit autres
+ * référentiels de cet écran — trente-deux gestes — n'en ont toujours aucun.
+ * L'asymétrie est un **périmètre**, pas un arbitrage : la liste des dix venait
+ * de C6, quand l'entité était le seul référentiel de l'écran, et T7.3 puis T7.4
+ * en ont ajouté huit sans que la liste bouge. Le dernier bloc de ce fichier la
+ * mesure des deux côtés, plutôt que de la laisser se découvrir.
  */
 
 import { eq } from "drizzle-orm";
@@ -43,6 +51,7 @@ import {
   approaches,
   domains,
   entities,
+  events,
   jobs,
   personSkills,
   persons,
@@ -482,8 +491,16 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (!domainId) return;
-  /* Enfants d'abord, parents ensuite : les clés `restrict` refusent l'inverse. */
+  /* Enfants d'abord, parents ensuite : les clés `restrict` refusent l'inverse.
+
+     **`events` en tête depuis T8.3**, et son absence aurait été une cascade de
+     63 : `events.domain_id` est `restrict`, si bien que la suppression du
+     domaine aurait échoué et laissé un résidu que `resolveDomainId` sert au
+     fichier suivant. C'est exactement la panne que T8.1 a diagnostiquée, et les
+     quatre gestes journalisés de l'entité sont ce qui la rendait atteignable
+     ici. */
   for (const table of [
+    events,
     personSkills,
     activities,
     projectApproaches,
@@ -1711,5 +1728,237 @@ describe("le doublon de libellé, sur la colonne `name`", () => {
     const state = await updateTool(f.renamedToolId, EMPTY_TOOL, toolForm(name));
 
     expect(state.ok).toBe(true);
+  });
+});
+
+/* ==========================================================================
+   Le journal de l'entité — T8.3
+   ========================================================================== */
+
+/**
+ * L'insécable de `lib/journal.ts`, **en échappement**.
+ *
+ * Écrit en caractère, il est indiscernable d'une espace ordinaire dans un
+ * fichier source : un test qui attendrait la seconde passerait le jour où la
+ * règle sauterait. C'est la forme des quatre autres fichiers de tests d'action
+ * qui lisent une phrase de journal.
+ */
+const NBSP = "\u00A0";
+
+type EventRow = {
+  verb: string;
+  targetType: string;
+  targetId: string | null;
+  actorId: string | null;
+  projectId: string | null;
+  productId: string | null;
+  summary: string;
+};
+
+async function journal(): Promise<EventRow[]> {
+  return db
+    .select({
+      verb: events.verb,
+      targetType: events.targetType,
+      targetId: events.targetId,
+      actorId: events.actorId,
+      projectId: events.projectId,
+      productId: events.productId,
+      summary: events.summary,
+    })
+    .from(events)
+    .where(eq(events.domainId, f.domainId))
+    .orderBy(events.occurredAt, events.createdAt);
+}
+
+/** Les lignes qu'un geste vient d'écrire — le décompte avant, le décompte après. */
+async function traced(gesture: () => Promise<unknown>): Promise<EventRow[]> {
+  const before = await journal();
+  await gesture();
+  return (await journal()).slice(before.length);
+}
+
+/** Une entité neuve, écrite par la couche, que le test peut malmener. */
+async function freshEntity(label: string) {
+  return f.scope.insert(entities, { label: `${label} ${suffix}` });
+}
+
+describe("le journal de l'entité", () => {
+  test("la création écrit une ligne, sans projet ni produit", async () => {
+    currentPerson = f.managerId;
+
+    const written = await traced(() =>
+      createEntity(EMPTY, labelForm(`Tracée ${suffix}`)),
+    );
+
+    expect(written).toHaveLength(1);
+    expect(written[0]?.verb).toBe("created");
+    expect(written[0]?.targetType).toBe("entity");
+    expect(written[0]?.actorId).toBe(f.managerId);
+    expect(written[0]?.summary).toBe(`Entité créée${NBSP}: Tracée ${suffix}`);
+
+    /* **Le point qu'aucun écran ne dira** : un événement de niveau domaine. Une
+       entité qualifie des produits, elle n'appartient à aucun — et le flux
+       global la rend **sans origine**, ce que `originOf` et `Entry` savent déjà
+       faire. */
+    expect(written[0]?.projectId).toBeNull();
+    expect(written[0]?.productId).toBeNull();
+
+    const created = (
+      await db
+        .select({ id: entities.id })
+        .from(entities)
+        .where(eq(entities.label, `Tracée ${suffix}`))
+    )[0];
+    expect(written[0]?.targetId).toBe(created?.id);
+  });
+
+  test("le renommage écrit le libellé d'après, jamais celui d'avant", async () => {
+    currentPerson = f.managerId;
+    const target = await freshEntity("Avant");
+
+    const written = await traced(() =>
+      updateEntity(target.id, EMPTY, labelForm(`Après ${suffix}`)),
+    );
+
+    expect(written).toHaveLength(1);
+    expect(written[0]?.verb).toBe("updated");
+    expect(written[0]?.targetType).toBe("entity");
+    expect(written[0]?.targetId).toBe(target.id);
+    expect(written[0]?.summary).toBe(`Entité modifiée${NBSP}: Après ${suffix}`);
+    /* Un renommage est le cas où la tentation d'écrire la valeur d'avant est la
+       plus forte — et le plus sûr moyen de faire du journal un historique
+       (D22). */
+    expect(written[0]?.summary).not.toContain("Avant");
+  });
+
+  test("le rangement écrit `archived`", async () => {
+    currentPerson = f.managerId;
+    const target = await freshEntity("À ranger");
+
+    const written = await traced(() => archiveEntity(target.id, ...confirm()));
+
+    expect(written).toHaveLength(1);
+    expect(written[0]?.verb).toBe("archived");
+    expect(written[0]?.targetType).toBe("entity");
+    expect(written[0]?.targetId).toBe(target.id);
+    expect(written[0]?.summary).toBe(
+      `Entité archivée${NBSP}: À ranger ${suffix}`,
+    );
+  });
+
+  /**
+   * **Le rétablissement écrit `updated`, et c'est la phrase qui le distingue.**
+   * Le cinquième verbe de l'énuméré ne nomme pas le rétablissement — la forme
+   * exacte de `restoreProject`, et le second appelant de `restored` du dépôt.
+   */
+  test("le rétablissement écrit `updated` et dit « rétablie »", async () => {
+    currentPerson = f.managerId;
+    const target = await freshEntity("À rétablir");
+    await archiveEntity(target.id, ...confirm());
+
+    const written = await traced(() => restoreEntity(target.id));
+
+    expect(written).toHaveLength(1);
+    expect(written[0]?.verb).toBe("updated");
+    expect(written[0]?.summary).toBe(
+      `Entité rétablie${NBSP}: À rétablir ${suffix}`,
+    );
+    expect(written[0]?.summary).not.toContain("modifiée");
+  });
+
+  /**
+   * **Rien n'est journalisé qui n'a pas eu lieu.** `restore` porte un filtre
+   * `is not null` : rétablir une entité vivante ne touche aucune ligne et rend
+   * `undefined`. Sans la condition, le journal dirait qu'un geste a eu lieu là
+   * où la base n'a rien bougé.
+   */
+  test("rétablir une entité vivante n'écrit aucune ligne", async () => {
+    currentPerson = f.managerId;
+    const target = await freshEntity("Déjà vivante");
+
+    const written = await traced(() => restoreEntity(target.id));
+
+    expect(written).toHaveLength(0);
+  });
+
+  /**
+   * **Le droit s'éprouve par l'action** : un refus n'écrit ni la ligne ni son
+   * événement. L'écran entier rend 404 au membre ordinaire, et ce n'est pas ce
+   * qui protège.
+   */
+  test("un refus n'écrit ni l'entité ni l'événement", async () => {
+    currentPerson = f.outsiderId;
+    const before = await entityCount();
+
+    const written = await traced(async () => {
+      const state = await createEntity(EMPTY, labelForm(`Forgée2 ${suffix}`));
+      expect(state.message).toBeDefined();
+      expect(state.ok).toBeUndefined();
+    });
+
+    expect(written).toHaveLength(0);
+    expect(await entityCount()).toBe(before);
+  });
+
+  /**
+   * **La suppression n'écrit rien, et l'arbitrage est rendu** (T8.3) :
+   * `event_verb` n'a aucun verbe qui dise l'effacement, et `archived` ferait
+   * dire à la colonne « rangée » d'un geste qui efface — quand le panneau prend
+   * soin de distinguer les deux avant le clic. Rien ne l'empêchait
+   * techniquement : `events` ne cascade pas sur `entities`.
+   *
+   * **Le jour où un sixième verbe entrera, c'est ce test qui tombera.**
+   */
+  test("la suppression n'écrit aucune ligne de journal", async () => {
+    currentPerson = f.managerId;
+    const doomed = await freshEntity("Effacée sans trace");
+
+    const written = await traced(async () => {
+      const state = await deleteEntity(doomed.id, ...confirm());
+      expect(state.ok).toBe(true);
+    });
+
+    expect(written).toHaveLength(0);
+    expect(await entityRow(doomed.id)).toBeUndefined();
+  });
+
+  /**
+   * **Les huit autres référentiels n'écrivent rien**, et ce constat fixe
+   * l'asymétrie plutôt que de la laisser se découvrir : renommer une entité
+   * laisse une trace, renommer un métier n'en laisse aucune, dans le même écran
+   * et sous le même droit. Ils n'étaient pas dans la liste des dix objets que la
+   * fiche T8.3 autorise — c'est un périmètre, pas un arbitrage, et le point
+   * ouvert le porte dans `ETAT.md`.
+   *
+   * **Le jour où un ticket les journalisera, c'est ce test qui tombera**, et
+   * c'est ce qu'on lui demande.
+   */
+  test("les huit autres référentiels n'écrivent aucune ligne", async () => {
+    currentPerson = f.managerId;
+
+    const written = await traced(async () => {
+      await createJob(
+        EMPTY_REFERENTIAL,
+        positionForm(`Métier tracé ${suffix}`),
+      );
+      await createApproach(
+        EMPTY_REFERENTIAL,
+        positionForm(`Approche tracée ${suffix}`),
+      );
+      await createSkill(
+        EMPTY_REFERENTIAL,
+        positionForm(`Compétence tracée ${suffix}`),
+      );
+      await updateJob(
+        f.freeJobId,
+        EMPTY_REFERENTIAL,
+        positionForm(`Métier repris ${suffix}`),
+      );
+      await archiveJob(f.freeJobId, ...confirm());
+      await restoreJob(f.freeJobId);
+    });
+
+    expect(written).toHaveLength(0);
   });
 });

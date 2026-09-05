@@ -34,6 +34,16 @@
  * repliés donne envie de les déplier ; savoir combien de fois un projet a été
  * touché classerait les projets entre eux.
  *
+ * **Ce bloc ne voit pas tout le journal, et c'est le filtre qui le décide.**
+ * `listProjectJournal` lit sur `events.project_id` : des dix `target_type` que
+ * T8.3 a ajoutés, **un seul paraît ici** — le budget, qui est une propriété de
+ * l'accompagnement. Les sept objets du produit portent `product_id`, la personne
+ * et l'entité ne portent ni l'un ni l'autre ; tous se lisent dans le flux de la
+ * vue d'ensemble, jamais dans cette frise. Ce n'est pas une lacune du bloc :
+ * poser un `project_id` sur l'événement d'un persona ou d'une entité aurait
+ * choisi arbitrairement un accompagnement parmi ceux du produit, et la frise
+ * aurait affiché ce mensonge fidèlement.
+ *
  * **Le journal n'est pas un historique** (D22) : chaque ligne dit la phrase
  * figée à l'écriture, son acteur et sa date. Ni valeur avant, ni valeur après,
  * aucun diff, aucune restauration, **et aucun lien vers l'objet touché** — la

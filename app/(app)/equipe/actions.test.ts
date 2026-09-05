@@ -23,6 +23,17 @@
  * échoue après cette ligne laisse malgré tout un domaine à effacer, et le
  * `if (!f?.domainId) return` des trois fichiers voisins l'abandonnerait — point
  * ouvert d'`ETAT.md`, qui ne gagne pas un quatrième nom.
+ *
+ * **T8.3 y ajoute le journal de la personne** — `person`, l'un des dix
+ * `target_type` de la migration `0015`. Ses trois lignes sont les **premières du
+ * dépôt à ne porter ni `project_id` ni `product_id`** : le cas de niveau
+ * domaine que `docs/04` §4 prévoyait depuis T1.2 sans que rien ne l'écrive.
+ * Aucun écran ne dira ce point, et c'est le dernier bloc qui le mesure.
+ *
+ * **La suppression, elle, n'écrit toujours rien**, et ce n'est pas un oubli :
+ * aucun `event_verb` ne dit l'effacement, `archived` mentirait, et T8.3
+ * s'interdit un sixième verbe. Un constat le fixe plutôt que de le laisser se
+ * redécouvrir.
  */
 
 import { eq, inArray } from "drizzle-orm";
@@ -62,7 +73,8 @@ vi.mock("next/headers", () => ({
 
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
-const { archivePerson, deletePerson } = await import("./actions");
+const { archivePerson, createPerson, deletePerson, updatePerson } =
+  await import("./actions");
 
 const suffix = Math.random().toString(36).slice(2, 10);
 
@@ -382,5 +394,223 @@ describe("deletePerson — ce que le geste écrit", () => {
     expect(after).toHaveLength(1);
     expect(after[0]?.summary).toBe(`Trace de l'autrice ${suffix}`);
     expect(after[0]?.actorId).toBeNull();
+  });
+});
+
+/* ==========================================================================
+   Le journal de la personne — T8.3
+   ========================================================================== */
+
+/**
+ * L'insécable de `lib/journal.ts`, **en échappement**.
+ *
+ * Écrit en caractère, il est indiscernable d'une espace ordinaire dans un
+ * fichier source. C'est la forme des deux autres fichiers de tests d'action qui
+ * lisent une phrase de journal.
+ */
+const NBSP = "\u00A0";
+
+type EventRow = {
+  verb: string;
+  targetType: string;
+  targetId: string | null;
+  actorId: string | null;
+  projectId: string | null;
+  productId: string | null;
+  summary: string;
+};
+
+async function journal(): Promise<EventRow[]> {
+  return db
+    .select({
+      verb: events.verb,
+      targetType: events.targetType,
+      targetId: events.targetId,
+      actorId: events.actorId,
+      projectId: events.projectId,
+      productId: events.productId,
+      summary: events.summary,
+    })
+    .from(events)
+    .where(eq(events.domainId, domainId as string))
+    .orderBy(events.occurredAt, events.createdAt);
+}
+
+/** Les lignes qu'un geste vient d'écrire — le décompte avant, le décompte après. */
+async function traced(gesture: () => Promise<unknown>): Promise<EventRow[]> {
+  const before = await journal();
+  await gesture();
+  return (await journal()).slice(before.length);
+}
+
+/** Le formulaire d'une personne, tel qu'une soumission le porte. */
+function personForm(overrides: Record<string, string> = {}): FormData {
+  const data = new FormData();
+  const values: Record<string, string> = {
+    fullName: `Camille Roux ${suffix}`,
+    jobId: "",
+    kind: "center",
+    bio: "",
+    ...overrides,
+  };
+  for (const [key, value] of Object.entries(values)) data.set(key, value);
+  return data;
+}
+
+const NO_PERSON_STATE = {
+  values: { fullName: "", jobId: "", kind: "", bio: "" },
+  errors: {},
+};
+
+/** La ligne créée par le chemin normal, retrouvée par son nom. */
+async function personNamed(fullName: string) {
+  const rows = await db
+    .select({ id: persons.id, fullName: persons.fullName })
+    .from(persons)
+    .where(eq(persons.fullName, fullName));
+  return rows[0] ?? null;
+}
+
+describe("le journal de la personne", () => {
+  test("la création écrit une ligne, sans projet ni produit", async () => {
+    currentPerson = f.managerId;
+
+    const written = await traced(() =>
+      createPerson(NO_PERSON_STATE, personForm({ fullName: `Neuve ${suffix}` })),
+    );
+
+    expect(written).toHaveLength(1);
+    expect(written[0]?.verb).toBe("created");
+    expect(written[0]?.targetType).toBe("person");
+    expect(written[0]?.actorId).toBe(f.managerId);
+    expect(written[0]?.summary).toBe(`Personne créée${NBSP}: Neuve ${suffix}`);
+
+    /* **Le point qu'aucun écran ne dira** : un événement de niveau domaine.
+       Une personne existe sans aucun accompagnement (D29), et lui en attribuer
+       un serait choisir arbitrairement parmi ceux qu'elle mène. La conséquence
+       est voulue — la ligne se rend **sans origine** dans le flux global. */
+    expect(written[0]?.projectId).toBeNull();
+    expect(written[0]?.productId).toBeNull();
+
+    const created = await personNamed(`Neuve ${suffix}`);
+    expect(written[0]?.targetId).toBe(created?.id);
+  });
+
+  test("la correction écrit `updated`, avec le nom d'après le geste", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Avant renommage");
+
+    const written = await traced(() =>
+      updatePerson(
+        target.id,
+        NO_PERSON_STATE,
+        personForm({ fullName: `Après renommage ${suffix}` }),
+      ),
+    );
+
+    expect(written).toHaveLength(1);
+    expect(written[0]?.verb).toBe("updated");
+    expect(written[0]?.targetType).toBe("person");
+    expect(written[0]?.targetId).toBe(target.id);
+    expect(written[0]?.summary).toBe(
+      `Personne modifiée${NBSP}: Après renommage ${suffix}`,
+    );
+    /* Le nom **d'après** : celui d'avant serait la « valeur avant » que D22
+       refuse, et une personne renommée reste la même personne. */
+    expect(written[0]?.summary).not.toContain("Avant renommage");
+  });
+
+  test("le rangement écrit `archived`", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("À ranger");
+
+    const written = await traced(() =>
+      archivePerson(target.id, {}, new FormData()),
+    );
+
+    expect(written).toHaveLength(1);
+    expect(written[0]?.verb).toBe("archived");
+    expect(written[0]?.targetType).toBe("person");
+    expect(written[0]?.targetId).toBe(target.id);
+    expect(written[0]?.summary).toBe(
+      `Personne archivée${NBSP}: À ranger ${suffix}`,
+    );
+  });
+
+  /**
+   * **Le droit s'éprouve par l'action** : un refus n'écrit ni la personne ni sa
+   * ligne de journal. Le point d'entrée n'est rendu qu'au responsable de
+   * domaine, et ce n'est pas ce qui protège.
+   */
+  test("un refus n'écrit ni la personne ni l'événement", async () => {
+    currentPerson = f.memberId;
+
+    const written = await traced(async () => {
+      const state = await createPerson(
+        NO_PERSON_STATE,
+        personForm({ fullName: `Forgée ${suffix}` }),
+      );
+      expect(state.message).toBeDefined();
+      expect(state.ok).toBeUndefined();
+    });
+
+    expect(written).toHaveLength(0);
+    expect(await personNamed(`Forgée ${suffix}`)).toBeNull();
+  });
+
+  /**
+   * **La suppression n'écrit rien, et l'arbitrage est rendu** (T8.3) :
+   * `event_verb` n'a aucun verbe qui dise l'effacement, et `archived` ferait
+   * dire à la colonne « rangée » d'un geste qui efface. Rien ne l'empêchait
+   * techniquement — `events` ne cascade pas sur `persons`, une ligne survivrait
+   * anonyme, ce que le test voisin prouve —, et c'est ce qui sépare ce cas de
+   * `deleteProject`, à qui la cascade retire jusqu'à la possibilité.
+   *
+   * **Le jour où un sixième verbe entrera, c'est ce test qui tombera**, et
+   * c'est ce qu'on lui demande.
+   */
+  test("la suppression n'écrit aucune ligne de journal", async () => {
+    currentPerson = f.managerId;
+    const doomed = await freshPerson("Effacée sans trace");
+
+    const written = await traced(async () => {
+      const state = await deletePerson(doomed.id, {}, new FormData());
+      expect(state.ok).toBe(true);
+    });
+
+    expect(written).toHaveLength(0);
+    expect(await exists(doomed.id)).toBe(false);
+  });
+
+  /**
+   * **La compétence portée n'entre pas au journal**, et ce constat fixe une
+   * asymétrie plutôt que de la laisser se découvrir : `person_skills` n'était
+   * pas dans la liste des dix objets que la fiche T8.3 autorise. C'est un
+   * périmètre, pas un arbitrage — point ouvert d'`ETAT.md`.
+   */
+  test("poser une compétence n'écrit aucune ligne", async () => {
+    currentPerson = f.managerId;
+
+    /* Une personne **neuve** : `f.orphanId` est celle que les tests de
+       suppression effacent, et la fixture est partagée. */
+    const carrier = await freshPerson("Porteuse de compétence");
+    const [skill] = await db
+      .select({ id: skills.id })
+      .from(skills)
+      .where(eq(skills.domainId, domainId as string));
+    const [level] = await db
+      .select({ id: skillLevels.id })
+      .from(skillLevels)
+      .where(eq(skillLevels.domainId, domainId as string));
+
+    const written = await traced(async () => {
+      await f.scope.insert(personSkills, {
+        personId: carrier.id,
+        skillId: skill!.id,
+        levelId: level!.id,
+      });
+    });
+
+    expect(written).toHaveLength(0);
   });
 });

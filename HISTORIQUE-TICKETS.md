@@ -6203,6 +6203,185 @@ fichier est hors périmètre — récrit en point ouvert d'`ETAT.md`.
 
 ---
 
+## T8.3 — Onze objets entrent au journal — 05/09/2026
+
+**Le point ouvert qu'il referme**, tel qu'`ETAT.md` le portait : *« Onze objets écrivent sans laisser
+de trace : persona, use case, indicateur, personne, entité, vision produit, budget, dispositif de
+mesure, plan de taggage, repère de contexte, et la suppression d'un accompagnement — cette dernière
+d'une autre nature, `events.project_id` étant `cascade` : pas de ligne à écrire, une disparition à
+admettre · l'en-tête de `schema.ts` dit « les 26 tables métier », elles sont 33 — cinquième chiffre
+faux d'une même famille, le geste est de retirer. »*
+
+### Cinq arbitrages rendus avant écriture
+
+L'outil de question n'étant pas exposé dans la session, ils ont été posés en tête du plan et validés
+par l'humain avant la première ligne :
+
+1. **Deux fichiers ajoutés au périmètre annoncé.** La fiche listait quatre fichiers d'actions ; or
+   l'**entité** s'écrit dans `app/(app)/administration/actions.ts` et le commentaire de la
+   **suppression d'un accompagnement** vit dans `app/(app)/accompagnements/actions.ts`. Sans eux, le
+   point ne se refermait pas — et la fiche exigeait *« il se referme entier ou il reste »*.
+2. **Les libellés du journal ne sont pas dans `lib/format.ts`.** Le périmètre nommait ce fichier ;
+   il ne porte ni `objectPhrase`, ni `NOUNS`, ni `targetType`. Tout vit dans `lib/journal.ts`.
+3. **La liste des onze était périmée** — voir plus bas. On s'en tient aux dix que la fiche autorise
+   (règle 3), et ce qu'on trouve devient un point ouvert.
+4. **Les suppressions définitives ne se journalisent pas.** `deletePerson` et `deleteEntity` n'ont
+   aucun `event_verb` qui les dise, et la fiche interdit un sixième.
+5. **Le critère de validation n'était pas atteignable tel qu'écrit.** Constaté, pas contourné.
+
+### La migration, et les seize noms
+
+`0015_spotty_doomsday.sql` est **dix `ALTER TYPE … ADD VALUE`, et rien d'autre** — vérifié avant
+application, l'inquiétude étant qu'un drizzle-kit choisisse une recréation de type. Appliquée sur les
+**deux** branches, `DATABASE_URL` et `TEST_DATABASE_URL`, et l'énuméré relu en base des deux côtés :
+seize valeurs, dans le même ordre. Sans la seconde application, toute la suite tombait.
+
+Les dix noms sont ceux du point ouvert, dans son ordre : `persona`, `use_case`, `indicator`,
+`person`, `entity`, `product_vision`, `budget`, `tracking`, `tagging_plan`, `context_marker`.
+**Chaque libellé français est celui de l'écran**, jamais celui de la table — « Use case » est le
+titre du bloc, « Vision produit » celui de l'en-tête du bloc de tête, et « Outil de mesure » le mot
+des messages de refus, quand « Dispositif de mesure » est le **bloc** qui les réunit.
+
+### Trois niveaux de rattachement, et le document les prévoyait
+
+| Niveau | Objets | `project_id` | `product_id` |
+|---|---|---|---|
+| accompagnement | `budget` | posé | nul |
+| produit | `indicator`, `persona`, `use_case`, `tracking`, `tagging_plan`, `context_marker`, `product_vision` | nul | posé |
+| **domaine** | `person`, `entity` | nul | nul |
+
+Le troisième est **neuf dans le dépôt et vieux dans le document** : `docs/04` §4 écrit `project_id`
+*« null pour les événements de niveau produit **ou domaine** »* depuis T1.2, et rien ne l'écrivait.
+Le flux de la vue d'ensemble rend ces lignes **sans origine** — un chemin que `originOf` et `Entry`
+portaient depuis T6.6 sans qu'aucun usage l'atteigne : il n'était joignable qu'en forgeant une ligne.
+**Rien n'a été ajouté pour l'ouvrir ; il était juste.**
+
+Le cas qui demandait une décision est le **repère de contexte**, seul objet du produit à *citer* un
+accompagnement (`context_markers.project_id`). Son événement ne le porte pas : le rattachement de la
+ligne de journal suit l'**objet**, jamais le champ qu'il cite — sans quoi un fait du produit entrerait
+dans la frise d'un accompagnement, à côté de ses activités. C'est le raisonnement de `createReading`.
+
+### La cinquième forme de phrase, et le seul geste qui l'exigeait
+
+`objectPhrase`, `statePhrase`, `teamPhrase` et `linkPhrase` ont suffi aux dix objets neufs : **dix
+noms de plus dans `NOUNS`, zéro fonction de plus.** La cinquième — `northStarPhrase` — n'est pas
+venue d'un objet mais d'un **geste** : `setNorthStar` n'est ni une création, ni une correction, ni un
+archivage, et `objectPhrase("indicator", "updated", …)` aurait rendu une désignation indiscernable
+d'un renommage. Le verbe est `state_changed`, celui de `transitionActivity`, et le `target_type`
+reste `indicator` — l'objet touché *est* l'indicateur, la phrase dit « North Star ». C'est la
+dissociation de `linkPhrase`, et c'est la phrase qui se lit.
+
+Deux propriétés du geste ont été écrites plutôt que subies : **redésigner la North Star en place
+n'écrit rien** — la règle mesurée d'`updateActivity` —, et **le retrait nomme l'indicateur qui cesse
+de l'être**, sans quoi la ligne dirait qu'on a retiré quelque chose sans dire quoi.
+
+### La seule lecture ajoutée, et pourquoi
+
+`toolName`. Une ligne de `product_trackings` n'a pas de nom propre : « Outil de mesure ajouté : Espace
+client » nommerait le **produit**, que le flux nomme déjà en origine et qui ne distingue pas une ligne
+de sa voisine — l'unicité partielle en fait une par outil. La doctrine du dépôt est que **la porte
+rende la désignation** (`createReading`, T6.2) ; ici aucune porte ne la rend, `openTracking`
+s'arrêtant à la ligne et au produit. Une lecture scopée d'une ligne connue est le prix d'une phrase
+juste, et il est plus faible que celui d'une phrase creuse.
+
+Pour le **plan de taggage** et la **vision**, à l'inverse, le produit *est* la désignation : un
+produit porte au plus un de chaque, et l'unique le garantit. Même raison pour le budget, qui nomme
+son accompagnement.
+
+### Ce que le ticket a trouvé, et n'a pas pris
+
+**La liste des onze datait de C6 et de C7, et elle était périmée.** Quatre familles écrivent encore
+sans laisser de trace :
+
+- **le produit lui-même** — dans le fichier même où sa vision en laisse une désormais. L'asymétrie
+  est visible depuis `produits/actions.ts` : `updateProductVision` journalise, `archiveProduct` non ;
+- **l'adoption d'indicateur** (`project_indicators`), et c'est la trouvaille la plus nette : son
+  absence **n'était écrite nulle part**, et l'en-tête d'`accompagnements/[id]/actions.ts` affirmait
+  même que le budget était *« la seule écriture de ce fichier dont l'absence de `record` soit
+  voulue »*. C'était faux. La phrase est corrigée ;
+- **la compétence portée** (`person_skills`), trois gestes ;
+- **les huit référentiels de `/administration` autres que l'entité** — trente-deux gestes. L'entité
+  était seule dans la liste parce qu'elle datait de C6, quand elle était le seul référentiel de
+  l'écran ; T7.3 puis T7.4 en ont ajouté huit sans que la liste bouge.
+
+**Aucune n'a été prise** : la fiche interdit nommément d'élargir au-delà des dix, et c'est le geste
+« pendant que j'y suis » de la règle 3. Mais **chacune est fixée par un test qui tombera** le jour où
+on la journalisera — « archiver un produit n'écrit aucune ligne », « l'adoption d'un indicateur
+n'écrit aucune ligne », « poser une compétence n'écrit aucune ligne », « les huit autres référentiels
+n'écrivent aucune ligne ». Un point ouvert sans témoin est un point qu'on redécouvre ; celui-ci en a
+quatre.
+
+### Trois commentaires faux, corrigés parce que le fichier était ouvert
+
+- l'en-tête de `schema.ts` annonçait *« les 26 tables métier »*, elles sont **33**. Le chiffre est
+  **retiré**, pas corrigé : cinquième de la famille, et un compte écrit dans une prose redeviendra
+  faux au prochain hors-ticket qui ajoute une table. Même geste dans `accompagnements/[id]/actions.ts`
+  (*« sur les onze »*) ;
+- l'en-tête d'`equipe/actions.ts` disait *« Aucune suppression de personne, jamais »* alors que
+  `deletePerson` existe depuis le 28/08/2026 — sept jours de plus qu'il n'était vrai ;
+- celui d'`accompagnements/[id]/actions.ts`, sur l'adoption (ci-dessus).
+
+### La vérification
+
+**Le critère se lit dans le HTML servi.** Une sonde jetable a écrit une ligne par `target_type` neuf
+dans la base de développement, **par les deux modules que les actions appellent** — `record` et
+`objectPhrase` —, puis `curl` sur `/` et sur la page d'un accompagnement, `<script>` retirés. Les
+onze phrases s'y lisent, avec leur libellé français, leur accord et leur insécable :
+
+| Ligne servie | Origine rendue |
+|---|---|
+| `Persona créé : …` · `Use case créé : …` · `Indicateur modifié : …` · `North Star désignée : …` · `Vision produit modifiée : …` · `Outil de mesure archivé : …` · `Plan de taggage créé : …` · `Repère de contexte créé : …` | le **produit**, lié vers `/produits/<id>` |
+| `Budget créé : …` | l'**accompagnement**, lié vers `/accompagnements/<id>` |
+| `Personne créée : …` · `Entité rétablie : …` | **aucune**, et aucun lien |
+
+**Le bloc « Journal » de la page d'accompagnement ne porte que le budget**, et c'est la limite du
+critère de la fiche, constatée plutôt que contournée : `listProjectJournal` filtre sur `project_id`,
+et les neuf autres objets sont de niveau produit ou domaine. Les demander « dans les deux écrans »
+n'était pas atteignable.
+
+**Le mot « activité » a été relu dans le HTML servi** : ses huit occurrences désignent toutes un fait
+d'accompagnement ou le titre de bloc de `docs/06` §3. Aucun des dix noms neufs ne l'emploie.
+
+**Le droit s'éprouve par l'action** : chaque objet porte un constat de refus qui compte les lignes
+d'`events` **avant et après** — un `record` posé avant la garde passerait tous les constats positifs
+sans que rien ne le signale.
+
+**Mise en défaut — dix neutralisations, dix chutes isolées.** Objet par objet, ses appels à `record()`
+remplacés par un `Promise.resolve()`, la suite du fichier relancée :
+
+| Objet | Appels | Ce qui tombe |
+|---|---|---|
+| `persona` | 3 | 2, et rien d'autre |
+| `use_case` | 3 | 2 |
+| `indicator` | 5 | 6 — les trois de l'indicateur **et** les trois de la North Star, qui partagent le `target_type` |
+| `tracking` | 3 | 1 |
+| `tagging_plan` | 3 | 1 |
+| `context_marker` | 3 | 2 |
+| `product_vision` | 1 | 2 |
+| `person` | 3 | 3 |
+| `entity` | 4 | 4 |
+| `budget` | 2 | 3 |
+
+Aucune cascade : chaque chute nomme l'objet neutralisé et lui seul. Les constats de **refus** ne
+tombent jamais — ils attendent zéro ligne, et zéro reste zéro : c'est ce qui les distingue des
+constats de présence, et c'est voulu.
+
+### Le vert
+
+`npm run test` : **1 646 tests sur 55 fichiers** — la référence de T8.1 était 1 582, portée à 1 589
+par T8.2, soit **+57**. `npm run lint` (`--max-warnings=0`) et `tsc --noEmit` au vert au même moment.
+
+### Le geste qui a coûté le plus cher, et il n'est pas dans le ticket
+
+Le harnais de mise en défaut restaurait les fichiers par `git checkout --`. Les cinq fichiers
+d'actions **n'étaient pas indexés** : la commande les a rendus à `HEAD`, et tout le travail
+d'écriture de T8.3 sur ces cinq fichiers a été perdu d'un coup. Il a été réécrit intégralement, et le
+harnais travaille désormais sur une **copie de sauvegarde hors dépôt**. Consigné au journal technique.
+
+**Ce qu'il ne referme pas** : les quatre familles ci-dessus, récrites en point ouvert d'`ETAT.md`.
+
+---
+
 ## Instantané d'`ETAT.md` au balayage du 04/09/2026 — session de découpage de C8
 
 *(geste 1 de la session de découpage de C8. `ETAT.md` faisait **744 lignes** pour un seuil de 250 :

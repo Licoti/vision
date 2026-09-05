@@ -13,15 +13,27 @@
  * règle sauterait. D'où les deux assertions jumelles — ce que la chaîne est, et
  * ce qu'elle n'est pas (leçon de `lib/format.test.ts`).
  *
- * Ils couvrent **les quatre formes et les six noms**. Les quatre noms de T6.2
+ * Ils couvrent **les cinq formes et les seize noms**. Les quatre noms de T6.2
  * sont arrivés avec les gestes qui les écrivent, la troisième forme —
- * `statePhrase` — avec les deux seuls gestes qui font *atteindre un état*, et
- * la quatrième — `linkPhrase` — avec les trois gestes du lien déclaré (T6.5).
+ * `statePhrase` — avec les deux seuls gestes qui font *atteindre un état*, la
+ * quatrième — `linkPhrase` — avec les trois gestes du lien déclaré (T6.5), et
+ * les **dix noms de T8.3** avec les vingt-sept points d'appel qui les écrivent.
+ *
+ * **Le constat qui vaut pour les seize, et pas seulement pour les dix neufs** :
+ * seize noms doivent produire seize phrases distinctes. Un nom qui doublerait
+ * un autre rendrait une frise mêlée illisible sans qu'aucun test d'action ne
+ * s'en aperçoive — chacun ne regarde que sa propre ligne.
  */
 
 import { describe, expect, test } from "vitest";
 
-import { linkPhrase, objectPhrase, statePhrase, teamPhrase } from "./journal";
+import {
+  linkPhrase,
+  northStarPhrase,
+  objectPhrase,
+  statePhrase,
+  teamPhrase,
+} from "./journal";
 
 const NBSP = "\u00A0";
 
@@ -104,11 +116,16 @@ describe("objectPhrase — les quatre objets de T6.2", () => {
   });
 
   /**
-   * **Le nom de l'objet distingue les six**, et c'est ce qui rend une frise
+   * **Le nom de l'objet distingue les seize**, et c'est ce qui rend une frise
    * mêlée lisible : « Activité créée » et « Ressource créée » ne se lisent pas
    * l'une pour l'autre, quand bien même le libellé serait le même.
+   *
+   * **La liste est écrite en toutes lettres, jamais dérivée de `NOUNS`** : un
+   * constat qui parcourrait la table qu'il éprouve passerait quel que soit son
+   * contenu. C'est elle qui doit tomber le jour où un dix-septième nom entre
+   * sans qu'on ait vérifié qu'il ne double personne.
    */
-  test("les six noms produisent six phrases distinctes", () => {
+  test("les seize noms produisent seize phrases distinctes", () => {
     const phrases = new Set(
       (
         [
@@ -118,10 +135,136 @@ describe("objectPhrase — les quatre objets de T6.2", () => {
           "resource",
           "result",
           "indicator_reading",
+          "persona",
+          "use_case",
+          "indicator",
+          "person",
+          "entity",
+          "product_vision",
+          "budget",
+          "tracking",
+          "tagging_plan",
+          "context_marker",
         ] as const
       ).map((kind) => objectPhrase(kind, "updated", "X")),
     );
-    expect(phrases.size).toBe(6);
+    expect(phrases.size).toBe(16);
+  });
+});
+
+/* ==========================================================================
+   Les dix noms de T8.3
+   ========================================================================== */
+
+describe("objectPhrase — les dix objets de T8.3", () => {
+  /**
+   * **Chaque libellé est celui de l'écran**, et c'est ce que ce constat éprouve
+   * — pas l'accord, que le suivant regarde. « Use case » est le titre du bloc
+   * de la page produit, « Vision produit » celui du bloc de tête, « Outil de
+   * mesure » le mot des messages de refus. Un journal qui nommerait les objets
+   * autrement que l'écran obligerait à traduire.
+   */
+  test("les dix libellés sont ceux de l'interface", () => {
+    expect(objectPhrase("persona", "created", "Le pressé")).toBe(
+      `Persona créé${NBSP}: Le pressé`,
+    );
+    expect(objectPhrase("use_case", "created", "Payer en trois fois")).toBe(
+      `Use case créé${NBSP}: Payer en trois fois`,
+    );
+    expect(objectPhrase("indicator", "created", "Autonomie")).toBe(
+      `Indicateur créé${NBSP}: Autonomie`,
+    );
+    expect(objectPhrase("budget", "created", "Refonte du panier")).toBe(
+      `Budget créé${NBSP}: Refonte du panier`,
+    );
+    expect(objectPhrase("tracking", "created", "Matomo")).toBe(
+      `Outil de mesure créé${NBSP}: Matomo`,
+    );
+    expect(objectPhrase("tagging_plan", "created", "Espace client")).toBe(
+      `Plan de taggage créé${NBSP}: Espace client`,
+    );
+    expect(objectPhrase("context_marker", "created", "Refonte du SI")).toBe(
+      `Repère de contexte créé${NBSP}: Refonte du SI`,
+    );
+  });
+
+  /**
+   * **Les trois noms féminins ont un appelant**, sans quoi la mécanique
+   * d'accord serait à la merci du premier qui s'en servirait — la propriété que
+   * T6.1 avait établie sur deux noms et T6.2 sur quatre.
+   */
+  test("les trois féminins portent leur `e`", () => {
+    expect(objectPhrase("person", "created", "Camille Roux")).toBe(
+      `Personne créée${NBSP}: Camille Roux`,
+    );
+    expect(objectPhrase("entity", "archived", "Retail")).toBe(
+      `Entité archivée${NBSP}: Retail`,
+    );
+    expect(objectPhrase("product_vision", "updated", "Espace client")).toBe(
+      `Vision produit modifiée${NBSP}: Espace client`,
+    );
+  });
+
+  /**
+   * `restored` n'a eu qu'un appelant de C6 à T8.3 — `restoreProject`.
+   * `restoreEntity` est le second, et il est le seul des dix objets neufs à
+   * rétablir : un persona, un use case ou un outil de mesure archivés se
+   * **ressaisissent** (arbitrage (b) de `tickets-C4bis.md`).
+   */
+  test("l'entité rétablie ne se confond pas avec l'entité modifiée", () => {
+    expect(objectPhrase("entity", "restored", "Retail")).toBe(
+      `Entité rétablie${NBSP}: Retail`,
+    );
+    expect(objectPhrase("entity", "restored", "Retail")).not.toBe(
+      objectPhrase("entity", "updated", "Retail"),
+    );
+  });
+
+  test("les quatre gestes de chaque objet neuf ne se confondent pas", () => {
+    for (const kind of [
+      "persona",
+      "use_case",
+      "indicator",
+      "person",
+      "entity",
+      "product_vision",
+      "budget",
+      "tracking",
+      "tagging_plan",
+      "context_marker",
+    ] as const) {
+      const phrases = new Set([
+        objectPhrase(kind, "created", "X"),
+        objectPhrase(kind, "updated", "X"),
+        objectPhrase(kind, "archived", "X"),
+        objectPhrase(kind, "restored", "X"),
+      ]);
+      expect(phrases.size).toBe(4);
+    }
+  });
+
+  /**
+   * L'insécable se mesure **sur son point de code**, jamais à l'œil : U+00A0 et
+   * l'espace ordinaire sont indiscernables dans un source comme dans un
+   * navigateur. La règle vaut pour les dix noms neufs comme pour les six aînés.
+   */
+  test("les dix noms portent l'insécable devant les deux-points", () => {
+    for (const kind of [
+      "persona",
+      "use_case",
+      "indicator",
+      "person",
+      "entity",
+      "product_vision",
+      "budget",
+      "tracking",
+      "tagging_plan",
+      "context_marker",
+    ] as const) {
+      const phrase = objectPhrase(kind, "created", "X");
+      expect(phrase).toContain(`${NBSP}: X`);
+      expect(phrase).not.toContain(" : X");
+    }
   });
 });
 
@@ -183,6 +326,64 @@ describe("statePhrase — l'état qu'une activité vient d'atteindre", () => {
         );
       }
     }
+  });
+});
+
+/* ==========================================================================
+   La cinquième forme — T8.3
+   ========================================================================== */
+
+describe("northStarPhrase — la North Star qu'un produit se donne", () => {
+  test("les deux participes, accordés au féminin de « North Star »", () => {
+    expect(northStarPhrase("designated", "Autonomie")).toBe(
+      `North Star désignée${NBSP}: Autonomie`,
+    );
+    expect(northStarPhrase("removed", "Autonomie")).toBe(
+      `North Star retirée${NBSP}: Autonomie`,
+    );
+  });
+
+  test("l'espace devant les deux-points est insécable", () => {
+    expect(northStarPhrase("designated", "Autonomie")).toContain(
+      `${NBSP}: Autonomie`,
+    );
+    expect(northStarPhrase("designated", "Autonomie")).not.toContain(
+      " : Autonomie",
+    );
+  });
+
+  /**
+   * **La désignation et le retrait ne se confondent pas**, et c'est tout ce que
+   * la frise a pour les distinguer : la colonne, elle, porte le **même** verbe
+   * `state_changed` et le **même** `target_type` `indicator` dans les deux cas.
+   */
+  test("désigner et retirer ne disent pas la même chose", () => {
+    expect(northStarPhrase("designated", "X")).not.toBe(
+      northStarPhrase("removed", "X"),
+    );
+  });
+
+  /**
+   * **La cinquième forme ne double aucune des quatre.** « North Star désignée »
+   * n'est ni « Indicateur modifié » ni « Activité terminée » : c'est la raison
+   * même de son existence — `objectPhrase("indicator", "updated", …)` aurait
+   * rendu un renommage d'indicateur indiscernable d'une désignation.
+   */
+  test("elle ne se confond avec aucun geste de correction d'indicateur", () => {
+    const phrases = new Set([
+      northStarPhrase("designated", "Autonomie"),
+      northStarPhrase("removed", "Autonomie"),
+      objectPhrase("indicator", "created", "Autonomie"),
+      objectPhrase("indicator", "updated", "Autonomie"),
+      objectPhrase("indicator", "archived", "Autonomie"),
+    ]);
+    expect(phrases.size).toBe(5);
+  });
+
+  test("le libellé est recopié tel quel, jamais retouché", () => {
+    expect(northStarPhrase("removed", "Taux : 2026")).toBe(
+      `North Star retirée${NBSP}: Taux : 2026`,
+    );
   });
 });
 

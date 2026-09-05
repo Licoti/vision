@@ -811,6 +811,38 @@ describe("le journal", () => {
     expect(rows[0]?.domainId).toBe(a.domainId);
   });
 
+  /**
+   * **La forme que T8.3 introduit : un événement de niveau domaine.**
+   *
+   * `docs/04` §4 la prévoyait depuis T1.2 — `project_id` « null pour les
+   * événements de niveau produit **ou domaine** » —, et rien ne l'écrivait :
+   * les six `target_type` de C6 portaient tous l'un ou l'autre. `person` et
+   * `entity` ne portent aucun des deux, une personne comme une entité existant
+   * hors de tout accompagnement et de tout produit.
+   *
+   * Ce n'est pas un chemin neuf de la couche : `insert` ne vérifie que les clés
+   * étrangères **posées**, et deux colonnes nulles ne se confrontent à rien. Ce
+   * constat le dit plutôt que de le supposer — c'est la forme sur laquelle
+   * reposent sept points d'appel de T8.3.
+   */
+  test("une ligne sans projet ni produit s'écrit, et reste au domaine", async () => {
+    const written = await signed().record({
+      verb: "created",
+      targetType: "person",
+      targetId: a.personId,
+      summary: "Personne créée\u00A0: Personne a",
+    });
+
+    const rows = await db.select().from(events).where(eq(events.id, written.id));
+    const row = rows[0];
+    expect(row?.projectId).toBeNull();
+    expect(row?.productId).toBeNull();
+    expect(row?.domainId).toBe(a.domainId);
+    expect(row?.actorId).toBe(a.personId);
+    expect(row?.targetType).toBe("person");
+    expect(row?.summary).toBe("Personne créée\u00A0: Personne a");
+  });
+
   test("une lecture d'un domaine ne voit pas le journal de l'autre", async () => {
     await forDomain({ domainId: b.domainId, actorId: b.personId }).record({
       projectId: b.projectId,

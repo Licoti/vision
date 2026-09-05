@@ -759,11 +759,16 @@ export async function archiveProject(
  * vivant comme sur un accompagnement rangé — choix de l'humain. Ranger reste le
  * chemin par défaut, et c'est le panneau qui le dit.
  *
- * **Aucune ligne de journal**, et ce n'est pas un oubli : `events.project_id` est
- * `cascade`, si bien qu'une trace écrite juste avant serait effacée par
- * l'instruction suivante. Le geste rejoint donc la famille des objets qui
- * écrivent sans laisser de trace — arbitrage (b) de C6, (d) de C7 — et le point
- * ouvert d'`ETAT.md` se récrit avec ce nom.
+ * **Aucune ligne de journal, et l'arbitrage est rendu** (T8.3, après avoir été
+ * redécouvert deux fois). `events.project_id` est `cascade` : une trace écrite
+ * juste avant serait effacée par l'instruction suivante, avec les dix clés qui
+ * pointent `projects.id`. **Il n'y a pas de ligne à écrire, il y a une
+ * disparition à admettre** — et elle est d'une autre nature que celle des
+ * suppressions de `deletePerson` et `deleteEntity`, à qui c'est le **verbe** qui
+ * manque, non la possibilité : là-bas une ligne survivrait, ici non. Le point
+ * ouvert des objets non journalisés s'est refermé sans que ce geste change
+ * d'état, et il n'y a plus rien à y attendre : **ce commentaire est la trace,
+ * puisqu'il ne peut pas y en avoir en base.**
  *
  * **Le droit est `manageDomain`**, celui d'`archiveProject`, redérivé sur
  * l'identifiant **reçu** : `bind(null, project.id)` fait sortir l'identifiant de

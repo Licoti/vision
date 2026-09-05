@@ -13,6 +13,22 @@
  * ordonnée, ses trois libellés portés en propre et ses interdits ; ce qui a
  * changé est l'endroit où la page le rend.
  *
+ * **Le flux traverse seize `event_target_type` depuis T8.3**, contre six
+ * auparavant, et **le bloc n'a pas changé d'une classe** : dix objets neufs
+ * s'écrivent, aucun n'a demandé un rendu de plus. C'est la mesure de ce que la
+ * ligne portait déjà — une phrase figée, un acteur, une origine facultative,
+ * une date —, et la preuve que le journal se lit sans connaître les objets dont
+ * il parle.
+ *
+ * **Ce qui a changé est la fréquence d'un cas, pas son existence** : une ligne
+ * **sans origine**. `person` et `entity` sont de niveau **domaine** — ni
+ * `project_id`, ni `product_id`, le cas que `docs/04` §4 prévoit —, si bien que
+ * `originOf` n'a rien à leur rattacher et que `Entry` tait le lien qu'il n'a
+ * pas. Ce chemin existait depuis T6.6, écrit pour l'événement dont l'origine est
+ * écartée par le filtre de domaine ; **il n'était atteignable qu'en forgeant une
+ * ligne**, il est désormais celui de tout geste d'équipe et d'administration.
+ * Rien n'a été ajouté pour l'ouvrir : il était juste.
+ *
  * **Ses lignes sont des événements, jamais des activités**, et c'est ici que
  * le piège de `docs/04` §4 coûte le plus cher. Le bloc porte le nom que
  * `docs/06` §3 lui donne ; ce qu'il liste vient d'`events` — la trace système,

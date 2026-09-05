@@ -75,6 +75,27 @@
  * Aucune écriture directe : tout passe par `session.db`, déjà scopé sur le
  * domaine courant et sur la personne courante — `domain_id` et `created_by`
  * sont posés par la couche, l'appelant n'y pense pas. Règle 1.
+ *
+ * **Quatre écritures laissent une trace depuis T8.3, et ce sont celles de
+ * l'entité** : la créer, corriger son libellé, l'archiver, la rétablir. Leur
+ * événement ne porte ni `project_id` ni `product_id` — de niveau **domaine**,
+ * comme ceux de la personne, le cas que `docs/04` §4 prévoit. Le flux global les
+ * rend **sans origine**, ce que `originOf` et `Entry` savent déjà faire.
+ *
+ * **Deux écritures de ce fichier n'en laissent pas, et ce sont deux raisons
+ * différentes.** La **suppression** d'une entité n'a aucun `event_verb` qui la
+ * dise — la raison est écrite au geste, et c'est le prix nommé de l'interdit de
+ * sixième verbe. Et **les huit autres référentiels n'ont pas de trace du tout**,
+ * soit trente-deux gestes : ils n'étaient pas dans la liste des dix objets que
+ * la fiche T8.3 autorise, l'entité y étant seule de ce fichier — elle date de
+ * C6, quand elle était le seul référentiel de l'écran, et T7.3 puis T7.4 en ont
+ * ajouté huit sans que la liste bouge.
+ *
+ * **L'asymétrie est donc voulue au sens où elle a été vue, et pas au sens où on
+ * la préférerait** : renommer une entité laisse une trace, renommer un métier
+ * n'en laisse aucune, dans le même écran et sous le même droit. Élargir aurait
+ * été le geste « pendant que j'y suis » que la règle 3 refuse. **C'est un point
+ * ouvert, écrit comme tel dans `ETAT.md`.**
  */
 
 import { eq } from "drizzle-orm";
@@ -144,6 +165,7 @@ import {
   readToolForm,
   type ToolFormState,
 } from "@/lib/forms/tool";
+import { objectPhrase } from "@/lib/journal";
 import { ROUTES, type Referential } from "@/lib/navigation";
 import { listEntityLabels } from "@/lib/queries/entities";
 import {
@@ -254,7 +276,17 @@ export async function createEntity(
   /* `position` n'est pas écrite : elle garde son défaut. Aucun écran de Vision
      ne la lit — tous les tris se font sur `label` —, et la poser ici ferait
      croire à un ordre que rien ne rend. */
-  await session.db.insert(entities, { label: input.label });
+  const created = await session.db.insert(entities, { label: input.label });
+
+  /* **Ni `project_id` ni `product_id`** : une entité qualifie des produits, elle
+     n'appartient à aucun. C'est le rattachement de la personne, et le cas de
+     niveau **domaine** que `docs/04` §4 prévoit. */
+  await session.db.record({
+    verb: "created",
+    targetType: "entity",
+    targetId: created.id,
+    summary: objectPhrase("entity", "created", created.label),
+  });
 
   revalidate();
   return { values, errors: {}, ok: true };
@@ -291,6 +323,17 @@ export async function updateEntity(
     label: input.label,
   });
   if (!updated) return refusal(formData, GONE);
+
+  /* Le libellé figé est celui **d'après** le geste (D22) : écrire celui d'avant
+     serait la « valeur avant » que le journal refuse. Un renommage d'entité est
+     précisément le cas où la tentation est la plus forte — et le plus sûr moyen
+     de faire du journal un historique. */
+  await session.db.record({
+    verb: "updated",
+    targetType: "entity",
+    targetId: entityId,
+    summary: objectPhrase("entity", "updated", updated.label),
+  });
 
   revalidate();
   return { values, errors: {}, ok: true };
@@ -342,6 +385,13 @@ export async function archiveEntity(
 
   await session.db.archive(entities, entityId);
 
+  await session.db.record({
+    verb: "archived",
+    targetType: "entity",
+    targetId: entityId,
+    summary: objectPhrase("entity", "archived", gate.entity.label),
+  });
+
   revalidate();
   return { ok: true };
 }
@@ -364,7 +414,24 @@ export async function restoreEntity(entityId: string): Promise<void> {
   const gate = await openEntity(session, entityId);
   if ("message" in gate) return;
 
-  await session.db.restore(entities, entityId);
+  const restored = await session.db.restore(entities, entityId);
+
+  /* **Rien n'est journalisé qui n'a pas eu lieu.** `restore` porte un filtre
+     `is not null` : rétablir une entité vivante ne touche aucune ligne et rend
+     `undefined`. C'est la forme exacte de `restoreProject`, jusqu'au verbe —
+     `updated`, le cinquième de l'énuméré ne nommant pas le rétablissement, et
+     c'est la **phrase** qui distingue « rétablie » de « modifiée ».
+
+     `revalidate` reste inconditionnel : ce qu'il rafraîchit ne dépend pas de ce
+     que le journal a écrit. */
+  if (restored) {
+    await session.db.record({
+      verb: "updated",
+      targetType: "entity",
+      targetId: entityId,
+      summary: objectPhrase("entity", "restored", restored.label),
+    });
+  }
 
   revalidate();
 }
@@ -399,6 +466,16 @@ function refusalOfAnyProducts(total: number): string {
  *
  * **Aucun rétablissement** : c'est la nature du geste, et c'est ce que le
  * panneau de confirmation dit avant de le proposer.
+ *
+ * **Aucune ligne de journal, et l'arbitrage est rendu** (T8.3) : `event_verb`
+ * n'a pas de verbe qui dise l'effacement — `created`, `updated`,
+ * `state_changed`, `linked`, `archived`. Écrire `archived` ferait dire à la
+ * colonne « rangée » d'un geste qui efface, et le panneau prend soin de
+ * distinguer les deux avant le clic. La fiche T8.3 s'interdit un sixième verbe :
+ * **la trace qui manque ici est le prix nommé de cet interdit, pas un oubli.**
+ * Rien ne l'empêchait techniquement — `events` ne cascade pas sur `entities` —,
+ * et c'est ce qui la sépare de `deleteProject`, à qui la cascade retire jusqu'à
+ * la possibilité. C'est aussi la règle de `deletePerson`, mot pour mot.
  */
 export async function deleteEntity(
   entityId: string,
