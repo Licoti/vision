@@ -35,6 +35,23 @@ export default defineConfig({
     alias: { "@": fileURLToPath(new URL(".", import.meta.url)) },
   },
   test: {
+    /* **La garde des domaines résiduels — T8.1, 04/09/2026.**
+
+       `resolveDomainId` (`lib/auth/session.ts`) rend **le premier domaine actif
+       par nom**, et `loadCurrentSession` l'appelle sans paramètre : aucun test
+       ne peut lui en désigner un autre. Un domaine de tests qui survit à son
+       fichier fait donc tomber **tout** fichier de tests d'action dont le
+       domaine ne trie pas avant lui — 63 échecs sur 3 fichiers, relevés le
+       02/09/2026 et reproduits à l'identique par une ligne forgée.
+
+       La parade ne pouvait pas vivre dans les fichiers : sur les six fichiers
+       de tests d'action, **deux** la portaient et **quatre** ne l'avaient pas —
+       et c'est cette asymétrie même qui a produit le défaut. Elle ne pouvait pas
+       non plus tenir au seul nettoyage par fichier : un processus tué n'appelle
+       aucun `afterAll`. Elle vit donc ici, une fois, avant la première ligne de
+       tests. */
+    globalSetup: ["./vitest.global-setup.ts"],
+
     /* `app/**` s'ajoute le 17/08/2026, avec le premier fichier de tests
        d'**action serveur** du projet. La discipline du `CLAUDE.md` — « le droit
        s'éprouve par l'action, jamais par l'écran » — demandait jusque-là de

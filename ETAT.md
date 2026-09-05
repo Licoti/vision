@@ -2,16 +2,14 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 04/09/2026, session de découpage de **C8**. **Balayage fait ce jour** —
-de **744 lignes** à moins de 250 ; le « Journal des tickets » et les « Points ouverts » d'avant
-balayage sont repris **verbatim** dans `HISTORIQUE-TICKETS.md`, où l'on va quand la forme brève
-ci-dessous ne suffit pas.
+**Dernière mise à jour :** 04/09/2026, **T8.1 livré** — la suite repasse au vert, cause nommée et
+mise en défaut dans les deux sens. L'avant-balayage du découpage de C8 est dans `HISTORIQUE-TICKETS.md`.
 **Chantier en cours :** **C8 — Dette**, cinq tickets, dans `tickets-C8.md`. **C7 est en pause, pas
 clos** — T7.7 → T7.10 reprennent après C8 (décision humaine du 04/09) ; écart à `docs/05` §6 consigné
 au journal technique. **Le SSO est sorti de C8 et forme C9 avec l'administration multi-domaine.**
-**Ticket suivant : T8.1 — la suite de tests repasse au vert.** Bloquant : aucun autre ne s'ouvre
-tant qu'elle est rouge. **À vérifier par l'humain :** la base de test doit porter la `0014` —
-`ETAT.md` n'en connaissait que la `0013` au 02/09, et c'est la piste première des 63 échecs.
+**Référence du chantier, relevée par T8.1 : 1 582 tests sur 55 fichiers, `lint` et `tsc` au vert** —
+chaque ticket de C8 y compare son vert, jamais à un souvenir.
+**Ticket suivant : T8.2 — les listes et leurs décomptes.**
 
 ---
 
@@ -29,7 +27,7 @@ tant qu'elle est rouge. **À vérifier par l'humain :** la base de test doit por
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
 | C7 — Finitions | T7.1 → T7.10 | **en pause** — T7.1 → T7.6 livrés, reprise après C8 |
-| C8 — Dette | T8.1 → T8.5 | **en cours** — aucun ticket livré |
+| C8 — Dette | T8.1 → T8.5 | **en cours** — T8.1 livré |
 | C9 — SSO et administration multi-domaine | à découper | bloqué sur l'inscription Entra ID |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
 
@@ -59,6 +57,9 @@ tant qu'elle est rouge. **À vérifier par l'humain :** la base de test doit por
   d'**un référentiel sur neuf à neuf sur neuf** en deux tickets (145 tests neufs), la coquille et sa
   barre d'ancres, et les petits écrans — **19 formes de page sur 31 en défaut à 375 px** avant,
   aucune après.
+- **C8 — Dette — T8.1, 04/09.** Les **63 échecs** venaient d'un domaine de tests **résiduel**, la
+  piste « migration `0014` » étant **fausse et mesurée telle**. Son retrait seul : 1 582 / 1 582 ;
+  reposé, **les mêmes 63 nominativement**. Garde au niveau de la suite, mise en défaut.
 - **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, tous détaillés dans
   `HISTORIQUE-TICKETS.md` et `JOURNAL-TECHNIQUE.md`. Cinq portent une migration : **`0010`**
   disponibilité déduite et suppression définitive · **`0011`** une seule cible par indicateur, portée
@@ -101,14 +102,6 @@ refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le
 
 ### b. Assignés à un ticket
 
-**T8.1 — la remise au vert.** La suite est rouge : **63 échecs sur 3 fichiers** sur 1 582, relevés
-sur `HEAD` intact le 02/09 — `accompagnements/actions.test.ts`, `accompagnements/[id]/actions.test.ts`,
-`equipe/actions.test.ts` ; cause non cherchée, piste première l'état de migration de la branche de
-test · **deux fichiers de tests d'action nettoient sur `if (!f?.domainId) return`** (`accompagnements/`,
-`produits/`), la forme même d'une cascade — `equipe/` et `administration/` ont la forme à reprendre ·
-**un test de `lib/queries/activities.test.ts` est intermittent** (un échec sur six le 31/08,
-l'hypothèse d'une ligne restée archivée ayant été vérifiée et écartée).
-
 **T8.2 — les listes et leurs décomptes.** **`countProjects` et la répartition par entité ne rejouent
 pas la jointure de statut de `listProjects`** : le contrat écrit dans `overview.ts` est faux d'une
 jointure, et les deux constats d'égalité du test ne tiennent que parce qu'aucune ligne de ce genre
@@ -136,7 +129,10 @@ adresse. Elles couvrent la route, **pas le fragment** : `#projets-lies` est deve
 **`lib/auth/session.ts:10` promet encore que « C7 change de source d'identité »** — cinquième énoncé
 de la famille, la ligne 4 **citant** D37 et restant juste · **le RLS que D38 rattache au SSO** ·
 l'**écran au-dessus des domaines**, `domains.status` portant déjà `active`/`suspended` · l'**amorçage
-des référentiels d'un domaine neuf**, aujourd'hui tenu par `scripts/seed.ts`.
+des référentiels d'un domaine neuf**, aujourd'hui tenu par `scripts/seed.ts` · **le couplage que T8.1
+n'a pas pu lever** — `resolveDomainId` rend le premier domaine actif *par nom* et rien ne peut lui en
+désigner un autre, donc un test d'action dépend de l'état global de la branche ; la garde de
+`vitest.global-setup.ts` protège la suite, elle ne supprime pas la cause.
 
 **C7 est en pause : ses huit points gardent leur ticket, et leur fiche les décrit en entier.**
 **T7.7** — le **clic** de `/equipe` et le **mode enrichi de `Picker`** n'ont jamais été parcourus au
@@ -195,7 +191,11 @@ secondaire · les props d'icône de `Button` n'ont aucun appelant.
   composants inactifs · **rien en base ne retient un outil**, ses quatre clés entrantes étant `set
   null` quand les huit autres butent sur un `restrict`, son refus d'archivage vivant dans l'action
   seule (`refusalOfToolUsage`) · **la fixture est incomplète sur les ressources et les résultats** —
-  deux résultats sans lien profond, `tools.base_url` sur trois `example.com`. → **sans échéance.**
+  deux résultats sans lien profond, `tools.base_url` sur trois `example.com` · **le réseau fait
+  tomber la suite** : l'intermittent de T8.1 est **`NeonDbError: fetch failed`**, reproduit une fois
+  sur dix **sans aucun écart d'assertion**, et sur un test *voisin* de celui que le point nommait —
+  il n'appartient à aucun test, et le remède serait un réessai dans `lib/db/client.ts`.
+  → **sans échéance.**
 - **La base de développement a dérivé de la fixture, et elle est jetable** — la règle 4 protège la
   donnée métier, pas une fixture locale, et **une comparaison avant/après n'y vaut que si rien n'a
   bougé entre les deux mesures**. Pas de `db:reset`. → **outillage si besoin réel.**

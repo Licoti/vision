@@ -5986,6 +5986,115 @@ a aucune duplication constatée de cette forme, et un cliquet sans duplication n
 
 ---
 
+## T8.1 — La suite de tests repasse au vert, et la cause est nommée — 04/09/2026
+
+**Le ticket bloquant de C8** (arbitrage (c) de `tickets-C8.md`) : tant que la suite est rouge, « les
+tests passent » ne veut plus rien dire et aucun critère de validation du dépôt ne vaut. Point de
+départ : **63 échecs sur 3 fichiers sur 1 582**, relevés sur `HEAD` intact le 02/09/2026, cause
+jamais cherchée.
+
+### Le diagnostic, avant toute correction
+
+**La piste première d'`ETAT.md` était fausse, et c'est la première chose mesurée.** Le fichier
+désignait l'état de migration de la branche de test — *« `ETAT.md` n'en connaissait que la `0013`
+quand la `0014` existe »*. Lecture de `drizzle.__drizzle_migrations` sur `TEST_DATABASE_URL` :
+**15 lignes**, la dernière du **01/09/2026 16:28**. `0000` → `0014` sont appliquées. Et la piste ne
+pouvait pas tenir sans même consulter la base — `0013` et `0014` ne créent que des tables neuves
+(`product_trackings`, `tagging_plans`, `context_markers`), dont l'absence aurait fait tomber
+`produits/[id]/actions.test.ts`, qui est **au vert**.
+
+**La cause : un domaine de tests résiduel.** La branche portait **un seul domaine**, et c'était un
+résidu — `__test__actions__zhl4eg71`, `active`, créé le **02/09/2026 à 07:45:38**, soit le jour même
+du relevé des 63. Le nom est celui que forge `app/(app)/produits/[id]/actions.test.ts` ; il portait
+une fixture partielle — 3 personnes dont un `domain_manager` connectable, 3 produits, 2
+accompagnements, 5 indicateurs, 2 outils, 1 persona, 1 entité, 1 statut.
+
+`resolveDomainId` rend **le premier domaine actif par nom**, et `loadCurrentSession` l'appelle sans
+paramètre : *aucun test ne peut lui en désigner un autre*. La base est en collation **`C.UTF-8`**
+(vérifié par `pg_database`), donc en ordre d'octets. Un fichier de tests d'action dont le domaine ne
+trie pas en tête tourne contre le résidu : la couche scopée ne trouve pas la personne de sa fixture
+dans le mauvais domaine, `loadSession` rend `null`, et **le repli du stub ouvre une session sur le
+responsable de l'autre domaine** — les gestes s'exécutent avec `manageDomain`, sur des identifiants
+absents de leur domaine.
+
+L'ordre, vérifié par un `ORDER BY` réel sur la branche : `__0__test__admin__…` ·
+`__0__test__vision__…` · `__test__actions__<suffixe frais>` · **le résidu** ·
+`__test__equipe_actions__…` · `__test__journal_projets__…` · `__test__projet_actions__…`. **Les trois
+derniers sont exactement les trois fichiers rouges.** Les deux premiers portent le préfixe `__0__`
+posé le 18/08/2026 puis en T7.3 contre ce piège ; le troisième partage le préfixe du résidu et son
+suffixe aléatoire trie avant `zhl4eg71` dans 35 cas sur 36 — **il passait par chance**. Les vingt
+autres fichiers sont des tests de `lib/**`, qui scopent par `forDomain({ domainId })` et n'appellent
+jamais `resolveDomainId`.
+
+### La mise en défaut, dans les deux sens
+
+| Étape | Mesure | Résultat |
+|---|---|---|
+| 1 | `HEAD` intact, résidu en place | **63 échecs / 1 582**, 3 fichiers |
+| 2 | résidu retiré, **aucune ligne de code touchée** | **1 582 / 1 582**, 55 fichiers |
+| 3 | cause reposée par une ligne forgée | **les mêmes 63, nominativement** |
+| 4 | geste appliqué, résidu en place | garde nomme et balaie → **1 582 / 1 582** |
+| 5 | `lint --max-warnings=0` · `tsc --noEmit` | exit 0 · exit 0 |
+
+L'étape 3 a reposé un domaine `active` nommé `__test__actions__zzzzzzzz`, avec les trois personnes du
+résidu d'origine dont un `domain_manager`. La liste des noms des tests tombés aux étapes 1 et 3 est
+**identique au caractère près** — 47 + 10 + 6, dans les trois mêmes fichiers. Un vert obtenu sans
+cette contre-épreuve aurait été une disparition, pas une correction.
+
+### Le geste
+
+**`vitest.global-setup.ts`**, neuf, branché par `globalSetup` de `vitest.config.mts` : il balaie les
+domaines dont le nom commence par `__` avant la première ligne de tests, **et les nomme sur la
+sortie**. Trois propriétés le séparent d'un `db:reset`, que la fiche interdit — le balayage est
+*nominatif* et n'atteint aucun domaine réel ; il lit `TEST_DATABASE_URL` **et elle seule** ; il tourne
+*avant* l'exécution, donc il ne peut pas effacer la trace d'un défaut de celle-ci. L'ordre de
+suppression n'est pas écrit mais **retenté** — les tables se lisent au catalogue et l'on boucle
+jusqu'à ce qu'un tour ne bute plus sur une clé étrangère, *un `restrict` ne disant pas « jamais »
+mais « pas encore »*. Une liste d'ordre écrite à la main serait une liste à maintenir à chaque table
+neuve, et c'est l'oubli qui a coûté un domaine résiduel en T6.2.
+
+**Pourquoi la garde ne vit pas dans les fichiers.** Sur les six fichiers de tests d'action, **deux**
+portaient la parade et **quatre** ne l'avaient pas : c'est cette asymétrie qui a produit le défaut. Et
+la forme prescrite par la fiche — retenir `domainId` hors de la fixture — **n'aurait pas empêché ces
+63-là** : le fichier qui a laissé le résidu la portait déjà depuis T6.2. Son `afterAll` n'a pas été
+*sauté*, il n'a **jamais été appelé**, le processus ayant été tué.
+
+**Les deux `afterAll` prescrits sont repris malgré tout** — `accompagnements/actions.test.ts` et
+`produits/actions.test.ts` retiennent désormais `createdDomainId` à la ligne suivant la création du
+domaine, forme d'`equipe/` (28/08) et d'`administration/` (T7.3). `produits/actions.test.ts` figurait
+dans l'« Attendu » de la fiche sans figurer dans son « Périmètre » : l'Attendu l'emporte, le point se
+referme entier. **Plus aucun `if (!f?.domainId) return` vivant dans le dépôt.**
+
+### L'intermittent : cause trouvée, aucun test modifié
+
+Le point ouvert nommait *« sans exception, un type archivé n'est proposé à personne »*, échoué une
+fois sur six le 31/08/2026, cause inconnue. **Dix exécutions isolées du fichier, sortie verbeuse
+conservée dans un fichier** — la discipline posée le 18/08 après qu'une relance eut effacé la preuve.
+Le défaut s'est reproduit **une fois sur dix**, et la preuve le nomme :
+`NeonDbError: Error connecting to database: TypeError: fetch failed`.
+
+**Ce n'est pas une assertion en défaut, c'est le transport** : aucune des dix exécutions n'a produit
+d'écart d'assertion. Et le test tombé n'est pas celui que le point nommait mais son voisin —
+*« l'exception ne traverse pas la frontière de domaine »* : le tirage frappe qui exécute une requête
+au moment de la coupure, donc **le défaut n'appartient à aucun test**. C'est l'hypothèse notée le
+18/08/2026 et restée deux semaines sans preuve, mesurée ici. Aucun test n'est modifié : un test qui
+échoue sur `fetch failed` a raison, la base n'a pas répondu. Le remède serait un réessai dans
+`lib/db/client.ts`, du code de production que le diagnostic n'exige pas.
+
+### Écarts et interdits
+
+Aucun test supprimé, aucun `skip`, aucun `only`, aucune migration, aucun `db:reset`, aucune
+dépendance, **aucun code de production touché**. Quatre fichiers : `vitest.global-setup.ts` (neuf),
+`vitest.config.mts`, et les deux fichiers de tests d'action. **Aucun test neuf** — le vert final est
+au même nombre que la référence, 1 582, et c'est ce qu'on attendait d'un ticket qui ne corrige aucune
+règle.
+
+**Un seul écart de périmètre, et il est déclaré** : la fiche ne prévoyait pas de fichier neuf, son
+« Périmètre » nommant `vitest.config.mts` seul. La garde y est *branchée* mais elle y serait
+illisible ; le fichier séparé est la forme, pas un élargissement.
+
+---
+
 ## Instantané d'`ETAT.md` au balayage du 04/09/2026 — session de découpage de C8
 
 *(geste 1 de la session de découpage de C8. `ETAT.md` faisait **744 lignes** pour un seuil de 250 :

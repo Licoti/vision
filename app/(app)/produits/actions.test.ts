@@ -120,11 +120,27 @@ type Fixture = {
 
 let f: Fixture;
 
+/**
+ * Le domaine, retenu **dès sa création** et hors de la fixture — T8.1.
+ *
+ * Le nettoyage portait sur `f.domainId` : un `beforeAll` qui échoue **après**
+ * avoir créé son domaine laisse `f` indéfinie, l'`afterAll` se saute, et le
+ * domaine résiduel fait tomber les fichiers suivants. La garde ci-dessous
+ * n'y change rien — elle échoue *avant* que `f` soit posée, et c'est
+ * précisément le cas que ce nettoyage doit rattraper. Forme d'`equipe/` et
+ * d'`administration/actions.test.ts` (T7.3).
+ *
+ * **Ce geste ne suffit pas seul** : un processus tué n'appelle aucun
+ * `afterAll`. La garde qui couvre ce cas-là vit dans `vitest.global-setup.ts`.
+ */
+let createdDomainId: string | null = null;
+
 beforeAll(async () => {
   const domain = await superAdmin.createDomain({
     name: `__0__test__vision__${suffix}`,
     competenceCenterName: `Centre ${suffix}`,
   });
+  createdDomainId = domain.id;
   const scope = forDomain({ domainId: domain.id });
 
   /* **Le domaine courant n'est pas choisi, il est trouvé** : `resolveDomainId`
@@ -207,7 +223,7 @@ beforeAll(async () => {
 }, 180_000);
 
 afterAll(async () => {
-  if (!f?.domainId) return;
+  if (!createdDomainId) return;
   const tables = [
     projectMembers,
     projects,
@@ -217,9 +233,9 @@ afterAll(async () => {
     persons,
   ];
   for (const table of tables) {
-    await db.delete(table).where(eq(table.domainId, f.domainId));
+    await db.delete(table).where(eq(table.domainId, createdDomainId));
   }
-  await db.delete(domains).where(eq(domains.id, f.domainId));
+  await db.delete(domains).where(eq(domains.id, createdDomainId));
 });
 
 /** La colonne telle qu'elle est en base, sans passer par une lecture d'écran. */

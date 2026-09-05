@@ -107,11 +107,29 @@ type Fixture = {
 
 let f: Fixture;
 
+/**
+ * Le domaine, retenu **dès sa création** et hors de la fixture — T8.1.
+ *
+ * Le nettoyage portait sur `f.domainId` : un `beforeAll` qui échoue **après**
+ * avoir créé son domaine laisse `f` indéfinie, l'`afterAll` se saute, et le
+ * domaine résiduel fait tomber les fichiers suivants — `resolveDomainId` rendant
+ * le premier domaine actif par nom. La forme est celle d'`equipe/actions.test.ts`
+ * (28/08/2026) et d'`administration/actions.test.ts` (T7.3) : la variable est
+ * posée à la ligne d'après la création, et entre les deux rien ne peut échouer.
+ *
+ * **Ce geste ne suffit pas seul, et c'est le ticket qui l'a mesuré** : un
+ * processus tué n'appelle aucun `afterAll`, et le résidu du 02/09/2026 est né
+ * dans un fichier qui portait déjà cette forme. La garde qui couvre ce cas-là
+ * vit dans `vitest.global-setup.ts`.
+ */
+let createdDomainId: string | null = null;
+
 beforeAll(async () => {
   const domain = await superAdmin.createDomain({
     name: `__test__journal_projets__${suffix}`,
     competenceCenterName: `Centre ${suffix}`,
   });
+  createdDomainId = domain.id;
   const scope = forDomain({ domainId: domain.id });
 
   /* `persons_role_requires_access` lie les deux colonnes : un compte porte un
@@ -180,7 +198,7 @@ beforeAll(async () => {
 }, 180_000);
 
 afterAll(async () => {
-  if (!f?.domainId) return;
+  if (!createdDomainId) return;
   const tables = [
     events,
     results,
@@ -196,9 +214,9 @@ afterAll(async () => {
     persons,
   ];
   for (const table of tables) {
-    await db.delete(table).where(eq(table.domainId, f.domainId));
+    await db.delete(table).where(eq(table.domainId, createdDomainId));
   }
-  await db.delete(domains).where(eq(domains.id, f.domainId));
+  await db.delete(domains).where(eq(domains.id, createdDomainId));
 });
 
 /* ==========================================================================
