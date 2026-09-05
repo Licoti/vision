@@ -2,15 +2,15 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 05/09/2026, **T8.4 livré** — le sceau passe de **trois dossiers métier à
-six**, l'amorçage reconnaît une ligne renommée sur **huit référentiels sur neuf**, et les deux use
-cases ont enfin leurs personae.
-**Chantier en cours :** **C8 — Dette**, cinq tickets, dans `tickets-C8.md`. **C7 est en pause, pas
-clos** — T7.7 → T7.10 reprennent après C8 (décision humaine du 04/09) ; écart à `docs/05` §6 consigné
-au journal technique. **Le SSO est sorti de C8 et forme C9 avec l'administration multi-domaine.**
-**Référence du chantier, relevée par T8.1 : 1 582 tests sur 55 fichiers, `lint` et `tsc` au vert** —
-chaque ticket y compare son vert, jamais à un souvenir. **T8.2 : 1 589 · T8.3 et T8.4 : 1 646, sur
-55.** **Ticket suivant : T8.5 — les adresses de `/projets`.**
+**Dernière mise à jour :** 05/09/2026, **T8.5 livré** — les deux redirections de `/projets` reçoivent
+leur **condition de retrait, datée**, et la mise en défaut a montré que **la première est
+redondante** : la seconde couvre déjà `/projets`, contre ce que la fiche affirmait.
+**Chantier en cours :** aucun — **C8 est clos** (T8.1 → T8.5, `tickets-C8.md`). **C7 reprend là où il
+s'était arrêté**, T7.7 → T7.10 dans `tickets-C7.md` ; l'écart à `docs/05` §6 se referme avec cette
+reprise. **Le SSO et l'administration multi-domaine forment C9**, qui ne se découpe pas avant
+l'inscription Entra ID. **Vert de référence, relevé par T8.1 et inchangé depuis T8.3 : 1 646 tests
+sur 55 fichiers, `lint` et `tsc` au vert** — chaque ticket y compare le sien, jamais à un souvenir.
+**Ticket suivant : T7.7 — accessibilité.**
 
 ---
 
@@ -27,8 +27,8 @@ chaque ticket y compare son vert, jamais à un souvenir. **T8.2 : 1 589 · T8.3 
 | TD — Dette technique et couche de présentation | TD.1 → TD.6 | **terminé** |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
-| C7 — Finitions | T7.1 → T7.10 | **en pause** — T7.1 → T7.6 livrés, reprise après C8 |
-| C8 — Dette | T8.1 → T8.5 | **en cours** — T8.1 → T8.4 livrés |
+| C7 — Finitions | T7.1 → T7.10 | **reprend** — T7.1 → T7.6 livrés, T7.7 → T7.10 à faire |
+| C8 — Dette | T8.1 → T8.5 | **terminé** |
 | C9 — SSO et administration multi-domaine | à découper | bloqué sur l'inscription Entra ID |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
 
@@ -58,23 +58,12 @@ chaque ticket y compare son vert, jamais à un souvenir. **T8.2 : 1 589 · T8.3 
   d'**un référentiel sur neuf à neuf sur neuf** en deux tickets (145 tests neufs), la coquille et sa
   barre d'ancres, et les petits écrans — **19 formes de page sur 31 en défaut à 375 px** avant,
   aucune après.
-- **C8 — Dette — T8.1, 04/09.** Les **63 échecs** venaient d'un domaine de tests **résiduel**, la
-  piste « migration `0014` » étant **fausse et mesurée telle**. Son retrait seul : 1 582 / 1 582 ;
-  reposé, **les mêmes 63 nominativement**. Garde au niveau de la suite, mise en défaut.
-- **C8 — Dette — T8.2, 05/09.** *« Chaque décompte rejoue les jointures de sa liste »* était **faux
-  d'une jointure** sur trois lectures : les constats d'égalité passaient faute de cas, et une ligne
-  forgée — projet du domaine, **statut d'un autre** — les a fait tomber avant qu'on les croie. Plus
-  les deux colonnes de `docs/06` §4 et le décompte de `/produits`. **Sept chutes isolées.**
-- **C8 — Dette — T8.3, 05/09.** *« Onze objets »* était un compte **périmé** : dix reçoivent leur
-  `event_target_type` (migration `0015`, six → **seize**), le onzième — supprimer un accompagnement —
-  ne le peut pas. **Vingt-sept appels à `record()`**, cinq verbes réemployés, une cinquième forme de
-  phrase pour la North Star. **Quatre familles hors liste**, intactes, fixées par des tests qui
-  tomberont. **Dix chutes isolées.**
-- **C8 — Dette — T8.4, 05/09.** *« Six clés »* était **périmé** deux fois : neuf référentiels se
-  renomment depuis T7.3/T7.4, et *« refermé pour les entités »* nommait une destination, pas un
-  comportement. Le sceau passe de **trois dossiers métier à six**. `ensureAll` reconnaît en trois
-  temps — clé, **ancre de position**, ancien libellé —, **huit référentiels sur neuf** ne recréent
-  plus, `tools` restant le résidu **mesuré 8 → 9**. **Huit chutes isolées**, plus deux personae.
+- **C8 — Dette — T8.1 → T8.5, 04-05/09.** Le premier chantier que `docs/05` §5 n'a pas écrit, tiré
+  des seuls points ouverts — et **quatre énoncés de fiche sur cinq y ont été mis en défaut** : les 63
+  échecs venaient d'un domaine de tests **résiduel** · le contrat de décompte était faux d'une
+  jointure · « onze objets » était périmé (dix `event_target_type`, migration `0015`, vingt-sept
+  `record()`) · « six clés » aussi (sceau à six dossiers, huit référentiels sur neuf) · et `/projets`
+  reçoit une condition de retrait **datée**, sa première règle mesurée **redondante**. 1 582 → 1 646.
 - **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, tous détaillés dans
   `HISTORIQUE-TICKETS.md` et `JOURNAL-TECHNIQUE.md`. Cinq portent une migration : **`0010`**
   disponibilité déduite et suppression définitive · **`0011`** une seule cible par indicateur, portée
@@ -117,11 +106,6 @@ refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le
 
 ### b. Assignés à un ticket
 
-**T8.5 — les adresses.** **Deux redirections 308 tiennent `/projets` en vie** dans `next.config.ts`,
-**sans condition de retrait**, et rien ne dira le jour où plus personne ne détient d'ancienne
-adresse. Elles couvrent la route, **pas le fragment** : `#projets-lies` est devenu
-`#accompagnements-lies` sans filet, le bloc étant masqué depuis le 28/08.
-
 **C9 — le SSO et l'administration multi-domaine** (sous la condition du groupe a).
 **`lib/auth/session.ts:10` promet encore que « C7 change de source d'identité »** — cinquième énoncé
 de la famille, la ligne 4 **citant** D37 et restant juste · **le RLS que D38 rattache au SSO** ·
@@ -131,7 +115,7 @@ n'a pas pu lever** — `resolveDomainId` rend le premier domaine actif *par nom*
 désigner un autre, donc un test d'action dépend de l'état global de la branche ; la garde de
 `vitest.global-setup.ts` protège la suite, elle ne supprime pas la cause.
 
-**C7 est en pause : ses huit points gardent leur ticket, et leur fiche les décrit en entier.**
+**C7 reprend : ses huit points gardent leur ticket, et leur fiche les décrit en entier.**
 **T7.7** — le **clic** de `/equipe` et le **mode enrichi de `Picker`** n'ont jamais été parcourus au
 navigateur · la cible de clic d'un repère fait **24 px**, sous les 44 px d'usage tactile · la frise
 du produit défile dans son conteneur, **et ce conteneur n'est pas atteignable au clavier** · la

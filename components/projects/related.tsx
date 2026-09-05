@@ -45,6 +45,15 @@
  * `listDeclaredLinks`, le panneau `?lien=` et les trois actions d'écriture
  * restent entiers et testés. Un fichier sans appelant est un fichier qu'on
  * relit un jour sans savoir pourquoi ; celui-ci le dit ici.
+ *
+ * **L'ancre s'appelait `projets-lies` jusqu'au 02/09/2026**, et le renommage du
+ * vocabulaire l'a faite `accompagnements-lies`. **Un 308 porte la route, jamais
+ * le fragment** — un `#` ne quitte pas le navigateur —, et les deux
+ * redirections de `next.config.ts` ne rattrapent donc pas un lien profond posé
+ * vers l'ancien nom. **Rien n'est ajouté pour cela** (T8.5) : ce bloc n'ayant
+ * aucun appelant, aucun des deux noms ne vise quoi que ce soit aujourd'hui, et
+ * une ancre de compatibilité posée ici ne se mesurerait dans aucun HTML servi.
+ * La question redevient posée le jour où le bloc revient.
  */
 
 import type { ReactNode } from "react";

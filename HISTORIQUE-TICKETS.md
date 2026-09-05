@@ -6478,6 +6478,146 @@ ligne. Référence inchangée : le ticket ne touche aucun fichier que la suite c
 
 ---
 
+## T8.5 — Les adresses de `/projets` : une condition de retrait, et une redirection de trop — 05/09/2026
+
+**Le point ouvert qu'il referme**, tel qu'`ETAT.md` le portait : *« Deux redirections 308 tiennent
+`/projets` en vie dans `next.config.ts`, sans condition de retrait, et rien ne dira le jour où plus
+personne ne détient d'ancienne adresse. Elles couvrent la route, pas le fragment : `#projets-lies`
+est devenu `#accompagnements-lies` sans filet, le bloc étant masqué depuis le 28/08. »*
+
+**Le ticket est un arbitrage avant d'être du code, et il ne change pas une ligne de comportement** :
+les deux règles restent, mot pour mot. Ce qui change est ce que le fichier dit d'elles.
+
+### Le critère, mesuré en HTTP — la fiche déroge à la discipline 1, et le dit
+
+Six mesures sur `next dev`, avec un UUID d'accompagnement et un `statut` **réels**, tirés du HTML
+servi par la base de développement :
+
+| Adresse | Code | `location` | Destination suivie |
+|---|---|---|---|
+| `/projets` | **308** | `/accompagnements` | 200, **1 saut** |
+| `/projets/42c4ca16-5b25-4688-a311-a7b46363f673` | **308** | `/accompagnements/42c4ca16-…` | 200, **1 saut** |
+| `/projets?statut=33ad70c2-af97-40db-a7a0-34cc20f4176f` | **308** | `/accompagnements?statut=33ad70c2-…` | 200, **1 saut** |
+
+**Le suivi comptait autant que le code.** Une chaîne de deux redirections aurait rendu le même 308 en
+tête ; c'est `num_redirects=1` qui prouve qu'il n'y en a pas. Et la phrase que le commentaire portait
+depuis le 02/09 — *« Next reporte la chaîne de requête de lui-même »* — n'avait été mesurée qu'une
+fois : elle l'est de nouveau, avec sa date.
+
+### La mise en défaut a renversé la moitié de l'énoncé de la fiche
+
+La fiche pose : *« la première ne couvre pas `/projets/<uuid>`, et la seconde ne couvre pas
+`/projets` ».* **La seconde moitié est fausse, et c'est mesuré.**
+
+**Chaque écriture de configuration a été accompagnée d'un changement observable sur une autre
+adresse**, faute de quoi rien ne prouve que le serveur a relu le fichier — un serveur qui n'a pas
+rechargé rend exactement les mêmes en-têtes qu'une règle intacte, et la mesure décisive prédisait
+justement *aucun changement*. Quatre états, dans cet ordre, chacun attendu par scrutation :
+
+| État de `next.config.ts` | `/projets` | `/projets/<uuid>` |
+|---|---|---|
+| Les deux règles | 308 → `/accompagnements` | 308 → `/accompagnements/<uuid>` |
+| **Règle 2 neutralisée** | 308 → `/accompagnements` | **404** |
+| Les deux neutralisées | **404** | **404** |
+| **Règle 1 neutralisée** | **308 → `/accompagnements`, 1 saut, 200** | 308 → `/accompagnements/<uuid>` |
+
+La dernière ligne est la mesure décisive : **`/projets/:path*` accepte `/projets` nu**. Dans le motif
+compilé par le `path-to-regexp` embarqué de Next 16.3.0 —
+`/^\/projets(?:\/((?:[^\/#\?]+?)(?:\/(?:[^\/#\?]+?))*))?[\/#\?]?$/i` — le groupe qui porte la barre
+oblique est **optionnel**, et `compile('/accompagnements/:path*')({})` rend exactement
+`"/accompagnements"`, sans barre finale. Le filtre passe de la même façon sous la seule seconde
+règle : `/projets?statut=…` rend `location: /accompagnements?statut=…`.
+
+L'avant-dernière ligne montre que **rien d'autre que ces deux règles ne tient `/projets` en vie** :
+les deux retirées, les deux adresses rendent 404. C'est la contre-épreuve de l'option « elles
+tombent », mesurée sans l'avoir choisie.
+
+**Quatrième énoncé de fiche mis en défaut en cinq tickets** — après la piste de la migration `0014`
+en T8.1, le contrat de jointure en T8.2, les « onze objets » en T8.3 et les « six clés » en T8.4.
+
+### Ce qui est écrit, et ce qui ne l'est pas
+
+**Les deux règles restent, et le commentaire porte quatre choses qu'il n'avait pas** : la date de
+naissance des règles et la population qu'elles servent · **la condition de retrait — après le
+02/03/2027** · la redondance mesurée de la première règle et la raison de la garder quand même · ce
+que les 308 ne couvrent pas.
+
+**La condition est une date et non un fait observable, et c'est un choix par défaut assumé.** Le
+point appelait *« une date, ou un fait observable »* ; le fait observable naturel — plus aucune
+requête sur `/projets` — suppose des journaux qu'on puisse lire, et **le dépôt ne nomme aucune URL
+servie** : `netlify.toml` existe, ni le `README` ni le code ne désignent de déploiement. Remplacer
+une dette sans signal par une dette au signal inaccessible n'aurait rien refermé. Six mois après le
+renommage, donc — les seules adresses en `/projets` qui aient pu circuler l'ont été entre le
+11/08/2026, premier commit du dépôt, et le 02/09/2026.
+
+**La première règle est redondante et elle reste, parce que sa redondance dépend d'une version.** La
+sémantique du répéteur a changé d'une majeure de `path-to-regexp` à l'autre ; l'énoncé littéral
+`/projets → /accompagnements` ne dépend de rien. Une redondance **écrite et mesurée** n'est plus une
+duplication silencieuse — et le jour où les règles tombent, elles tombent ensemble.
+
+**Le fragment se dit, il ne se rattrape pas.** `#projets-lies` est le **seul** `id` que le renommage
+a déplacé : `demarrage`, `activites`, `ressources` et `indicateurs` sont intacts. Le bloc
+« Accompagnements liés » n'ayant aucun appelant depuis le 28/08/2026, **aucun des deux noms ne vise
+quoi que ce soit aujourd'hui** — une ancre de compatibilité posée dans `related.tsx` ne se serait
+mesurée dans aucun HTML servi, ce qui est l'inverse de la discipline 1. Deux paragraphes de
+commentaire à la place : un dans `next.config.ts`, un dans `related.tsx`, à l'endroit même où le
+fichier raconte déjà son absence d'appelant.
+
+**Aucun test n'est ajouté.** Un test qui importerait `next.config.ts` vérifierait le **code de
+configuration**, ce que la fiche interdit nommément — le critère est une mesure HTTP, et il a été
+rejoué sur la configuration livrée après une bascule aller-retour qui prouve que le serveur tournait
+bien sur elle. **Aucune troisième redirection, aucun élargissement à d'autres anciennes adresses,
+aucun `id` touché, aucune réouverture de D35.**
+
+### Le vert, comparé à la référence de T8.1
+
+**1 646 tests sur 55 fichiers**, `npm run lint` (`--max-warnings=0`) et `npx tsc --noEmit` sans une
+ligne. Référence inchangée, et attendue telle : les deux fichiers touchés ne portent que du
+commentaire, et ni `next.config.ts` ni `components/**` n'entrent dans l'`include` de Vitest.
+
+---
+
+## Repli de C8 dans `ETAT.md` — 05/09/2026
+
+*(le geste de clôture d'un chantier, appliqué à la fin de T8.5 : `ETAT.md` passait le seuil de 250
+lignes — **265** — et ses cinq lignes de ticket se replient en une ligne de chantier clos. Elles sont
+reprises ici **verbatim**, avec le point ouvert que T8.5 referme. Le fichier revient à **249
+lignes**. C'est un balayage fait hors session de découpage, consigné au journal technique.)*
+
+### Les cinq lignes du journal des tickets, verbatim au 05/09/2026
+
+- **C8 — Dette — T8.1, 04/09.** Les **63 échecs** venaient d'un domaine de tests **résiduel**, la
+  piste « migration `0014` » étant **fausse et mesurée telle**. Son retrait seul : 1 582 / 1 582 ;
+  reposé, **les mêmes 63 nominativement**. Garde au niveau de la suite, mise en défaut.
+- **C8 — Dette — T8.2, 05/09.** *« Chaque décompte rejoue les jointures de sa liste »* était **faux
+  d'une jointure** sur trois lectures : les constats d'égalité passaient faute de cas, et une ligne
+  forgée — projet du domaine, **statut d'un autre** — les a fait tomber avant qu'on les croie. Plus
+  les deux colonnes de `docs/06` §4 et le décompte de `/produits`. **Sept chutes isolées.**
+- **C8 — Dette — T8.3, 05/09.** *« Onze objets »* était un compte **périmé** : dix reçoivent leur
+  `event_target_type` (migration `0015`, six → **seize**), le onzième — supprimer un accompagnement —
+  ne le peut pas. **Vingt-sept appels à `record()`**, cinq verbes réemployés, une cinquième forme de
+  phrase pour la North Star. **Quatre familles hors liste**, intactes, fixées par des tests qui
+  tomberont. **Dix chutes isolées.**
+- **C8 — Dette — T8.4, 05/09.** *« Six clés »* était **périmé** deux fois : neuf référentiels se
+  renomment depuis T7.3/T7.4, et *« refermé pour les entités »* nommait une destination, pas un
+  comportement. Le sceau passe de **trois dossiers métier à six**. `ensureAll` reconnaît en trois
+  temps — clé, **ancre de position**, ancien libellé —, **huit référentiels sur neuf** ne recréent
+  plus, `tools` restant le résidu **mesuré 8 → 9**. **Huit chutes isolées**, plus deux personae.
+- **C8 — Dette — T8.5, 05/09.** Les deux 308 de `/projets` reçoivent leur **condition de retrait —
+  après le 02/03/2027**, une date faute de journaux lisibles. La mise en défaut a renversé la fiche :
+  **`/projets/:path*` accepte `/projets` nu**, la première règle est donc **redondante**, gardée
+  parce que sa redondance tient à une version du moteur de motifs. Le fragment se dit, il ne se
+  rattrape pas. **Six mesures, quatre états de configuration.**
+
+### Le point refermé, verbatim
+
+**T8.5 — les adresses.** **Deux redirections 308 tiennent `/projets` en vie** dans `next.config.ts`,
+**sans condition de retrait**, et rien ne dira le jour où plus personne ne détient d'ancienne
+adresse. Elles couvrent la route, **pas le fragment** : `#projets-lies` est devenu
+`#accompagnements-lies` sans filet, le bloc étant masqué depuis le 28/08.
+
+---
+
 ## Instantané d'`ETAT.md` au balayage du 04/09/2026 — session de découpage de C8
 
 *(geste 1 de la session de découpage de C8. `ETAT.md` faisait **744 lignes** pour un seuil de 250 :

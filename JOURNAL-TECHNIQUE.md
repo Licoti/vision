@@ -10231,3 +10231,74 @@ L'en-tête de `scripts/seed.ts` pose *« deux sources, et pas une de plus »*. L
 viennent d'aucune : le brief §7 ne les connaît pas. Ils rejoignent les présentations et les
 compétences (17/08), les use cases (19/08) et la quatrième piste de démarrage (20/08). Signalé avant
 écriture, jamais découvert après.
+
+---
+
+## T8.5 — Une redirection de trop, une date faute de signal, et un balayage hors découpage (05/09/2026)
+
+### `/projets/:path*` accepte `/projets` nu : la fiche disait le contraire
+
+La fiche T8.5 écrit, dans sa mise en défaut : *« la première ne couvre pas `/projets/<uuid>`, et la
+seconde ne couvre pas `/projets` ».* La première moitié tient — mesurée, 404. **La seconde est
+fausse.** Le motif compilé par le `path-to-regexp` embarqué de Next 16.3.0 est
+`/^\/projets(?:\/((?:[^\/#\?]+?)(?:\/(?:[^\/#\?]+?))*))?[\/#\?]?$/i` : **le groupe qui porte la barre
+oblique est optionnel**, donc `/projets` entre. Et la destination se compile sans barre finale —
+`compile('/accompagnements/:path*')({})` rend `"/accompagnements"`. Mesuré en HTTP, la première règle
+neutralisée : `/projets` rend toujours **308 → `/accompagnements`**, un seul saut, destination 200.
+
+**La première règle est donc redondante, et elle reste** — c'est l'arbitrage tranché. La raison n'est
+pas la prudence : c'est que la couverture de `/projets` par la seconde règle **dépend de la
+sémantique du répéteur**, que `path-to-regexp` a déjà changée d'une majeure à l'autre. Le dépôt
+épingle `next 16.3.0` ; une montée de version transformerait une redondance silencieuse en 404
+silencieux. Un énoncé littéral ne dépend d'aucune version. **Ce qui rendait la duplication mauvaise
+n'était pas qu'elle existe, c'est qu'elle n'était pas dite** — elle l'est maintenant, avec sa mesure
+et sa date.
+
+**C'est le quatrième énoncé de fiche mis en défaut en cinq tickets de C8**, après la piste `0014` de
+T8.1, le contrat de jointure de T8.2, les « onze objets » de T8.3 et les « six clés » de T8.4. La
+constante n'est pas que les fiches soient mal écrites : c'est qu'**une fiche de découpage vieillit de
+tout ce qui se fait entre son écriture et son exécution**, et qu'aucun de ces cinq énoncés n'aurait
+été démenti sans une mesure.
+
+### Mettre en défaut une règle dont on prédit qu'elle ne change rien
+
+Le piège est propre à ce ticket, et il vaut pour toute vérification par neutralisation. **La mesure
+décisive prédisait *aucun changement*** : la première règle retirée, `/projets` devait rendre le même
+308 vers la même adresse. Or **un serveur qui n'a pas rechargé sa configuration rend exactement ces
+en-têtes-là.** Le résultat attendu et le résultat d'un outil qui n'a pas fait son travail sont
+indiscernables — c'est la leçon de T7.5 sur la sonde qui répond « absent » quand c'est elle qui ne
+sait pas lire, reprise d'un autre bord.
+
+La parade a été d'**ordonner les quatre états pour que chaque écriture de configuration change une
+autre adresse**, observable par scrutation avant toute mesure : règle 2 retirée → le chemin profond
+passe à 404 ; les deux retirées → `/projets` passe à 404 ; règle 2 remise, règle 1 toujours retirée →
+le chemin profond revient à 308, **et c'est ce retour qui prouve le rechargement au moment où l'on
+mesure `/projets`**. La configuration livrée a reçu le même traitement : une bascule aller-retour de
+la seconde règle avant de rejouer les six mesures du critère, puis un `diff` avec la version livrée.
+
+### La condition de retrait est une date, et c'est un choix par défaut
+
+Le point ouvert appelait *« une date, ou un fait observable »*. Le fait observable naturel — plus
+aucune requête sur `/projets` — suppose des journaux serveur qu'on puisse lire, et **le dépôt ne
+nomme aucun déploiement** : `netlify.toml` existe, mais ni le `README` ni le code ne désignent d'URL
+servie. Poser cette condition aurait remplacé une dette **sans signal** par une dette au **signal
+inaccessible**, ce qui ne referme rien.
+
+La date retenue est le **02/03/2027**, six mois après le renommage, et sa raison est écrite dans le
+commentaire : la population servie est bornée — les seules adresses en `/projets` qui aient pu
+circuler l'ont été entre le 11/08/2026, premier commit, et le 02/09/2026. **Ce n'est pas la meilleure
+forme de condition, c'est la seule qui soit vérifiable sans outillage aujourd'hui.** Le jour où un
+déploiement existe et que ses journaux se lisent, la date peut céder la place au fait.
+
+### `ETAT.md` a été balayé hors session de découpage, et le seuil l'imposait
+
+`ETAT.md` faisait **265 lignes** à l'ouverture du ticket, pour un seuil de 250 posé par l'étape 5 du
+protocole — *« au-delà, le balayer avant de continuer »*. La section « Session de découpage » écrit
+par ailleurs que le découpage *« est le seul moment où `ETAT.md` se balaie »*. **Les deux règles se
+contredisent dès que le seuil est franchi entre deux découpages**, et c'est exactement ce qui est
+arrivé : T8.5 clôt C8, et aucune session de découpage n'est programmée — C7 reprend par un ticket.
+
+Le geste retenu est le plus étroit qui referme le seuil : les **cinq lignes de ticket de C8 repliées
+en une ligne de chantier clos**, verbatim dans `HISTORIQUE-TICKETS.md`, et le point refermé sorti au
+même endroit. Rien d'autre n'a été touché. **249 lignes** après. C'est un écart au texte de la
+section « Session de découpage », assumé au profit du seuil, qui est le seul des deux à se contrôler.
