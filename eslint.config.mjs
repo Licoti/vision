@@ -264,14 +264,29 @@ const uiLayerSeal = {
             message:
               "Le socle ne lit pas la base : une requête ne s'importe ici qu'en `import type` (TD.6).",
           },
+          /* **Les six dossiers métier, nommés un par un** (T8.4). La clause en
+             portait trois, et `shell/`, `overview/` et `admin/` étaient hors du
+             sceau — trois dossiers que le socle pouvait importer sans qu'ESLint
+             bronche, quand la règle affirmait l'inverse.
+
+             **Ce qu'elle ne garde pas** : un **septième dossier créé demain
+             échappera**, faute d'y être écrit. C'est le défaut de forme même qui
+             a rendu ce ticket nécessaire — une garde qui désigne une liste
+             plutôt qu'une propriété vieillit à chaque dossier. La clause
+             auto-portante (`["@/components/*", "!@/components/ui/*"]`) la
+             refermerait ; elle **remplacerait** le sceau au lieu de l'étendre,
+             ce que la fiche de T8.4 interdit. Le résidu est au journal. */
           {
             group: [
+              "@/components/admin/*",
+              "@/components/overview/*",
               "@/components/products/*",
               "@/components/projects/*",
+              "@/components/shell/*",
               "@/components/team/*",
             ],
             message:
-              "Le socle ne connaît aucun composant métier : la dépendance va du métier vers `components/ui/`, jamais l'inverse (TD.6).",
+              "Le socle ne connaît aucun composant métier : la dépendance va du métier vers `components/ui/`, jamais l'inverse (TD.6, élargi T8.4).",
           },
           {
             group: ["@/app/*"],

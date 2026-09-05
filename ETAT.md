@@ -2,14 +2,15 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 05/09/2026, **T8.3 livré** — l'énuméré du journal passe de **six à
-seize**, vingt-sept points d'appel, et **dix chutes isolées** à la mise en défaut.
+**Dernière mise à jour :** 05/09/2026, **T8.4 livré** — le sceau passe de **trois dossiers métier à
+six**, l'amorçage reconnaît une ligne renommée sur **huit référentiels sur neuf**, et les deux use
+cases ont enfin leurs personae.
 **Chantier en cours :** **C8 — Dette**, cinq tickets, dans `tickets-C8.md`. **C7 est en pause, pas
 clos** — T7.7 → T7.10 reprennent après C8 (décision humaine du 04/09) ; écart à `docs/05` §6 consigné
 au journal technique. **Le SSO est sorti de C8 et forme C9 avec l'administration multi-domaine.**
 **Référence du chantier, relevée par T8.1 : 1 582 tests sur 55 fichiers, `lint` et `tsc` au vert** —
-chaque ticket y compare son vert, jamais à un souvenir. **T8.2 : 1 589 · T8.3 : 1 646, sur 55.**
-**Ticket suivant : T8.4 — les garde-fous du dépôt.**
+chaque ticket y compare son vert, jamais à un souvenir. **T8.2 : 1 589 · T8.3 et T8.4 : 1 646, sur
+55.** **Ticket suivant : T8.5 — les adresses de `/projets`.**
 
 ---
 
@@ -27,7 +28,7 @@ chaque ticket y compare son vert, jamais à un souvenir. **T8.2 : 1 589 · T8.3 
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
 | C7 — Finitions | T7.1 → T7.10 | **en pause** — T7.1 → T7.6 livrés, reprise après C8 |
-| C8 — Dette | T8.1 → T8.5 | **en cours** — T8.1 → T8.3 livrés |
+| C8 — Dette | T8.1 → T8.5 | **en cours** — T8.1 → T8.4 livrés |
 | C9 — SSO et administration multi-domaine | à découper | bloqué sur l'inscription Entra ID |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
 
@@ -69,6 +70,11 @@ chaque ticket y compare son vert, jamais à un souvenir. **T8.2 : 1 589 · T8.3 
   ne le peut pas. **Vingt-sept appels à `record()`**, cinq verbes réemployés, une cinquième forme de
   phrase pour la North Star. **Quatre familles hors liste**, intactes, fixées par des tests qui
   tomberont. **Dix chutes isolées.**
+- **C8 — Dette — T8.4, 05/09.** *« Six clés »* était **périmé** deux fois : neuf référentiels se
+  renomment depuis T7.3/T7.4, et *« refermé pour les entités »* nommait une destination, pas un
+  comportement. Le sceau passe de **trois dossiers métier à six**. `ensureAll` reconnaît en trois
+  temps — clé, **ancre de position**, ancien libellé —, **huit référentiels sur neuf** ne recréent
+  plus, `tools` restant le résidu **mesuré 8 → 9**. **Huit chutes isolées**, plus deux personae.
 - **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, tous détaillés dans
   `HISTORIQUE-TICKETS.md` et `JOURNAL-TECHNIQUE.md`. Cinq portent une migration : **`0010`**
   disponibilité déduite et suppression définitive · **`0011`** une seule cible par indicateur, portée
@@ -111,11 +117,6 @@ refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le
 
 ### b. Assignés à un ticket
 
-**T8.4 — les garde-fous du dépôt.** **`uiLayerSeal` ne scelle ni `shell/`, ni `overview/`, ni
-`admin/`**, et la destination « au prochain qui l'ouvre » a **déjà échoué** le 29/08 · **l'amorçage
-rapproche par clé naturelle, donc un renommage recrée — et c'est arrivé** ; refermé pour les entités
-seules, six clés restent · **les deux use cases de la fixture n'ont aucun persona rattaché**.
-
 **T8.5 — les adresses.** **Deux redirections 308 tiennent `/projets` en vie** dans `next.config.ts`,
 **sans condition de retrait**, et rien ne dira le jour où plus personne ne détient d'ancienne
 adresse. Elles couvrent la route, **pas le fragment** : `#projets-lies` est devenu
@@ -154,7 +155,9 @@ d'`accompagnements/[id]/` niait · la **compétence portée** · les **huit réf
 l'entité, trente-deux gestes. Chacune est **fixée par un test qui tombera**. L'énuméré et
 `lib/journal.ts` sont prêts ; il manque un ticket. → **prochaine session de découpage.**
 
-**Au prochain ticket qui ouvre le fichier** — **destination qui a déjà échoué une fois** (fiche T8.4).
+**Au prochain ticket qui ouvre le fichier** — **destination qui a déjà échoué une fois**, et T8.4 a dû
+recevoir un ticket pour ce seul motif. **`uiLayerSeal` garde une liste de six dossiers, pas une
+propriété** : un septième lui échappera (`eslint.config.mjs`) ·
 **`listProductsWithCounts` ne rejoue pas la jointure de statut** (`lib/queries/products.ts`) : sa
 colonne « Accompagnements » compte `projects.id` sans confronter le statut au domaine — **le
 quatrième décompte de la famille**, trouvé par la ligne forgée de T8.2 et laissé intact, son fichier
@@ -203,6 +206,11 @@ secondaire · les props d'icône de `Button` n'ont aucun appelant.
   sur dix **sans aucun écart d'assertion**, et sur un test *voisin* de celui que le point nommait —
   il n'appartient à aucun test, et le remède serait un réessai dans `lib/db/client.ts`.
   → **sans échéance.**
+- **Un référentiel sur neuf reste ouvert au renommage, et c'est structurel.** T8.4 reconnaît une
+  ligne par sa `position` — **huit refermés, mesurés** —, mais `tools` n'a pas d'ordinal : **mesuré
+  8 → 9**, comme les sept tables hors référentiel. Refermer demande une colonne, donc une migration.
+  **L'orpheline « Audit d'accessibilité » reste** — le rapprochement corrige, il n'efface pas — et
+  **`ensureAll` n'a aucun test**. → **le jour où une colonne s'autorise.**
 - **La base de développement a dérivé de la fixture, et elle est jetable** — la règle 4 protège la
   donnée métier, pas une fixture locale, et **une comparaison avant/après n'y vaut que si rien n'a
   bougé entre les deux mesures**. Pas de `db:reset`. → **outillage si besoin réel.**

@@ -6382,6 +6382,102 @@ harnais travaille désormais sur une **copie de sauvegarde hors dépôt**. Consi
 
 ---
 
+## T8.4 — Les garde-fous du dépôt : le sceau, et l'amorçage qui recrée — 05/09/2026
+
+**Le point ouvert qu'il referme**, tel qu'`ETAT.md` le portait : *« `uiLayerSeal` ne scelle ni
+`shell/`, ni `overview/`, ni `admin/`, et la destination « au prochain qui l'ouvre » a déjà échoué le
+29/08 · l'amorçage rapproche par clé naturelle, donc un renommage recrée — et c'est arrivé ; refermé
+pour les entités seules, six clés restent · les deux use cases de la fixture n'ont aucun persona
+rattaché. »*
+
+### Le compte de la fiche était périmé, et la vérification l'a établi avant l'écriture
+
+Le « six » remonte au 21/08/2026, quand seules les entités avaient un écran. **T7.3 et T7.4 ont porté
+l'administration à neuf référentiels sur neuf** : il y en a donc neuf renommables. Et « refermé pour
+les entités » nommait une destination atteinte, pas un comportement — un écran de renommage n'a
+jamais refermé le défaut, il l'expose. La mesure a tranché : `entities` recrée un doublon comme les
+sept autres. Troisième compte faux du chantier, après les « onze objets » de T8.3 et le contrat de
+jointure de T8.2.
+
+### Geste 1 — le sceau passe de trois dossiers métier à six
+
+`uiLayerSeal` affirmait que *« la dépendance va du métier vers `components/ui/`, jamais l'inverse »*
+en ne nommant que `products/`, `projects/` et `team/`. `shell/`, `overview/` et `admin/` sont entrés
+dans la clause existante ; les deux autres clauses — la couche de requêtes, les actions serveur —
+n'ont pas bougé.
+
+**Mise en défaut, dossier par dossier.** Trois imports interdits *utilisés*, un à la fois, dans un
+fichier de `components/ui/` : chacun fait échouer `npm run lint` avec **une erreur, zéro
+avertissement**, portée par `@typescript-eslint/no-restricted-imports`. Le contrôle importait : un
+import inutilisé aurait fait tomber `lint` par `no-unused-vars` sous `--max-warnings=0`, et le sceau
+n'aurait rien prouvé.
+
+### Geste 2 — l'amorçage reconnaît une ligne qu'on a renommée
+
+`ensureAll` résout désormais en trois temps : **clé naturelle**, puis **ancre** — la `position`, que
+nul renommage ne touche —, puis **anciens libellés déclarés** par la fixture. Deux gardes tiennent la
+manœuvre : une ligne déjà revendiquée par un `seed` ne peut plus l'être par un autre, et **deux
+candidates sur une même ancre n'en désignent aucune** — le script insère plutôt que de deviner. Le
+compte rendu gagne une colonne « renommé(s) » et une ligne nommant les deux libellés à chaque
+reconnaissance.
+
+**Neuf mesures en base, avant et après, une par référentiel** — renommer une ligne semée, réamorcer,
+recompter :
+
+| Référentiel | Avant → après | Verdict |
+|---|---|---|
+| `entities` · `jobs` · `skills` · `skill_levels` | 6→6 · 6→6 · 11→11 · 4→4 | aucun doublon, libellé rendu |
+| `approaches` · `project_statuses` · `activity_types` · `starters` | 7→7 · 4→4 · 25→25 · 4→4 | aucun doublon, libellé rendu |
+| `tools` | **8 → 9** | **doublon : le résidu, mesuré** |
+
+**`tools` est le seul des neuf qui reste ouvert, et c'est structurel** : la table ne porte pas de
+`position`. Le refermer demanderait une colonne, donc une migration, que l'arbitrage (a) de C8 pose
+en signal d'arrêt. La route « ancien libellé » lui donne malgré tout une reconnaissance, mesurée
+séparément : « Everyone » remis à « Audit d'accessibilité » en base est **reconnu et rendu**, 8 → 8.
+
+**Mise en défaut.** La route d'ancre neutralisée, les **huit** référentiels ancrés recréent leur
+doublon — huit chutes, et le témoin `formerKeys` de `tools` tient. Aucune cascade.
+
+**Le geste a agi sur de la dérive réelle dès la première exécution** : une entité en position 1 ne
+portait plus « Banque de détail », l'ancre l'a reconnue et rendue à la valeur du fichier. La ligne
+qui nommait l'ancien libellé a été coupée par un `tail`, et elle est perdue — consigné au journal.
+
+**Le nettoyage a mordu là où on ne l'attendait pas.** Sur `jobs`, `skills` et `skill_levels`, la base
+a refusé de supprimer, et ce n'était pas le doublon neuf qui était retenu mais **l'originale** : le
+même amorçage avait créé des liaisons vers le doublon sans retirer celles qui pointaient l'originale.
+Les liaisons mortes retirées, les orphelines sont parties et l'amorçage suivant a tout rétabli —
+`person_skills` 26, `project_jobs` 8, les neuf décomptes revenus à leur valeur d'avant mesure.
+
+### Geste 3 — les deux use cases reçoivent leurs personae
+
+Deux personae sur « Espace client web », clé `produit · nom` : un **`primary`** et un
+**`secondary`**, pour que les deux valeurs de `persona_kind` soient rendues. Cinq traits sur le
+principal, clé `persona · famille · rang` — **déjà stable**, le rang étant l'ordre de saisie. Le
+secondaire n'en porte aucun, et sert l'état normal des trois listes vides. Trois rattachements : un
+use case à un profil, l'autre à deux.
+
+**Le critère se lit dans le HTML servi** (`<script>` retirés) : le rang « Personae » rend les deux
+cartes et **une seule** mention « Principal » ; la section « Personae associés » de
+*« Démarrer, reprendre un projet »* rend un profil, celle de *« Gérer les droits d'accès »* en rend
+deux, et **l'état vide « Aucun persona rattaché » a disparu des deux**. La fiche du persona principal
+sert ses cinq traits ; celle du secondaire sert ses trois états vides. Second amorçage :
+*« Rien à faire »*.
+
+### Ce que le ticket n'a pas fait, et pourquoi
+
+**L'orpheline « Audit d'accessibilité » reste en base.** L'interdit de la fiche est net — *« le
+rapprochement corrige, il n'efface pas »* : la route neuve empêche la prochaine, elle n'efface pas
+celle d'avant. **Aucune migration, aucune dépendance, aucune règle ESLint neuve, aucun écran ni route
+neuf** (arbitrage (d) de C8). **`ensureAll` n'a pas de test** : le périmètre est de deux fichiers, et
+la preuve est la mesure — dette écrite au journal.
+
+### Le vert, comparé à la référence de T8.1
+
+**1 646 tests sur 55 fichiers**, `npm run lint` (`--max-warnings=0`) et `npx tsc --noEmit` sans une
+ligne. Référence inchangée : le ticket ne touche aucun fichier que la suite couvre.
+
+---
+
 ## Instantané d'`ETAT.md` au balayage du 04/09/2026 — session de découpage de C8
 
 *(geste 1 de la session de découpage de C8. `ETAT.md` faisait **744 lignes** pour un seuil de 250 :

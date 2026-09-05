@@ -20,10 +20,27 @@
  * `actorId` est nul : l'amorçage n'a pas de personne courante. C'est
  * exactement ce que `created_by` nullable prévoyait.
  *
- * **Rejouable.** Chaque table est rapprochée de son contenu par une clé
- * naturelle : ce qui manque est créé, ce qui a dérivé est remis à la valeur
- * du fichier, le reste est laissé tel quel. Deux exécutions successives
- * laissent la base dans le même état.
+ * **Rejouable, et ce qui reconnaît une ligne se lit ici** (T8.4). Le
+ * rapprochement va en trois temps, du plus sûr au plus faible :
+ *
+ *   1. la **clé naturelle** — un libellé, un nom, un titre ;
+ *   2. l'**ancre**, quand la table en porte une : la `position`, colonne
+ *      qu'aucun renommage ne touche. C'est elle qui fait qu'un libellé changé —
+ *      en base par l'écran d'administration, ou ici par le fichier — est
+ *      **reconnu et corrigé** au lieu d'être recréé à côté de l'ancien ;
+ *   3. les **anciens libellés déclarés** (`formerKeys`), là où le fichier sait
+ *      qu'il a renommé une de ses propres lignes.
+ *
+ * Ce qui manque ensuite est créé, ce qui a dérivé est remis à la valeur du
+ * fichier, le reste est laissé tel quel. Deux exécutions successives laissent
+ * la base dans le même état.
+ *
+ * **Le résidu, et il est mesuré.** Huit référentiels portent une `position` et
+ * sont donc refermés. **`tools` n'en porte aucune** — un renommage en base y
+ * recrée encore —, et il en va de même de `products`, `projects`, `persons`,
+ * `indicators`, `resources`, `use_cases` et `personas`. Les refermer demanderait
+ * une colonne, donc une migration, que l'arbitrage (a) de C8 pose en signal
+ * d'arrêt. Le fait est écrit dans `ETAT.md` plutôt que contourné.
  *
  *   npm run db:seed
  */
@@ -48,7 +65,11 @@ import {
   indicatorReadings,
   indicators,
   jobs,
+  personaKind,
+  personaTraitKind,
+  personaTraits,
   personSkills,
+  personas,
   persons,
   projectApproaches,
   projectIndicators,
@@ -66,6 +87,7 @@ import {
   starters,
   toolKind,
   tools,
+  useCasePersonas,
   useCases,
 } from "../lib/db/schema";
 
@@ -166,14 +188,31 @@ const STATUSES: { label: string; nature: Nature }[] = [
  * budget est en C7 (D28).
  *
  * (2) **« Audit d'accessibilité » s'appelle désormais « Everyone »**, du nom de
- * la plateforme. La clé naturelle de l'amorçage est le nom : la base de
- * développement gardera donc l'ancienne ligne à côté de la neuve, ce qu'`ETAT.md`
- * documente déjà — « l'amorçage rapproche par clé naturelle, donc un renommage
- * recrée ». Sans conséquence en production, où l'amorçage ne tourne pas.
+ * la plateforme. Le renommage a semé une ligne neuve et laissé l'ancienne
+ * orpheline en base de développement — le défaut que T8.4 referme. Il est
+ * désormais **déclaré** (`formerNames`) : le fichier dit ses propres
+ * renommages, et l'amorçage reprend la ligne au lieu d'en créer une seconde.
+ *
+ * **`tools` est le seul des neuf référentiels qui reste ouvert**, et c'est
+ * mesuré : la table ne porte **pas** de `position`, donc aucune ancre ne
+ * survivrait à un renommage fait **en base** depuis `/administration`. Les huit
+ * autres sont refermés par leur position ; celui-ci demanderait une colonne,
+ * donc une migration, que l'arbitrage (a) de C8 pose en signal d'arrêt.
  */
-const TOOLS: { name: string; kind: ToolKind; baseUrl?: string }[] = [
+const TOOLS: {
+  name: string;
+  kind: ToolKind;
+  baseUrl?: string;
+  /** Les noms portés avant celui-ci, dans ce fichier. */
+  formerNames?: string[];
+}[] = [
   { name: "Ergonome", kind: "audit", baseUrl: "https://ergonome.example.com" },
-  { name: "Everyone", kind: "audit", baseUrl: "https://everyone.example.com" },
+  {
+    name: "Everyone",
+    kind: "audit",
+    baseUrl: "https://everyone.example.com",
+    formerNames: ["Audit d'accessibilité"],
+  },
   {
     name: "Portail analytics",
     kind: "analytics",
@@ -760,6 +799,70 @@ const INDICATOR = {
 };
 
 /**
+ * Les **personae** du produit — **une quatrième source, et c'est un écart**
+ * (T8.4).
+ *
+ * L'en-tête de ce fichier pose « deux sources, et pas une de plus » : les
+ * référentiels des `docs/`, les données factices du brief §7. Le brief ne
+ * connaît aucun persona. **Ces deux lignes sont donc inventées ici**, comme les
+ * présentations et les compétences l'ont été le 17/08/2026 et la quatrième
+ * piste de démarrage le 20/08 — signalé avant écriture, jamais découvert après.
+ * L'écart est consigné dans `JOURNAL-TECHNIQUE.md` (règle 6).
+ *
+ * **Ce qui manquait n'était pas le lien, c'était le jeu d'essai.** Les deux use
+ * cases ci-dessous n'avaient aucun persona rattaché depuis le 19/08/2026 : la
+ * branche « rattaché » de la fiche d'un use case n'apparaissait dans **aucun
+ * HTML servi**, et seul son état vide se lisait. C'est la raison exacte pour
+ * laquelle la quatrième piste de démarrage a été inventée le 20/08.
+ *
+ * Deux propriétés sont **construites**, et se casseraient si on les
+ * « nettoyait » :
+ *   — les **deux valeurs** de `persona_kind` sont représentées, sans quoi la
+ *     mention « Principal » de la fiche d'un use case n'aurait rien à rendre ;
+ *   — le second persona **n'a aucun trait**, et c'est un état normal
+ *     (`listPersonaTraits` rend trois listes vides) : il fallait qu'une ligne le
+ *     serve, comme la quatrième piste sert la branche « sans lien ».
+ *
+ * `imageUrl` reste nul sur les deux : Vision ne stocke aucun fichier, et
+ * inventer une adresse d'image afficherait un lien mort comme un lien vivant —
+ * l'arbitrage rendu sur `results.external_url`. L'écran retombe sur la pastille
+ * d'initiales, ce qu'il sait faire.
+ */
+const PERSONAS: {
+  product: string;
+  name: string;
+  role: string;
+  kind: PersonaKind;
+  summary: string;
+  /** Une ligne par trait, dans l'ordre de saisie : c'est lui qui fait `position`. */
+  traits?: { kind: TraitKind; label: string }[];
+}[] = [
+  {
+    product: "Espace client web",
+    name: "Utilisateur autonome",
+    role: "Usage quotidien, sans accompagnement",
+    kind: "primary",
+    summary:
+      "Ouvre son espace de travail plusieurs fois par jour et attend de pouvoir démarrer sans demander l'aide de personne.",
+    traits: [
+      { kind: "goal", label: "Reprendre un travail en cours sans le reconfigurer" },
+      { kind: "goal", label: "Retrouver en une minute ce qui a été fait la veille" },
+      { kind: "pain", label: "Doit passer par le support pour la moindre opération inhabituelle" },
+      { kind: "pain", label: "Perd sa saisie quand la session expire" },
+      { kind: "expectation", label: "Savoir à tout moment où en est son opération" },
+    ],
+  },
+  {
+    product: "Espace client web",
+    name: "Responsable des accès",
+    role: "Ouvre et ferme les droits, côté entité",
+    kind: "secondary",
+    summary:
+      "Donne et retire les accès aux projets, et doit pouvoir le faire sans ouvrir une demande au support.",
+  },
+];
+
+/**
  * Les use cases du produit — **une troisième source, et c'est un écart**.
  *
  * L'en-tête de ce fichier pose « deux sources, et pas une de plus » : les
@@ -769,12 +872,12 @@ const INDICATOR = {
  * inventées ici, mais elles ne viennent pas d'un document non plus. L'écart est
  * consigné dans `JOURNAL-TECHNIQUE.md` (règle 6).
  *
- * **Aucun rattachement de persona**, et ce n'est pas un oubli : `personas` n'est
- * pas amorcée — la table n'apparaît nulle part dans ce fichier. Le rattachement
- * est facultatif (arbitrage du 19/08/2026), si bien que ces deux lignes sont
- * des use cases complets ; il se saisit par l'interface sur un persona créé à la
- * main. Semer des personae aurait été ouvrir le bloc voisin, hors du périmètre
- * de la demande (règle 3).
+ * **Les deux reçoivent un persona depuis T8.4.** Le rattachement reste
+ * facultatif (arbitrage du 19/08/2026) — ces deux lignes étaient des use cases
+ * complets sans lui, et le sont encore —, mais aucune des deux ne l'exerçait, si
+ * bien que la branche « rattaché » de la fiche ne se lisait dans aucun HTML
+ * servi. Voir `USE_CASE_PERSONAS` juste en dessous : l'un porte **un** profil,
+ * l'autre **deux**, et la liste se lit donc dans ses deux formes.
  */
 const USE_CASES: { product: string; title: string; summary: string }[] = [
   {
@@ -791,6 +894,41 @@ const USE_CASES: { product: string; title: string; summary: string }[] = [
   },
 ];
 
+/**
+ * Qui chaque use case sert — le rattachement que la fixture n'exerçait pas.
+ *
+ * **Un use case à un profil, l'autre à deux** : c'est ce qui rend lisibles les
+ * deux formes de la liste de la fiche, là où un jeu uniforme n'en montrerait
+ * qu'une. Aucun des deux ne reste sans rattachement, ce qui est l'objet même du
+ * point refermé ici.
+ *
+ * La table porte son unicité en base (`use_case_personas_use_case_persona_unique`)
+ * et le couple est un **identifiant**, jamais un libellé : cette clé-là ne se
+ * renomme pas, et rien ne peut la recréer.
+ */
+const USE_CASE_PERSONAS: {
+  /** Le produit, écrit ici plutôt que déduit : les deux clés en dépendent. */
+  product: string;
+  useCase: string;
+  persona: string;
+}[] = [
+  {
+    product: "Espace client web",
+    useCase: "Démarrer, reprendre un projet",
+    persona: "Utilisateur autonome",
+  },
+  {
+    product: "Espace client web",
+    useCase: "Gérer les droits d'accès",
+    persona: "Utilisateur autonome",
+  },
+  {
+    product: "Espace client web",
+    useCase: "Gérer les droits d'accès",
+    persona: "Responsable des accès",
+  },
+];
+
 /* ==========================================================================
    Types dérivés du schéma — jamais réécrits à la main
    ========================================================================== */
@@ -801,6 +939,8 @@ type StarterKind = (typeof starterKind.enumValues)[number];
 type Family = (typeof activityFamily.enumValues)[number];
 type ActivityState = (typeof activityState.enumValues)[number];
 type DomainRole = (typeof domainRole.enumValues)[number];
+type PersonaKind = (typeof personaKind.enumValues)[number];
+type TraitKind = (typeof personaTraitKind.enumValues)[number];
 
 /* ==========================================================================
    Le rapprochement
@@ -810,15 +950,36 @@ type DomainRole = (typeof domainRole.enumValues)[number];
    valeur du fichier.
    ========================================================================== */
 
-type Tally = { created: number; updated: number; unchanged: number };
+type Tally = {
+  created: number;
+  updated: number;
+  /** Reconnue par son ancre ou par un ancien libellé, donc **pas** recréée. */
+  renamed: number;
+  unchanged: number;
+};
 
 const tallies = new Map<string, Tally>();
 
 function record(table: string, outcome: keyof Tally, count = 1): void {
-  const tally = tallies.get(table) ?? { created: 0, updated: 0, unchanged: 0 };
+  const tally = tallies.get(table) ?? {
+    created: 0,
+    updated: 0,
+    renamed: 0,
+    unchanged: 0,
+  };
   tally[outcome] += count;
   tallies.set(table, tally);
 }
+
+/**
+ * Les renommages reconnus, nommés des deux côtés.
+ *
+ * **Une correction silencieuse est une correction qu'on redécouvre.** Le compte
+ * rendu dit le chiffre ; ces lignes disent *quelle* ligne a été reprise et
+ * depuis quel libellé, faute de quoi le geste de T8.4 serait invisible le jour
+ * où il agit.
+ */
+const renames: string[] = [];
 
 /**
  * Deux valeurs de colonne sont-elles la même ?
@@ -847,9 +1008,23 @@ function sameValue(left: unknown, right: unknown): boolean {
   return String(left) === String(right);
 }
 
-/** Ce que le fichier déclare pour une ligne, et la clé qui la reconnaît. */
+/** Ce que le fichier déclare pour une ligne, et ce qui la reconnaît. */
 type Seed<T extends ScopedTable> = {
+  /** La clé naturelle : le libellé, le nom, le titre. Celle qui se renomme. */
   key: string;
+  /**
+   * Ce qu'un renommage ne touche pas — la `position`, pour les huit
+   * référentiels qui en portent une. Nulle là où la table n'a rien de tel.
+   */
+  anchor?: string;
+  /**
+   * Les libellés que cette ligne a portés avant, dans le fichier.
+   *
+   * C'est la fixture qui déclare ses propres renommages : sans cela, changer un
+   * nom ici sème une ligne neuve et laisse l'ancienne orpheline — ce qui est
+   * arrivé le 20/08/2026 avec « Audit d'accessibilité » → « Everyone ».
+   */
+  formerKeys?: string[];
   values: InsertValues<T>;
 };
 
@@ -867,6 +1042,8 @@ async function ensureAll<T extends ScopedTable>(
   name: string,
   keyOfRow: (row: Row<T>) => string,
   seeds: Seed<T>[],
+  /** L'ancre d'une ligne en base. Absente : la table n'en porte pas. */
+  anchorOfRow?: (row: Row<T>) => string | null,
 ): Promise<Map<string, Row<T>>> {
   const seen = new Set<string>();
   for (const seed of seeds) {
@@ -879,31 +1056,92 @@ async function ensureAll<T extends ScopedTable>(
     seen.add(seed.key);
   }
 
+  const rows = await scope.list(table, { includeArchived: true });
   const existing = new Map<string, Row<T>>();
-  for (const row of await scope.list(table, { includeArchived: true })) {
-    existing.set(keyOfRow(row), row);
-  }
+  for (const row of rows) existing.set(keyOfRow(row), row);
 
-  const missing = seeds.filter((seed) => !existing.has(seed.key));
+  /* La reconnaissance se fait **avant toute écriture** : on résout d'abord les
+     lignes, on écrit ensuite. Une ligne déjà revendiquée par un `seed` ne peut
+     plus l'être par un autre — sans quoi deux lignes du fichier se
+     disputeraient la même ligne en base. */
+  const claimed = new Set<string>();
+  const matched = new Map<string, Row<T>>();
+  const renamedFrom = new Map<string, string>();
 
   for (const seed of seeds) {
     const row = existing.get(seed.key);
     if (!row) continue;
+    claimed.add(rowId(row));
+    matched.set(seed.key, row);
+  }
 
+  /** Une ligne que ni la fixture ni un autre `seed` ne désigne déjà. */
+  const free = (row: Row<T>): boolean =>
+    !claimed.has(rowId(row)) && !seen.has(keyOfRow(row));
+
+  for (const seed of seeds) {
+    if (matched.has(seed.key)) continue;
+
+    /* L'ancre. **Deux candidates n'en désignent aucune** : le script ne devine
+       jamais entre deux lignes, il insère et laisse la base telle quelle. */
+    let found: Row<T> | undefined;
+    if (anchorOfRow && seed.anchor !== undefined) {
+      const candidates = rows.filter(
+        (row) => free(row) && anchorOfRow(row) === seed.anchor,
+      );
+      if (candidates.length === 1) found = candidates[0];
+    }
+
+    /* Les anciens libellés, dans l'ordre déclaré. */
+    if (!found) {
+      for (const former of seed.formerKeys ?? []) {
+        const row = existing.get(former);
+        if (row && free(row)) {
+          found = row;
+          break;
+        }
+      }
+    }
+
+    if (!found) continue;
+    claimed.add(rowId(found));
+    matched.set(seed.key, found);
+    renamedFrom.set(seed.key, keyOfRow(found));
+  }
+
+  const missing = seeds.filter((seed) => !matched.has(seed.key));
+
+  for (const seed of seeds) {
+    const row = matched.get(seed.key);
+    if (!row) continue;
+
+    const former = renamedFrom.get(seed.key);
     const current = row as unknown as Record<string, unknown>;
     const wanted = seed.values as unknown as Record<string, unknown>;
     const drifted = Object.keys(wanted).filter(
       (column) => !sameValue(current[column], wanted[column]),
     );
 
-    if (drifted.length === 0) {
+    if (drifted.length === 0 && former === undefined) {
       record(name, "unchanged");
       continue;
     }
 
     const updated = await scope.update(table, rowId(row), seed.values);
-    if (updated) existing.set(seed.key, updated);
-    record(name, "updated");
+    if (updated) {
+      existing.set(seed.key, updated);
+      matched.set(seed.key, updated);
+    }
+
+    if (former === undefined) {
+      record(name, "updated");
+      continue;
+    }
+
+    /* La ligne existait sous un autre nom : elle est reprise, jamais doublée. */
+    existing.delete(former);
+    record(name, "renamed");
+    renames.push(`${name} : « ${former} » reconnu, et rendu à « ${seed.key} ».`);
   }
 
   if (missing.length > 0) {
@@ -920,6 +1158,16 @@ async function ensureAll<T extends ScopedTable>(
 
   return existing;
 }
+
+/**
+ * L'ancre d'un référentiel ordonné : sa `position`, normalisée.
+ *
+ * PostgreSQL rend un `numeric(10,2)` cadré — `"3.00"` pour un `"3"` écrit —, et
+ * comparer les deux chaînes telles quelles ne rapprocherait jamais rien. C'est
+ * la raison d'être de `sameValue` juste au-dessus, resservie ici.
+ */
+const positionAnchor = (row: { position: string }): string =>
+  String(Number(row.position));
 
 /** L'identifiant d'une ligne attendue, ou une erreur qui nomme ce qui manque. */
 function idOf<T extends ScopedTable>(
@@ -965,8 +1213,10 @@ async function seed(): Promise<void> {
     (row) => row.label,
     ENTITIES.map((label, index) => ({
       key: label,
+      anchor: positionOf(index),
       values: { label, position: positionOf(index) },
     })),
+    positionAnchor,
   );
 
   const jobIndex = await ensureAll(
@@ -976,8 +1226,10 @@ async function seed(): Promise<void> {
     (row) => row.label,
     JOBS.map((label, index) => ({
       key: label,
+      anchor: positionOf(index),
       values: { label, position: positionOf(index) },
     })),
+    positionAnchor,
   );
 
   const skillIndex = await ensureAll(
@@ -987,8 +1239,10 @@ async function seed(): Promise<void> {
     (row) => row.label,
     SKILLS.map((label, index) => ({
       key: label,
+      anchor: positionOf(index),
       values: { label, position: positionOf(index) },
     })),
+    positionAnchor,
   );
 
   const levelIndex = await ensureAll(
@@ -998,12 +1252,14 @@ async function seed(): Promise<void> {
     (row) => row.label,
     SKILL_LEVELS.map((level, index) => ({
       key: level.label,
+      anchor: positionOf(index),
       values: {
         label: level.label,
         rank: level.rank,
         position: positionOf(index),
       },
     })),
+    positionAnchor,
   );
 
   const approachIndex = await ensureAll(
@@ -1013,8 +1269,10 @@ async function seed(): Promise<void> {
     (row) => row.label,
     APPROACHES.map((label, index) => ({
       key: label,
+      anchor: positionOf(index),
       values: { label, position: positionOf(index) },
     })),
+    positionAnchor,
   );
 
   const statusIndex = await ensureAll(
@@ -1024,12 +1282,14 @@ async function seed(): Promise<void> {
     (row) => row.label,
     STATUSES.map((status, index) => ({
       key: status.label,
+      anchor: positionOf(index),
       values: {
         label: status.label,
         nature: status.nature,
         position: positionOf(index),
       },
     })),
+    positionAnchor,
   );
 
   const toolIndex = await ensureAll(
@@ -1039,6 +1299,7 @@ async function seed(): Promise<void> {
     (row) => row.name,
     TOOLS.map((tool) => ({
       key: tool.name,
+      formerKeys: tool.formerNames,
       values: {
         name: tool.name,
         kind: tool.kind,
@@ -1055,6 +1316,7 @@ async function seed(): Promise<void> {
     (row) => row.label,
     ACTIVITY_TYPES.map((type, index) => ({
       key: type.label,
+      anchor: positionOf(index),
       values: {
         label: type.label,
         family: type.family,
@@ -1065,6 +1327,7 @@ async function seed(): Promise<void> {
           : null,
       },
     })),
+    positionAnchor,
   );
 
   /* Les pistes de démarrage. Elles viennent après les outils, dont elles
@@ -1077,6 +1340,7 @@ async function seed(): Promise<void> {
     (row) => row.label,
     STARTERS.map((starter, index) => ({
       key: starter.label,
+      anchor: positionOf(index),
       values: {
         label: starter.label,
         kind: starter.kind,
@@ -1086,6 +1350,7 @@ async function seed(): Promise<void> {
         toolId: starter.tool ? idOf(toolIndex, starter.tool, "Outil") : null,
       },
     })),
+    positionAnchor,
   );
 
   /* --- Les personnes ----------------------------------------------------- */
@@ -1424,7 +1689,7 @@ async function seed(): Promise<void> {
      **Le renommage recrée**, comme partout ailleurs dans ce fichier : c'est la
      dette de la clé naturelle, déjà consignée dans `ETAT.md`, et sans
      conséquence en production où l'amorçage ne tourne pas. */
-  await ensureAll(
+  const useCaseIndex = await ensureAll(
     scope,
     useCases,
     "use_cases",
@@ -1437,6 +1702,84 @@ async function seed(): Promise<void> {
         summary: useCase.summary,
       },
     })),
+  );
+
+  /* --- Les personae ------------------------------------------------------- */
+
+  /* La clé naturelle est le couple produit · nom, pour la raison des use cases
+     ci-dessus : deux produits peuvent porter le même archétype. `personas` ne
+     porte pas de `position` — c'est l'une des tables que T8.4 laisse ouvertes au
+     renommage en base, et l'en-tête du fichier les nomme toutes. */
+  const personaIndex = await ensureAll(
+    scope,
+    personas,
+    "personas",
+    (row) => `${row.productId}·${row.name}`,
+    PERSONAS.map((persona) => ({
+      key: `${idOf(productIndex, persona.product, "Produit")}·${persona.name}`,
+      values: {
+        productId: idOf(productIndex, persona.product, "Produit"),
+        name: persona.name,
+        role: persona.role,
+        summary: persona.summary,
+        // Vision ne stocke aucun fichier : voir l'en-tête de PERSONAS.
+        imageUrl: null,
+        kind: persona.kind,
+      },
+    })),
+  );
+
+  /* Les traits. La clé est `persona · famille · rang`, et elle est **déjà
+     stable** : c'est le libellé qui se récrit, jamais le rang, qui est l'ordre
+     de saisie de la zone de texte. Table de liaison au sens de `scoped.ts` —
+     aucun `archived_at`, une ligne se retire, elle ne s'archive pas. */
+  await ensureAll(
+    scope,
+    personaTraits,
+    "persona_traits",
+    (row) => `${row.personaId}·${row.kind}·${row.position}`,
+    PERSONAS.flatMap((persona) => {
+      const personaId = idOf(
+        personaIndex,
+        `${idOf(productIndex, persona.product, "Produit")}·${persona.name}`,
+        "Persona",
+      );
+      const ranks = new Map<TraitKind, number>();
+      return (persona.traits ?? []).map((trait) => {
+        const position = ranks.get(trait.kind) ?? 0;
+        ranks.set(trait.kind, position + 1);
+        return {
+          key: `${personaId}·${trait.kind}·${position}`,
+          values: {
+            personaId,
+            kind: trait.kind,
+            label: trait.label,
+            position,
+          },
+        };
+      });
+    }),
+  );
+
+  await ensureAll(
+    scope,
+    useCasePersonas,
+    "use_case_personas",
+    (row) => `${row.useCaseId}·${row.personaId}`,
+    USE_CASE_PERSONAS.map((link) => {
+      const product = idOf(productIndex, link.product, "Produit");
+      const useCaseId = idOf(
+        useCaseIndex,
+        `${product}·${link.useCase}`,
+        "Use case",
+      );
+      const personaId = idOf(
+        personaIndex,
+        `${product}·${link.persona}`,
+        "Persona",
+      );
+      return { key: `${useCaseId}·${personaId}`, values: { useCaseId, personaId } };
+    }),
   );
 
   /* --- La fraîcheur ------------------------------------------------------- */
@@ -1457,22 +1800,33 @@ async function seed(): Promise<void> {
 
   /* --- Le compte rendu ---------------------------------------------------- */
 
+  if (renames.length > 0) {
+    console.log("");
+    renames.forEach((line) => console.log(line));
+  }
+
+  console.log("");
+
   let created = 0;
   let updated = 0;
+  let renamed = 0;
   for (const [table, tally] of tallies) {
     created += tally.created;
     updated += tally.updated;
+    renamed += tally.renamed;
     console.log(
       `${table.padEnd(22)} ${String(tally.created).padStart(3)} créé(s)  ` +
         `${String(tally.updated).padStart(3)} mis à jour  ` +
+        `${String(tally.renamed).padStart(3)} renommé(s)  ` +
         `${String(tally.unchanged).padStart(3)} inchangé(s)`,
     );
   }
 
   console.log(
-    created === 0 && updated === 0
+    created === 0 && updated === 0 && renamed === 0
       ? "\nRien à faire : le domaine était déjà à jour."
-      : `\n${created} ligne(s) créée(s), ${updated} mise(s) à jour.`,
+      : `\n${created} ligne(s) créée(s), ${updated} mise(s) à jour, ` +
+          `${renamed} reconnue(s) sous un autre nom.`,
   );
 }
 

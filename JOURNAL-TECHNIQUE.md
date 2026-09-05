@@ -10111,3 +10111,123 @@ les deux portes ont réellement en commun.
 et `events.domain_id` est `restrict` : sans le geste, la suppression du domaine échouait et laissait
 le **résidu** dont T8.1 a diagnostiqué qu'il fait tomber tout fichier suivant. Le défaut n'a pas eu
 lieu — il a été vu en lisant les six `afterAll` avant de lancer quoi que ce soit.
+
+---
+
+## T8.4 — Une ancre plutôt qu'un libellé, et un référentiel qui reste ouvert (05/09/2026)
+
+### Le compte « six » de la fiche était périmé, et il fallait le dire avant de coder
+
+La fiche pose *« refermé pour les entités seules ; six clés naturelles restent »*. Les deux moitiés
+de la phrase étaient fausses au jour du ticket, et pour deux raisons distinctes.
+
+**Le « six » date du 21/08/2026**, jour où l'écran d'administration ne servait que les entités : le
+compte disait alors *« `tools` et les cinq autres référentiels n'ont pas d'écran »*. **T7.3 et T7.4
+ont porté l'administration à neuf sur neuf.** Il y a donc neuf référentiels renommables, pas sept.
+
+**Et « refermé pour les entités » décrivait une destination atteinte, pas un comportement.** La
+destination d'origine était *« écran de gestion des référentiels (D25, C7) »*, et l'écran est arrivé
+— mais un écran de renommage ne referme rien du tout : il **ouvre** le défaut au lieu de le fermer,
+puisqu'il donne à n'importe qui le geste que l'amorçage ne sait pas reconnaître. La mesure l'a
+confirmé : `entities` recrée un doublon comme les sept autres.
+
+C'est le troisième compte faux de C8 après *« onze objets »* de T8.3 et *« chaque décompte rejoue les
+jointures »* de T8.2. **Un chiffre écrit dans une prose de ticket vieillit exactement comme un
+chiffre écrit dans un commentaire de code**, et les deux se relisent avec la même méfiance.
+
+### Ce qu'aucune migration n'aurait pu éviter, et pourquoi `tools` reste ouvert
+
+Le défaut est structurel : `ensureAll` reconnaît une ligne par la seule colonne que l'écran renomme.
+Le remède évident — un identifiant stable écrit par la fixture — **n'existe pas sans colonne** :
+`UpdateValues` exclut `id` (`lib/db/scoped.ts:207`), et Postgres n'a pas d'`ON UPDATE CASCADE` sur
+ses clés. Poser des identifiants déterministes ne paierait que sur une base neuve, jamais sur celle
+qui porte déjà les lignes.
+
+La seule ancre disponible sans migration est donc **la `position`** — écrite par l'amorçage, non
+touchée par un renommage. **Huit référentiels en portent une. `tools` n'en porte aucune.** Le
+référentiel des outils est donc **le seul des neuf qui reste ouvert à un renommage fait en base**, et
+ce n'est pas une négligence : le refermer demanderait `tools.position`, donc une migration, que
+l'arbitrage (a) de C8 pose explicitement en **signal d'arrêt**. Le fait est **mesuré** — 8 outils →
+9 après renommage et réamorçage — plutôt qu'affirmé, et il part dans `ETAT.md` avec sa destination.
+
+Les tables hors référentiel sont dans le même cas et pour la même raison : `products`, `projects`,
+`persons`, `indicators`, `resources`, `use_cases` et `personas` n'ont pas d'ordinal. L'en-tête de
+`scripts/seed.ts` les nomme toutes, pour qu'on n'ait pas à le redécouvrir.
+
+### Ce que la route « ancien libellé » ajoute, et ce qu'elle n'ajoute pas
+
+`formerKeys` couvre l'autre sens du défaut — **le fichier renomme une de ses propres lignes** —, qui
+est le cas réellement survenu le 20/08/2026 avec « Audit d'accessibilité » → « Everyone ». Elle vaut
+pour **toutes** les tables, ancre ou pas, et c'est ce qui donne à `tools` une reconnaissance malgré
+l'absence d'ordinal. Elle ne couvre pas un renommage arbitraire fait en base : les deux routes
+répondent à deux questions différentes et aucune ne remplace l'autre.
+
+**L'orpheline de 2026-08-20 n'est pas effacée.** La base de développement porte toujours les deux
+lignes, « Audit d'accessibilité » et « Everyone ». L'interdit de la fiche est net — *« le
+rapprochement corrige, il n'efface pas »* —, et la route neuve empêche la **prochaine** orpheline
+sans supprimer celle d'avant.
+
+### Le geste a agi sur de la dérive réelle dès la première exécution, et j'ai perdu la trace
+
+Premier amorçage après écriture : `entities … 1 renommé(s)`. Une entité en position 1 ne portait plus
+« Banque de détail » — dérive d'un renommage en base, non daté —, l'ancre l'a reconnue et rendue à la
+valeur du fichier. C'est le contrat de tête de `seed.ts` (*« ce qui a dérivé est remis à la valeur du
+fichier »*) appliqué à la lettre.
+
+**Mais la ligne qui nommait l'ancien libellé a été coupée par un `tail -30`, et elle est perdue.**
+Rien ne la rejoue : l'amorçage est idempotent, et l'amorçage n'écrit pas au journal `events`. Le fait
+est sans conséquence — la base de développement est jetable et actée, et la ligne renommée est une
+ligne de fixture — mais **c'est exactement le geste que la ligne de compte rendu existe pour rendre
+visible**, et je l'ai tronqué à la première occasion. La leçon est bête et elle mérite d'être
+écrite : *une sortie qu'on ajoute pour ne rien perdre se lit en entier, ou elle ne sert à rien.*
+
+### La mise en défaut a laissé trois orphelines, et la cascade n'était pas celle qu'on croyait
+
+Neutraliser la route d'ancre fait tomber **les huit** mesures — huit doublons recréés, et le témoin
+`formerKeys` de `tools` tient. C'est la chute attendue, isolée, sans cascade.
+
+Le nettoyage, lui, a mordu. Sur `jobs`, `skills` et `skill_levels`, la suppression du doublon a été
+**refusée par la base** (`ri_ReportViolation`, contraintes `restrict`), et la lecture immédiate était
+fausse dans les deux sens : ce n'était pas le doublon neuf qui était retenu, c'était **l'originale**.
+Le même amorçage avait en effet créé des lignes de liaison neuves vers le doublon *sans retirer*
+celles qui pointaient l'originale — `project_jobs` pour les métiers, `person_skills` pour les
+compétences et les niveaux —, si bien que les deux lignes étaient référencées à la fois.
+
+Il a fallu retirer les liaisons devenues mortes avant les orphelines. **Aucune donnée n'est perdue** :
+`project_jobs` est dérivé de l'équipe (D44) et `person_skills` vient de la fixture ; l'amorçage
+suivant les a rétablies à l'identique — `26 inchangé(s)` et `8 inchangé(s)`. Les neuf décomptes sont
+revenus à leur valeur d'avant mesure.
+
+**Ce que ça dit du geste lui-même** : un doublon de référentiel ne se répare pas par une simple
+suppression, parce qu'il se propage aux liaisons dans la même exécution. C'est un argument de plus
+pour la reconnaissance — et un rappel que `drop` sur un référentiel n'est jamais une opération à une
+étape.
+
+### Le sceau garde une liste, pas une propriété
+
+`uiLayerSeal` nomme désormais les six dossiers métier au lieu de trois, et les trois neufs ont été
+mis en défaut un par un — chaque import interdit fait échouer `npm run lint` sur
+`@typescript-eslint/no-restricted-imports`, avec **zéro avertissement**, ce qui écarte l'échec
+parasite par `no-unused-vars` sous `--max-warnings=0`.
+
+**La clause reste une énumération, et un septième dossier créé demain lui échappera.** La forme
+auto-portante — `["@/components/*", "!@/components/ui/*"]` — la refermerait pour de bon, mais elle
+**remplacerait** le sceau au lieu de l'étendre, ce que la fiche interdit en toutes lettres. C'est
+donc une dette de forme assumée, et c'est **la même forme de dette qui a rendu ce ticket
+nécessaire** : une garde qui désigne une liste plutôt qu'une propriété vieillit à chaque ajout.
+→ **au prochain ticket qui ouvre `eslint.config.mjs`** — destination dont ce ticket vient de
+démontrer qu'elle ne se déclenche pas toute seule.
+
+### `ensureAll` n'a pas de test, et c'est un choix de périmètre
+
+Le périmètre de la fiche est de deux fichiers, et `scripts/` n'a aucun test dans le dépôt. La
+résolution en trois temps est donc **prouvée par la mesure** — dix-huit amorçages, neuf décomptes
+avant/après, huit chutes à la neutralisation — et par rien d'autre. Extraire la résolution dans un
+module testé serait le bon geste ; il ouvre un fichier hors périmètre (règle 3). → **dette assumée.**
+
+### Les personae sont inventés, et c'est la quatrième source de la fixture
+
+L'en-tête de `scripts/seed.ts` pose *« deux sources, et pas une de plus »*. Les personae n'en
+viennent d'aucune : le brief §7 ne les connaît pas. Ils rejoignent les présentations et les
+compétences (17/08), les use cases (19/08) et la quatrième piste de démarrage (20/08). Signalé avant
+écriture, jamais découvert après.
