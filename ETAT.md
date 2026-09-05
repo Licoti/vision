@@ -2,14 +2,14 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 04/09/2026, **T8.1 livré** — la suite repasse au vert, cause nommée et
-mise en défaut dans les deux sens. L'avant-balayage du découpage de C8 est dans `HISTORIQUE-TICKETS.md`.
+**Dernière mise à jour :** 05/09/2026, **T8.2 livré** — le contrat des décomptes redevient vrai et
+**mesuré sur une ligne forgée**, la liste transverse rend ses sept colonnes, `/produits` son nombre.
 **Chantier en cours :** **C8 — Dette**, cinq tickets, dans `tickets-C8.md`. **C7 est en pause, pas
 clos** — T7.7 → T7.10 reprennent après C8 (décision humaine du 04/09) ; écart à `docs/05` §6 consigné
 au journal technique. **Le SSO est sorti de C8 et forme C9 avec l'administration multi-domaine.**
 **Référence du chantier, relevée par T8.1 : 1 582 tests sur 55 fichiers, `lint` et `tsc` au vert** —
-chaque ticket de C8 y compare son vert, jamais à un souvenir.
-**Ticket suivant : T8.2 — les listes et leurs décomptes.**
+chaque ticket de C8 y compare son vert, jamais à un souvenir. **T8.2 la porte à 1 589 sur 55.**
+**Ticket suivant : T8.3 — onze objets entrent au journal.**
 
 ---
 
@@ -27,7 +27,7 @@ chaque ticket de C8 y compare son vert, jamais à un souvenir.
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
 | C7 — Finitions | T7.1 → T7.10 | **en pause** — T7.1 → T7.6 livrés, reprise après C8 |
-| C8 — Dette | T8.1 → T8.5 | **en cours** — T8.1 livré |
+| C8 — Dette | T8.1 → T8.5 | **en cours** — T8.1, T8.2 livrés |
 | C9 — SSO et administration multi-domaine | à découper | bloqué sur l'inscription Entra ID |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
 
@@ -60,6 +60,10 @@ chaque ticket de C8 y compare son vert, jamais à un souvenir.
 - **C8 — Dette — T8.1, 04/09.** Les **63 échecs** venaient d'un domaine de tests **résiduel**, la
   piste « migration `0014` » étant **fausse et mesurée telle**. Son retrait seul : 1 582 / 1 582 ;
   reposé, **les mêmes 63 nominativement**. Garde au niveau de la suite, mise en défaut.
+- **C8 — Dette — T8.2, 05/09.** *« Chaque décompte rejoue les jointures de sa liste »* était **faux
+  d'une jointure** sur trois lectures : les constats d'égalité passaient faute de cas, et une ligne
+  forgée — projet du domaine, **statut d'un autre** — les a fait tomber avant qu'on les croie. Plus
+  les deux colonnes de `docs/06` §4 et le décompte de `/produits`. **Sept chutes isolées.**
 - **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, tous détaillés dans
   `HISTORIQUE-TICKETS.md` et `JOURNAL-TECHNIQUE.md`. Cinq portent une migration : **`0010`**
   disponibilité déduite et suppression définitive · **`0011`** une seule cible par indicateur, portée
@@ -101,12 +105,6 @@ refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le
   devra entrer dans `docs/02` §2, et `docs/` est figé. → **session de découpage de C10.**
 
 ### b. Assignés à un ticket
-
-**T8.2 — les listes et leurs décomptes.** **`countProjects` et la répartition par entité ne rejouent
-pas la jointure de statut de `listProjects`** : le contrat écrit dans `overview.ts` est faux d'une
-jointure, et les deux constats d'égalité du test ne tiennent que parce qu'aucune ligne de ce genre
-n'existe · **deux colonnes de `docs/06` §4 manquent à la liste transverse**, l'entité et les métiers
-· **`/produits` n'affiche aucun compteur**, là où `/accompagnements` en affiche un.
 
 **T8.3 — le journal.** **Onze objets écrivent sans laisser de trace** : persona, use case,
 indicateur, personne, entité, vision produit, budget, dispositif de mesure, plan de taggage, repère
@@ -151,7 +149,11 @@ au découpage, il n'y a qu'un geste · `default_tool_id` ne présélectionne rie
 n'est plus replié par défaut (`docs/03` §6) · rétablir un accompagnement sous un produit archivé le
 laisse invisible.
 
-**Au prochain ticket qui ouvre le fichier.** `listResultToolOptions` sert trois panneaux et son nom
+**Au prochain ticket qui ouvre le fichier** — **destination qui a déjà échoué une fois** (fiche T8.4).
+**`listProductsWithCounts` ne rejoue pas la jointure de statut** (`lib/queries/products.ts`) : sa
+colonne « Accompagnements » compte `projects.id` sans confronter le statut au domaine — **le
+quatrième décompte de la famille**, trouvé par la ligne forgée de T8.2 et laissé intact, son fichier
+étant hors du périmètre de la fiche (règle 3) · `listResultToolOptions` sert trois panneaux et son nom
 n'en dit qu'un (`lib/queries/activities.ts`) · `sameReferentialLabel` et `sameEntityLabel` disent la
 même règle deux fois, et `entities.position` ne se saisit pas (`lib/forms/entity.ts`) · la carte
 radio est écrite deux fois, et le formulaire de produit ne dit pas « (obligatoire) » quand celui de

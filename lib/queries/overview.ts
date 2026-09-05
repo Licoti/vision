@@ -29,7 +29,7 @@
  * et il y en a trois.
  */
 
-import { and, asc, desc, eq, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, exists, isNull, lt, ne, or, sql } from "drizzle-orm";
 
 import type { ScopedDb } from "@/lib/db/scoped";
 import {
@@ -306,18 +306,27 @@ function strip(row: DistributionRow): DistributionEntry {
 /**
  * Combien de projets par statut, par entité, et par approche.
  *
- * **Les trois conditions d'archivage sont celles de `listProjects`, à la
- * lettre** — `filter(projects)`, `projects.archived_at is null`,
- * `products.archived_at is null` — et c'est tout ce qui fait tenir le contrat
- * du ticket. Le décompte et la liste ne sont pas deux lectures qui se
- * ressemblent : ce sont deux façons d'écrire la même clause, et la seule preuve
- * qu'elles disent la même chose est de suivre le lien et de compter.
+ * **Les quatre conditions sont celles de `listProjects`, à la lettre** —
+ * `filter(projects)`, `projects.archived_at is null`,
+ * `products.archived_at is null`, **et sa jointure de statut filtrée** — et
+ * c'est tout ce qui fait tenir le contrat du ticket. Le décompte et la liste ne
+ * sont pas deux lectures qui se ressemblent : ce sont deux façons d'écrire la
+ * même clause, et la seule preuve qu'elles disent la même chose est de suivre
+ * le lien et de compter.
+ *
+ * **La quatrième est arrivée en T8.2**, et elle manquait à deux chaînes sur
+ * trois : un accompagnement du domaine posé sur un statut d'un **autre**
+ * domaine était écarté par la liste — dont la jointure de statut est interne et
+ * filtrée — et **compté** par la répartition par entité comme par celle par
+ * approche, toutes deux arrêtées au produit. La chaîne du statut, elle, n'a
+ * jamais eu ce défaut : elle part du référentiel filtré.
  *
  * **On compte toujours la colonne de la table la plus lointaine de la
- * chaîne**, et c'est la seule règle qui tienne le contrat. Pour le statut et
- * l'approche, la chaîne va `référentiel → projects → products` : on compte
- * `products.id`. Pour l'entité, elle va `entities → products → projects`, en
- * sens inverse : on compte `projects.id`.
+ * chaîne**, et c'est la seule règle qui tienne le contrat. Pour le statut, la
+ * chaîne va `project_statuses → projects → products` : on compte
+ * `products.id`. Pour l'entité, elle va `entities → products → projects →
+ * project_statuses`, en sens inverse et **d'un maillon de plus depuis T8.2** :
+ * on compte `project_statuses.id`.
  *
  * La différence n'est pas cosmétique. Sur la chaîne des statuts, un projet
  * vivant sous un **produit archivé** franchit le premier `leftJoin` et échoue
@@ -326,6 +335,14 @@ function strip(row: DistributionRow): DistributionEntry {
  * liste, sans qu'aucune erreur ne se produise. C'est exactement la divergence
  * que la mise en défaut de la fiche cherche, et compter le bout de la chaîne
  * est ce qui l'empêche des deux côtés.
+ *
+ * **La chaîne de l'approche ne peut pas se refermer ainsi, et c'est pourquoi
+ * elle porte une forme à elle.** `products` et `project_statuses` y sont deux
+ * **frères** de `projects` : aucune des deux colonnes de feuille ne dit que
+ * l'autre a survécu, et un `count()` sur l'une laisserait passer ce que l'autre
+ * écarte. La condition de statut entre donc dans le `on` de la jointure des
+ * projets, sous la forme d'`exists` que `listProjects` emploie déjà pour ses
+ * liaisons n-à-n — la ligne entière tombe, et `count(products.id)` reste juste.
  *
  * **Le référentiel entier, zéros compris**, à rebours de
  * `listProjectFilterOptions` qui n'offre que ce qui ramène quelque chose. Les
@@ -391,7 +408,7 @@ export function listProjectDistribution(
         id: entities.id,
         label: entities.label,
         archivedAt: entities.archivedAt,
-        count: sql<number>`count(${projects.id})::int`,
+        count: sql<number>`count(${projectStatuses.id})::int`,
       })
       .from(entities)
       .leftJoin(
@@ -408,6 +425,20 @@ export function listProjectDistribution(
           eq(projects.productId, products.id),
           filter(projects),
           isNull(projects.archivedAt),
+        ),
+      )
+      /* **Le maillon de T8.2**, et le nouveau bout de la chaîne. La jointure de
+         statut de `listProjects`, rejouée : un accompagnement posé sur un statut
+         d'un autre domaine ne se compte pas plus qu'il ne se liste. Elle vient
+         **après** celle des projets, donc elle en dépend — un produit archivé
+         coupe déjà la chaîne en amont, et c'est ce qui permet de compter cette
+         colonne-ci sans rien perdre de ce que les deux clauses précédentes
+         écartaient. */
+      .leftJoin(
+        projectStatuses,
+        and(
+          eq(projectStatuses.id, projects.statusId),
+          filter(projectStatuses),
         ),
       )
       .where(filter(entities))
@@ -438,6 +469,29 @@ export function listProjectDistribution(
           eq(projects.id, projectApproaches.projectId),
           filter(projects),
           isNull(projects.archivedAt),
+          /* **La jointure de statut de `listProjects`, dans le `on` et non à
+             côté** (T8.2). Ici `products` et `project_statuses` seraient deux
+             frères de `projects` : une jointure de plus laisserait
+             `count(products.id)` compter ce que le statut écarte, et compter
+             la colonne du statut laisserait passer ce que le produit écarte.
+             Aucune colonne de feuille ne dit que les deux ont survécu.
+
+             Posée dans le `on`, la condition coupe la ligne **entière** : le
+             projet ne franchit pas la jointure, donc son produit non plus, et
+             la règle de la chaîne redevient vraie sans qu'on ait à choisir
+             laquelle des deux feuilles compter. C'est la forme d'`exists` que
+             `listProjects` emploie déjà pour ses liaisons n-à-n. */
+          exists(
+            database
+              .select({ one: sql`1` })
+              .from(projectStatuses)
+              .where(
+                and(
+                  filter(projectStatuses),
+                  eq(projectStatuses.id, projects.statusId),
+                ),
+              ),
+          ),
         ),
       )
       .leftJoin(
@@ -663,10 +717,16 @@ export function listStaleProjects(
  * moyenne ou un taux, et elle n'en tire rien.
  *
  * **Chaque décompte rejoue les jointures de sa liste, et non un `count(*)`
- * nu.** `listProjects` écarte les projets d'un produit archivé par son
- * `innerJoin`, `listProductsWithCounts` écarte les produits dont l'entité n'est
+ * nu.** `listProjects` en porte **deux** — le produit vivant, et le statut du
+ * domaine —, `listProductsWithCounts` écarte les produits dont l'entité n'est
  * pas du domaine : un décompte plus simple que sa liste est un décompte qui
  * finit par en dire plus qu'elle.
+ *
+ * **La seconde manquait jusqu'en T8.2**, et la phrase ci-dessus était donc
+ * fausse d'une jointure : un accompagnement du domaine posé sur un statut d'un
+ * **autre** domaine était écarté par la liste et compté ici. Le contrat n'était
+ * pas seulement inexact, il était **invérifiable** — les deux constats
+ * d'égalité du test passaient parce qu'aucune ligne de ce genre n'existait.
  */
 export function countProjects(scope: ScopedDb): Promise<number> {
   return scope.joinedRead(async (database, { filter }) => {
@@ -679,6 +739,16 @@ export function countProjects(scope: ScopedDb): Promise<number> {
           eq(products.id, projects.productId),
           filter(products),
           isNull(products.archivedAt),
+        ),
+      )
+      /* La jointure de statut de `listProjects`, à la lettre : interne, filtrée,
+         et sans rien en sélectionner — le décompte n'a que faire du libellé,
+         c'est la **survivance de la ligne** qui l'intéresse. */
+      .innerJoin(
+        projectStatuses,
+        and(
+          eq(projectStatuses.id, projects.statusId),
+          filter(projectStatuses),
         ),
       )
       .where(and(filter(projects), isNull(projects.archivedAt)));

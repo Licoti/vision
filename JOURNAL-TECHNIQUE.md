@@ -9902,3 +9902,94 @@ global de la branche. Le lever demande une source d'identité — c'est C9, et c
 tel. Le fait est consigné plutôt que corrigé : donner un paramètre à `resolveDomainId` pour un défaut
 d'outillage serait toucher au code de production sans que le diagnostic l'exige, et empiéter sur un
 chantier qui a déjà sa fiche.
+
+---
+
+## T8.2 — Un contrat faux d'une jointure, et une ligne forgée qui le prouve (05/09/2026)
+
+### Un test qui passe parce que le cas n'existe pas n'a rien éprouvé
+
+`lib/queries/overview.ts` écrivait, en toutes lettres, *« chaque décompte rejoue les jointures de sa
+liste »*. Il en manquait une. `listProjects` joint `project_statuses` en **`innerJoin` filtré** ;
+`countProjects` et deux des trois chaînes de `listProjectDistribution` s'arrêtaient au produit. Un
+accompagnement du domaine posé sur un statut d'un **autre** domaine était donc **écarté par la liste
+et compté par le chiffre** — et les trois constats d'égalité du test passaient, faute d'une seule
+ligne de ce genre dans la fixture.
+
+**La mesure d'abord, la correction ensuite.** La ligne forgée a été semée *avant* toute modification
+du code de production, et les six chutes relevées : les trois boucles d'égalité — par entité, par
+approche, `countProjects` — et les trois constats neufs qui les nomment. Puis le code, puis le vert.
+Un contrat qu'on croit sur parole n'est pas un contrat, c'est une phrase.
+
+### Trois chaînes, trois formes, et la troisième n'est pas cosmétique
+
+La règle du fichier — *« on compte toujours la colonne de la table la plus lointaine de la chaîne »* —
+se prolonge naturellement sur deux chaînes et **casse sur la troisième** :
+
+- **statut** : `project_statuses → projects → products`. Rien à faire, la chaîne part du référentiel
+  filtré ; un statut d'ailleurs n'y entre pas.
+- **entité** : `entities → products → projects`, à laquelle T8.2 ajoute `→ project_statuses`. Le
+  décompte suit le bout de la chaîne et passe de `count(projects.id)` à `count(project_statuses.id)`.
+  Le maillon dépend du précédent, donc un produit archivé coupe toujours en amont.
+- **approche** : `approaches → project_approaches → projects`, puis **`products` et
+  `project_statuses` en frères**. Aucune colonne de feuille ne dit que l'autre a survécu : compter le
+  produit laisse passer ce que le statut écarte, compter le statut laisse passer ce que le produit
+  écarte. La condition entre donc dans le `on` de la jointure des projets, sous forme d'`exists` — la
+  ligne entière tombe, et `count(products.id)` redevient juste.
+
+**Une jointure de plus n'est pas toujours une jointure de plus.** La forme dépend de la place du
+maillon dans la chaîne, et la lire comme une recette aurait produit un décompte faux qu'aucun test
+n'aurait pris.
+
+### La ligne forgée a fait tomber un constat qu'on ne visait pas — et c'était une trouvaille
+
+En semant la seconde liaison forgée du fichier `projects.test.ts` — une liaison **de `a`** vers un
+métier **de `b`** —, le constat de T7.2 *« le filtre de métier ne laisse pas passer un métier d'un
+autre domaine »* est tombé. Il ne testait pas ce qu'il annonçait : l'`exists` des filtres de métier
+et d'approche portait `filter(projectJobs)` / `filter(projectApproaches)` — le domaine de la
+**liaison** — et jamais celui de la **valeur**. Une liaison d'ici pointant un métier d'ailleurs
+ramenait donc sa ligne.
+
+**Écart de périmètre assumé, et il est déclaré.** Les deux `exists` reçoivent la jointure filtrée de
+leur référentiel. La justification est celle du ticket lui-même : c'est le même défaut, dans un
+fichier que la fiche met au périmètre, et *un contrat faux se corrige, il ne se laisse pas*. Le cas
+reste forgé — la couche scopée refuse d'écrire une telle liaison, et l'écran confronte le paramètre
+au domaine avant d'appeler —, exactement comme l'était le cas des décomptes. **Les deux constats de
+T7.2 ont désormais des dents** : neutraliser l'un des deux `filter()` fait tomber le sien, et lui
+seul.
+
+### La colonne d'entité se joint à gauche, et c'est un arbitrage
+
+Les trois autres lectures qui affichent une entité la joignent en **interne**
+(`findProjectDetail`, `listProductsWithCounts`, `findProductDetail`). La liste transverse, non : un
+`innerJoin` y retirerait une ligne que `countProjects` compte encore, c'est-à-dire **rouvrirait d'un
+cran plus loin le défaut que ce ticket referme**. Conséquence assumée et typée : `entityLabel` est
+`string | null`, et la cellule ne rend **rien** — pas même son `sr-only` — dans le seul cas où la
+lecture n'a pas su nommer l'entité. `products.entity_id` étant `NOT NULL`, ce cas est forgé.
+
+### Le harnais de capture rognait, et le bruit de fond l'a montré
+
+La vérification du repli de T7.6 a d'abord été tentée au `chrome --headless --screenshot
+--window-size=375`. La capture montrait la liste coupée à droite — verdict alarmant, et **faux** : la
+même commande sur `/equipe`, page que T7.6 a certifiée et que ce ticket ne touche pas, rendait la
+**même** coupure. Le harnais rend à une largeur de mise en page supérieure et **rogne le PNG** à la
+taille demandée ; `--headless=new` n'y change rien. *Une empreinte qui diffère ne prouve rien tant
+que le bruit de fond n'a pas été mesuré* — la leçon de T7.6, repayée.
+
+La mesure a donc repris par **CDP**, comme T7.6 : `Emulation.setDeviceMetricsOverride`, puis une
+sonde de débordement qui cherche un nœud dont un ancêtre **rogneur et non défilant** coupe une part.
+**Node 24 porte `WebSocket` en global** : aucune dépendance ajoutée pour la conduire.
+
+**Et la sonde a été mise en défaut avant d'être crue.** Zéro rogné à 375, 1280 et 1440 px ne vaut
+rien tant qu'on n'a pas vu la sonde rapporter quelque chose : une cellule de métiers forcée à 900 px
+lui fait rapporter 4 nœuds rognés à 375 px et 21 à 1280. Restaurée à l'octet près, elle retombe à
+zéro. Une sonde qui n'a jamais rien trouvé n'est pas une sonde, c'est une intention.
+
+### Ce que ce ticket ne referme pas
+
+**`listProductsWithCounts` porte le même défaut** — sa colonne « Accompagnements » compte
+`projects.id` sans confronter le statut au domaine. C'est le quatrième décompte de la famille, et
+`lib/queries/products.ts` est **hors du périmètre de la fiche** : il est consigné dans `ETAT.md`
+plutôt que corrigé (règle 3). Sa destination est le seau *« au prochain ticket qui ouvre le
+fichier »* — celui-là même dont la fiche T8.4 démontre qu'il **a déjà échoué une fois**. Le fait est
+écrit à côté du point : il mériterait un ticket plutôt qu'un événement.

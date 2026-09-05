@@ -13,11 +13,16 @@
  * ici elle produirait une vingtaine de pastilles. Le formulaire fonctionne
  * sans JavaScript.
  *
- * **Les quatre filtres de `docs/06` §4 sont là depuis T7.2 ; les colonnes qu'il
- * demande, non.** Le document veut sur chaque ligne l'entité et les métiers, en
- * plus des cinq colonnes rendues. L'« Attendu » de la fiche T7.2 ne les nomme
- * pas — elle pose des filtres et un chiffre —, et les ajouter aurait été une
- * fonctionnalité hors du ticket (règle 3). Point ouvert d'`ETAT.md`.
+ * **Les sept colonnes de `docs/06` §4 depuis T8.2** — nom, produit, entité,
+ * statut, métiers, équipe, dernière activité —, et dans son ordre. Les deux
+ * dernières venues ont attendu un chantier : T7.2 avait posé leurs **filtres**
+ * sans poser leurs colonnes, son « Attendu » ne les nommant pas, et les ajouter
+ * alors aurait été une fonctionnalité hors du ticket (règle 3).
+ *
+ * **L'entité se lit sur le produit**, jamais sur l'accompagnement — il n'en
+ * porte pas —, et **les métiers sont ceux qu'il déclare** (D44), jamais ceux que
+ * son équipe porte : les deux peuvent diverger, et c'est le déclaré qui fait
+ * foi, comme pour le filtre du même nom.
  *
  * Un identifiant qui ne désigne rien dans le domaine est ignoré, jamais
  * affiché : inventer un libellé à partir d'un paramètre serait donner du
@@ -58,15 +63,23 @@ export const metadata = {
 };
 
 /** Les gabarits de colonne, tenus en un seul endroit pour que l'en-tête et
- *  les lignes ne puissent pas diverger.
+ *  les lignes ne puissent pas diverger. **Leur ordre est celui de
+ *  `docs/06` §4**, et il n'a pas d'autre raison.
  *
- *  **Sous `xl`, la ligne se replie** (T7.6) : les trois colonnes fixes font
- *  336 px, gouttières comprises 400, et elles étaient rognées avant de se
- *  rétrécir. Le nom prend sa ligne, le reste suit. */
+ *  **Sous `xl`, la ligne se replie** (T7.6) : les colonnes fixes étaient rognées
+ *  avant de se rétrécir. Le nom prend sa ligne, le reste suit.
+ *
+ *  **T8.2 en ajoute deux, et les nombres bougent** : les colonnes fixes passent
+ *  de 336 px à **592**, gouttières comprises de 400 à **688**. Le palier de
+ *  repli, lui, ne bouge pas — mesuré à 375, 1280 et 1440 px, rien n'est rogné :
+ *  le repli sous `xl` fait son office, et au-delà ce sont les deux colonnes
+ *  élastiques qui cèdent, jamais la carte qui coupe. */
 const COLUMN = {
   name: "w-full min-w-0 xl:w-auto xl:flex-[1.4]",
   product: "min-w-0 xl:flex-1",
+  entity: "min-w-0 flex-none truncate xl:w-28",
   status: "flex-none xl:w-28",
+  jobs: "min-w-0 flex-none xl:w-36",
   team: "flex-none xl:w-28",
   freshness: "flex-none text-right xl:w-28",
 } as const;
@@ -213,7 +226,9 @@ export default async function ProjectsPage({
           <ListHeader>
             <span className={COLUMN.name}>Accompagnement</span>
             <span className={COLUMN.product}>Produit</span>
+            <span className={COLUMN.entity}>Entité</span>
             <span className={COLUMN.status}>Statut</span>
+            <span className={COLUMN.jobs}>Métiers</span>
             <span className={COLUMN.team}>Équipe</span>
             <span className={COLUMN.freshness}>Dernière act.</span>
           </ListHeader>
@@ -241,9 +256,44 @@ export default async function ProjectsPage({
                 </Link>
               </span>
 
+              {/* L'entité **du produit**, jamais de l'accompagnement : c'est
+                  la lecture de `docs/06` §4, et la même que celle du filtre
+                  d'entité posé par T7.2. Rien n'est rendu quand la lecture n'a
+                  pas su la nommer — cas forgé d'un produit dont l'entité est
+                  d'un autre domaine : un libellé inventé serait pire qu'un
+                  blanc, et un `sr-only` sans valeur annoncerait du vide. */}
+              <span className={COLUMN.entity}>
+                {row.entityLabel ? (
+                  <>
+                    <span className="sr-only">Entité : </span>
+                    {row.entityLabel}
+                  </>
+                ) : null}
+              </span>
+
               <span className={`${COLUMN.status} flex items-center`}>
                 <span className="sr-only">Statut : </span>
                 <StatusPill nature={row.statusNature} label={row.statusLabel} />
+              </span>
+
+              {/* **Les métiers déclarés** (D44), joints par le point médian de
+                  `/equipe` — une liste courte se lit mieux en une phrase qu'en
+                  pastilles, et des pastilles ici feraient une seconde colonne de
+                  statuts. L'absence s'écrit en toutes lettres : « Aucun métier
+                  déclaré » dit qui n'a rien déclaré, quand une cellule vide
+                  laisserait croire à un défaut d'affichage — la règle de « Aucun
+                  plan déclaré » sur la liste des produits. Aucun décompte :
+                  ce sont des libellés, pas un nombre qui qualifierait
+                  l'accompagnement (D39). */}
+              <span className={COLUMN.jobs}>
+                <span className="sr-only">Métiers : </span>
+                {row.jobLabels.length > 0 ? (
+                  row.jobLabels.join(" · ")
+                ) : (
+                  <span className="text-content-neutral-base">
+                    Aucun métier déclaré
+                  </span>
+                )}
               </span>
 
               <span className={COLUMN.team}>

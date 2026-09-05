@@ -2,8 +2,16 @@
  * Produits — la liste, chemin canonique de la navigation.
  *
  * Elle répond à « sur quels objets le centre intervient-il, et pour quelles
- * entités ». Quatre colonnes, pas une de plus : nom, entité, nombre
- * d'accompagnements, dernière activité.
+ * entités ». Ses colonnes : nom, entité, nombre d'accompagnements, plan de
+ * taggage, dernière activité — **le compte s'écrivait ici et il était faux**
+ * (« quatre » pour cinq depuis le 01/09/2026). Il est retiré plutôt que
+ * corrigé : un compte écrit dans une prose est un compte qui redeviendra faux,
+ * et le gabarit de `COLUMN` juste en dessous les décrit déjà toutes.
+ *
+ * **Elle dit son nombre de lignes depuis T8.2**, comme la liste transverse le
+ * fait depuis T2.3. La ligne de faits de la vue d'ensemble annonce « 5
+ * produits » et pointe ici : l'écran de destination rendait bien cinq lignes et
+ * ne les comptait pas — mesuré le 29/08/2026 en suivant le lien.
  *
  * **Le filtre passe par l'URL** (`?entite=…`) et non par un état client : il
  * se partage, il survit à un rechargement, et l'écran reste un composant
@@ -33,6 +41,7 @@ import {
   formatAccompaniments,
   formatDay,
   formatMonth,
+  formatProducts,
   formatTaggingPlanStatus,
 } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
@@ -114,7 +123,38 @@ export default async function ProductsPage({
       />
 
       {filters.length > 0 ? (
-        <EntityFilters entities={filters} activeId={activeEntity?.id} />
+        <>
+          <EntityFilters entities={filters} activeId={activeEntity?.id} />
+
+          {/* **Le décompte, et lui seul** (T8.2). `/accompagnements` fait
+              suivre le sien de ce qui est filtré et d'un lien de retrait ; ici
+              les pastilles portent déjà les deux — l'entité active en
+              `aria-current`, « Toutes les entités » pour la retirer —, et le
+              redire serait écrire deux fois le même état.
+
+              **C'est un nombre de lignes, pas une mesure** : il dit ce que cet
+              écran contient, et le contient vraiment — filtré, il compte les
+              lignes que le filtre laisse. La frontière de D39 est franche tant
+              que Vision n'en tire ni rythme, ni moyenne, ni taux, et elle n'en
+              tire rien.
+
+              `aria-live` parce qu'il change **sans rechargement perceptible**
+              quand on passe d'une pastille à l'autre : l'assistance doit
+              l'entendre. La forme est celle du compteur de la liste transverse,
+              au mot près.
+
+              **Il vit sous la même condition que les pastilles**, et c'est la
+              règle de `/accompagnements` : sur un domaine qui n'accompagne aucun
+              produit, l'état vide est un écran à part entière (règle 5) et
+              « Aucun produit » posé au-dessus de lui ne serait qu'un doublon.
+              Filtré sur une entité qui ne porte rien, en revanche, il s'affiche
+              — le nombre de lignes que le filtre laisse est un fait. */}
+          <p aria-live="polite" className="text-sm text-content-neutral-dark">
+            <span className="font-semibold text-content-neutral-darkest">
+              {formatProducts(products.length)}
+            </span>
+          </p>
+        </>
       ) : null}
 
       {products.length > 0 ? (

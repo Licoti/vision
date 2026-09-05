@@ -6095,6 +6095,114 @@ illisible ; le fichier séparé est la forme, pas un élargissement.
 
 ---
 
+## T8.2 — Les listes et leurs décomptes : ce que le contrat promettait — 05/09/2026
+
+**Le point ouvert qu'il referme**, tel qu'`ETAT.md` le portait : *« `countProjects` et la répartition
+par entité ne rejouent pas la jointure de statut de `listProjects` : le contrat écrit dans
+`overview.ts` est faux d'une jointure, et les deux constats d'égalité du test ne tiennent que parce
+qu'aucune ligne de ce genre n'existe · deux colonnes de `docs/06` §4 manquent à la liste transverse,
+l'entité et les métiers · `/produits` n'affiche aucun compteur, là où `/accompagnements` en affiche
+un. »*
+
+**Quatre arbitrages rendus avant écriture**, l'outil de question n'étant pas exposé dans la session :
+étendre la correction de jointure à la **répartition par approche** que la fiche ne nommait pas (même
+défaut, même fonction, trente lignes plus bas) · joindre l'entité **à gauche** · le décompte de
+`/produits` **seul**, les pastilles portant déjà le filtre et son retrait · **retirer** le chiffre
+faux de l'en-tête de `produits/page.tsx` plutôt que le corriger, doctrine de T8.3.
+
+### La mesure avant la correction
+
+La ligne forgée — un accompagnement **du domaine `a`**, vivant, sous le produit vivant de `a`, posé
+sur le statut de `b` — a été semée **avant** de toucher au code de production. Six chutes, relevées
+et écrites :
+
+| Constat tombé | Ce qu'il mesurait vraiment |
+|---|---|
+| le décompte de chaque **entité** est le nombre de lignes que son filtre rend | rien, faute de cas |
+| le décompte de chaque **approche** est le nombre de lignes que son filtre rend | rien, faute de cas |
+| le décompte des **projets** est le nombre de lignes de la liste transverse | rien, faute de cas |
+| les trois constats neufs qui nomment `filter(projectStatuses)` | le défaut, nominativement |
+
+Puis le geste, puis le vert. **Les trois lectures rejouent désormais la jointure de statut**, chacune
+sous la forme que sa chaîne impose — `innerJoin` pour `countProjects`, un maillon de plus et un
+`count()` déplacé sur le bout de chaîne pour l'entité, un `exists` dans le `on` pour l'approche, dont
+`products` et `project_statuses` sont deux **frères**. Le détail de cette asymétrie est au journal
+technique.
+
+### Les deux colonnes, et le métier qui a fait tomber autre chose
+
+`docs/06` §4 en veut **sept** ; il y en avait cinq. L'entité se lit sur le produit (`leftJoin`
+filtré, arbitrage assumé et typé `string | null`), les métiers sont ceux que **l'accompagnement
+déclare** (D44) — une lecture de plus, en `Promise.all` avec celle de l'équipe, ordonnée par la
+`position` du référentiel et non par l'alphabet.
+
+En semant la liaison forgée qui éprouve `filter(jobs)`, **un constat de T7.2 est tombé** — et il
+avait raison de tomber : les `exists` des filtres de métier et d'approche éprouvaient le domaine de
+la **liaison**, jamais celui de la **valeur**. Les deux reçoivent la jointure filtrée de leur
+référentiel. **Écart de périmètre, déclaré** : c'est le même défaut que celui du ticket, dans un
+fichier que la fiche met au périmètre.
+
+### Le décompte de `/produits`
+
+`formatProducts(products.length)` dans un `<p aria-live="polite">`, sous la **même condition que les
+pastilles** — sur un domaine sans produit, l'état vide est un écran à part entière (règle 5) et
+« Aucun produit » posé au-dessus de lui ne serait qu'un doublon. Filtré sur une entité qui ne porte
+rien, il s'affiche : le nombre de lignes que le filtre laisse est un fait.
+
+### La vérification
+
+**Le HTML servi**, `<script>` retirés, confronté à une **sonde scopée en base** ligne à ligne : les
+sept valeurs d'entité et les sept listes de métiers du HTML sont celles de la base, dans le même
+ordre. `?entite=<uuid>` rend 4 lignes portant chacune sa valeur **de la base** ; `?entite=<uuid
+inconnu>` est ignoré et **n'invente aucun libellé**. Le décompte égale le nombre de `role="listitem"`
+réellement rendus dans les quatre cas mesurés — 7/7 et 4/4 sur `/accompagnements`, 7/7, 1/1 et 0/0
+sur `/produits`, ce dernier disant « Aucun produit » au-dessus de son état vide.
+
+**Sept neutralisations, sept chutes isolées, aucune cascade** — chacune sur la suite entière :
+
+| Neutralisé | Tombé |
+|---|---|
+| la jointure de statut de `countProjects` | 2 constats, les siens |
+| le maillon de statut de la chaîne d'entité | 2 constats, les siens |
+| l'`exists` de la chaîne d'approche | 2 constats, les siens |
+| la colonne d'entité | 1 |
+| la lecture des métiers | 1 |
+| le `filter(jobs)` de l'`exists` | 1 — le constat de T7.2 |
+| le `filter(approaches)` de l'`exists` | 1 — le constat de T7.2 |
+
+**Le contraste, mesuré et non supposé** : aucun couple neuf **par la position**. Les deux cellules
+neuves rendent `rgb(78,78,84)` sur `rgb(253,253,253)`, celui des cellules voisines de la même ligne ;
+le repli « Aucun métier déclaré » rend `rgb(110,110,116)` sur le même fond — **4,98:1**, exactement
+le couple que la cellule « Dernière activité » sert déjà dans ces lignes ; les deux en-têtes neufs et
+le compteur de `/produits` reprennent au chiffre près ceux de leurs voisins.
+
+**Le repli de T7.6, remesuré** parce que les colonnes fixes passent de 336 à 592 px (688 gouttières
+comprises) : **zéro nœud rogné à 375, 1280 et 1440 px**, sur les deux pages touchées et sur `/equipe`
+en témoin. La sonde a été mise en défaut avant d'être crue — une cellule forcée à 900 px lui fait
+rapporter 4 nœuds rognés à 375 px et 21 à 1280 —, et le harnais de capture qui rognait de lui-même
+est nommé au journal technique.
+
+**Le droit s'éprouve par l'action** — et il n'y avait rien à éprouver, ce ticket n'ajoutant **aucune
+écriture et aucun point d'entrée**. Les trois lectures sont ouvertes à tout le domaine (D9). C'est
+dit plutôt que passé sous silence.
+
+**Le vert, comparé à la référence de T8.1** : **1 589 tests sur 55 fichiers** (1 582 + 7 neufs),
+`npm run lint --max-warnings=0` et `tsc --noEmit` à zéro, relevés au même moment.
+
+### Écarts et interdits
+
+`components/overview/distribution.tsx` était au périmètre et **n'a rien reçu** : sa promesse — *«
+suivre le lien rend exactement le nombre annoncé »* — devient vraie par la correction des requêtes,
+sans qu'une ligne y change. Deux écarts déclarés : les deux `exists` de filtre, et le chiffre faux
+retiré de l'en-tête de `produits/page.tsx`. Aucun filtre neuf, aucun tri par nombre, aucun classement
+d'entités, aucun décompte qui qualifie (D39), aucune huitième colonne, aucune pagination, aucune
+migration, aucune dépendance, aucun test supprimé ni `skip` ni `only`.
+
+**Ce qu'il ne referme pas** : `listProductsWithCounts` porte le même défaut de jointure, et son
+fichier est hors périmètre — récrit en point ouvert d'`ETAT.md`.
+
+---
+
 ## Instantané d'`ETAT.md` au balayage du 04/09/2026 — session de découpage de C8
 
 *(geste 1 de la session de découpage de C8. `ETAT.md` faisait **744 lignes** pour un seuil de 250 :

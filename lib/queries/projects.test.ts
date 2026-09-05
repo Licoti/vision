@@ -69,10 +69,24 @@ type Fixture = {
   researchJobId: string;
   /** Le métier du projet `Ancien` — il donne sa seconde option au filtre. */
   contentJobId: string;
+  /**
+   * Le **second** métier de `Frais` (T8.2) : sans lui, la colonne des métiers se
+   * validerait sur une valeur unique — ni la multiplicité ni l'ordre du
+   * référentiel n'y seraient mesurables.
+   */
+  interfaceJobId: string;
   /** Déclaré par le seul projet archivé : jamais proposé au filtrage. */
   orphanJobId: string;
   approachId: string;
   orphanApproachId: string;
+  /**
+   * `Muet` — l'accompagnement qui ne déclare **aucun** métier (T8.2).
+   *
+   * C'est ce qui en fait le porteur des deux liaisons forgées : sur une ligne
+   * qui en déclare déjà, une fuite se lirait au milieu des légitimes et le
+   * constat aurait à distinguer. Ici, la moindre étiquette est la fuite.
+   */
+  muteProjectId: string;
 };
 
 const suffix = Math.random().toString(36).slice(2, 10);
@@ -141,6 +155,14 @@ async function seedDomain(label: string): Promise<Fixture> {
     label: `Métier orphelin ${label}`,
     position: "3",
   });
+  /* Le **second** métier de `Frais` (T8.2). Sa position ferme le référentiel
+     quand son libellé ouvre le dictionnaire : « UI Design » passe avant « UX
+     Research » dans l'alphabet et après lui dans le domaine. C'est ce
+     désaccord, et lui seul, qui rend l'ordre de la colonne mesurable. */
+  const interfaceJob = await scope.insert(jobs, {
+    label: `UI Design ${label}`,
+    position: "4",
+  });
 
   const approach = await scope.insert(approaches, { label: `Research ${label}` });
   const orphanApproach = await scope.insert(approaches, {
@@ -184,7 +206,7 @@ async function seedDomain(label: string): Promise<Fixture> {
     statusId: active.id,
     lastActivityAt: new Date("2023-01-31T00:00:00Z"),
   });
-  await scope.insert(projects, {
+  const mute = await scope.insert(projects, {
     name: `Muet ${label}`,
     productId: product.id,
     statusId: active.id,
@@ -251,6 +273,12 @@ async function seedDomain(label: string): Promise<Fixture> {
 
   await scope.insert(projectJobs, { projectId: fresh.id, jobId: research.id });
   await scope.insert(projectJobs, { projectId: old.id, jobId: content.id });
+  /* Le second métier de `Frais` : deux déclarations sur une même ligne, dont
+     l'ordre rendu est celui du domaine et non celui de l'alphabet. */
+  await scope.insert(projectJobs, {
+    projectId: fresh.id,
+    jobId: interfaceJob.id,
+  });
 
   // Et le métier orphelin sur le seul projet archivé, comme l'approche.
   await scope.insert(projectJobs, {
@@ -267,9 +295,11 @@ async function seedDomain(label: string): Promise<Fixture> {
     doneStatusId: done.id,
     researchJobId: research.id,
     contentJobId: content.id,
+    interfaceJobId: interfaceJob.id,
     orphanJobId: orphanJob.id,
     approachId: approach.id,
     orphanApproachId: orphanApproach.id,
+    muteProjectId: mute.id,
   };
 }
 
@@ -678,6 +708,48 @@ beforeAll(async () => {
   b = await seedDomain("b");
   c = await seedDetailDomain();
   d = await seedFormDomain();
+
+  /* ----- Les deux liaisons de métier forgées — T8.2. ---------------------
+
+     La colonne des métiers traverse **deux** tables, donc deux `filter()`, et
+     chacun demande son montage : une liaison ne franchit la frontière que sur
+     **une** colonne, et aucune autre clause ne l'écarte en amont (leçon de
+     T5bis.2, puis de T6.3). Toutes deux se posent sur `Muet a`, qui ne déclare
+     rien : la moindre étiquette rendue sur cette ligne est une fuite.
+
+     Deux métiers **distincts**, et c'est la condition de l'isolement : sur le
+     même, retirer l'un ou l'autre `filter()` ferait apparaître le même libellé
+     et les deux constats tomberaient ensemble. */
+
+  /* (1) La **liaison** est d'un autre domaine ; ses deux extrémités sont de
+         `a` — le projet de `a`, le métier de `a`. Seul `filter(projectJobs)`
+         l'écarte : une table de liaison est une table du domaine comme les
+         autres. */
+  await db.insert(projectJobs).values({
+    domainId: b.domainId,
+    projectId: a.muteProjectId,
+    jobId: a.interfaceJobId,
+  });
+
+  /* (2) L'inverse : la liaison est de `a`, son projet est de `a` — seul le
+         **métier** est d'ailleurs. Seul `filter(jobs)` l'écarte, dans le `on`
+         de la jointure interne. */
+  await db.insert(projectJobs).values({
+    domainId: a.domainId,
+    projectId: a.muteProjectId,
+    jobId: b.researchJobId,
+  });
+
+  /* (3) Le pendant pour l'approche, et il ne sert **que** le filtre : la liste
+         ne rend pas de colonne d'approche. Sans lui, le constat *« un filtre ne
+         laisse pas passer une valeur d'un autre domaine »* passait faute de cas
+         — la liaison manquait, pas la règle. Il est ce qui donne ses dents à un
+         test écrit en T7.2. */
+  await db.insert(projectApproaches).values({
+    domainId: a.domainId,
+    projectId: a.muteProjectId,
+    approachId: b.approachId,
+  });
 }, 240_000);
 
 afterAll(async () => {
@@ -751,6 +823,65 @@ describe("listProjects — ordre et périmètre", () => {
 
     expect(mute?.team).toEqual([]);
     expect(mute?.lastActivityAt).toBeNull();
+  });
+
+  /* ------------------------------------------------------------------------
+     Les deux colonnes de `docs/06` §4 que T7.2 n'avait pas posées — T8.2.
+     ------------------------------------------------------------------------ */
+
+  test("chaque ligne porte l'entité de son produit", async () => {
+    const rows = await listProjects(a.scope);
+
+    // **Deux entités, et c'est ce qui fait le constat** : sur une seule, une
+    // constante passerait aussi bien. Un accompagnement n'a pas d'entité à lui,
+    // il la tient de son produit — `Voisin` est sous le second produit, donc
+    // sous la seconde entité.
+    expect(rows.find((row) => row.name === "Frais a")?.entityLabel).toBe(
+      "Entité a",
+    );
+    expect(rows.find((row) => row.name === "Voisin a")?.entityLabel).toBe(
+      "Zone voisine a",
+    );
+  });
+
+  test("chaque ligne porte ses métiers déclarés, dans l'ordre du référentiel", async () => {
+    const rows = await listProjects(a.scope);
+
+    // D44 : les métiers **déclarés de l'accompagnement**. `Frais` en déclare
+    // deux, et l'ordre rendu est celui du domaine — « UX Research » est en
+    // position 1, « UI Design » en 4 — quand l'alphabet les donnerait dans
+    // l'autre sens. Un tri par libellé passerait ici, et il serait faux.
+    expect(rows.find((row) => row.name === "Frais a")?.jobLabels).toEqual([
+      "UX Research a",
+      "UI Design a",
+    ]);
+    expect(rows.find((row) => row.name === "Ancien a")?.jobLabels).toEqual([
+      "Content Design a",
+    ]);
+
+    // Et l'absence est un tableau vide, jamais une ligne manquante.
+    expect(rows.find((row) => row.name === "Muet a")?.jobLabels).toEqual([]);
+  });
+
+  test("une liaison de métier d'un autre domaine ne déclare rien — `filter(projectJobs)`", async () => {
+    const rows = await listProjects(a.scope);
+
+    // Les deux extrémités sont de `a` : seule la ligne de liaison est
+    // d'ailleurs. Sans son `filter()`, « UI Design a » apparaîtrait sur une
+    // ligne qui ne l'a jamais déclaré.
+    expect(rows.find((row) => row.name === "Muet a")?.jobLabels).not.toContain(
+      "UI Design a",
+    );
+  });
+
+  test("un métier d'un autre domaine ne se déclare pas — `filter(jobs)`", async () => {
+    const rows = await listProjects(a.scope);
+
+    // L'inverse : la liaison est de `a`, seul le métier est d'ailleurs. C'est
+    // le `filter()` posé dans le `on` de la jointure interne qui l'écarte.
+    expect(rows.find((row) => row.name === "Muet a")?.jobLabels).not.toContain(
+      "UX Research b",
+    );
   });
 });
 
@@ -839,6 +970,10 @@ describe("listProjects — filtres", () => {
   });
 
   test("un filtre ne laisse pas passer une valeur d'un autre domaine", async () => {
+    // **Le constat a des dents depuis T8.2** : `Muet a` porte une liaison d'ici
+    // vers cette approche-là. Sans le `filter(approaches)` de l'`exists`, la
+    // ligne remonterait — le filtre éprouvait le domaine de la liaison, jamais
+    // celui de la valeur.
     const rows = await listProjects(a.scope, { approachId: b.approachId });
     expect(rows).toEqual([]);
   });
@@ -857,8 +992,10 @@ describe("listProjects — filtres", () => {
   });
 
   test("le filtre de métier ne laisse pas passer un métier d'un autre domaine", async () => {
-    // Le métier de `b` ne trouve aucune liaison d'ici — `filter(projectJobs)`
-    // est dans le `where` de l'`exists`.
+    // **Deux cas, et ils n'éprouvent pas la même clause.** « UX Research b »
+    // trouve une liaison d'ici depuis T8.2 — `Muet a` la porte —, et seul le
+    // `filter(jobs)` de l'`exists` l'écarte. « Content Design b » n'en trouve
+    // aucune : c'est `filter(projectJobs)` qui répond pour lui.
     expect(await listProjects(a.scope, { jobId: b.researchJobId })).toEqual([]);
     expect(await listProjects(a.scope, { jobId: b.contentJobId })).toEqual([]);
   });
@@ -948,13 +1085,16 @@ describe("listProjectFilterOptions", () => {
     ]);
   });
 
-  test("les deux métiers déclarés par un projet vivant sont proposés", async () => {
+  test("les trois métiers déclarés par un projet vivant sont proposés", async () => {
     const options = await listProjectFilterOptions(a.scope);
 
-    // `position` de nouveau contre l'alphabet : « UX Research » est en 1.
+    // `position` de nouveau contre l'alphabet : « UX Research » est en 1, et
+    // « UI Design » — le second métier de `Frais`, semé par T8.2 — ferme le
+    // référentiel en 4 quand il ouvrirait le dictionnaire.
     expect(options.jobs.map((option) => option.label)).toEqual([
       "UX Research a",
       "Content Design a",
+      "UI Design a",
     ]);
   });
 

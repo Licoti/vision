@@ -219,6 +219,32 @@ let otherDomainApproachId: string;
 let leakedProductEntityId: string;
 let leakedProjectEntityId: string;
 
+/**
+ * **L'accompagnement posé sur un statut d'un autre domaine — T8.2.**
+ *
+ * Il est du domaine `a`, vivant, sous le produit vivant de `a` : **tout** le
+ * reste est en règle, et seule la jointure de statut de `listProjects` l'écarte.
+ * C'est la ligne qui met en défaut le contrat d'`overview.ts` — *« chaque
+ * décompte rejoue les jointures de sa liste »* —, faux d'une jointure jusqu'au
+ * 05/09/2026 : la liste l'écartait, `countProjects` et deux des trois
+ * répartitions le comptaient.
+ *
+ * **Sans elle, les constats d'égalité ne mesuraient rien.** Ils passaient parce
+ * qu'aucune ligne de ce genre n'existait — la forme même de test que la fiche
+ * du chantier condamne.
+ */
+let leakedStatusProjectId: string;
+
+/**
+ * L'approche que **seul** cet accompagnement déclare.
+ *
+ * Une approche à elle, jamais `usedApproachId` dont le décompte est asserté à
+ * `2` : sur l'approche commune, la chute de la répartition par approche
+ * emporterait aussi celle du projet à deux approches, et une chute non isolée
+ * ne désigne plus la clause qu'elle éprouve (leçon de T6.3).
+ */
+let statusLeakApproachId: string;
+
 async function seedDomain(label: string): Promise<Fixture> {
   const domain = await superAdmin.createDomain({
     name: `__test__overview__${label}__${suffix}`,
@@ -850,6 +876,44 @@ beforeAll(async () => {
     statusId: leakedDomainStatusId,
     lastActivityAt: STALE_TAIL_AT,
   });
+
+  /* (11) **T8.2 — le projet de `a` posé sur le statut de `b`.**
+
+          Tout est en règle sauf une chose : le domaine, le produit, l'archivage,
+          la fraîcheur — seul le **statut** est d'ailleurs. Seule la jointure de
+          statut l'écarte, celle que `listProjects` porte depuis T2.3 et que les
+          décomptes ne rejouaient pas.
+
+          `SEEDED_AT` et non `STALE_TAIL_AT`, à rebours de ses dix aînées : cette
+          ligne-ci doit rester **fraîche**. `listStaleProjects` l'écarte déjà par
+          sa propre jointure de statut ; datée dormante, elle entrerait dans la
+          liste de fraîcheur le jour où l'on retire ce `filter()` pour l'éprouver,
+          et déplacerait le plafond des dix — une chute de plus, et non isolée. */
+  const leakedStatusProject = await db
+    .insert(projects)
+    .values({
+      domainId: a.domainId,
+      name: `Fuite de projet par le statut ${suffix}`,
+      productId: a.productId,
+      statusId: b.statusId,
+      lastActivityAt: SEEDED_AT,
+    })
+    .returning({ id: projects.id });
+  leakedStatusProjectId = leakedStatusProject[0]!.id;
+
+  /* Son approche, à lui seul : c'est ce qui porte la fuite jusqu'à la troisième
+     chaîne de la répartition. La liaison, elle, est parfaitement régulière —
+     domaine `a`, projet de `a`, approche de `a` — et passe donc par la couche. */
+  const statusLeakApproach = await a.scope.insert(approaches, {
+    label: `Approche du projet au statut forgé ${suffix}`,
+    position: "5",
+  });
+  statusLeakApproachId = statusLeakApproach.id;
+
+  await a.scope.insert(projectApproaches, {
+    projectId: leakedStatusProjectId,
+    approachId: statusLeakApproachId,
+  });
 });
 
 afterAll(async () => {
@@ -1257,6 +1321,40 @@ describe("listProjectDistribution", () => {
     // une approche d'ici.
     expect(entryFor(rows, leakedLinkApproachId)?.count).toBe(0);
   });
+
+  /* ------------------------------------------------------------------------
+     T8.2 — la jointure de statut, celle que les décomptes ne rejouaient pas.
+
+     Les deux chaînes qui ne partent pas du statut — l'entité, l'approche —
+     s'arrêtaient au produit. Un accompagnement du domaine posé sur un statut
+     d'ailleurs était donc **écarté par la liste et compté par le chiffre**, et
+     la promesse d'égalité tenait faute de cas. Les deux constats ci-dessous la
+     nomment, chacun sur une valeur de référentiel qui ne porte que lui.
+     ------------------------------------------------------------------------ */
+
+  test("un accompagnement au statut d'un autre domaine ne se compte pas par entité — `filter(projectStatuses)`", async () => {
+    const { entities: rows } = await listProjectDistribution(a.scope);
+
+    // La liste l'écarte : c'est le point de comparaison, et il ne se suppose
+    // pas.
+    const listed = await listProjects(a.scope, { entityId: a.entityId });
+    expect(listed.map((row) => row.id)).not.toContain(leakedStatusProjectId);
+
+    // Donc le chiffre aussi. L'entité d'amorçage porte le produit de la ligne
+    // forgée : sans la jointure, elle en dirait un de plus que sa liste.
+    expect(entryFor(rows, a.entityId)?.count).toBe(listed.length);
+  });
+
+  test("un accompagnement au statut d'un autre domaine ne se compte pas par approche — `filter(projectStatuses)`", async () => {
+    const { approaches: rows } = await listProjectDistribution(a.scope);
+
+    // L'approche n'appartient qu'à cette ligne : son décompte est zéro, et il
+    // ne peut le cesser que si la jointure de statut disparaît de sa chaîne.
+    expect(entryFor(rows, statusLeakApproachId)?.count).toBe(0);
+    expect(
+      await listProjects(a.scope, { approachId: statusLeakApproachId }),
+    ).toEqual([]);
+  });
 });
 
 describe("listStaleProjects", () => {
@@ -1466,6 +1564,18 @@ describe("countProjects / countProducts", () => {
 
     expect(rows.map((row) => row.id)).not.toContain(leakedEntityProductId);
     expect(await countProducts(a.scope)).toBe(rows.length);
+  });
+
+  test("un accompagnement au statut d'un autre domaine ne se compte pas — `filter(projectStatuses)`", async () => {
+    // Le projet est de `a`, son produit est de `a` et vivant, il n'est pas
+    // archivé : **seul son statut est d'ailleurs**, et seule la jointure que
+    // `listProjects` porte l'écarte. Sans elle, le décompte disait un de plus
+    // que la liste vers laquelle il pointe — un mensonge que rien d'autre ne
+    // détecte, puisque aucune somme n'est affichée.
+    const rows = await listProjects(a.scope);
+
+    expect(rows.map((row) => row.id)).not.toContain(leakedStatusProjectId);
+    expect(await countProjects(a.scope)).toBe(rows.length);
   });
 
   test("les décomptes n'ont pas d'autre domaine que le leur", async () => {

@@ -61,15 +61,40 @@ export type ProjectStatusNature = (typeof projectStatusNature.enumValues)[number
 /** Un membre d'équipe, tel qu'il s'affiche : un nom. */
 export type ProjectRowMember = { id: string; fullName: string };
 
-/** Une ligne de la liste transverse — ses cinq colonnes. */
+/**
+ * Une ligne de la liste transverse — **les sept colonnes de `docs/06` §4**
+ * depuis T8.2 : *« nom du projet, produit de rattachement, entité, statut,
+ * métiers, équipe, date de dernière activité. Rien d'autre. »*
+ *
+ * L'entité et les métiers ont manqué deux chantiers : T7.2 a posé leurs
+ * **filtres** sans poser leurs colonnes — son « Attendu » ne les nommait pas —
+ * et aucun ticket de C7 n'a rouvert cet écran.
+ */
 export type ProjectRow = {
   id: string;
   name: string;
   /** Le rattachement, affiché **et cliquable** : la hiérarchie reste lisible. */
   productId: string;
   productName: string;
+  /**
+   * L'entité, **tenue du produit** : un accompagnement n'en porte pas.
+   *
+   * `null` dans un seul cas, et il est forgé : un produit du domaine dont
+   * `entity_id` désigne une entité d'un **autre** domaine, que la jointure
+   * filtrée écarte. La ligne reste alors rendue, sans son entité — la règle
+   * qu'`originOf` tient déjà dans le flux de la vue d'ensemble : ce qu'on n'a
+   * pas lu ne s'invente pas, et une ligne ne disparaît pas pour autant.
+   */
+  entityLabel: string | null;
   statusLabel: string;
   statusNature: ProjectStatusNature;
+  /**
+   * Les métiers **déclarés de l'accompagnement** (D44), dans l'ordre du
+   * référentiel du domaine. Jamais ceux que son équipe porte : les deux peuvent
+   * diverger, et c'est le déclaré qui fait foi — la règle même du filtre posé
+   * par T7.2.
+   */
+  jobLabels: string[];
   team: ProjectRowMember[];
   lastActivityAt: Date | null;
 };
@@ -131,16 +156,16 @@ function likePattern(search: string): string {
  * lettre** (T7.2) : c'est la même liaison n-à-n, et elle appelle la même
  * précaution.
  *
- * **L'entité, elle, ne joint rien de neuf** : `products` est déjà en
- * `innerJoin`, avec son `filter()`, et l'entité se lit sur sa colonne. Il n'y a
- * donc aucun `filter()` de plus à ne pas oublier — la meilleure façon de ne pas
- * manquer une jointure est de ne pas en ajouter.
+ * **Le filtre d'entité, lui, ne joint rien de neuf** : `products` est déjà en
+ * `innerJoin`, avec son `filter()`, et l'entité se filtre sur sa colonne. La
+ * **colonne** d'entité, elle, demande le libellé, donc une jointure — gauche,
+ * pour la raison écrite à son `on` (T8.2).
  *
- * L'équipe est lue en une requête supplémentaire plutôt qu'agrégée en SQL : un
- * `json_agg` ferait tenir le tout en un aller-retour, au prix d'un type que rien
- * ne vérifie à la sortie du pilote. `is_contributor` n'est pas retenu — D9 sépare
- * l'appartenance à l'équipe du droit d'écrire, et cette liste affiche une équipe,
- * pas des droits.
+ * L'équipe et les métiers sont lus en deux requêtes supplémentaires plutôt
+ * qu'agrégés en SQL : un `json_agg` ferait tenir le tout en un aller-retour, au
+ * prix d'un type que rien ne vérifie à la sortie du pilote. `is_contributor`
+ * n'est pas retenu — D9 sépare l'appartenance à l'équipe du droit d'écrire, et
+ * cette liste affiche une équipe, pas des droits.
  */
 export function listProjects(
   scope: ScopedDb,
@@ -163,12 +188,27 @@ export function listProjects(
       conditions.push(eq(products.entityId, filters.entityId));
     }
 
+    /* **Les deux `exists` joignent leur référentiel, et c'est une correction de
+       T8.2** — trouvée par la ligne forgée du ticket, pas par la lecture. Ils ne
+       portaient que `filter(projectJobs)` / `filter(projectApproaches)`, donc ils
+       éprouvaient le domaine de la **liaison** et jamais celui de la **valeur** :
+       une liaison d'ici pointant un métier d'ailleurs ramenait sa ligne. Le cas
+       est forgé — la couche scopée refuse d'écrire une telle liaison, et l'écran
+       confronte de toute façon le paramètre au domaine avant d'appeler —, mais
+       c'est exactement la nature du défaut que ce ticket referme sur les
+       décomptes : *une étanchéité de second rang, sans conséquence sur une base
+       saine, et un contrat faux se corrige*.
+
+       Les deux constats d'étanchéité de ces filtres passaient jusqu'ici **parce
+       qu'aucune liaison de ce genre n'existait**. La fixture en porte une par
+       filtre depuis T8.2 : ils éprouvent enfin ce qu'ils affirment. */
     if (filters.jobId) {
       conditions.push(
         exists(
           database
             .select({ one: sql`1` })
             .from(projectJobs)
+            .innerJoin(jobs, and(eq(jobs.id, projectJobs.jobId), filter(jobs)))
             .where(
               and(
                 filter(projectJobs),
@@ -186,6 +226,13 @@ export function listProjects(
           database
             .select({ one: sql`1` })
             .from(projectApproaches)
+            .innerJoin(
+              approaches,
+              and(
+                eq(approaches.id, projectApproaches.approachId),
+                filter(approaches),
+              ),
+            )
             .where(
               and(
                 filter(projectApproaches),
@@ -232,6 +279,7 @@ export function listProjects(
         name: projects.name,
         productId: products.id,
         productName: products.name,
+        entityLabel: entities.label,
         statusLabel: projectStatuses.label,
         statusNature: projectStatuses.nature,
         lastActivityAt: projects.lastActivityAt,
@@ -240,6 +288,17 @@ export function listProjects(
       .innerJoin(
         products,
         and(eq(products.id, projects.productId), filter(products)),
+      )
+      /* **Une jointure gauche, et c'est un choix** (T8.2) : elle **nomme**
+         l'entité, elle ne restreint pas la liste. Les trois autres lectures qui
+         affichent une entité la joignent en interne ; ici une jointure interne
+         retirerait de la liste une ligne que `countProjects` compte encore —
+         c'est-à-dire qu'elle rouvrirait, d'un cran plus loin, le défaut même que
+         ce ticket referme. `products.entity_id` est `NOT NULL` : hors ligne
+         forgée, la colonne est toujours servie. */
+      .leftJoin(
+        entities,
+        and(eq(entities.id, products.entityId), filter(entities)),
       )
       .innerJoin(
         projectStatuses,
@@ -252,19 +311,44 @@ export function listProjects(
 
     const ids = rows.map((row) => row.id);
 
-    const members = await database
-      .select({
-        projectId: projectMembers.projectId,
-        id: persons.id,
-        fullName: persons.fullName,
-      })
-      .from(projectMembers)
-      .innerJoin(
-        persons,
-        and(eq(persons.id, projectMembers.personId), filter(persons)),
-      )
-      .where(and(filter(projectMembers), inArray(projectMembers.projectId, ids)))
-      .orderBy(asc(persons.fullName));
+    /* Deux lectures de plus, **et elles partent ensemble** : elles ne dépendent
+       que des identifiants ci-dessus, donc rien ne justifie de faire attendre la
+       seconde derrière la première. Jamais une requête par ligne — la discipline
+       de `listTeam` et de `findProjectActivities`. */
+    const [members, declaredJobs] = await Promise.all([
+      database
+        .select({
+          projectId: projectMembers.projectId,
+          id: persons.id,
+          fullName: persons.fullName,
+        })
+        .from(projectMembers)
+        .innerJoin(
+          persons,
+          and(eq(persons.id, projectMembers.personId), filter(persons)),
+        )
+        .where(
+          and(filter(projectMembers), inArray(projectMembers.projectId, ids)),
+        )
+        .orderBy(asc(persons.fullName)),
+      /* **Les métiers déclarés du projet** (D44), jamais ceux de son équipe :
+         un accompagnement peut mobiliser un métier que personne de son équipe ne
+         porte, et c'est le déclaré qui fait foi — la règle exacte du filtre posé
+         par T7.2, appliquée à sa colonne.
+
+         La forme est celle de l'équipe juste au-dessus, et `filter()` est posé
+         sur les **deux** tables : la liaison est une table du domaine comme les
+         autres, et l'oublier laisserait un projet d'ici déclarer un métier
+         d'ailleurs. L'ordre est celui du référentiel du domaine — `position`
+         d'abord, le libellé départageant —, celui de `approachLabels` sur la
+         page projet. */
+      database
+        .select({ projectId: projectJobs.projectId, label: jobs.label })
+        .from(projectJobs)
+        .innerJoin(jobs, and(eq(jobs.id, projectJobs.jobId), filter(jobs)))
+        .where(and(filter(projectJobs), inArray(projectJobs.projectId, ids)))
+        .orderBy(asc(jobs.position), asc(jobs.label)),
+    ]);
 
     const teams = new Map<string, ProjectRowMember[]>();
     for (const member of members) {
@@ -273,8 +357,16 @@ export function listProjects(
       teams.set(member.projectId, team);
     }
 
+    const jobLabels = new Map<string, string[]>();
+    for (const declared of declaredJobs) {
+      const labels = jobLabels.get(declared.projectId) ?? [];
+      labels.push(declared.label);
+      jobLabels.set(declared.projectId, labels);
+    }
+
     return rows.map((row) => ({
       ...row,
+      jobLabels: jobLabels.get(row.id) ?? [],
       team: teams.get(row.id) ?? [],
     }));
   });
