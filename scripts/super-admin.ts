@@ -27,7 +27,12 @@
  * serait inventer (même raisonnement que `scripts/seed.ts` sur `persons`).
  */
 
-import { superAdmin } from "../lib/db/scoped";
+import { asSuperAdmin, superAdmin, withoutAnySession } from "../lib/db/scoped";
+
+/* L'amorçage écrit hors de toute session — l'échappée nommée de T9.3. */
+const outsideAnySession = asSuperAdmin(
+  withoutAnySession("amorçage du premier droit"),
+);
 
 function argument(name: string): string | null {
   const prefix = `--${name}=`;
@@ -48,7 +53,7 @@ async function main(): Promise<void> {
     );
   }
 
-  const { row, created } = await superAdmin.upsertSuperAdmin({
+  const { row, created } = await outsideAnySession.upsertSuperAdmin({
     email,
     fullName,
   });

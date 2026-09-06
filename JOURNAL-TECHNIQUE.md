@@ -10642,3 +10642,76 @@ détachement par le fond. C'est son **bord** qui porte la limite du composant :
 `border-primary-base` (`#24226a`) sur `surface-neutral-pale` mesure **13,65:1**, très au-dessus des
 3:1 de WCAG 1.4.11 ; son texte, `content-primary-base`, mesure les mêmes 13,65:1 pour un seuil de
 4,5:1. C'est la position qui décide du jeton, jamais la provenance (leçon de T5.4).
+
+**T9.3 — Le périmètre a débordé sur vingt-neuf fichiers, et ce n'est pas une fonctionnalité.** La
+fiche annonce `lib/db/scoped.ts` et son test, plus `lib/auth/` pour le droit. Le geste retenu change
+la **signature** des deux écrivains : trente-six sites d'appel ont suivi — vingt-sept fichiers de
+tests qui construisent leur domaine de fixture, et les deux scripts d'amorçage. Aucun ne change de
+comportement, aucune fonctionnalité n'est ajoutée (règle 3) ; c'est la retombée mécanique d'un
+changement de porte. **Et c'est aussi la mesure du ticket** : le compilateur a désigné les
+trente-six, un par un. Une garde qu'on peut oublier d'appeler n'aurait rien désigné du tout.
+
+**T9.3 — Pourquoi la preuve se passe en argument, et pas par un sceau ESLint.** La voie écartée
+était une façade dans `lib/auth/` (`createDomainAsSuperAdmin()`) et une clause
+`no-restricted-syntax` interdisant `superAdmin.createDomain` hors de `lib/auth/`, `scripts/` et des
+tests. Elle ne coûtait **aucune** reprise d'appel, et c'est le patron de `dbClientLock`, qui tient
+la règle 1. Elle a été écartée pour la raison que le dépôt a déjà écrite contre lui-même :
+`ETAT.md` reproche à `uiLayerSeal` de *« garder une liste de six dossiers, pas une propriété »*, et
+prédit qu'*« un septième lui échappera »*. Un sceau nommant deux fonctions a exactement ce défaut —
+**le troisième écrivain ajouté demain ne serait pas rattrapé**. Le typage, lui, refuse l'appel nu
+sans qu'on ait à penser à l'étendre. Argument secondaire, mais réel : ouvrir `eslint.config.mjs`
+aurait réveillé le point ouvert d'`uiLayerSeal`, dont la destination est *« au prochain ticket qui
+ouvre le fichier »* — destination qui a déjà échoué une fois, et qui a coûté un ticket entier (T8.4).
+
+**T9.3 — La couche ne croit pas un `SuperAdminGrant` sur parole, et c'est ce qui fait tenir la
+forme.** Le typage oblige à nommer une autorité ; il ne dit pas qu'elle existe encore. `asSuperAdmin`
+**relit la ligne** avant chaque écriture — sans quoi forger `{ kind: "super_admin", superAdminId: …
+}` depuis `app/` aurait suffi, et le brandage TypeScript n'aurait été qu'un décor. Deux lectures
+pour une écriture est le prix, et la création d'un domaine est un geste rare. La propriété est
+mesurée sur une **autorité forgée** dans `lib/db/scoped.test.ts`, séparément de la garde du droit.
+
+**T9.3 — `findSuperAdminById` enfreint la lettre d'un interdit de la fiche, et l'argument est
+écrit.** *« Aucune quatrième fonction ajoutée à `superAdmin` »* était déjà mort : T9.2 en a ajouté
+deux avec argument, et `ETAT.md` note la fiche comme *« périmée sur deux points »*. Ce qui a fait
+pencher : **la lecture est la garde elle-même**, pas une commodité. Sans elle, un super
+administrateur archivé garderait son droit **trente jours**, le temps que son cookie expire — alors
+que `getSession` relit la personne à chaque requête depuis C1. Le contournement conforme à la lettre
+existait — balayer `listSuperAdmins()` — et disait « liste » là où le geste dit « une ligne ».
+
+**T9.3 — La fiche demande une mesure impossible, et elle se contredit elle-même.** *« Validation —
+par l'action, en `text/plain`, avec étape témoin »* : aucun point d'entrée HTTP n'existe avant T9.4,
+et les interdits du ticket lui-même en refusent un (*« Ce ticket protège un point d'entrée, il n'en
+rend aucun »*). La « Vérification de fin de chantier » de `tickets-C9.md` dit d'ailleurs l'inverse
+de la fiche : *« T9.3 ne rend aucun écran non plus : son critère est un décompte en base après un
+appel refusé »*. C'est cette phrase-là qui a été suivie. Ce qui remplace le `text/plain` est plus
+fort que lui : le cookie n'est pas simulé, il est **scellé par le vrai sceau** et rouvert par le vrai
+code, et le geste mesuré est exactement celui que T9.4 écrira.
+
+**T9.3 — Le résidu de la garde, écrit plutôt que masqué.** Rien n'empêche **mécaniquement** un
+module d'`app/` d'importer `withoutAnySession()` et de s'accorder l'autorité. Ce qui l'en empêche
+est que l'appel se lit : le nom dit qu'on écrit hors de toute session, et la revue le voit. La
+frontière dure est ailleurs — un module d'`app/` peut de toute façon importer `lib/db/scoped.ts`
+tout entier. **Le sceau ESLint écarté n'aurait pas refermé ce résidu non plus** : il aurait interdit
+deux noms, jamais l'échappée.
+
+**T9.3 — `listSuperAdmins` reste ouverte, et c'est une décision.** Elle dit **qui détient le droit**,
+ce qui n'est pas anodin, et la fiche ne demande de garde que sur ce qui écrit. Elle n'a qu'un
+appelant, un script d'amorçage qui tourne hors de toute session : la fermer aurait demandé de lui
+passer une autorité qu'il n'a pas plus de raison d'avoir que pour écrire. Le point est posé ici
+plutôt que tranché en silence.
+
+**T9.3 — Une troisième classe d'erreur, et non un `DomainScopeError` élargi.** L'en-tête de
+`lib/db/scoped.ts` écrit que les deux classes existantes sont distinctes *« pour que l'appelant sache
+s'il a franchi une frontière de domaine ou violé une règle métier »*. Une écriture au-dessus des
+domaines sans autorité n'est ni l'un ni l'autre — il n'y a pas de domaine à franchir. Les confondre
+aurait rendu le message d'interface de T9.4 impossible à écrire, ce qui est l'argument déjà posé
+pour les deux premières.
+
+**T9.3 — Une mise en défaut a failli détruire ce qu'elle mesurait.** Le script de sonde restaurait
+le fichier patché par `git checkout -- <path>`. Sur `lib/db/scoped.ts`, **dont le travail du ticket
+n'était pas commité, cela l'aurait effacé** ; sur `lib/auth/super-admin.ts`, fichier neuf donc non
+suivi par git, la commande échoue et le fichier **est resté patché** après la première sonde. Arrêté
+avant `scoped.ts`, fichier remis en état, `tsc` et `lint` revérifiés. **La reprise sauvegarde par
+copie, restaure dans un `finally`, et relit le fichier pour le comparer à sa sauvegarde.** La règle
+qui en sort : *une neutralisation se défait par où elle s'est faite* — jamais par un outil qui
+connaît un autre état de référence que celui d'avant la sonde.

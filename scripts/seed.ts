@@ -46,8 +46,10 @@
  */
 
 import {
+  asSuperAdmin,
   forDomain,
   superAdmin,
+  withoutAnySession,
   type InsertValues,
   type Row,
   type ScopedDb,
@@ -90,6 +92,9 @@ import {
   useCasePersonas,
   useCases,
 } from "../lib/db/schema";
+
+/* L'amorçage écrit hors de toute session — l'échappée nommée de T9.3. */
+const outsideAnySession = asSuperAdmin(withoutAnySession("amorçage"));
 
 /* ==========================================================================
    La fixture — le cadre (docs/04 §2)
@@ -1199,7 +1204,8 @@ async function seed(): Promise<void> {
 
   const known = await superAdmin.listDomains({ includeArchived: true });
   const existingDomain = known.find((row) => row.name === DOMAIN.name);
-  const domain = existingDomain ?? (await superAdmin.createDomain(DOMAIN));
+  const domain =
+    existingDomain ?? (await outsideAnySession.createDomain(DOMAIN));
   record("domains", existingDomain ? "unchanged" : "created");
 
   const scope = forDomain({ domainId: domain.id, actorId: null });

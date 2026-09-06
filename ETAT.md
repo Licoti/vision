@@ -2,17 +2,15 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 06/09/2026, **T9.2 terminé** — le SSO. `lib/auth/provider.ts` réécrit,
-trois modules neufs, quatre routes, **aucun écran du produit touché** : la séparation posée en C1
-était vraie. **Onze contre-épreuves isolées**, et le couplage de T8.1 refermé — mesuré par un
-domaine étranger qui fait passer un fichier de 12 verts à 11 rouges.
+**Dernière mise à jour :** 06/09/2026, **T9.3 terminé** — le droit du super administrateur. La
+preuve se passe **en argument**, sur le patron de `forDomain` : `superAdmin` garde six lectures,
+`asSuperAdmin(grant)` tient les deux écritures, et **le compilateur a désigné les trente-six sites
+d'appel** qu'un sceau ESLint aurait laissés passer. **Trois gardes mises en défaut séparément.**
 **Chantier en cours :** **C9 — SSO et administration multi-domaine** (`tickets-C9.md`).
 **C7 garde ses quatre tickets** T7.7 → T7.10 (`tickets-C7.md`) et passe après C9 — second écart à
-`docs/05` §6. **Vert de référence : 1 689 tests sur 57 fichiers, `lint` et `tsc` au vert** (1 655
-avant T9.2) — chaque ticket y compare le sien, jamais à un souvenir. **Ticket suivant : T9.3 — le
-droit du super administrateur**, qui hérite de **sept** fonctions et de **deux** écrivains.
-**L'exclusion de `docs/05` §3 et §4 a été levée le 06/09/2026** — deux lignes amendées et datées par
-une main humaine : **plus aucun ticket de C9 n'est bloqué.**
+`docs/05` §6. **Vert de référence : 1 697 tests sur 58 fichiers, `lint` et `tsc` au vert** (1 689
+avant T9.3) — chaque ticket y compare le sien, jamais à un souvenir. **Ticket suivant : T9.4 —
+l'écran au-dessus des domaines**, premier appelant de `requireSuperAdmin()`.
 
 ---
 
@@ -31,7 +29,7 @@ une main humaine : **plus aucun ticket de C9 n'est bloqué.**
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
 | C7 — Finitions | T7.1 → T7.10 | **en pause** — T7.1 → T7.6 livrés, T7.7 → T7.10 après C9 |
 | C8 — Dette | T8.1 → T8.5 | **terminé** |
-| C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **en cours** — T9.1, T9.2 livrés ; plus aucun ticket bloqué |
+| C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **en cours** — T9.1 → T9.3 livrés ; plus aucun ticket bloqué |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
 
 ---
@@ -61,10 +59,11 @@ une main humaine : **plus aucun ticket de C9 n'est bloqué.**
 - **C8 — Dette — T8.1 → T8.5, 04-05/09.** Le premier chantier que `docs/05` §5 n'a pas écrit, tiré
   des seuls points ouverts — et **quatre énoncés de fiche sur cinq y ont été mis en défaut**, du
   domaine de tests résiduel à la redirection redondante. 1 582 → 1 646 tests.
-- **C9 — T9.1 puis T9.2, 06/09.** Le schéma de l'identité — deux tables hors du produit, une clé
-  **laissée intacte plutôt qu'élargie**, les `NULL` étant distincts en base. Puis le SSO : le stub
-  tombe, le domaine cesse d'être *trouvé* pour être *désigné*, et **aucun écran du produit ne
-  bouge**. 1 646 → 1 655 → **1 689 tests sur 57 fichiers**.
+- **C9 — T9.1 → T9.3, 06/09.** Le schéma de l'identité — deux tables hors du produit, une clé
+  **laissée intacte plutôt qu'élargie**. Puis le SSO : le stub tombe, le domaine cesse d'être
+  *trouvé* pour être *désigné*, **aucun écran du produit ne bouge**. Puis le droit du super
+  administrateur : **la preuve se passe en argument**, et le compilateur désigne les trente-six
+  appels. 1 646 → 1 689 → **1 697 tests sur 58 fichiers**.
 - **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, tous détaillés dans
   `HISTORIQUE-TICKETS.md` et `JOURNAL-TECHNIQUE.md`. **Cinq portent une migration, `0010` à `0014`** :
   disponibilité déduite, cible unique portée par le produit, période déduite des activités,
@@ -105,15 +104,15 @@ refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le
 
 ### b. Assignés à un ticket
 
-**C9 — T9.1 et T9.2 sont faits ; les quatre autres gardent leur fiche entière** (`tickets-C9.md`).
-**T9.3** le droit qui manque à `superAdmin` — et sa fiche est **périmée sur deux points** : elle dit
-« trois fonctions », T9.1 en a fait cinq et **T9.2 sept**, et son interdit *« aucune quatrième
-fonction ajoutée »* a été enfreint avec argument (journal technique). Il y a donc **deux écrivains à
-garder, `createDomain` et `upsertSuperAdmin`**, quand les quatre lectures restent ouvertes — elles
-tournent *pendant* la connexion · **T9.4** l'écran au-dessus des domaines · **T9.5** l'amorçage
-d'un domaine neuf · **T9.6** les comptes d'un domaine, dont **`email`, sans lequel aucune personne
-saisie dans Vision ne peut se connecter** — le jeu de démonstration lui-même a `email = null`, donc
-**aucun de ses comptes n'est joignable par le SSO** (mesuré en T9.2).
+**C9 — T9.1 à T9.3 sont faits ; les trois autres gardent leur fiche entière** (`tickets-C9.md`).
+**T9.4** l'écran au-dessus des domaines, **premier appelant de `requireSuperAdmin()`** · **T9.5**
+l'amorçage d'un domaine neuf · **T9.6** les comptes d'un domaine, dont **`email`, sans lequel aucune
+personne saisie dans Vision ne peut se connecter** — le jeu de démonstration lui-même a
+`email = null`, donc **aucun de ses comptes n'est joignable par le SSO** (mesuré en T9.2).
+**La garde de T9.3 a deux limites nommées** : `withoutAnySession()` est importable depuis `app/`,
+rien ne l'en empêche mécaniquement — seul son nom le dit ; et **`listSuperAdmins` reste ouverte**
+alors qu'elle dit qui détient le droit, la fiche ne gardant que ce qui écrit. → **T9.4**, le premier
+écran qui appelle la garde.
 **`persons.identity_provider` n'a aucun écrivain, et T9.2 a écrit pourquoi** : l'inscrire sur une
 ligne trouvée par e-mail buterait sur `persons_external_id_requires_directory`, toutes les personnes
 saisies dans Vision étant `manual`. Le geste n'a d'objet qu'avec un import d'annuaire, que C9
@@ -244,5 +243,8 @@ secondaire · les props d'icône de `Button` n'ont aucun appelant.
   et `requireSession` redirige vers `/auth/acces`. **`/dev/session` reste**, 404 en production :
   une adresse personnelle ne porte ni `hd` ni `tid`, donc le chemin d'un membre de domaine ne se
   parcourt pas au navigateur.
+- **Une écriture au-dessus des domaines se prouve.** `superAdmin` ne porte que des lectures ; les
+  deux écrivains vivent derrière `asSuperAdmin(grant)`, et la couche **relit la ligne** — un grant
+  forgé ne vaut rien. `requireSuperAdmin()` depuis une session, `withoutAnySession(motif)` hors.
 - **Les maquettes `docs/design/maquettes/` sont une référence visuelle**, jamais branchées, et **le
   levier n'est pas le modèle mais les quatre disciplines de vérification.**

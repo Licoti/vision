@@ -18,7 +18,12 @@ import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { db } from "../db/client";
-import { forDomain, superAdmin, type ScopedTable } from "../db/scoped";
+import {
+  asSuperAdmin,
+  forDomain,
+  withoutAnySession,
+  type ScopedTable,
+} from "../db/scoped";
 import {
   domainIdentities,
   domains,
@@ -36,6 +41,9 @@ import {
   rightsFor,
   type Session,
 } from "./session";
+
+/* Une fixture écrit hors de toute session — l'échappée nommée de T9.3. */
+const outsideAnySession = asSuperAdmin(withoutAnySession("fixture"));
 
 /* ==========================================================================
    Le jeu d'essai
@@ -74,7 +82,7 @@ let other: Fixture;
 let suspendedDomainId: string;
 
 async function seedDomain(label: string): Promise<Fixture> {
-  const domain = await superAdmin.createDomain({
+  const domain = await outsideAnySession.createDomain({
     name: `__test__auth__${label}__${suffix}`,
     competenceCenterName: `Centre ${label}`,
   });
@@ -181,7 +189,7 @@ beforeAll(async () => {
   main = await seedDomain("main");
   other = await seedDomain("other");
 
-  const suspended = await superAdmin.createDomain({
+  const suspended = await outsideAnySession.createDomain({
     name: `__test__auth__suspended__${suffix}`,
     competenceCenterName: "Centre suspendu",
   });

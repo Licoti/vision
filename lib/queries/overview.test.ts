@@ -50,7 +50,12 @@ import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { db } from "@/lib/db/client";
-import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
+import {
+  asSuperAdmin,
+  forDomain,
+  withoutAnySession,
+  type ScopedDb,
+} from "@/lib/db/scoped";
 import {
   approaches,
   domains,
@@ -73,6 +78,9 @@ import {
   listStaleProjects,
   staleBefore,
 } from "./overview";
+
+/* Une fixture écrit hors de toute session — l'échappée nommée de T9.3. */
+const outsideAnySession = asSuperAdmin(withoutAnySession("fixture"));
 
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
 const teardownOrder = [
@@ -246,7 +254,7 @@ let leakedStatusProjectId: string;
 let statusLeakApproachId: string;
 
 async function seedDomain(label: string): Promise<Fixture> {
-  const domain = await superAdmin.createDomain({
+  const domain = await outsideAnySession.createDomain({
     name: `__test__overview__${label}__${suffix}`,
     competenceCenterName: `Centre ${label}`,
   });

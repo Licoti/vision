@@ -7593,3 +7593,111 @@ rouvre pas, la règle 2 tenant depuis C1 pour que ce soit possible un jour, pas 
 maintenant.
 
 **T9.4, T9.5 et T9.6 ne sont plus bloqués.**
+
+---
+
+## T9.3 — Le droit du super administrateur : la preuve se passe en argument — 06/09/2026
+
+**Le ticket que T9.2 a rendu nécessaire en le rendant possible.** `superAdmin` portait sept
+fonctions, dont **deux qui écrivent**, et aucune ne demandait de droit. Tant qu'aucun écran ne les
+appelait, le fait était sans conséquence ; T9.4 les appellera. *Le droit passe avant l'écran, et pas
+après.*
+
+### Le choix de forme, et la voie écartée
+
+La difficulté était nommée par le code lui-même : les deux écrivains ont des appelants **légitimes
+et hors session** — les deux scripts d'amorçage, et **trente-cinq sites d'appel dans vingt-sept
+fichiers de tests** qui construisent leur domaine de fixture. Une garde qui les aurait cassés aurait
+été désactivée au premier usage.
+
+**La voie écartée** était une façade dans `lib/auth/` plus une clause ESLint interdisant
+`superAdmin.createDomain` hors de `lib/auth/`, `scripts/` et des tests. Elle ne coûtait **aucune**
+reprise d'appel, et c'est le patron de `dbClientLock`, qui tient la règle 1. Elle a été écartée pour
+la raison que le dépôt a déjà écrite contre lui-même : `ETAT.md` reproche à `uiLayerSeal` de
+*« garder une liste de six dossiers, pas une propriété »* et prédit qu'*« un septième lui
+échappera »*. Un sceau nommant deux fonctions a exactement ce défaut.
+
+**Le geste retenu est celui de `forDomain`, appliqué un cran plus haut.** On n'écrit pas dans une
+table métier sans avoir nommé un domaine ; on n'écrit plus au-dessus des domaines sans avoir nommé
+une autorité.
+
+| | |
+|---|---|
+| `superAdmin` | ce qui se **lit** avant le domaine — six lectures, ouvertes, car elles tournent *pendant* la connexion |
+| `asSuperAdmin(grant)` | ce qui s'**écrit** au-dessus des domaines — deux écritures, fermées |
+
+**Et la couche ne croit pas le grant sur parole** : elle **relit la ligne** avant chaque écriture.
+Sans cela, forger `{ kind: "super_admin", superAdminId: … }` depuis `app/` aurait suffi, et le
+typage n'aurait été qu'un décor.
+
+### Ce qui a été écrit
+
+`lib/db/scoped.ts` — le bandeau « Ce qui vit avant le domaine » **écrit** la distinction au lieu de
+l'annoncer ; `SuperAdminGrant`, `withoutAnySession()`, `SuperAdminRequiredError` ;
+**`findSuperAdminById`**, qui est la garde elle-même et non une commodité ; `asSuperAdmin(grant)`,
+dont les deux corps n'ont pas bougé d'une ligne — seule leur porte est neuve.
+
+`lib/auth/super-admin.ts`, neuf — `getSuperAdmin()` sur le patron de `getSession`, et
+`requireSuperAdmin()` qui redirige comme `requireSession`. **Aucun droit neuf dans
+`lib/auth/session.ts`** : l'arbitrage (c) de C5bis l'interdit, et un super administrateur n'a ni
+domaine ni ligne `persons` — il n'a pas sa place dans `SessionRights`.
+
+**Trente-six sites d'appel repris dans vingt-neuf fichiers**, sans un changement de comportement.
+C'est un débordement du périmètre annoncé, consigné au journal : la retombée mécanique d'un
+changement de porte, et non une fonctionnalité (règle 3). **C'est aussi la mesure du geste** — le
+compilateur les a désignés un par un ; une garde qu'on peut oublier d'appeler n'aurait rien désigné.
+
+### Les mesures — un décompte en base, jamais un code de retour
+
+**La fiche demandait une mesure impossible**, et elle se contredit elle-même : *« par l'action, en
+`text/plain` »*, quand ses propres interdits refusent tout point d'entrée (*« Ce ticket protège un
+point d'entrée, il n'en rend aucun »*) et que la « Vérification de fin de chantier » écrit
+l'inverse — *« son critère est un décompte en base après un appel refusé »*. C'est cette phrase-là
+qui a été suivie, et ce qui remplace le `text/plain` est plus fort que lui : **le cookie n'est pas
+simulé, il est scellé par le vrai sceau** et rouvert par le vrai code, et le geste mesuré —
+`requireSuperAdmin()` puis `asSuperAdmin(grant)` — est exactement celui que T9.4 écrira.
+
+**Chaque cas lit la cible avant le geste, puis après.** Sans étape témoin, un zéro final ne
+distingue pas un refus d'une cible qui n'a jamais été atteignable.
+
+| Ce qui frappe | Attendu | Relevé |
+|---|---|---|
+| aucun cookie | refus | 307 → `/auth/acces`, **`domains` inchangé** |
+| un **responsable de domaine** — la personne la plus habilitée du produit | refus | 307 → `/auth/acces`, **`domains` inchangé** |
+| un super administrateur **archivé**, cookie parfaitement valide | refus | 307 → `/auth/acces`, **`domains` inchangé** |
+| un super administrateur **en exercice** | création | **`domains` +1** |
+| une **autorité forgée** — un identifiant qui ne désigne personne | refus | `SuperAdminRequiredError`, **`domains` inchangé** |
+| une autorité **archivée**, passée directement à la couche | refus | idem, sur `domains` **et** sur `super_admins` |
+
+**Deux barrières, et elles ne se remplacent pas** : celle du droit refuse un visiteur qui n'a pas
+d'autorité ; celle de la couche refuse un appelant qui **fabrique** la sienne.
+
+**`npm run db:seed` reste rejouable** — *« Rien à faire : le domaine était déjà à jour »* —, et
+`npm run auth:super-admin` refuse toujours avant toute écriture quand ses arguments manquent.
+
+### La mise en défaut — trois gardes, trois isolements
+
+Chaque garde a été neutralisée **seule**, la suite entière relancée, et l'arbre restauré par copie.
+
+| Garde neutralisée | Tests tombés | Isolement |
+|---|---|---|
+| le refus de `requireSuperAdmin` | **3** — les trois refus du droit | la quatrième mesure tient : la garde laisse passer ce qu'elle doit |
+| la **relecture de la ligne** (`getSuperAdmin`) | **1** — le super administrateur archivé, et lui seul | la seconde barrière porte, à elle seule, un test qu'aucune autre ne porte |
+| `assertAuthority` (`asSuperAdmin`) | **3** — les trois de la couche | `super-admin.test.ts` reste vert : les deux barrières sont bien indépendantes |
+
+**Aucune neutralisation n'a fait tomber un test d'une autre garde**, ni un test ailleurs dans le
+dépôt : 1 694 ou 1 696 verts sur 1 697 à chaque fois. La sonde B est la plus parlante — un seul test
+tombe, celui de la propriété que *le cookie vit trente jours, la ligne se relit à chaque passage*.
+
+### L'incident de méthode, consigné parce qu'il a failli coûter le ticket
+
+Le premier script de sonde restaurait le fichier patché par `git checkout -- <path>`. Sur
+`lib/db/scoped.ts`, **dont le travail du ticket n'est pas commité, cela l'aurait effacé** ; et sur
+`lib/auth/super-admin.ts`, non suivi par git, la commande échoue — le fichier est resté patché après
+la sonde A. Le script a été arrêté avant d'atteindre `scoped.ts`, le fichier remis en état, `tsc` et
+`lint` revérifiés. **La reprise sauvegarde par copie, restaure dans un `finally`, et relit le
+fichier pour vérifier qu'il est identique à sa sauvegarde.** Une mise en défaut ne doit pas pouvoir
+détruire ce qu'elle mesure.
+
+**Vert** : 1 689 → **1 697 tests sur 58 fichiers** (+8, +1 fichier), `lint` (`--max-warnings=0`) et
+`tsc` au vert. Aucune migration, aucune dépendance, **aucun écran**.

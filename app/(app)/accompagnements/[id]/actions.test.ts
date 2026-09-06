@@ -53,8 +53,9 @@ import { SESSION_COOKIE, sealPrincipal } from "@/lib/auth/cookie";
 import { db } from "@/lib/db/client";
 import {
   DomainScopeError,
+  asSuperAdmin,
   forDomain,
-  superAdmin,
+  withoutAnySession,
   type ScopedDb,
 } from "@/lib/db/scoped";
 import {
@@ -76,6 +77,9 @@ import {
   results,
   tools,
 } from "@/lib/db/schema";
+
+/* Une fixture écrit hors de toute session — l'échappée nommée de T9.3. */
+const outsideAnySession = asSuperAdmin(withoutAnySession("fixture"));
 
 /**
  * Qui la requête prétend être — **et dans quel domaine** (T9.2).
@@ -199,7 +203,7 @@ let createdDomainId: string | null = null;
 let createdOtherDomainId: string | null = null;
 
 beforeAll(async () => {
-  const domain = await superAdmin.createDomain({
+  const domain = await outsideAnySession.createDomain({
     name: `__test__projet_actions__${suffix}`,
     competenceCenterName: `Centre ${suffix}`,
   });
@@ -301,7 +305,7 @@ beforeAll(async () => {
 
   /* Un accompagnement d'un **autre domaine**, créé par sa propre couche
      scopée : rien ici ne contourne la règle 1, pas même pour forger. */
-  const otherDomain = await superAdmin.createDomain({
+  const otherDomain = await outsideAnySession.createDomain({
     name: `__test__projet_actions_ailleurs__${suffix}`,
     competenceCenterName: `Centre ailleurs ${suffix}`,
   });

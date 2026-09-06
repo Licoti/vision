@@ -903,26 +903,77 @@ export function forDomain(scope: Scope) {
    que par `forDomain`, et les deux lectures d'identité ne rendent que de quoi
    *choisir* un domaine, jamais de quoi le traverser.
 
-   **Aucune de ces fonctions ne demande de droit**, et c'est l'objet de T9.3 :
-   les deux lectures d'identité doivent rester ouvertes — elles s'exécutent
-   *pendant* la connexion, quand aucune session n'existe encore —, quand
-   `createDomain` n'a aucune raison de l'être. La distinction s'écrit là-bas,
-   avant que T9.4 n'ouvre l'écran qui appelle.
+   **La distinction que T9.3 devait écrire, la voici — et elle est portée par
+   deux objets, pas par un commentaire.**
+
+     `superAdmin`            ce qui se **lit** avant le domaine. Ouvert, et il
+                             doit l'être : ces lectures s'exécutent *pendant* la
+                             connexion, quand aucune session n'existe encore.
+                             Une garde ici fermerait la porte à qui vient
+                             l'ouvrir.
+
+     `asSuperAdmin(grant)`   ce qui s'**écrit** au-dessus des domaines. Fermé :
+                             on ne l'obtient qu'en nommant son autorité.
+
+   **C'est le geste de `forDomain`, appliqué un cran plus haut.** On n'écrit pas
+   dans une table métier sans avoir nommé un domaine ; on n'écrit pas au-dessus
+   des domaines sans avoir nommé une autorité. La preuve se passe en argument
+   plutôt que de se vérifier par un sceau ESLint, et la raison est écrite dans
+   `ETAT.md` à propos d'`uiLayerSeal` : *une garde qui désigne une liste plutôt
+   qu'une propriété vieillit à chaque ajout*. Un sceau nommant `createDomain` et
+   `upsertSuperAdmin` laisserait passer le troisième écrivain venu ; le typage,
+   lui, le refuse sans qu'on ait à y penser.
    ========================================================================== */
 
-export const superAdmin = {
-  async createDomain(values: {
-    name: string;
-    competenceCenterName: string;
-  }): Promise<InferSelectModel<typeof domains>> {
-    const rows = await db.insert(domains).values(values).returning();
-    const row = rows[0];
-    if (!row) {
-      throw new IntegrityError("La création du domaine n'a rien renvoyé.");
-    }
-    return row;
-  },
+/**
+ * Une écriture au-dessus des domaines a été tentée sans autorité vivante.
+ *
+ * **Une troisième classe, et pas un `DomainScopeError`.** Celui-ci dit qu'une
+ * écriture a tenté de sortir de son domaine ; ici il n'y a pas de domaine à
+ * sortir — c'est l'autorité qui manque. Les confondre rendrait le message
+ * d'interface impossible à écrire, ce que l'en-tête de ce fichier dit déjà des
+ * deux premières.
+ */
+export class SuperAdminRequiredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SuperAdminRequiredError";
+  }
+}
 
+/**
+ * L'autorité d'une écriture au-dessus des domaines. **Deux provenances, et pas
+ * une de plus.**
+ *
+ * `super_admin` — une session vérifiée. C'est `requireSuperAdmin()`
+ * (`lib/auth/super-admin.ts`) qui la produit, et elle **n'est pas crue sur
+ * parole** : `asSuperAdmin` relit la ligne avant chaque écriture. Forger ce
+ * couple depuis `app/` ne donne donc rien — l'identifiant doit désigner un
+ * super administrateur qui existe et qui n'est pas archivé.
+ *
+ * `outside_any_session` — ce qui tourne hors de toute requête HTTP : les deux
+ * scripts d'amorçage, et les fixtures des tests. **C'est l'échappée, et son nom
+ * est l'alarme.** Rien n'empêche mécaniquement `app/` de l'importer ; ce qui
+ * l'en empêche est qu'elle se lit. Le résidu est consigné au journal technique
+ * plutôt que masqué.
+ */
+export type SuperAdminGrant =
+  | { readonly kind: "super_admin"; readonly superAdminId: string }
+  | { readonly kind: "outside_any_session"; readonly reason: string };
+
+/**
+ * L'autorité de ce qui n'a pas de session — **un script, une fixture**.
+ *
+ * *« L'amorçage d'un droit qui, par construction, ne peut pas s'accorder depuis
+ * l'intérieur du produit — comme une première clé se pose de l'extérieur de la
+ * serrure »* (`scripts/super-admin.ts`). Le motif n'est lu par personne : il
+ * est là pour que l'appel dise pourquoi il se passe de session.
+ */
+export function withoutAnySession(reason: string): SuperAdminGrant {
+  return { kind: "outside_any_session", reason };
+}
+
+export const superAdmin = {
   async findDomain(
     id: string,
   ): Promise<InferSelectModel<typeof domains> | undefined> {
@@ -979,67 +1030,34 @@ export const superAdmin = {
   },
 
   /**
-   * Le seul écrivain de `super_admins` — **et il n'a qu'un appelant, un script**
-   * (T9.2, `scripts/auth:super-admin`).
+   * La même lecture, par identifiant — **et c'est la seconde barrière** (T9.3).
    *
-   * **Pourquoi la fonction vit ici.** Le premier super administrateur ne peut
-   * pas s'accorder depuis l'intérieur du produit : c'est l'amorçage d'un droit,
-   * comme une première clé se pose de l'extérieur de la serrure. Le geste doit
-   * pourtant passer par cette couche — `lib/db/client` n'est importable que par
-   * ce fichier (règle 1, tenue par ESLint), et un script qui ouvrirait sa propre
-   * connexion pour contourner cela contournerait la règle, pas la contrainte.
+   * Le cookie de session vit trente jours et ne porte qu'un identifiant.
+   * `getSession` relit la personne à **chaque** requête, si bien qu'un accès
+   * retiré ne survit pas dans un cookie déjà posé ; le super administrateur n'a
+   * pas de raison d'échapper à cette règle. Sans cette lecture, archiver une
+   * ligne ne retirerait son droit qu'au bout d'un mois — or *archiver **est** le
+   * geste qui retire le droit*.
    *
-   * **Elle écrit, donc elle demandera un droit** : c'est T9.3, qui distingue ce
-   * qui doit rester ouvert au chargement de session — les deux lectures
-   * d'identité, qui s'exécutent *pendant* la connexion — de ce qui n'a aucune
-   * raison de l'être. `createDomain` et celle-ci sont du second groupe.
+   * **Elle n'est pas une commodité, elle est la garde** : `asSuperAdmin`
+   * l'appelle avant chaque écriture, et `getSuperAdmin` avant chaque rendu.
+   * C'est ce qui autorise à ne pas croire un `SuperAdminGrant` sur parole.
    *
-   * **Rejouable**, comme l'amorçage des référentiels de T8.4 : une seconde pose
-   * sur la même adresse met le nom à jour et **rétablit une ligne archivée**
-   * plutôt que de buter sur `super_admins_email_unique`. Réaccorder le droit à
-   * quelqu'un qu'on avait archivé est un geste légitime, et le refuser en
-   * silence sur un conflit d'unicité serait illisible.
+   * **Elle enfreint la lettre d'un interdit de la fiche** — *« aucune quatrième
+   * fonction ajoutée »* —, lettre déjà morte : T9.2 en a ajouté deux avec
+   * argument, et `ETAT.md` note la fiche comme périmée sur ce point précis. Un
+   * balayage de `listSuperAdmins` aurait tenu la lettre en disant « liste » là
+   * où le geste dit « une ligne ».
    */
-  async upsertSuperAdmin(values: {
-    email: string;
-    fullName: string;
-  }): Promise<{ row: InferSelectModel<typeof superAdmins>; created: boolean }> {
-    /* Sur `lower(email)`, du même côté que l'index unique — et **sans écarter
-       les archivés**, à la différence de `findSuperAdminByEmail` : cette
-       lecture-ci cherche la ligne que la base empêcherait de doubler, pas celle
-       qui ouvre une session. */
-    const existing = await db
+  async findSuperAdminById(
+    id: string,
+  ): Promise<InferSelectModel<typeof superAdmins> | undefined> {
+    const rows = await db
       .select()
       .from(superAdmins)
-      .where(sql`lower(${superAdmins.email}) = lower(${values.email})`)
+      .where(and(eq(superAdmins.id, id), isNull(superAdmins.archivedAt)))
       .limit(1);
-
-    const known = existing[0];
-
-    if (known) {
-      const updated = await db
-        .update(superAdmins)
-        .set({ ...values, archivedAt: null, updatedAt: new Date() })
-        .where(eq(superAdmins.id, known.id))
-        .returning();
-
-      const row = updated[0];
-      if (!row) {
-        throw new IntegrityError(
-          "La mise à jour du super administrateur n'a rien renvoyé.",
-        );
-      }
-      return { row, created: false };
-    }
-
-    const inserted = await db.insert(superAdmins).values(values).returning();
-    const row = inserted[0];
-    if (!row) {
-      throw new IntegrityError(
-        "La création du super administrateur n'a rien renvoyé.",
-      );
-    }
-    return { row, created: true };
+    return rows[0];
   },
 
   /**
@@ -1086,3 +1104,125 @@ export const superAdmin = {
     return rows[0];
   },
 };
+
+/**
+ * Les deux écritures au-dessus des domaines — **et la porte qui les précède**.
+ *
+ * `asSuperAdmin(grant)` est à `superAdmin` ce que `forDomain(scope)` est aux
+ * tables métier : on ne tient pas l'écriture, on tient de quoi l'obtenir. Le
+ * corps des deux fonctions n'a pas bougé d'une ligne en T9.3 ; seule leur porte
+ * est neuve.
+ *
+ * **L'autorité se vérifie ici, et pas seulement chez l'appelant.** Un
+ * `SuperAdminGrant` n'est pas un laissez-passer : la ligne est relue avant
+ * chaque écriture, et une ligne archivée entre-temps ne passe plus. Mettre la
+ * frontière dans la vigilance de qui appelle est exactement ce que
+ * `findSuperAdminByEmail` refuse de faire depuis T9.1.
+ *
+ * **Aucun `created_by` n'est écrit pour autant** : `domains` n'en a pas, T9.1
+ * l'a voulu ainsi, et lui en donner un serait une migration — donc un signal
+ * d'arrêt (interdits communs de C9). L'autorité est une **preuve**, pas une
+ * provenance.
+ */
+export function asSuperAdmin(grant: SuperAdminGrant) {
+  /**
+   * La garde, appelée avant chaque écriture et par elles seules.
+   *
+   * Hors session, il n'y a rien à vérifier : un script tourne dans le terminal
+   * de qui tient déjà les secrets de la base, et la clé est dans sa main avant
+   * d'être dans la serrure.
+   */
+  async function assertAuthority(): Promise<void> {
+    if (grant.kind === "outside_any_session") return;
+
+    const admin = await superAdmin.findSuperAdminById(grant.superAdminId);
+    if (!admin) {
+      throw new SuperAdminRequiredError(
+        "Écriture au-dessus des domaines refusée : aucun super administrateur " +
+          "en exercice ne porte cette autorité.",
+      );
+    }
+  }
+
+  return {
+    async createDomain(values: {
+      name: string;
+      competenceCenterName: string;
+    }): Promise<InferSelectModel<typeof domains>> {
+      await assertAuthority();
+
+      const rows = await db.insert(domains).values(values).returning();
+      const row = rows[0];
+      if (!row) {
+        throw new IntegrityError("La création du domaine n'a rien renvoyé.");
+      }
+      return row;
+    },
+
+    /**
+     * Le seul écrivain de `super_admins` — **et il n'a qu'un appelant, un
+     * script** (T9.2, `scripts/auth:super-admin`).
+     *
+     * **Pourquoi la fonction vit ici.** Le premier super administrateur ne peut
+     * pas s'accorder depuis l'intérieur du produit : c'est l'amorçage d'un
+     * droit, comme une première clé se pose de l'extérieur de la serrure. Le
+     * geste doit pourtant passer par cette couche — `lib/db/client` n'est
+     * importable que par ce fichier (règle 1, tenue par ESLint), et un script
+     * qui ouvrirait sa propre connexion pour contourner cela contournerait la
+     * règle, pas la contrainte.
+     *
+     * **Rejouable**, comme l'amorçage des référentiels de T8.4 : une seconde
+     * pose sur la même adresse met le nom à jour et **rétablit une ligne
+     * archivée** plutôt que de buter sur `super_admins_email_unique`.
+     * Réaccorder le droit à quelqu'un qu'on avait archivé est un geste
+     * légitime, et le refuser en silence sur un conflit d'unicité serait
+     * illisible.
+     */
+    async upsertSuperAdmin(values: {
+      email: string;
+      fullName: string;
+    }): Promise<{
+      row: InferSelectModel<typeof superAdmins>;
+      created: boolean;
+    }> {
+      await assertAuthority();
+
+      /* Sur `lower(email)`, du même côté que l'index unique — et **sans écarter
+         les archivés**, à la différence de `findSuperAdminByEmail` : cette
+         lecture-ci cherche la ligne que la base empêcherait de doubler, pas
+         celle qui ouvre une session. */
+      const existing = await db
+        .select()
+        .from(superAdmins)
+        .where(sql`lower(${superAdmins.email}) = lower(${values.email})`)
+        .limit(1);
+
+      const known = existing[0];
+
+      if (known) {
+        const updated = await db
+          .update(superAdmins)
+          .set({ ...values, archivedAt: null, updatedAt: new Date() })
+          .where(eq(superAdmins.id, known.id))
+          .returning();
+
+        const row = updated[0];
+        if (!row) {
+          throw new IntegrityError(
+            "La mise à jour du super administrateur n'a rien renvoyé.",
+          );
+        }
+        return { row, created: false };
+      }
+
+      const inserted = await db.insert(superAdmins).values(values).returning();
+      const row = inserted[0];
+      if (!row) {
+        throw new IntegrityError(
+          "La création du super administrateur n'a rien renvoyé.",
+        );
+      }
+      return { row, created: true };
+    },
+  };
+}

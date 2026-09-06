@@ -39,7 +39,12 @@ import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
 import { SESSION_COOKIE, sealPrincipal } from "@/lib/auth/cookie";
 import { db } from "@/lib/db/client";
-import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
+import {
+  asSuperAdmin,
+  forDomain,
+  withoutAnySession,
+  type ScopedDb,
+} from "@/lib/db/scoped";
 import {
   domains,
   entities,
@@ -50,6 +55,9 @@ import {
   projectStatuses,
   projects,
 } from "@/lib/db/schema";
+
+/* Une fixture écrit hors de toute session — l'échappée nommée de T9.3. */
+const outsideAnySession = asSuperAdmin(withoutAnySession("fixture"));
 
 /**
  * Qui la requête prétend être — **et dans quel domaine** (T9.2).
@@ -167,7 +175,7 @@ let f: Fixture;
 let createdDomainId: string | null = null;
 
 beforeAll(async () => {
-  const domain = await superAdmin.createDomain({
+  const domain = await outsideAnySession.createDomain({
     name: `__0__test__vision__${suffix}`,
     competenceCenterName: `Centre ${suffix}`,
   });

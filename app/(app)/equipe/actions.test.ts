@@ -41,7 +41,12 @@ import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
 import { SESSION_COOKIE, sealPrincipal } from "@/lib/auth/cookie";
 import { db } from "@/lib/db/client";
-import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
+import {
+  asSuperAdmin,
+  forDomain,
+  withoutAnySession,
+  type ScopedDb,
+} from "@/lib/db/scoped";
 import {
   activities,
   activityParticipants,
@@ -59,6 +64,9 @@ import {
   skillLevels,
   skills,
 } from "@/lib/db/schema";
+
+/* Une fixture écrit hors de toute session — l'échappée nommée de T9.3. */
+const outsideAnySession = asSuperAdmin(withoutAnySession("fixture"));
 
 /**
  * Qui la requête prétend être — **et dans quel domaine** (T9.2).
@@ -124,7 +132,7 @@ type Fixture = {
 let f: Fixture;
 
 beforeAll(async () => {
-  const domain = await superAdmin.createDomain({
+  const domain = await outsideAnySession.createDomain({
     name: `__test__equipe_actions__${suffix}`,
     competenceCenterName: `Centre ${suffix}`,
   });
@@ -327,7 +335,7 @@ describe("deletePerson — ce que le geste refuse", () => {
   /* La couche est scopée : une personne d'un autre domaine n'existe pas, elle
      ne « manque » pas. Le refus doit être le même, et la ligne doit rester. */
   test("une personne d'un autre domaine n'est pas effacée", async () => {
-    const other = await superAdmin.createDomain({
+    const other = await outsideAnySession.createDomain({
       name: `__test__equipe_voisin__${suffix}`,
       competenceCenterName: `Voisin ${suffix}`,
     });

@@ -27,8 +27,16 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { resolvePrincipal } from "./entry";
 import type { VerifiedClaims } from "./oidc";
 import { db } from "../db/client";
-import { forDomain, superAdmin, type ScopedTable } from "../db/scoped";
+import {
+  asSuperAdmin,
+  forDomain,
+  withoutAnySession,
+  type ScopedTable,
+} from "../db/scoped";
 import { domainIdentities, domains, persons, superAdmins } from "../db/schema";
+
+/* Une fixture écrit hors de toute session — l'échappée nommée de T9.3. */
+const outsideAnySession = asSuperAdmin(withoutAnySession("fixture"));
 
 const suffix = Math.random().toString(36).slice(2, 10);
 
@@ -74,13 +82,13 @@ function claims(overrides: Partial<VerifiedClaims> = {}): VerifiedClaims {
 beforeAll(async () => {
   /* Trois domaines : l'ouvert, le suspendu, et un voisin qui ne porte aucune
      identité — c'est lui qui éprouve l'étanchéité. */
-  const open = await superAdmin.createDomain({
+  const open = await outsideAnySession.createDomain({
     name: `__test__entry__ouvert__${suffix}`,
     competenceCenterName: "Centre ouvert",
   });
   openDomainId = open.id;
 
-  const closed = await superAdmin.createDomain({
+  const closed = await outsideAnySession.createDomain({
     name: `__test__entry__suspendu__${suffix}`,
     competenceCenterName: "Centre suspendu",
   });
@@ -90,7 +98,7 @@ beforeAll(async () => {
     .set({ status: "suspended" })
     .where(eq(domains.id, closed.id));
 
-  const neighbour = await superAdmin.createDomain({
+  const neighbour = await outsideAnySession.createDomain({
     name: `__test__entry__voisin__${suffix}`,
     competenceCenterName: "Centre voisin",
   });

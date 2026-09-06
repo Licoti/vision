@@ -20,10 +20,14 @@ import { db } from "./client";
 import {
   DomainScopeError,
   IntegrityError,
+  SuperAdminRequiredError,
+  asSuperAdmin,
   forDomain,
   superAdmin,
+  withoutAnySession,
   type ScopedDb,
   type ScopedTable,
+  type SuperAdminGrant,
 } from "./scoped";
 import {
   activities,
@@ -55,6 +59,9 @@ import {
   superAdmins,
   tools,
 } from "./schema";
+
+/* Une fixture écrit hors de toute session — l'échappée nommée de T9.3. */
+const outsideAnySession = asSuperAdmin(withoutAnySession("fixture"));
 
 /* ==========================================================================
    Deux domaines de test
@@ -108,7 +115,7 @@ let a: Fixture;
 let b: Fixture;
 
 async function seedDomain(label: string): Promise<Fixture> {
-  const domain = await superAdmin.createDomain({
+  const domain = await outsideAnySession.createDomain({
     name: `__test__${label}__${suffix}`,
     competenceCenterName: `Centre ${label}`,
   });
@@ -1039,6 +1046,12 @@ describe("les garde-fous de typage", () => {
       await scope.unlink(domainIdentities, "…");
       // @ts-expect-error `domain_identities` n'a pas `archived_at` : rien à archiver.
       await scope.archive(domainIdentities, "…");
+      /* **La garde de T9.3 se relit ici, à la compilation.** `createDomain` a
+         quitté `superAdmin` : on ne l'obtient qu'en ayant nommé son autorité.
+         C'est ce qui a rattrapé les trente-six sites d'appel du jour du ticket,
+         et c'est ce qui rattrapera le trente-septième. */
+      // @ts-expect-error `createDomain` ne s'obtient que par `asSuperAdmin`.
+      await superAdmin.createDomain({ name: "…", competenceCenterName: "…" });
     };
     expect(typeof jamaisAppele).toBe("function");
   });
@@ -1070,17 +1083,25 @@ describe("superAdmin", () => {
        dans un script à connexion propre aurait contourné la règle 1 plutôt que
        sa contrainte, et **laissé T9.3 sans rien à garder**.
 
-       **Deux écrivains à garder, donc, et non un** : `createDomain` et
-       `upsertSuperAdmin`. Les quatre lectures restent ouvertes — elles
-       s'exécutent *pendant* la connexion, quand aucune session n'existe. C'est
-       la distinction que T9.3 doit écrire. */
+       **Le sceau s'est dédoublé, et c'est la distinction que T9.3 devait
+       écrire.** La liste portait sept clés dont deux écrivaient ; elle en porte
+       six, qui toutes lisent. Les deux écrivains vivent derrière
+       `asSuperAdmin`, et on ne les tient qu'en ayant nommé son autorité.
+
+       **Les deux listes se relisent ensemble**, et c'est la raison de la
+       seconde : une écriture qui reviendrait se poser sur `superAdmin`
+       quitterait la garde sans qu'aucun autre test ne le dise. */
     expect(Object.keys(superAdmin).sort()).toEqual([
-      "createDomain",
       "findDomain",
       "findDomainIdentity",
       "findSuperAdminByEmail",
+      "findSuperAdminById",
       "listDomains",
       "listSuperAdmins",
+    ]);
+
+    expect(Object.keys(outsideAnySession).sort()).toEqual([
+      "createDomain",
       "upsertSuperAdmin",
     ]);
   });
@@ -1141,13 +1162,13 @@ describe("superAdmin", () => {
   test("une seconde pose met à jour plutôt que de doubler", async () => {
     const email = `rejouable.${suffix}@exemple.test`;
 
-    const first = await superAdmin.upsertSuperAdmin({
+    const first = await outsideAnySession.upsertSuperAdmin({
       email,
       fullName: `Première ${suffix}`,
     });
     expect(first.created).toBe(true);
 
-    const second = await superAdmin.upsertSuperAdmin({
+    const second = await outsideAnySession.upsertSuperAdmin({
       email: email.toUpperCase(),
       fullName: `Seconde ${suffix}`,
     });
@@ -1170,7 +1191,7 @@ describe("superAdmin", () => {
   test("une seconde pose rétablit une ligne archivée", async () => {
     const email = `retabli.${suffix}@exemple.test`;
 
-    const { row } = await superAdmin.upsertSuperAdmin({
+    const { row } = await outsideAnySession.upsertSuperAdmin({
       email,
       fullName: `À rétablir ${suffix}`,
     });
@@ -1181,7 +1202,7 @@ describe("superAdmin", () => {
 
     expect(await superAdmin.findSuperAdminByEmail(email)).toBeUndefined();
 
-    const again = await superAdmin.upsertSuperAdmin({
+    const again = await outsideAnySession.upsertSuperAdmin({
       email,
       fullName: `Rétabli ${suffix}`,
     });
@@ -1193,7 +1214,7 @@ describe("superAdmin", () => {
 
   test("la liste ne porte que les super administrateurs en exercice", async () => {
     const email = `hors-liste.${suffix}@exemple.test`;
-    const { row } = await superAdmin.upsertSuperAdmin({
+    const { row } = await outsideAnySession.upsertSuperAdmin({
       email,
       fullName: `Hors liste ${suffix}`,
     });
@@ -1210,6 +1231,124 @@ describe("superAdmin", () => {
     expect(
       (await superAdmin.listSuperAdmins()).map((admin) => admin.id),
     ).not.toContain(row.id);
+  });
+});
+
+/* ==========================================================================
+   L'autorité d'une écriture au-dessus des domaines — T9.3
+
+   **La couche ne croit pas un `SuperAdminGrant` sur parole.** Le typage oblige
+   à nommer une autorité ; il ne dit pas qu'elle existe encore. Sans la relecture
+   de la ligne, forger `{ kind: "super_admin", superAdminId: … }` depuis `app/`
+   suffirait — et un super administrateur archivé garderait son droit un mois,
+   le temps que son cookie expire.
+
+   **Le décompte en base tranche, jamais la levée.** Une exception ressemble à
+   une autre, et un refus rend 200 comme une réussite (leçon de T6.1) : chaque
+   cas lit la cible **avant** le geste, puis après. Sans l'étape témoin, un test
+   qui compte zéro à la fin ne distingue pas un refus d'une cible qui n'a jamais
+   été atteignable.
+   ========================================================================== */
+
+describe("l'autorité d'une écriture au-dessus des domaines", () => {
+  const countDomains = async (name: string): Promise<number> =>
+    (await db.select().from(domains).where(eq(domains.name, name))).length;
+
+  const countAdmins = async (email: string): Promise<number> =>
+    (await db.select().from(superAdmins).where(eq(superAdmins.email, email)))
+      .length;
+
+  /** Un super administrateur en exercice, son identifiant et son autorité. */
+  async function grantOf(
+    label: string,
+  ): Promise<{ id: string; grant: SuperAdminGrant }> {
+    const { row } = await outsideAnySession.upsertSuperAdmin({
+      email: `${label}.${suffix}@exemple.test`,
+      fullName: `Autorité ${label} ${suffix}`,
+    });
+    return { id: row.id, grant: { kind: "super_admin", superAdminId: row.id } };
+  }
+
+  test("une autorité qui ne désigne personne ne crée pas de domaine", async () => {
+    const name = `__test__sans-autorite__${suffix}`;
+    expect(await countDomains(name)).toBe(0);
+
+    const forged: SuperAdminGrant = {
+      kind: "super_admin",
+      superAdminId: crypto.randomUUID(),
+    };
+
+    await expect(
+      asSuperAdmin(forged).createDomain({
+        name,
+        competenceCenterName: "Centre forgé",
+      }),
+    ).rejects.toThrow(SuperAdminRequiredError);
+
+    expect(await countDomains(name)).toBe(0);
+  });
+
+  test("une autorité archivée ne crée plus de domaine", async () => {
+    const { id, grant } = await grantOf("archivee");
+    const name = `__test__autorite-archivee__${suffix}`;
+    expect(await countDomains(name)).toBe(0);
+
+    /* Archiver **est** le geste qui retire le droit : la ligne existe encore,
+       et c'est exactement ce que la relecture doit refuser. */
+    await db
+      .update(superAdmins)
+      .set({ archivedAt: new Date() })
+      .where(eq(superAdmins.id, id));
+
+    await expect(
+      asSuperAdmin(grant).createDomain({
+        name,
+        competenceCenterName: "Centre archivé",
+      }),
+    ).rejects.toThrow(SuperAdminRequiredError);
+
+    expect(await countDomains(name)).toBe(0);
+  });
+
+  test("une autorité archivée ne pose plus de super administrateur", async () => {
+    const { id, grant } = await grantOf("archivee-bis");
+    const email = `jamais-pose.${suffix}@exemple.test`;
+    expect(await countAdmins(email)).toBe(0);
+
+    await db
+      .update(superAdmins)
+      .set({ archivedAt: new Date() })
+      .where(eq(superAdmins.id, id));
+
+    await expect(
+      asSuperAdmin(grant).upsertSuperAdmin({
+        email,
+        fullName: `Jamais posé ${suffix}`,
+      }),
+    ).rejects.toThrow(SuperAdminRequiredError);
+
+    expect(await countAdmins(email)).toBe(0);
+  });
+
+  /* **La mesure qui prouve que la garde sert à quelque chose.** Les trois
+     au-dessus prouvent qu'elle ne laisse pas passer ; celle-ci prouve qu'elle
+     laisse passer ce qu'elle doit. Une garde qui refuse tout se testerait aussi
+     bien sans le produit. */
+  test("un super administrateur en exercice crée un domaine", async () => {
+    const { grant } = await grantOf("en-exercice");
+    const name = `__test__autorite-vivante__${suffix}`;
+    expect(await countDomains(name)).toBe(0);
+
+    const domain = await asSuperAdmin(grant).createDomain({
+      name,
+      competenceCenterName: "Centre vivant",
+    });
+
+    try {
+      expect(await countDomains(name)).toBe(1);
+    } finally {
+      await db.delete(domains).where(eq(domains.id, domain.id));
+    }
   });
 });
 
