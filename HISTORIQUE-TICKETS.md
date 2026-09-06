@@ -7422,3 +7422,174 @@ de développement. Une seule migration, comme les interdits communs du chantier 
 
 **Vert** : 1 646 → **1 655 tests sur 55 fichiers**, `lint` (`--max-warnings=0`) et `tsc` au vert.
 Aucun écran touché, aucune route, aucune donnée d'amorçage, aucune dépendance neuve.
+
+---
+
+## T9.2 — Le SSO : le stub tombe, et le domaine cesse d'être trouvé pour être désigné — 06/09/2026
+
+**L'épreuve d'une promesse faite en C1.** `lib/auth/provider.ts` annonçait depuis T1.4 qu'il serait
+*« le seul fichier que le SSO réécrira »*, et que *« le contexte, les droits, les écrans et les
+tests ne bougeront pas »*. Le critère du ticket était donc autant un diff qu'un comportement :
+**aucun fichier sous `components/`, aucune page du produit, aucun `drawers.tsx`, aucune migration**
+n'a bougé. `lib/auth/session.ts` n'a vu changer qu'une fonction. La séparation était vraie.
+
+### Ce qui a été écrit
+
+Trois modules neufs sous `lib/auth/`, et l'écart de périmètre est assumé au journal technique :
+`cookie.ts` scelle le cookie en HMAC-SHA256 synchrone (`node:crypto`, `timingSafeEqual`), avec une
+charge en **union** — une personne porte `{personId, domainId}`, un super administrateur porte son
+seul identifiant, n'ayant ni domaine ni ligne `persons` (arbitrage 4) ; `oidc.ts` porte les deux
+fournisseurs par `oauth4webapi` 3.8.8, découverte, `state`, `nonce`, PKCE ; `entry.ts` porte **les
+six règles d'entrée**, sur claims déjà vérifiés, sans réseau — c'est ce joint qui les rend
+mesurables sur claims forgés.
+
+Quatre routes, les **premiers `route.ts` du dépôt**. `/auth/connexion?fournisseur=…` rend un 302 ;
+`/auth/callback/[fournisseur]` vérifie, statue, et ne pose un cookie qu'après ; `/auth/deconnexion`
+efface les deux cookies ; `/auth/acces` est **l'écran d'entrée et de refus à la fois** — décision
+humaine du 06/09/2026. Sans lui, `/auth/connexion` étant une redirection, rien ne permettrait de
+*démarrer* une connexion au navigateur ; et réunir les deux tient en une phrase : on n'apprend rien
+de plus en étant refusé qu'en arrivant. Il porte trois états, dont un qui n'existe que le temps d'un
+chantier — un super administrateur connecté, dont l'écran est T9.4, et qui bouclerait sans lui.
+
+`requireSession` **redirige** au lieu de lever : le stub garantissait toujours une session, une
+absence était donc un défaut ; avec le SSO elle est légitime. Le geste vit entièrement dans
+`provider.ts`, et c'est ce qui laisse une centaine d'appelants intacts.
+
+`resolveDomainId` ne rend plus « le premier domaine actif, par nom » : elle prend une identité
+vérifiée et interroge `domain_identities`. `loadCurrentSession` disparaît avec elle.
+`setCurrentPerson` garde sa signature — pour que `/dev/session` ne bouge pas — et devient **le
+dernier endroit du dépôt** où vit l'ancienne règle, bornée à trois titres : ici et nulle part
+ailleurs, une levée hors développement, et un unique appelant qui rend 404 en production.
+
+### Le couplage de T8.1, refermé — et mesuré
+
+T8.1 avait nommé le défaut sans pouvoir le lever : *« rien ne peut lui désigner un autre domaine,
+donc un test d'action dépend de l'état global de la branche »* — 63 échecs sur trois fichiers le
+02/09/2026. Le cookie portant désormais le domaine, chaque fichier de tests d'action **désigne le
+sien**. Le changement est de six blocs `vi.mock` et de six lignes ; les 293 affectations de
+`currentPerson` n'ont pas bougé, et **les trois gardes qui vérifiaient l'ordre alphabétique ont
+disparu avec leur raison d'être**.
+
+**La preuve n'est pas l'absence d'échec, c'est la mise en défaut** : le domaine du cookie de
+`produits/actions.test.ts` remplacé par un UUID étranger fait passer le fichier de **12 tests verts
+à 11 rouges**. Aucun repli ne rattrape : c'est bien le domaine du cookie qui sert.
+
+### Les mesures — un code de réponse, un en-tête, un cookie, un décompte
+
+Le ticket dérogeait au premier point du protocole et le disait : son entrée se lit dans un 302, pas
+dans du HTML.
+
+| Mesure | Relevé |
+|---|---|
+| `/auth/connexion?fournisseur=google` | 307 → `accounts.google.com/o/oauth2/v2/auth`, `client_id` juste, `redirect_uri` exacte au caractère, `scope=openid email profile` **sans `offline_access`**, `state`, `nonce`, `code_challenge_method=S256` |
+| l'équivalent Microsoft | `login.microsoftonline.com/organizations/oauth2/v2.0/authorize`, mêmes portées et mêmes garanties — **avec des valeurs de client factices**, Entra n'étant pas raccordé |
+| cookie d'aller-retour | `vision_oauth`, `HttpOnly`, `SameSite=lax`, `Max-Age=600` |
+| session de personne → `/produits` | **200**, « Camille Roux » et « Groupe Meridian » lus dans le HTML servi |
+| sans cookie → `/produits`, `/equipe`, `/administration` | **307 → `/auth/acces`** |
+| cookie falsifié d'un caractère → `/produits` | **307 → `/auth/acces`** |
+| **cookie de l'ancien stub** (`vision_person`) → `/produits` | **307 → `/auth/acces`** : le stub n'ouvre plus rien |
+| cookie de super administrateur → `/produits` | 307 → `/auth/acces`, et l'écran le reconnaît |
+| session de personne → `/auth/acces` | 307 → `/` : l'écran n'a plus d'objet |
+| `/auth/deconnexion` | 307 → `/auth/acces`, **deux `set-cookie` expirés en 1970** |
+| rappel sans cookie d'aller-retour | 307 → `/auth/acces`, et **aucun `vision_session` dans la réponse** |
+
+**Deux mesures ne se remplacent pas l'une l'autre** : qu'un jeton soit refusé se lit dans la
+réponse, mais qu'aucune session n'ait été posée se lit dans le cookie et dans la base.
+
+### La mise en défaut — onze contre-épreuves isolées
+
+**Sept refus pour six règles** : la règle 6 en porte quatre, et l'état du domaine est le septième —
+c'est lui qui referme le point qu'`ETAT.md` portait depuis T9.1. *Un domaine suspendu ouvre-t-il une
+session ?* **Non.**
+
+| Règle neutralisée | Tests tombés |
+|---|---|
+| 4 — ni `hd` ni `tid` | **1** |
+| 5 — entreprise non cliente | **2**, les deux de cette règle |
+| état du domaine — suspendu ou archivé | **1** |
+| 6a — aucune ligne `persons` | **2**, les deux de cette règle |
+| 6b — personne archivée | **1** |
+| 6c — personne désactivée | **1** |
+| 6d — `has_access` faux | **1** |
+| sceau — comparaison de signature | **3**, les trois de cette règle |
+| sceau — expiration | **1** |
+| sceau — seuil de longueur du secret | **1** |
+| sceau — relecture de forme | **1** |
+
+Aucune neutralisation n'a fait tomber un test d'une autre règle. Le test parapluie « aucun refus ne
+rend de principal » a été **retiré** en cours de route : il tombait avec n'importe quelle règle et
+brouillait l'isolement ; son invariant est replié dans chacun des sept cas.
+
+### Le défaut que la mesure a pris
+
+La première écriture du fournisseur Microsoft ne marchait pas, et seule la mesure l'a dit : le
+document de découverte de `organizations` annonce un émetteur **gabarit**, et
+`processDiscoveryResponse` refusait la découverte entière **avant même qu'un locataire puisse être
+connu**. Détail et parade au journal technique. Le fournisseur porte désormais deux adresses.
+
+### Ce qui a changé hors du plan
+
+`lib/db/scoped.ts` est entré au périmètre en cours de route : ESLint interdit à tout module hors de
+lui d'importer `lib/db/client`, et un script d'amorçage à connexion propre aurait contourné la
+règle 1 plutôt que sa contrainte — **et laissé T9.3 sans rien à garder**. `superAdmin` passe de cinq
+fonctions à sept (`upsertSuperAdmin`, `listSuperAdmins`), et le sceau nominatif de
+`lib/db/scoped.test.ts` a été **récrit plutôt que retiré** : une clé de plus est une décision qui se
+prend. **T9.3 hérite donc de deux écrivains à garder, et non d'un.**
+
+**Vert** : 1 655 → **1 689 tests sur 57 fichiers** (+34, +2 fichiers), `lint` (`--max-warnings=0`)
+et `tsc` au vert. Une seule dépendance de production ajoutée, `oauth4webapi@3.8.8`, sans dépendance
+transitive. Aucune migration.
+
+---
+
+## Point refermé hors ticket — la levée de `docs/05` §3 et §4 — 06/09/2026
+
+**Le seul point qui empêchait un ticket de C9 de s'ouvrir**, refermé par une main humaine le jour
+même de T9.2. Archivé ici parce que `ACTIONS-HUMAINES-C9.md`, qui le portait, se supprime à la
+clôture du chantier.
+
+### Le point, verbatim au 06/09/2026
+
+> **T9.4 attend la levée de l'exclusion de `docs/05` §4** — *« interface d'administration
+> multi-domaine : un seul domaine au POC »* — et de §3, *« domaine unique … amorçage par script »*.
+> `docs/` est figé : ces lignes se récrivent, ou l'écart s'autorise et se consigne. → **action
+> humaine, puis T9.4.**
+
+### Ce qui a fait pencher la balance
+
+**Ce n'était pas une décision de `docs/07`.** Aucune de `D1` à `D41` ne portait l'exclusion : elle
+vivait dans deux tableaux de `docs/05`, et dans eux seuls. La règle 6 — *« ne jamais rouvrir une
+décision de `docs/07-decisions.md` »* — ne s'appliquait donc pas. C'était un énoncé de périmètre à
+amender, pas une décision à rouvrir, et le point l'avait présenté plus lourd qu'il n'était.
+
+**Deux autres documents décrivaient déjà l'écran.** `docs/02` §3 donne au super administrateur
+*« créer, suspendre, archiver un domaine ; désigner ses responsables »*, et `docs/04`, sous
+`domains`, écrit *« Seul le super administrateur écrit dans cette table. Créer un domaine déclenche
+l'amorçage de ses référentiels par défaut »* — c'est T9.4 et T9.5, mot pour mot. Seul `docs/05`
+l'excluait, et **du POC, pas du produit**.
+
+**`docs/05` dit lui-même quoi faire** dans son en-tête : *« Il sert de référence opposable : une
+demande hors périmètre n'est pas refusée, elle est datée. »*
+
+### La voie écartée, et pourquoi
+
+**L'écart autorisé et consigné** — la pratique du dépôt : l'existence de C8 et le passage de C9
+devant C7 sont deux écarts à `docs/05` §5 et §6, consignés au journal technique. Elle convenait
+moins ici : un écart de séquencement est ponctuel, quand celui-ci est **permanent** — l'écran
+restera. Un `docs/05` qui exclut durablement ce que `docs/02` et `docs/04` décrivent devient un
+document qu'on apprend à ne pas lire.
+
+### Le geste
+
+**Deux lignes, amendées et datées ; le document n'a pas été récrit.** Dans le tableau Socle de §3,
+la ligne « Domaine unique » devient « Domaines » et nomme les deux ajouts de C9, en gardant
+l'amorçage par script. Dans le tableau Hors périmètre de §4, l'exclusion est **barrée et non
+effacée**, avec sa date et sa raison : *le SSO rend le domaine désigné par le jeton et non plus
+trouvé en base ; sans écran pour créer une entreprise et saisir son identité vérifiée, aucune
+seconde entreprise ne peut exister.* `git diff` sur `docs/` : **2 insertions, 2 suppressions**.
+
+Les douze autres exclusions de §4 tiennent, **thème par domaine compris** — le multi-domaine ne le
+rouvre pas, la règle 2 tenant depuis C1 pour que ce soit possible un jour, pas pour que ce soit fait
+maintenant.
+
+**T9.4, T9.5 et T9.6 ne sont plus bloqués.**

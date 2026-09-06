@@ -2,14 +2,17 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 06/09/2026, **T9.1 terminé** — `super_admins`, `domain_identities`,
-l'identifiant de fournisseur sur `persons`, migration `0016` appliquée sur les deux branches. Six
-contraintes mesurées en base et **six contre-épreuves isolées**, une par contrainte.
-**Chantier en cours :** **C9 — SSO et administration multi-domaine** (`tickets-C9.md`), ouvert.
+**Dernière mise à jour :** 06/09/2026, **T9.2 terminé** — le SSO. `lib/auth/provider.ts` réécrit,
+trois modules neufs, quatre routes, **aucun écran du produit touché** : la séparation posée en C1
+était vraie. **Onze contre-épreuves isolées**, et le couplage de T8.1 refermé — mesuré par un
+domaine étranger qui fait passer un fichier de 12 verts à 11 rouges.
+**Chantier en cours :** **C9 — SSO et administration multi-domaine** (`tickets-C9.md`).
 **C7 garde ses quatre tickets** T7.7 → T7.10 (`tickets-C7.md`) et passe après C9 — second écart à
-`docs/05` §6. **Vert de référence : 1 655 tests sur 55 fichiers, `lint` et `tsc` au vert** (1 646
-avant T9.1) — chaque ticket y compare le sien, jamais à un souvenir. **Ticket suivant : T9.2 — le
-SSO**, dont les quatre valeurs d'ouverture sont posées.
+`docs/05` §6. **Vert de référence : 1 689 tests sur 57 fichiers, `lint` et `tsc` au vert** (1 655
+avant T9.2) — chaque ticket y compare le sien, jamais à un souvenir. **Ticket suivant : T9.3 — le
+droit du super administrateur**, qui hérite de **sept** fonctions et de **deux** écrivains.
+**L'exclusion de `docs/05` §3 et §4 a été levée le 06/09/2026** — deux lignes amendées et datées par
+une main humaine : **plus aucun ticket de C9 n'est bloqué.**
 
 ---
 
@@ -28,7 +31,7 @@ SSO**, dont les quatre valeurs d'ouverture sont posées.
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
 | C7 — Finitions | T7.1 → T7.10 | **en pause** — T7.1 → T7.6 livrés, T7.7 → T7.10 après C9 |
 | C8 — Dette | T8.1 → T8.5 | **terminé** |
-| C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **en cours** — T9.1 livré ; T9.4 attend une levée de `docs/05` §4 |
+| C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **en cours** — T9.1, T9.2 livrés ; plus aucun ticket bloqué |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
 
 ---
@@ -58,9 +61,10 @@ SSO**, dont les quatre valeurs d'ouverture sont posées.
 - **C8 — Dette — T8.1 → T8.5, 04-05/09.** Le premier chantier que `docs/05` §5 n'a pas écrit, tiré
   des seuls points ouverts — et **quatre énoncés de fiche sur cinq y ont été mis en défaut**, du
   domaine de tests résiduel à la redirection redondante. 1 582 → 1 646 tests.
-- **C9 — T9.1, 06/09.** Le schéma de l'identité : deux tables hors du produit, un énuméré, une
-  colonne sur `persons`. **La clé d'unicité a été laissée intacte plutôt qu'élargie** — l'élargir
-  l'aurait affaiblie, les `NULL` étant distincts en base. 1 646 → 1 655 tests.
+- **C9 — T9.1 puis T9.2, 06/09.** Le schéma de l'identité — deux tables hors du produit, une clé
+  **laissée intacte plutôt qu'élargie**, les `NULL` étant distincts en base. Puis le SSO : le stub
+  tombe, le domaine cesse d'être *trouvé* pour être *désigné*, et **aucun écran du produit ne
+  bouge**. 1 646 → 1 655 → **1 689 tests sur 57 fichiers**.
 - **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, tous détaillés dans
   `HISTORIQUE-TICKETS.md` et `JOURNAL-TECHNIQUE.md`. **Cinq portent une migration, `0010` à `0014`** :
   disponibilité déduite, cible unique portée par le produit, période déduite des activités,
@@ -75,23 +79,25 @@ SSO**, dont les quatre valeurs d'ouverture sont posées.
 *(un point, une destination — sans destination, c'est un point qu'on n'a pas tranché. Un point
 refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le 04/09/2026.)*
 
-### a. À trancher — sinon les tickets suivants héritent du problème
+### a. À trancher — sinon les tickets suivants héritent du problème · gestes détaillés : `ACTIONS-HUMAINES-C9.md`
 
-- **T9.2 s'ouvre : ses quatre valeurs sont posées** dans `.env.local` (Google, `AUTH_SECRET`,
-  `AUTH_URL`). **Une réserve mesurée : `AUTH_SECRET` fait 23 caractères**, quand la fiche prescrit
-  `openssl rand -base64 32`, qui en rend 44 — moins de 17 octets pour signer le cookie de session,
-  là où le stub ne signait rien. Entra ID attend qu'un client l'impose. → **action humaine.**
-- **T9.4 attend la levée de l'exclusion de `docs/05` §4** — *« interface d'administration
-  multi-domaine : un seul domaine au POC »* — et de §3, *« domaine unique … amorçage par script »*.
-  `docs/` est figé : ces lignes se récrivent, ou l'écart s'autorise et se consigne. → **action
-  humaine, puis T9.4.**
+- **Microsoft est écrit et n'est pas branché.** Entra ID Free demande une carte bancaire de
+  vérification, et *« only paid customers can create a new Workforce tenant »*. Ce qui est mesuré :
+  la découverte aboutit, l'adresse d'autorisation est juste. Ce qui **ne l'est pas** : l'échange du
+  code, et la substitution d'émetteur que son gabarit `{tenantid}` impose. **La promesse « deux
+  valeurs de plus, jamais une reprise » est une hypothèse non éprouvée.** → **action humaine.**
+- **Le premier super administrateur réel reste à poser** — `npm run auth:super-admin --
+  --email=… --nom="…"`. Sans lui, personne ne créera le premier domaine en T9.4, et le seul chemin
+  parcourable au navigateur (une adresse sans `hd`, arbitrage 2) ne se parcourt pas. La ligne de
+  mesure a été retirée après usage. → **action humaine.**
 - **Les secrets Neon n'ont jamais été tournés.** Deux chaînes ont transité en clair le 12/08, hors
   dépôt mais valides. **Reportés quatre fois**, et la raison ne tient plus : **C9 touche aux secrets
   de toute façon.** → **action humaine.**
-- **`CLAUDE.md` porte trois énoncés périmés** : « Statut de projet » quand l'écran dit « Statuts
-  d'accompagnement » · l'entrée « Projet », qui tait que le menu affiche « Accompagnements » ·
-  *« Entra ID le remplacera en C7 »*, quand C9 en porte **deux** — même écart dans `docs/01` §141.
-  Règle 7, et `docs/` figé. **Aucun des trois ne bloque un ticket.** → **action humaine.**
+- **`CLAUDE.md` porte trois énoncés périmés**, et le troisième a empiré : « Statut de projet »
+  quand l'écran dit « Statuts d'accompagnement » · l'entrée « Projet », qui tait que le menu affiche
+  « Accompagnements » · *« Entra ID le remplacera en C7 »*, quand **c'est Google qui l'a remplacé,
+  en C9** — même écart dans `docs/01` §141. Règle 7, et `docs/` figé. **Aucun ne bloque un
+  ticket.** → **action humaine.**
 - **Ce qu'un macro-parcours relie reste à trancher**, et avec lui **« macro-parcours » contre le
   « Réseau de liens entre produits » de `docs/02` §10**, qui dit la même direction sous un autre nom.
   L'entrée de menu et l'écran vide restent tels quels — ni table, ni objet, ni droit. Le concept
@@ -99,42 +105,32 @@ refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le
 
 ### b. Assignés à un ticket
 
-**C9 — T9.1 est fait ; les cinq autres gardent leur fiche entière** (`tickets-C9.md`).
-**T9.2** le SSO, deux fournisseurs par `oauth4webapi`, six règles d'entrée, et **le couplage
-que T8.1 n'a pas pu lever**, `resolveDomainId` cessant de rendre le premier domaine actif *par nom* ·
-**T9.3** le droit qui manque à `superAdmin`, que **T9.1 porte de trois fonctions à cinq** : les deux
-lectures d'identité doivent rester ouvertes — elles tournent *pendant* la connexion —, quand
-`createDomain` n'a aucune raison de l'être · **T9.4** l'écran au-dessus des domaines · **T9.5**
-l'amorçage d'un domaine neuf, aujourd'hui tenu par `scripts/seed.ts` · **T9.6** les comptes d'un
-domaine — **aucun écran n'écrit `has_access`, `domain_role` ni même `email`**.
-**Un domaine suspendu ouvre-t-il une session ?** Aucune des six règles d'entrée ne le dit, et
-`findDomainIdentity` ne juge pas de l'état du domaine : T9.1 a laissé le point plutôt que de
-trancher à la place de T9.2. → **T9.2.**
-**`lib/auth/session.ts:10` promet encore que « C7 change de source d'identité »** — cinquième énoncé
-de la famille, corrigé par T9.2. **Le RLS a quitté C9** : voir le groupe (c).
+**C9 — T9.1 et T9.2 sont faits ; les quatre autres gardent leur fiche entière** (`tickets-C9.md`).
+**T9.3** le droit qui manque à `superAdmin` — et sa fiche est **périmée sur deux points** : elle dit
+« trois fonctions », T9.1 en a fait cinq et **T9.2 sept**, et son interdit *« aucune quatrième
+fonction ajoutée »* a été enfreint avec argument (journal technique). Il y a donc **deux écrivains à
+garder, `createDomain` et `upsertSuperAdmin`**, quand les quatre lectures restent ouvertes — elles
+tournent *pendant* la connexion · **T9.4** l'écran au-dessus des domaines · **T9.5** l'amorçage
+d'un domaine neuf · **T9.6** les comptes d'un domaine, dont **`email`, sans lequel aucune personne
+saisie dans Vision ne peut se connecter** — le jeu de démonstration lui-même a `email = null`, donc
+**aucun de ses comptes n'est joignable par le SSO** (mesuré en T9.2).
+**`persons.identity_provider` n'a aucun écrivain, et T9.2 a écrit pourquoi** : l'inscrire sur une
+ligne trouvée par e-mail buterait sur `persons_external_id_requires_directory`, toutes les personnes
+saisies dans Vision étant `manual`. Le geste n'a d'objet qu'avec un import d'annuaire, que C9
+exclut. → **le jour où l'import d'annuaire arrive.**
+**Le RLS a quitté C9** : voir le groupe (c).
 
-**C7 passe après C9 : ses huit points gardent leur ticket, et leur fiche les décrit en entier.**
-**T7.7** — le **clic** de `/equipe` et le **mode enrichi de `Picker`** n'ont jamais été parcourus au
-navigateur · la cible de clic d'un repère fait **24 px**, sous les 44 px d'usage tactile · la frise
-du produit défile dans son conteneur, **et ce conteneur n'est pas atteignable au clavier** · la
-coquille reste **focalisable derrière le voile** sans JavaScript.
-**T7.8** — les **quatre états vides de T7.4 n'ont pas été vus rendus** · le contenu rédigé
-d'`/a-propos` reste à écrire, sans lecture en base (D36).
-**T7.9** — `products.kind` (D10) et `persons.kind` ne sont lus par aucun écran ·
-`project_indicators.note` n'a ni écrivain ni lecteur · passer une personne du centre en intervenant
-côté entité **lui laisse ses compétences**, illisibles en écriture · **quatre libellés vivent hors
-de `lib/format.ts`**, dont `PERSON_KIND_LABEL`, qui porte **un vocabulaire à trancher**.
-**T7.10** — une piste ne mène pas à l'activité qu'elle suggère, **et c'est aussi le point d'entrée
-annoncé du bloc « Démarrage »** qu'un point distinct destinait à C8 : le recouvrement a été trouvé
-au découpage, il n'y a qu'un geste · `default_tool_id` ne présélectionne rien · le groupe « Annulé »
-n'est plus replié par défaut (`docs/03` §6) · rétablir un accompagnement sous un produit archivé le
-laisse invisible.
+**C7 passe après C9 : ses huit points gardent leur ticket, et `tickets-C7.md` les décrit en
+entier** — la liste n'est plus recopiée ici, elle y a doublé une fiche quatre chantiers durant.
+**T7.7** accessibilité et navigation au clavier, quatre points · **T7.8** quatre états vides jamais
+vus rendus, et le contenu d'`/a-propos` (D36) · **T7.9** quatre colonnes sans lecteur, et **quatre
+libellés hors de `lib/format.ts`**, dont un vocabulaire à trancher · **T7.10** quatre reprises
+d'ergonomie, dont la piste qui ne mène pas à son activité.
 
-**Le journal reste incomplet : la liste des onze était périmée** (T8.3, laissé intact — règle 3).
-**Quatre familles écrivent sans trace** — le **produit**, dans le fichier même où sa vision en laisse
-une · l'**adoption**, que l'en-tête d'`accompagnements/[id]/` niait · la **compétence portée** · les
-**huit référentiels** autres que l'entité, trente-deux gestes. Chacune est **fixée par un test qui
-tombera** ; l'énuméré et `lib/journal.ts` sont prêts. → **prochaine session de découpage.**
+**Le journal reste incomplet** (T8.3, laissé intact — règle 3) : **quatre familles écrivent sans
+trace** — le produit, l'adoption, la compétence portée, et les huit référentiels autres que
+l'entité (trente-deux gestes). Chacune est **fixée par un test qui tombera** ; l'énuméré et
+`lib/journal.ts` sont prêts. → **prochaine session de découpage.**
 
 **Au prochain ticket qui ouvre le fichier** — **destination qui a déjà échoué une fois**, et T8.4 a dû
 recevoir un ticket pour ce seul motif. **`uiLayerSeal` garde une liste de six dossiers, pas une
@@ -162,15 +158,13 @@ secondaire · les props d'icône de `Button` n'ont aucun appelant.
   légitimes. Six substituts mesurés. Et **les points d'arrêt sont posés à la main, écran par écran**,
   hors de la clause 2 de `spacingScaleLock` (T1.6). → **design system.**
 - **Six points attendent une main humaine, et aucun ne se referme par un ticket.** Le **filtre de la
-  roadmap** ne se partage plus par son adresse (repassé côté client le 21/08 : il ne se copie plus,
-  ne survit plus au rechargement, n'existe plus sans JavaScript) · la **page produit porte deux
-  langages d'en-tête**, `northstar-v2` contre `BlockHeader` · **`docs/06` §3 porte deux écarts** du
-  29/08 — l'ordre des blocs, dit non neutre, et « Accès direct » qui n'est plus rendu —, et reste à
-  trancher **si le document suit ou si l'écart tient**, `docs/` étant figé · les **deux listes de
-  l'écran d'accueil** se rendent de la même façon et leurs titres partagent le mot « activité » pour
-  `events` d'un côté et `activities` de l'autre · la **page projet ne consomme pas
-  `PageHeader.facts`**, le seul fait qu'on y écrirait étant un décompte interdit par D39 · **« +N »
-  sur `/equipe`** est un décompte de compétences que T5bis.2 interdit. → **arbitrage humain.**
+  roadmap** ne se partage plus par son adresse (côté client depuis le 21/08) · la **page produit
+  porte deux langages d'en-tête**, `northstar-v2` contre `BlockHeader` · **`docs/06` §3 porte deux
+  écarts** du 29/08 — l'ordre des blocs et « Accès direct » —, et reste à trancher **si le document
+  suit ou si l'écart tient** · les **deux listes de l'écran d'accueil** partagent le mot
+  « activité » pour `events` d'un côté et `activities` de l'autre · la **page projet ne consomme pas
+  `PageHeader.facts`** (D39) · **« +N » sur `/equipe`** est un décompte que T5bis.2 interdit.
+  → **arbitrage humain.**
 - **La liste close de `docs/06` §5 porte trois écarts** (28/08, à la demande) — « Projets liés »
   n'est plus rendu, « Démarrage » ne l'est que sans activité, « Budget » est un rang de la fiche
   d'identité. **Rien n'est supprimé**, tout reste testé. → **assumés** ; le geste restant est en
@@ -188,13 +182,12 @@ secondaire · les props d'icône de `Button` n'ont aucun appelant.
   il n'appartient à aucun test, et le remède serait un réessai dans `lib/db/client.ts`.
   → **sans échéance.**
 - **Un référentiel sur neuf reste ouvert au renommage, et c'est structurel.** T8.4 reconnaît une
-  ligne par sa `position` — **huit refermés, mesurés** —, mais `tools` n'a pas d'ordinal : **mesuré
-  8 → 9**, comme les sept tables hors référentiel. Refermer demande une colonne, donc une migration.
-  **L'orpheline « Audit d'accessibilité » reste** — le rapprochement corrige, il n'efface pas — et
-  **`ensureAll` n'a aucun test**. → **le jour où une colonne s'autorise.**
+  ligne par sa `position` — **huit refermés, mesurés** —, mais `tools` n'a pas d'ordinal (**mesuré
+  8 → 9**). Refermer demande une colonne, donc une migration. **L'orpheline « Audit
+  d'accessibilité » reste**, et **`ensureAll` n'a aucun test**. → **le jour où une colonne
+  s'autorise.**
 - **La base de développement a dérivé de la fixture, et elle est jetable** — la règle 4 protège la
-  donnée métier, pas une fixture locale, et **une comparaison avant/après n'y vaut que si rien n'a
-  bougé entre les deux mesures**. Pas de `db:reset`. → **outillage si besoin réel.**
+  donnée métier, pas une fixture locale. Pas de `db:reset`. → **outillage si besoin réel.**
 - **Deux dettes, une seule cause : `neon-http` n'a pas de transaction interactive.** La **création
   d'un projet n'est pas atomique** — tout se confronte au domaine **avant** l'écriture (T3.6) —, et
   **`SET LOCAL app.domain_id` n'est pas offert**, donc **le RLS que D38 rattache au SSO est sorti de
@@ -241,10 +234,15 @@ secondaire · les props d'icône de `Button` n'ont aucun appelant.
   `DeletableTable` est un arbitrage humain, jamais une décision de ticket.
 - **La période d'un accompagnement se déduit de ses activités** depuis le 31/08, **cinq lectures
   joignant la même règle** en sous-requête groupée et non corrélée.
-- **Le domaine courant est le premier domaine actif trouvé en base**, rendu **par nom** (`docs/05`
-  §3 pose un domaine unique) : le jour où un second existe, le choix revient au fournisseur — C9.
-- **L'authentification est un stub, et il a de nouveau une échéance : T9.2.** Le contexte de session
-  a sa forme finale ; `lib/auth/provider.ts` reste le seul fichier que le SSO réécrira, et
-  **`/dev/session` reste** : seul endroit où l'on change de personne courante, 404 en production.
+- **Le domaine vient du jeton, et de lui seul.** `resolveDomainId` prend une identité vérifiée —
+  le `hd` de Google, le `tid` d'Entra — et interroge `domain_identities`. « Le premier domaine actif
+  par nom » ne survit que dans `setCurrentPerson`, hors production, pour `/dev/session` seul.
+- **Le cookie authentifie, donc il se signe** (`lib/auth/cookie.ts`, HMAC-SHA256). Il porte une
+  **union** : une personne porte `{personId, domainId}`, un super administrateur son seul
+  identifiant — il n'a ni domaine ni ligne `persons`, et `getSession()` rend donc `null` pour lui.
+  **Le repli du stub est mort** : une identité absente ou inéligible est refusée, jamais remplacée,
+  et `requireSession` redirige vers `/auth/acces`. **`/dev/session` reste**, 404 en production :
+  une adresse personnelle ne porte ni `hd` ni `tid`, donc le chemin d'un membre de domaine ne se
+  parcourt pas au navigateur.
 - **Les maquettes `docs/design/maquettes/` sont une référence visuelle**, jamais branchées, et **le
   levier n'est pas le modèle mais les quatre disciplines de vérification.**

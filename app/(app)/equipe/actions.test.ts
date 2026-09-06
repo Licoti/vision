@@ -39,6 +39,7 @@
 import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
+import { SESSION_COOKIE, sealPrincipal } from "@/lib/auth/cookie";
 import { db } from "@/lib/db/client";
 import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
 import {
@@ -59,14 +60,37 @@ import {
   skills,
 } from "@/lib/db/schema";
 
-/** Qui la requête prétend être. Chaque test la pose avant d'appeler l'action. */
+/**
+ * Qui la requête prétend être — **et dans quel domaine** (T9.2).
+ *
+ * Le cookie du stub portait un identifiant de personne en clair, et le domaine
+ * se déduisait ailleurs : `resolveDomainId` rendait « le premier domaine actif,
+ * par nom ». C'est le couplage que T8.1 avait nommé sans pouvoir le lever —
+ * *rien ne pouvait lui désigner un autre domaine, donc ce fichier dépendait de
+ * l'état global de la branche*, et un domaine résiduel faisait tomber 63 tests
+ * sur trois fichiers (02/09/2026).
+ *
+ * Le cookie porte désormais le couple, **scellé par le vrai sceau** — la
+ * signature n'est pas simulée, elle est celle du produit. Ce fichier désigne son
+ * domaine, et la garde qui vérifiait l'ordre alphabétique a disparu avec sa
+ * raison d'être. Le balayage de `vitest.global-setup.ts` reste : il cesse d'être
+ * la seule protection, il ne devient pas inutile.
+ */
 let currentPerson: string | null = null;
+let currentDomain: string | null = null;
 
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (name: string) =>
-      name === "vision_person" && currentPerson
-        ? { name, value: currentPerson }
+      name === SESSION_COOKIE && currentPerson && currentDomain
+        ? {
+            name,
+            value: sealPrincipal({
+              kind: "person",
+              personId: currentPerson,
+              domainId: currentDomain,
+            }),
+          }
         : undefined,
   }),
 }));
@@ -106,6 +130,7 @@ beforeAll(async () => {
   });
   domainId = domain.id;
 
+  currentDomain = domain.id;
   const scope = forDomain({ domainId: domain.id });
 
   const person = (fullName: string, role: "domain_manager" | "member" | null) =>
@@ -249,13 +274,16 @@ describe("deletePerson — ce que le geste refuse", () => {
   });
 
   /* **Le cas « aucune personne courante » n'est pas testé ici, et c'est une
-     mesure, pas un oubli** : sans cookie, le stub d'authentification replie sur
-     la première personne éligible du premier domaine actif
-     (`lib/auth/provider.ts`), et la suppression **réussit**. C'est une propriété
-     du stub — documentée, sans échéance depuis que le SSO est sorti de C7 —, pas
-     de cette action, et l'éprouver ici ferait croire que ce fichier la couvre.
-     Le cas qui prouve quelque chose est celui d'une personne courante réelle
-     **sans** `manageDomain`, ci-dessus. */
+     mesure, pas un oubli** — mais la raison a changé avec T9.2. Elle était :
+     *sans cookie, le stub replie sur la première personne éligible du premier
+     domaine actif, et la suppression réussit*. Ce repli n'existe plus — « une
+     identité fournie et inéligible est refusée, jamais remplacée », et une
+     identité absente ne se remplace pas davantage : `requireSession` redirige
+     vers l'écran d'entrée. Le cas est désormais éprouvé **une fois**, là où il
+     dit quelque chose de la porte plutôt que de cette action —
+     `produits/[id]/actions.test.ts`, avec son étape témoin. Le cas qui prouve
+     quelque chose ici reste celui d'une personne courante réelle **sans**
+     `manageDomain`, ci-dessus. */
 
   /* La première des deux clés `restrict`. Le décompte parle — l'action rend une
      phrase qui dit *ce qui* s'oppose —, la clé étrangère décide. */

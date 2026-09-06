@@ -37,7 +37,7 @@ Cette boucle tient en quatre écrans. Tout le reste du POC gravite autour d'elle
 
 | Élément | Contenu |
 |---|---|
-| Domaine unique | Un domaine amorcé avec ses référentiels. Pas d'interface d'administration : amorçage par script. |
+| Domaines | **Amendé le 06/09/2026 (C9).** Un domaine amorcé avec ses référentiels. L'amorçage par script reste (`npm run db:seed`) ; C9 lui ajoute un écran au-dessus des domaines (T9.4) et l'amorçage des référentiels à la création (T9.5). |
 | Authentification | SSO de l'entreprise. Rôles `domain_manager` et `member`. |
 | Annuaire | Import des personnes du centre. Saisie manuelle possible pour les personnes sans compte. |
 | Référentiels | Entités, métiers, statuts, types d'activité, approches, outils — en base, modifiables par un responsable de domaine via un écran sommaire. |
@@ -72,7 +72,7 @@ Chaque exclusion renvoie à sa justification.
 | Graphe de relations entre projets | Sans valeur à quinze projets ; les liens déduits suffisent (F1, principe de simplicité). |
 | Intégration API des outils d'audit | Niveau déclaratif retenu (D15). Les champs sont prêts. |
 | Synchronisation SharePoint des métadonnées | Le lien suffit. La synchronisation demande des autorisations Graph longues à obtenir. |
-| Interface d'administration multi-domaine | Un seul domaine au POC. Amorçage par script. |
+| ~~Interface d'administration multi-domaine~~ | **Levé le 06/09/2026 (C9).** L'exclusion supposait un domaine unique. Le SSO rend le domaine désigné par le jeton et non plus trouvé en base : sans écran pour créer une entreprise et saisir son identité vérifiée, aucune seconde entreprise ne peut exister. `docs/02` §3 et `docs/04` (`domains`) décrivaient déjà le geste. |
 | Thème par domaine | Un seul design system (F4, section 9). Le front doit néanmoins être théminé par variables dès le départ. |
 | Accès des commanditaires côté entité | Décidé en F1 (D2). La page projet est conçue lisible par eux, sans leur être ouverte. |
 | Notifications et relances | Contraire au principe « Vision montre le fait, elle ne harcèle pas » (F3, section 8). |

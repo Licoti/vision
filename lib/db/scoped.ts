@@ -979,6 +979,85 @@ export const superAdmin = {
   },
 
   /**
+   * Le seul écrivain de `super_admins` — **et il n'a qu'un appelant, un script**
+   * (T9.2, `scripts/auth:super-admin`).
+   *
+   * **Pourquoi la fonction vit ici.** Le premier super administrateur ne peut
+   * pas s'accorder depuis l'intérieur du produit : c'est l'amorçage d'un droit,
+   * comme une première clé se pose de l'extérieur de la serrure. Le geste doit
+   * pourtant passer par cette couche — `lib/db/client` n'est importable que par
+   * ce fichier (règle 1, tenue par ESLint), et un script qui ouvrirait sa propre
+   * connexion pour contourner cela contournerait la règle, pas la contrainte.
+   *
+   * **Elle écrit, donc elle demandera un droit** : c'est T9.3, qui distingue ce
+   * qui doit rester ouvert au chargement de session — les deux lectures
+   * d'identité, qui s'exécutent *pendant* la connexion — de ce qui n'a aucune
+   * raison de l'être. `createDomain` et celle-ci sont du second groupe.
+   *
+   * **Rejouable**, comme l'amorçage des référentiels de T8.4 : une seconde pose
+   * sur la même adresse met le nom à jour et **rétablit une ligne archivée**
+   * plutôt que de buter sur `super_admins_email_unique`. Réaccorder le droit à
+   * quelqu'un qu'on avait archivé est un geste légitime, et le refuser en
+   * silence sur un conflit d'unicité serait illisible.
+   */
+  async upsertSuperAdmin(values: {
+    email: string;
+    fullName: string;
+  }): Promise<{ row: InferSelectModel<typeof superAdmins>; created: boolean }> {
+    /* Sur `lower(email)`, du même côté que l'index unique — et **sans écarter
+       les archivés**, à la différence de `findSuperAdminByEmail` : cette
+       lecture-ci cherche la ligne que la base empêcherait de doubler, pas celle
+       qui ouvre une session. */
+    const existing = await db
+      .select()
+      .from(superAdmins)
+      .where(sql`lower(${superAdmins.email}) = lower(${values.email})`)
+      .limit(1);
+
+    const known = existing[0];
+
+    if (known) {
+      const updated = await db
+        .update(superAdmins)
+        .set({ ...values, archivedAt: null, updatedAt: new Date() })
+        .where(eq(superAdmins.id, known.id))
+        .returning();
+
+      const row = updated[0];
+      if (!row) {
+        throw new IntegrityError(
+          "La mise à jour du super administrateur n'a rien renvoyé.",
+        );
+      }
+      return { row, created: false };
+    }
+
+    const inserted = await db.insert(superAdmins).values(values).returning();
+    const row = inserted[0];
+    if (!row) {
+      throw new IntegrityError(
+        "La création du super administrateur n'a rien renvoyé.",
+      );
+    }
+    return { row, created: true };
+  },
+
+  /**
+   * Les super administrateurs en exercice — **la liste que le script relit**.
+   *
+   * Les archivés n'y figurent pas, pour la raison de `findSuperAdminByEmail` :
+   * archiver *est* le geste qui retire le droit, et une liste qui les montrerait
+   * demanderait à son lecteur de refaire le tri.
+   */
+  async listSuperAdmins(): Promise<InferSelectModel<typeof superAdmins>[]> {
+    return db
+      .select()
+      .from(superAdmins)
+      .where(isNull(superAdmins.archivedAt))
+      .orderBy(superAdmins.email);
+  },
+
+  /**
    * Les règles d'entrée 3 et 5 — l'entreprise du jeton, confrontée aux clientes.
    *
    * Rend le rattachement, donc le `domain_id` : c'est cette ligne, et elle

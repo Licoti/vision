@@ -28,6 +28,7 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
+import { SESSION_COOKIE, sealPrincipal } from "@/lib/auth/cookie";
 import { db } from "@/lib/db/client";
 import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
 import {
@@ -47,14 +48,37 @@ import {
 } from "@/lib/db/schema";
 import { TEAM_FIELD_PREFIX } from "@/lib/forms/project";
 
-/** Qui la requête prétend être. Chaque test la pose avant d'appeler l'action. */
+/**
+ * Qui la requête prétend être — **et dans quel domaine** (T9.2).
+ *
+ * Le cookie du stub portait un identifiant de personne en clair, et le domaine
+ * se déduisait ailleurs : `resolveDomainId` rendait « le premier domaine actif,
+ * par nom ». C'est le couplage que T8.1 avait nommé sans pouvoir le lever —
+ * *rien ne pouvait lui désigner un autre domaine, donc ce fichier dépendait de
+ * l'état global de la branche*, et un domaine résiduel faisait tomber 63 tests
+ * sur trois fichiers (02/09/2026).
+ *
+ * Le cookie porte désormais le couple, **scellé par le vrai sceau** — la
+ * signature n'est pas simulée, elle est celle du produit. Ce fichier désigne son
+ * domaine, et la garde qui vérifiait l'ordre alphabétique a disparu avec sa
+ * raison d'être. Le balayage de `vitest.global-setup.ts` reste : il cesse d'être
+ * la seule protection, il ne devient pas inutile.
+ */
 let currentPerson: string | null = null;
+let currentDomain: string | null = null;
 
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (name: string) =>
-      name === "vision_person" && currentPerson
-        ? { name, value: currentPerson }
+      name === SESSION_COOKIE && currentPerson && currentDomain
+        ? {
+            name,
+            value: sealPrincipal({
+              kind: "person",
+              personId: currentPerson,
+              domainId: currentDomain,
+            }),
+          }
         : undefined,
   }),
 }));
@@ -112,8 +136,8 @@ let f: Fixture;
  *
  * Le nettoyage portait sur `f.domainId` : un `beforeAll` qui échoue **après**
  * avoir créé son domaine laisse `f` indéfinie, l'`afterAll` se saute, et le
- * domaine résiduel fait tomber les fichiers suivants — `resolveDomainId` rendant
- * le premier domaine actif par nom. La forme est celle d'`equipe/actions.test.ts`
+ * domaine résiduel faisait tomber les fichiers suivants — `resolveDomainId`
+ * rendant alors le premier domaine actif par nom (T9.2 l'a refermé). La forme est celle d'`equipe/actions.test.ts`
  * (28/08/2026) et d'`administration/actions.test.ts` (T7.3) : la variable est
  * posée à la ligne d'après la création, et entre les deux rien ne peut échouer.
  *
@@ -130,6 +154,7 @@ beforeAll(async () => {
     competenceCenterName: `Centre ${suffix}`,
   });
   createdDomainId = domain.id;
+  currentDomain = domain.id;
   const scope = forDomain({ domainId: domain.id });
 
   /* `persons_role_requires_access` lie les deux colonnes : un compte porte un

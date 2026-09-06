@@ -44,6 +44,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
+import { SESSION_COOKIE, sealPrincipal } from "@/lib/auth/cookie";
 import { db } from "@/lib/db/client";
 import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
 import {
@@ -73,14 +74,37 @@ import { EMPTY_TAGGING_PLAN_VALUES } from "@/lib/forms/tagging-plan";
 import { EMPTY_TRACKING_VALUES } from "@/lib/forms/tracking";
 import { EMPTY_USE_CASE_VALUES } from "@/lib/forms/use-case";
 
-/** Qui la requête prétend être. Chaque test la pose avant d'appeler l'action. */
+/**
+ * Qui la requête prétend être — **et dans quel domaine** (T9.2).
+ *
+ * Le cookie du stub portait un identifiant de personne en clair, et le domaine
+ * se déduisait ailleurs : `resolveDomainId` rendait « le premier domaine actif,
+ * par nom ». C'est le couplage que T8.1 avait nommé sans pouvoir le lever —
+ * *rien ne pouvait lui désigner un autre domaine, donc ce fichier dépendait de
+ * l'état global de la branche*, et un domaine résiduel faisait tomber 63 tests
+ * sur trois fichiers (02/09/2026).
+ *
+ * Le cookie porte désormais le couple, **scellé par le vrai sceau** — la
+ * signature n'est pas simulée, elle est celle du produit. Ce fichier désigne son
+ * domaine, et la garde qui vérifiait l'ordre alphabétique a disparu avec sa
+ * raison d'être. Le balayage de `vitest.global-setup.ts` reste : il cesse d'être
+ * la seule protection, il ne devient pas inutile.
+ */
 let currentPerson: string | null = null;
+let currentDomain: string | null = null;
 
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (name: string) =>
-      name === "vision_person" && currentPerson
-        ? { name, value: currentPerson }
+      name === SESSION_COOKIE && currentPerson && currentDomain
+        ? {
+            name,
+            value: sealPrincipal({
+              kind: "person",
+              personId: currentPerson,
+              domainId: currentDomain,
+            }),
+          }
         : undefined,
   }),
 }));
@@ -188,8 +212,9 @@ let f: Fixture;
  *
  * `afterAll` nettoyait sur `if (!f?.domainId) return` : quand `beforeAll`
  * échoue **après** la création du domaine, `f` reste indéfinie, le nettoyage se
- * saute, et le domaine résiduel fait tomber le fichier suivant par la
- * résolution « premier domaine actif **par nom** » (`resolveDomainId`). La
+ * saute, et le domaine résiduel faisait tomber le fichier suivant par la
+ * résolution « premier domaine actif **par nom** » (`resolveDomainId`) — que
+ * T9.2 a remplacée par le domaine que porte le cookie. La
  * variable est posée à la ligne d'après la création : entre les deux, rien ne
  * peut échouer.
  */
@@ -201,6 +226,7 @@ beforeAll(async () => {
     competenceCenterName: `Centre ${suffix}`,
   });
   createdDomainId = domain.id;
+  currentDomain = domain.id;
   const scope = forDomain({ domainId: domain.id });
 
   const person = (fullName: string, domainRole: "domain_manager" | "member") =>
@@ -534,33 +560,34 @@ describe("setNorthStar — ce que le geste refuse", () => {
     }
   });
 
-  test("sans cookie, le stub **accorde** une identité — propriété du POC", async () => {
-    /* **Ce test a démenti deux premisses avant de dire vrai**, et c'est pour
-       cela qu'il reste : je l'avais d'abord écrit « `requireSession` refuse »,
-       puis « le domaine protège ». Les deux étaient faux.
+  test("sans cookie, **rien ne s'écrit** — le repli du stub est mort avec lui", async () => {
+    /* **Ce test a été retourné par T9.2, et c'est ce qu'on lui demandait.**
+       Il s'appelait « sans cookie, le stub **accorde** une identité — propriété
+       du POC », et il épinglait le repli : `resolveDomainId` rendait le premier
+       domaine actif, `resolveAccount` y choisissait un compte quand le cookie
+       était absent, et l'écriture passait. Son commentaire annonçait le jour :
+       *« le SSO remplacera `lib/auth/provider.ts`, et ce test tombera : c'est
+       précisément ce qu'on veut de lui. Il épingle la propriété pour que le jour
+       où elle change, quelqu'un le voie. »* Le voici : même geste, propriété
+       inverse. **Une identité fournie et inéligible est refusée, jamais
+       remplacée** — et une identité absente ne se remplace pas davantage.
 
-       Ce que fait le stub, lu dans le code après coup : `resolveDomainId`
-       (`lib/auth/session.ts`) rend **le premier domaine actif** de l'instance,
-       et `resolveAccount` y choisit un compte quand le cookie est absent. Sans
-       cookie, on est donc quelqu'un — potentiellement le responsable du
-       domaine —, et l'écriture passe.
-
-       Ce n'est **pas un défaut de cette action** : c'est le sélecteur de
-       personne du POC (T1.4, D37), qui « ne authentifie personne — il désigne,
-       en développement, qui l'on prétend être ». C7 remplacera
-       `lib/auth/provider.ts` par Entra ID, et **ce test tombera** : c'est
-       précisément ce qu'on veut de lui. Il épingle la propriété pour que le
-       jour où elle change, quelqu'un le voie.
-
-       Le geste est éprouvé sur un produit du domaine de repli, sans quoi le
-       test dirait la règle 1 et non la propriété d'authentification. */
+       **La levée ne prouve rien à elle seule.** `requireSession` redirige vers
+       l'écran d'entrée, et une redirection n'est pas une écriture refusée : un
+       refus rend 200 comme une réussite (leçon de T6.1). C'est l'étape témoin,
+       puis le décompte après, qui tranchent. */
     currentPerson = null;
     try {
-      await setNorthStar(f.productId, f.indicatorId);
+      // Étape témoin : la cible est vide **avant** le geste.
+      expect(await northStarOf(f.productId)).toBeNull();
 
-      const written = await northStarOf(f.productId);
-      expect(written).toBe(f.indicatorId);
+      await expect(setNorthStar(f.productId, f.indicatorId)).rejects.toThrow(
+        `${REDIRECT}/auth/acces`,
+      );
+
+      expect(await northStarOf(f.productId)).toBeNull();
     } finally {
+      currentPerson = f.managerId;
       await clear();
     }
   });

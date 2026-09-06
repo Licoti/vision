@@ -519,8 +519,10 @@ function round(value: number): number {
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
 const teardownOrder = [
   /* **Avant `projects` et `products`**, la règle « enfants d'abord » : un
-     oubli ici laisse un domaine résiduel, et c'est le **fichier suivant** qui
-     tombe, sur une résolution « premier domaine actif par nom ». */
+     oubli ici laisse un domaine résiduel. C'était le **fichier suivant** qui
+     tombait, sur une résolution « premier domaine actif par nom » ; T9.2 a
+     refermé ce couplage — le cookie porte désormais son domaine. Le nettoyage
+     reste dû, une branche de test partagée n'étant pas une poubelle. */
   contextMarkers,
   results,
   activities,

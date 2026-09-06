@@ -1058,16 +1058,30 @@ describe("superAdmin", () => {
     expect(names).toContain(`__test__a__${suffix}`);
     expect(names).toContain(`__test__b__${suffix}`);
 
-    /* **Cinq clés depuis T9.1, et la liste reste nominative.** Ce qui s'y
-       ajoute ne donne toujours accès à aucune donnée métier : deux lectures qui
-       rendent de quoi *choisir* un domaine, jamais de quoi le traverser. T9.3
-       interdit une sixième. */
+    /* **Sept clés depuis T9.2, et la liste reste nominative** — c'est
+       exactement ce que ce sceau sert à obtenir : une clé de plus est une
+       décision qui se prend, jamais un ajout qui passe.
+
+       **La propriété qu'il garde n'a pas bougé** : aucune de ces fonctions ne
+       donne accès à une donnée métier. Les deux qui s'ajoutent écrivent et
+       lisent `super_admins`, qui vit *au-dessus* des domaines et n'en traverse
+       aucun — elles amorcent le droit que rien, dans le produit, ne peut
+       s'accorder à lui-même (`scripts/auth:super-admin`, T9.2). Les faire vivre
+       dans un script à connexion propre aurait contourné la règle 1 plutôt que
+       sa contrainte, et **laissé T9.3 sans rien à garder**.
+
+       **Deux écrivains à garder, donc, et non un** : `createDomain` et
+       `upsertSuperAdmin`. Les quatre lectures restent ouvertes — elles
+       s'exécutent *pendant* la connexion, quand aucune session n'existe. C'est
+       la distinction que T9.3 doit écrire. */
     expect(Object.keys(superAdmin).sort()).toEqual([
       "createDomain",
       "findDomain",
       "findDomainIdentity",
       "findSuperAdminByEmail",
       "listDomains",
+      "listSuperAdmins",
+      "upsertSuperAdmin",
     ]);
   });
 
@@ -1117,6 +1131,85 @@ describe("superAdmin", () => {
     expect(
       await db.select().from(superAdmins).where(eq(superAdmins.id, rows[0]!.id)),
     ).toHaveLength(1);
+  });
+
+  /* **Rejouable, et mesuré en base** — la propriété que T8.4 a posée sur les
+     référentiels, rejouée sur l'amorçage du droit. Un script qu'on hésite à
+     relancer n'est pas un outil, et le décompte tranche : un second appel qui
+     aurait créé une ligne se lirait exactement comme un appel qui l'a mise à
+     jour, si l'on s'en tenait à ce que la fonction rend. */
+  test("une seconde pose met à jour plutôt que de doubler", async () => {
+    const email = `rejouable.${suffix}@exemple.test`;
+
+    const first = await superAdmin.upsertSuperAdmin({
+      email,
+      fullName: `Première ${suffix}`,
+    });
+    expect(first.created).toBe(true);
+
+    const second = await superAdmin.upsertSuperAdmin({
+      email: email.toUpperCase(),
+      fullName: `Seconde ${suffix}`,
+    });
+    expect(second.created).toBe(false);
+    expect(second.row.id).toBe(first.row.id);
+
+    const rows = await db
+      .select()
+      .from(superAdmins)
+      .where(sql`lower(${superAdmins.email}) = lower(${email})`);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.fullName).toBe(`Seconde ${suffix}`);
+  });
+
+  /* Réaccorder le droit à quelqu'un qu'on avait archivé est un geste légitime.
+     Le refuser en silence sur un conflit d'unicité serait illisible : c'est la
+     raison pour laquelle cette lecture-ci n'écarte pas les archivés, quand
+     `findSuperAdminByEmail` le fait. */
+  test("une seconde pose rétablit une ligne archivée", async () => {
+    const email = `retabli.${suffix}@exemple.test`;
+
+    const { row } = await superAdmin.upsertSuperAdmin({
+      email,
+      fullName: `À rétablir ${suffix}`,
+    });
+    await db
+      .update(superAdmins)
+      .set({ archivedAt: new Date() })
+      .where(eq(superAdmins.id, row.id));
+
+    expect(await superAdmin.findSuperAdminByEmail(email)).toBeUndefined();
+
+    const again = await superAdmin.upsertSuperAdmin({
+      email,
+      fullName: `Rétabli ${suffix}`,
+    });
+
+    expect(again.created).toBe(false);
+    expect(again.row.id).toBe(row.id);
+    expect((await superAdmin.findSuperAdminByEmail(email))?.id).toBe(row.id);
+  });
+
+  test("la liste ne porte que les super administrateurs en exercice", async () => {
+    const email = `hors-liste.${suffix}@exemple.test`;
+    const { row } = await superAdmin.upsertSuperAdmin({
+      email,
+      fullName: `Hors liste ${suffix}`,
+    });
+
+    expect(
+      (await superAdmin.listSuperAdmins()).map((admin) => admin.id),
+    ).toContain(row.id);
+
+    await db
+      .update(superAdmins)
+      .set({ archivedAt: new Date() })
+      .where(eq(superAdmins.id, row.id));
+
+    expect(
+      (await superAdmin.listSuperAdmins()).map((admin) => admin.id),
+    ).not.toContain(row.id);
   });
 });
 

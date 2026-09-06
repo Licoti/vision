@@ -42,7 +42,7 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
-import { resolveDomainId } from "@/lib/auth/session";
+import { SESSION_COOKIE, sealPrincipal } from "@/lib/auth/cookie";
 import { db } from "@/lib/db/client";
 import { forDomain, superAdmin, type ScopedDb } from "@/lib/db/scoped";
 import {
@@ -66,14 +66,37 @@ import {
   tools,
 } from "@/lib/db/schema";
 
-/** Qui la requête prétend être. Chaque test la pose avant d'appeler l'action. */
+/**
+ * Qui la requête prétend être — **et dans quel domaine** (T9.2).
+ *
+ * Le cookie du stub portait un identifiant de personne en clair, et le domaine
+ * se déduisait ailleurs : `resolveDomainId` rendait « le premier domaine actif,
+ * par nom ». C'est le couplage que T8.1 avait nommé sans pouvoir le lever —
+ * *rien ne pouvait lui désigner un autre domaine, donc ce fichier dépendait de
+ * l'état global de la branche*, et un domaine résiduel faisait tomber 63 tests
+ * sur trois fichiers (02/09/2026).
+ *
+ * Le cookie porte désormais le couple, **scellé par le vrai sceau** — la
+ * signature n'est pas simulée, elle est celle du produit. Ce fichier désigne son
+ * domaine, et la garde qui vérifiait l'ordre alphabétique a disparu avec sa
+ * raison d'être. Le balayage de `vitest.global-setup.ts` reste : il cesse d'être
+ * la seule protection, il ne devient pas inutile.
+ */
 let currentPerson: string | null = null;
+let currentDomain: string | null = null;
 
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (name: string) =>
-      name === "vision_person" && currentPerson
-        ? { name, value: currentPerson }
+      name === SESSION_COOKIE && currentPerson && currentDomain
+        ? {
+            name,
+            value: sealPrincipal({
+              kind: "person",
+              personId: currentPerson,
+              domainId: currentDomain,
+            }),
+          }
         : undefined,
   }),
 }));
@@ -236,24 +259,9 @@ beforeAll(async () => {
     competenceCenterName: `Centre ${suffix}`,
   });
   domainId = domain.id;
+  currentDomain = domain.id;
   const scope = forDomain({ domainId: domain.id });
 
-  /* **Le domaine courant n'est pas choisi, il est trouvé** : `resolveDomainId`
-     rend **le premier domaine actif par nom**, et le POC n'a aucun moyen de lui
-     en désigner un autre. D'où le nom qui trie en tête, et cette garde, qui
-     échoue en **nommant la cause** — la leçon du 18/08/2026. */
-  const resolved = await resolveDomainId();
-  if (resolved !== domain.id) {
-    const others = await superAdmin.listDomains({ includeArchived: true });
-    throw new Error(
-      "Le domaine courant n'est pas celui de ce fichier : `resolveDomainId` " +
-        "rend le premier domaine actif par nom, et la branche de test en " +
-        "porte un qui trie avant. Domaines présents : " +
-        others.map((row) => row.name).join(", ") +
-        ". Nettoyer les domaines `__test__…` laissés par une exécution " +
-        "interrompue avant de relancer.",
-    );
-  }
 
   const person = (fullName: string, domainRole: "domain_manager" | "member") =>
     scope.insert(persons, {
@@ -495,8 +503,8 @@ afterAll(async () => {
 
      **`events` en tête depuis T8.3**, et son absence aurait été une cascade de
      63 : `events.domain_id` est `restrict`, si bien que la suppression du
-     domaine aurait échoué et laissé un résidu que `resolveDomainId` sert au
-     fichier suivant. C'est exactement la panne que T8.1 a diagnostiquée, et les
+     domaine aurait échoué et laissé un résidu que `resolveDomainId` servait
+     au fichier suivant. C'est exactement la panne que T8.1 a diagnostiquée, et les
      quatre gestes journalisés de l'entité sont ce qui la rendait atteignable
      ici. */
   for (const table of [

@@ -10553,3 +10553,92 @@ longueur seule, jamais par la valeur. → **action humaine avant T9.2.**
 sans juger de l'état du domaine : *un domaine suspendu ouvre-t-il une session ?* n'est **aucune des
 six règles d'entrée** écrites dans `tickets-C9.md`. Trancher ici aurait posé une septième règle dans
 une fonction de lecture, là où les six autres se relisent au même endroit. → **T9.2.**
+
+**T9.2 — Le document de découverte d'Entra annonce un émetteur *gabarit*, et la découverte
+échoue avant même que le locataire puisse être connu.** Mesuré le 06/09/2026 : sur
+`login.microsoftonline.com/organizations/v2.0`, le document rend
+`issuer: "https://login.microsoftonline.com/{tenantid}/v2.0"`, littéralement, accolades comprises.
+`processDiscoveryResponse` compare `new URL(json.issuer).href` à l'identifiant attendu et refuse la
+**découverte entière** sur `OAUTH_JSON_ATTRIBUTE_COMPARISON_FAILED` — bien avant l'échange du code,
+donc bien avant qu'un `tid` réel existe. Ma première écriture ne traitait le locataire qu'au moment
+de la vérification du jeton : elle n'était jamais atteinte. **La parade tient à une propriété du
+constructeur `URL`** : les deux côtés de la comparaison y passent, et les accolades s'y encodent de
+la même façon (`%7Btenantid%7D`) — le gabarit se compare donc à lui-même. Le fournisseur porte
+désormais deux adresses, `issuer` (ce qu'on interroge) et `declaredIssuer` (ce que le document doit
+annoncer), et l'émetteur du locataire réel se substitue plus tard, dérivé du `tid` **non vérifié**
+puis confronté par `oauth4webapi` à la signature et au claim `iss`. **Ce chemin n'est pas mesuré de
+bout en bout** : voir l'entrée suivante.
+
+**T9.2 — Écart à l'arbitrage (1) : la couche sert deux fournisseurs, un seul est branché.** Entra
+ID Free demande une carte bancaire de vérification d'identité, et *« only paid customers can create
+a new Workforce tenant »* ; `ENTRA_CLIENT_ID` et `ENTRA_CLIENT_SECRET` n'existent donc pas. Ce qui a
+été mesuré de Microsoft : la découverte aboutit, et l'adresse d'autorisation est bien
+`login.microsoftonline.com/organizations/oauth2/v2.0/authorize`, avec les trois portées, PKCE S256,
+`state` et `nonce` — relevé avec des valeurs de client factices, hors `.env.local`. Ce qui **n'a pas
+été mesuré** : l'échange du code, la substitution d'émetteur ci-dessus, et le claim `tid`. La fiche
+autorisait la livraison à un fournisseur *« à condition que le second ne demande aucune modification
+de forme »* : la table `PROVIDERS` porte la différence en deux champs déclarés, et l'ajouter sera
+deux valeurs dans `.env.local`. **Ce n'est pas une promesse, c'est une hypothèse non éprouvée**, et
+elle est écrite ici pour ne pas se redécouvrir.
+
+**T9.2 — Quatre écarts de périmètre, annoncés au plan et validés avant d'écrire.** (1) Trois
+modules neufs sous `lib/auth/` — `cookie.ts`, `oidc.ts`, `entry.ts` — plutôt qu'un `provider.ts` de
+huit cents lignes : les six règles d'entrée doivent être **appelables sans Next** pour se mesurer
+sur claims forgés, ce qui est la forme même que la fiche prescrit à sa validation. (2) Les six
+fichiers de tests d'action : la fiche demande que `resolveDomainId` cesse de rendre le premier
+domaine actif par nom *pour refermer le couplage de T8.1*, et ces six fichiers **sont** le couplage.
+(3) `scripts/super-admin.ts`, sur décision humaine — l'interdit de T9.1 renvoie la première ligne de
+`super_admins` à T9.2. (4) `lib/db/scoped.ts`, découvert en cours de route : ESLint interdit à tout
+module hors `lib/db/scoped.ts` d'importer `lib/db/client`, et un script qui aurait ouvert sa propre
+connexion aurait contourné la règle 1 plutôt que sa contrainte — **et laissé T9.3 sans rien à
+garder**. `superAdmin` passe donc de cinq fonctions à sept, et le sceau nominatif de
+`lib/db/scoped.test.ts` a été récrit plutôt que retiré : c'est exactement ce à quoi il sert.
+
+**T9.2 — `persons.identity_provider` n'a toujours aucun écrivain, et c'est délibéré.** T9.1 a posé
+la colonne en annonçant que *« la règle d'entrée 6 cherchera le couple (`identity_provider`,
+`external_id`) »* — elle le fait, en lecture. Écrire ce couple sur la ligne trouvée par e-mail au
+premier passage buterait sur `persons_external_id_requires_directory` pour **toute** personne saisie
+dans Vision, qui sont toutes `manual` ; le geste n'aurait d'objet que pour des lignes venues d'un
+import d'annuaire, que C9 exclut explicitement (`docs/05` §3, hors chantier). Écrire pour un cas qui
+ne peut pas se produire, c'est écrire ce qu'aucune mesure ne couvre. Le repli par `lower(email)`
+reste donc le chemin, et le point part dans `ETAT.md`.
+
+**T9.2 — Un compte du jeu de démonstration ne peut pas se connecter, et le trou est nommé par
+T9.6.** `scripts/seed.ts` pose ses personnes avec `email = null` — *« fabriquer un `external_id`
+serait inventer »*, et l'adresse a suivi. La règle d'entrée 6 rapproche sur l'e-mail au premier
+passage : **aucune personne amorcée n'est donc joignable par le SSO**. C'est exactement le second
+manque que T9.6 décrit — *« `email` n'est écrit par aucun formulaire »* —, découvert ici par la
+mesure plutôt que par la fiche. Sans conséquence sur ce ticket : `/dev/session` reste, et les sept
+refus se mesurent sur des personnes de fixture qui, elles, portent une adresse.
+
+**T9.2 — La tolérance du stub est morte, et un test a été retourné plutôt que supprimé.**
+`produits/[id]/actions.test.ts` portait « sans cookie, le stub **accorde** une identité — propriété
+du POC », avec ce commentaire : *« C7 remplacera `lib/auth/provider.ts` par Entra ID, et ce test
+tombera : c'est précisément ce qu'on veut de lui. Il épingle la propriété pour que le jour où elle
+change, quelqu'un le voie. »* Le jour est venu, et le test dit désormais l'inverse — même geste,
+étape témoin, décompte en base : sans cookie, **rien ne s'écrit**. Un test écrit pour tomber, et qui
+tombe au bon moment, vaut mieux qu'un test qu'on aurait retiré.
+
+**T9.2 — `AUTH_SECRET` a été régénéré, et la garde qui l'a exigé est en base de code.** La valeur
+de `.env.local` faisait **23 caractères**, quand `openssl rand -base64 32` en rend 44 — moins de
+17 octets pour signer un cookie que le stub n'avait pas besoin de signer. `lib/auth/cookie.ts` lève
+désormais une `AuthSecretError` nommée en deçà de 32 caractères, à l'usage et non au chargement du
+module : lever à l'import ferait tomber la suite entière sur un fichier mal configuré, et rendrait
+le défaut illisible. La régénération a été faite le 06/09/2026, sur accord humain explicite ; aucune
+session n'existait, rien n'a été invalidé.
+
+**T9.2 — Six commentaires ont été rendus faux par ce ticket, et corrigés.** Cinq disent la
+résolution « premier domaine actif par nom » au présent — les six fichiers de tests d'action et
+`lib/queries/timeline.test.ts` —, un dit que « sans cookie, le stub replie sur la première personne
+éligible » (`equipe/actions.test.ts`). Tous sont passés au passé ou récrits. `timeline.test.ts` est
+hors du périmètre annoncé : c'est ce ticket qui a rendu son commentaire faux, et un commentaire faux
+vaut une ligne de code fausse (leçon de T7.5). La correction fait une ligne.
+
+**T9.2 — Le contraste d'un couple neuf par la position, mesuré.** `EmptyState` reçoit pour la
+première fois un bouton **secondaire** (`/auth/acces`) : le primaire y vit déjà
+(`components/products/roadmap.tsx`), le secondaire non. Le fond du bouton secondaire
+(`surface-neutral-pale`, `#fdfdfd`) est **identique** à celui de l'état vide — 1,00:1, aucun
+détachement par le fond. C'est son **bord** qui porte la limite du composant :
+`border-primary-base` (`#24226a`) sur `surface-neutral-pale` mesure **13,65:1**, très au-dessus des
+3:1 de WCAG 1.4.11 ; son texte, `content-primary-base`, mesure les mêmes 13,65:1 pour un seuil de
+4,5:1. C'est la position qui décide du jeton, jamais la provenance (leçon de T5.4).

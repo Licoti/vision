@@ -7,8 +7,15 @@
  *
  * **Ce fichier n'importe rien de Next**, et c'est délibéré : le fournisseur
  * appelle le contexte, jamais l'inverse. Les tests le chargent donc sans
- * traîner `next/headers`, et C7 change de source d'identité sans toucher
- * d'une ligne aux droits.
+ * traîner `next/headers`.
+ *
+ * **La promesse a été tenue, et T9.2 est l'épreuve qui le dit.** Cet en-tête
+ * annonçait « C7 change de source d'identité sans toucher d'une ligne aux
+ * droits » — cinquième énoncé de la famille des promesses faites à C7, et un
+ * commentaire faux vaut une ligne de code fausse (leçon de T7.5). C'est C9 qui
+ * l'a fait, et le SSO n'a touché ici qu'une seule fonction, `resolveDomainId` :
+ * `rightsFor`, `loadSession`, `listAccounts` et `resolveAccount` n'ont pas
+ * bougé d'un caractère, ni aucun écran du produit.
  *
  * Les droits, en deux règles et pas une de plus :
  *   — `manageDomain` : créer et modifier produits, projets et référentiels.
@@ -25,7 +32,13 @@
 import { and, asc, eq } from "drizzle-orm";
 
 import { forDomain, superAdmin, type ScopedDb } from "../db/scoped";
-import { domainRole, personKind, persons, projectMembers } from "../db/schema";
+import {
+  domainRole,
+  identityProvider,
+  personKind,
+  persons,
+  projectMembers,
+} from "../db/schema";
 
 /* ==========================================================================
    La forme du contexte
@@ -107,15 +120,39 @@ export function rightsFor(
 /* ==========================================================================
    Le domaine courant
 
-   docs/05 §3 — « domaine unique » au POC. Le domaine n'est donc pas choisi :
-   il est trouvé. Une variable d'environnement serait un réglage de plus à
-   tenir à jour pour une valeur que la base connaît déjà.
+   **Il ne se trouve plus, il se désigne** (T9.2). La version précédente rendait
+   « le premier domaine actif, par nom » : `docs/05` §3 posant un domaine unique,
+   il n'y avait rien à choisir. Le coût de ce raccourci n'était pas théorique —
+   il est **le couplage que T8.1 n'a pas pu lever** : *rien ne pouvait désigner
+   un autre domaine, donc un test d'action dépendait de l'état global de la
+   branche*, et un domaine résiduel faisait tomber 63 tests sur trois fichiers
+   (02/09/2026).
+
+   Le domaine vient désormais du **jeton**, et de lui seul : le `hd` de Google ou
+   le `tid` d'Entra, confrontés à `domain_identities`. C'est aussi ce qui
+   interdit tout sélecteur de domaine à l'écran — une liste déroulante que
+   n'importe qui change serait l'inverse de l'étanchéité qu'elle prétendrait
+   servir.
    ========================================================================== */
 
-/** Le premier domaine actif, par nom. `null` si la base n'est pas amorcée. */
-export async function resolveDomainId(): Promise<string | null> {
-  const open = await superAdmin.listDomains();
-  return open.find((domain) => domain.status === "active")?.id ?? null;
+/**
+ * Le domaine d'une entreprise **vérifiée**, ou `null` si elle n'est pas cliente.
+ *
+ * Règles d'entrée 3 et 5. La lecture ne passe pas par `forDomain`, et ce n'est
+ * pas une entorse à la règle 1 : c'est cette ligne qui *désigne* le domaine —
+ * la scoper demanderait de connaître la réponse avant de poser la question.
+ * Le raisonnement est écrit une fois pour toutes au-dessus du bloc « Ce qui vit
+ * avant le domaine » de `lib/db/scoped.ts`.
+ */
+export async function resolveDomainId(identity: {
+  provider: (typeof identityProvider.enumValues)[number];
+  value: string;
+}): Promise<string | null> {
+  const row = await superAdmin.findDomainIdentity(
+    identity.provider,
+    identity.value,
+  );
+  return row?.domainId ?? null;
 }
 
 /* ==========================================================================
@@ -242,13 +279,4 @@ async function resolveAccount(
     accounts[0] ??
     null
   );
-}
-
-/** Le domaine du POC, puis la session. Ce qu'appelle le fournisseur. */
-export async function loadCurrentSession(
-  personId?: string | null,
-): Promise<Session | null> {
-  const domainId = await resolveDomainId();
-  if (!domainId) return null;
-  return loadSession({ domainId, personId });
 }

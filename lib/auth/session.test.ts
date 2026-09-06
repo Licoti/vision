@@ -20,6 +20,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { db } from "../db/client";
 import { forDomain, superAdmin, type ScopedTable } from "../db/scoped";
 import {
+  domainIdentities,
   domains,
   entities,
   persons,
@@ -50,6 +51,7 @@ const teardownOrder: ScopedTable[] = [
   persons,
   projectStatuses,
   entities,
+  domainIdentities,
 ];
 
 const suffix = Math.random().toString(36).slice(2, 10);
@@ -188,6 +190,15 @@ beforeAll(async () => {
     .update(domains)
     .set({ status: "suspended" })
     .where(eq(domains.id, suspended.id));
+
+  /* L'identité vérifiée du domaine principal — c'est elle, et rien d'autre,
+     qui désigne un domaine depuis T9.2. La valeur porte le suffixe du fichier :
+     l'unicité de `domain_identities` porte sur le couple (fournisseur, valeur),
+     et deux exécutions concurrentes ne doivent pas se disputer la même. */
+  await forDomain({ domainId: main.domainId }).insert(domainIdentities, {
+    provider: "google",
+    value: `main-${suffix}.example.test`,
+  });
 });
 
 afterAll(async () => {
@@ -400,13 +411,41 @@ describe("les comptes proposés au sélecteur", () => {
   });
 });
 
-describe("le domaine courant", () => {
-  test("`resolveDomainId` rend un domaine actif et non archivé", async () => {
-    const domainId = await resolveDomainId();
-    expect(domainId).not.toBeNull();
+/* ==========================================================================
+   Le domaine courant — il ne se trouve plus, il se désigne
 
-    const domain = await superAdmin.findDomain(domainId as string);
-    expect(domain?.status).toBe("active");
-    expect(domain?.archivedAt).toBeNull();
+   T9.2. La version précédente rendait « le premier domaine actif, par nom », et
+   ce test le constatait ; il constate désormais que **le domaine vient du
+   jeton**. Les deux derniers cas sont ceux qui referment le couplage de T8.1 :
+   une valeur inconnue ne retombe sur aucun domaine, et un couple partiellement
+   juste non plus.
+   ========================================================================== */
+
+describe("le domaine courant", () => {
+  test("une identité vérifiée désigne son domaine", async () => {
+    const domainId = await resolveDomainId({
+      provider: "google",
+      value: `main-${suffix}.example.test`,
+    });
+
+    expect(domainId).toBe(main.domainId);
+  });
+
+  test("une entreprise inconnue ne désigne aucun domaine", async () => {
+    const domainId = await resolveDomainId({
+      provider: "google",
+      value: `jamais-cliente-${suffix}.example.test`,
+    });
+
+    expect(domainId).toBeNull();
+  });
+
+  test("l'unicité porte sur le couple : le bon `hd` chez le mauvais fournisseur ne désigne rien", async () => {
+    const domainId = await resolveDomainId({
+      provider: "microsoft",
+      value: `main-${suffix}.example.test`,
+    });
+
+    expect(domainId).toBeNull();
   });
 });

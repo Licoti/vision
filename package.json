@@ -10,12 +10,14 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx --env-file=.env.local scripts/seed.ts"
+    "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
+    "auth:super-admin": "tsx --env-file=.env.local scripts/super-admin.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
     "drizzle-orm": "^0.45.2",
     "next": "16.3.0",
+    "oauth4webapi": "3.8.8",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },
