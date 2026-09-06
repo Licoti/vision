@@ -2,15 +2,14 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 06/09/2026, **session de découpage de C9** — six arbitrages rendus, dont
-deux délégués, et `tickets-C9.md` écrit : T9.1 → T9.5. **La condition de matériel descend du chantier
-au ticket** — les inscriptions fournissent des valeurs, pas une forme, et ne bloquent plus que la
-vérification de T9.2.
-**Chantier en cours :** **C9 — SSO et administration multi-domaine** (`tickets-C9.md`), découpé et
-non ouvert. **C7 garde ses quatre tickets** T7.7 → T7.10 (`tickets-C7.md`) et passe après C9 —
-second écart à `docs/05` §6. **Vert de référence, relevé par T8.1 et inchangé depuis T8.3 : 1 646
-tests sur 55 fichiers, `lint` et `tsc` au vert** — chaque ticket y compare le sien, jamais à un
-souvenir. **Ticket suivant : T9.1 — le schéma de l'identité**, qui ne dépend d'aucun matériel.
+**Dernière mise à jour :** 06/09/2026, **T9.1 terminé** — `super_admins`, `domain_identities`,
+l'identifiant de fournisseur sur `persons`, migration `0016` appliquée sur les deux branches. Six
+contraintes mesurées en base et **six contre-épreuves isolées**, une par contrainte.
+**Chantier en cours :** **C9 — SSO et administration multi-domaine** (`tickets-C9.md`), ouvert.
+**C7 garde ses quatre tickets** T7.7 → T7.10 (`tickets-C7.md`) et passe après C9 — second écart à
+`docs/05` §6. **Vert de référence : 1 655 tests sur 55 fichiers, `lint` et `tsc` au vert** (1 646
+avant T9.1) — chaque ticket y compare le sien, jamais à un souvenir. **Ticket suivant : T9.2 — le
+SSO**, dont les quatre valeurs d'ouverture sont posées.
 
 ---
 
@@ -29,7 +28,7 @@ souvenir. **Ticket suivant : T9.1 — le schéma de l'identité**, qui ne dépen
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
 | C7 — Finitions | T7.1 → T7.10 | **en pause** — T7.1 → T7.6 livrés, T7.7 → T7.10 après C9 |
 | C8 — Dette | T8.1 → T8.5 | **terminé** |
-| C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **découpé** — T9.4 attend une levée de `docs/05` §4 ; T9.6 ajouté le 06/09 |
+| C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **en cours** — T9.1 livré ; T9.4 attend une levée de `docs/05` §4 |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
 
 ---
@@ -59,6 +58,9 @@ souvenir. **Ticket suivant : T9.1 — le schéma de l'identité**, qui ne dépen
 - **C8 — Dette — T8.1 → T8.5, 04-05/09.** Le premier chantier que `docs/05` §5 n'a pas écrit, tiré
   des seuls points ouverts — et **quatre énoncés de fiche sur cinq y ont été mis en défaut**, du
   domaine de tests résiduel à la redirection redondante. 1 582 → 1 646 tests.
+- **C9 — T9.1, 06/09.** Le schéma de l'identité : deux tables hors du produit, un énuméré, une
+  colonne sur `persons`. **La clé d'unicité a été laissée intacte plutôt qu'élargie** — l'élargir
+  l'aurait affaiblie, les `NULL` étant distincts en base. 1 646 → 1 655 tests.
 - **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, tous détaillés dans
   `HISTORIQUE-TICKETS.md` et `JOURNAL-TECHNIQUE.md`. **Cinq portent une migration, `0010` à `0014`** :
   disponibilité déduite, cible unique portée par le produit, période déduite des activités,
@@ -75,23 +77,21 @@ refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le
 
 ### a. À trancher — sinon les tickets suivants héritent du problème
 
-- **T9.2 s'ouvre avec quatre valeurs, six pour les deux fournisseurs** — et l'ancienne liste de
-  quatre était fausse deux fois : un tenant **en trop**, un `AUTH_SECRET` **en moins**. **Google
-  d'abord** : Entra ID Free demande une **carte bancaire** de vérification, non débitée, et un tenant
-  gratuit n'en crée pas d'autre ; Google ne demande rien pour des portées non sensibles. Tout est
-  nommé en tête de `tickets-C9.md`. → **action humaine, puis T9.2.**
+- **T9.2 s'ouvre : ses quatre valeurs sont posées** dans `.env.local` (Google, `AUTH_SECRET`,
+  `AUTH_URL`). **Une réserve mesurée : `AUTH_SECRET` fait 23 caractères**, quand la fiche prescrit
+  `openssl rand -base64 32`, qui en rend 44 — moins de 17 octets pour signer le cookie de session,
+  là où le stub ne signait rien. Entra ID attend qu'un client l'impose. → **action humaine.**
 - **T9.4 attend la levée de l'exclusion de `docs/05` §4** — *« interface d'administration
   multi-domaine : un seul domaine au POC »* — et de §3, *« domaine unique … amorçage par script »*.
   `docs/` est figé : ces lignes se récrivent, ou l'écart s'autorise et se consigne. → **action
   humaine, puis T9.4.**
-- **Les secrets Neon n'ont jamais été tournés.** Deux chaînes ont transité en clair le 12/08. Hors
-  dépôt (`.env.local` seul), mais valides. **Reportés quatre fois** — découpages de C6, C7, C8 et
-  C9 —, mais la raison ne tient plus : **C9 touche aux secrets de toute façon.** → **action humaine.**
+- **Les secrets Neon n'ont jamais été tournés.** Deux chaînes ont transité en clair le 12/08, hors
+  dépôt mais valides. **Reportés quatre fois**, et la raison ne tient plus : **C9 touche aux secrets
+  de toute façon.** → **action humaine.**
 - **`CLAUDE.md` porte trois énoncés périmés** : « Statut de projet » quand l'écran dit « Statuts
   d'accompagnement » · l'entrée « Projet », qui tait que le menu affiche « Accompagnements » ·
-  *« Entra ID le remplacera en C7 »*, quand C9 en porte **deux**, Google et Microsoft — même écart
-  dans `docs/01` §141, *« environnement Microsoft »*. La règle 7 réserve ce fichier à l'humain, et
-  `docs/` est figé. **Aucun des trois ne bloque un ticket.** → **action humaine.**
+  *« Entra ID le remplacera en C7 »*, quand C9 en porte **deux** — même écart dans `docs/01` §141.
+  Règle 7, et `docs/` figé. **Aucun des trois ne bloque un ticket.** → **action humaine.**
 - **Ce qu'un macro-parcours relie reste à trancher**, et avec lui **« macro-parcours » contre le
   « Réseau de liens entre produits » de `docs/02` §10**, qui dit la même direction sous un autre nom.
   L'entrée de menu et l'écran vide restent tels quels — ni table, ni objet, ni droit. Le concept
@@ -99,14 +99,17 @@ refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le
 
 ### b. Assignés à un ticket
 
-**C9 — chaque point a désormais son ticket, et sa fiche le décrit en entier** (`tickets-C9.md`).
-**T9.1** le schéma de l'identité — `super_admins` hors domaine, `domain_identities`, migration
-`0016` · **T9.2** le SSO, deux fournisseurs par `oauth4webapi`, six règles d'entrée, et **le couplage
+**C9 — T9.1 est fait ; les cinq autres gardent leur fiche entière** (`tickets-C9.md`).
+**T9.2** le SSO, deux fournisseurs par `oauth4webapi`, six règles d'entrée, et **le couplage
 que T8.1 n'a pas pu lever**, `resolveDomainId` cessant de rendre le premier domaine actif *par nom* ·
-**T9.3** le droit qui manque aux trois fonctions de `superAdmin` · **T9.4** l'écran au-dessus des
-domaines · **T9.5** l'amorçage d'un domaine neuf, aujourd'hui tenu par `scripts/seed.ts` · **T9.6**
-les comptes d'un domaine — **aucun écran n'écrit `has_access`, `domain_role` ni même `email`**,
-trouvé le 06/09 en confrontant une question au code et non à la fiche.
+**T9.3** le droit qui manque à `superAdmin`, que **T9.1 porte de trois fonctions à cinq** : les deux
+lectures d'identité doivent rester ouvertes — elles tournent *pendant* la connexion —, quand
+`createDomain` n'a aucune raison de l'être · **T9.4** l'écran au-dessus des domaines · **T9.5**
+l'amorçage d'un domaine neuf, aujourd'hui tenu par `scripts/seed.ts` · **T9.6** les comptes d'un
+domaine — **aucun écran n'écrit `has_access`, `domain_role` ni même `email`**.
+**Un domaine suspendu ouvre-t-il une session ?** Aucune des six règles d'entrée ne le dit, et
+`findDomainIdentity` ne juge pas de l'état du domaine : T9.1 a laissé le point plutôt que de
+trancher à la place de T9.2. → **T9.2.**
 **`lib/auth/session.ts:10` promet encore que « C7 change de source d'identité »** — cinquième énoncé
 de la famille, corrigé par T9.2. **Le RLS a quitté C9** : voir le groupe (c).
 
@@ -129,10 +132,9 @@ laisse invisible.
 
 **Le journal reste incomplet : la liste des onze était périmée** (T8.3, laissé intact — règle 3).
 **Quatre familles écrivent sans trace** — le **produit**, dans le fichier même où sa vision en laisse
-une · l'**adoption**, dont l'absence n'était écrite nulle part et que l'en-tête
-d'`accompagnements/[id]/` niait · la **compétence portée** · les **huit référentiels** autres que
-l'entité, trente-deux gestes. Chacune est **fixée par un test qui tombera**. L'énuméré et
-`lib/journal.ts` sont prêts ; il manque un ticket. → **prochaine session de découpage.**
+une · l'**adoption**, que l'en-tête d'`accompagnements/[id]/` niait · la **compétence portée** · les
+**huit référentiels** autres que l'entité, trente-deux gestes. Chacune est **fixée par un test qui
+tombera** ; l'énuméré et `lib/journal.ts` sont prêts. → **prochaine session de découpage.**
 
 **Au prochain ticket qui ouvre le fichier** — **destination qui a déjà échoué une fois**, et T8.4 a dû
 recevoir un ticket pour ce seul motif. **`uiLayerSeal` garde une liste de six dossiers, pas une

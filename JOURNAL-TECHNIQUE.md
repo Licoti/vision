@@ -10495,3 +10495,61 @@ qu'un ticket annonce et non ce qu'un chantier promet.
 contre `docs/` et les points ouverts. Les cinq premières fiches ont été tirées de `ETAT.md` et de
 `tickets-C8.md` — deux sources qui disaient vrai, et qui ne pouvaient pas savoir ce que
 `equipe/actions.ts` force en dur.
+
+---
+
+## T9.1 — Le schéma de l'identité : trois arbitrages, et une contrainte qui se serait affaiblie en s'élargissant (06/09/2026)
+
+**Le fournisseur n'est pas entré dans la clé d'unicité de `persons`, et c'est mesuré.** La fiche
+laissait le choix — *« le fournisseur entre dans la clé, ou le ticket écrit pourquoi il n'y entre
+pas »*. Passer `persons_domain_external_id_unique` de `(domain_id, external_id)` à
+`(domain_id, identity_provider, external_id)` **aurait affaibli la garantie d'aujourd'hui** :
+PostgreSQL tient les `NULL` pour distincts, donc deux lignes `directory` héritées, sans fournisseur
+et portant le même `external_id`, auraient cessé d'entrer en conflit. `NULLS NOT DISTINCT` aurait
+fait pire encore : il aurait interdit la **seconde personne `manual`** d'un domaine, toutes portant
+`external_id` nul. Le danger que le fournisseur écarte n'est pas dans la clé, **il est dans le
+rapprochement** : la règle d'entrée 6 cherchera le couple `(identity_provider, external_id)`, jamais
+l'identifiant seul. La colonne est donc ajoutée, la clé laissée intacte, et **un test mesure qu'elle
+tient toujours** — sans lui, une contrainte affaiblie se serait lue comme une contrainte inchangée.
+
+**`domain_identities` n'a pas d'`archived_at`, sur arbitrage humain.** La table entre ainsi dans
+`LinkTable` : `unlink` y est disponible à la compilation, `archive` y est un refus de typage, et
+deux lignes du test des garde-fous le relisent. C'est l'idiome de `person_skills` — un rattachement
+se retire, il ne s'archive pas. La règle 4 protège la donnée métier ; une identité vérifiée est un
+lien. **Conséquence assumée** : l'unicité `(provider, value)` vaut sur toutes les lignes présentes,
+donc retirer une identité la rend réinscriptible ailleurs — ce qu'un `archived_at` aurait interdit
+sans le dire.
+
+**L'unicité des super administrateurs porte sur `lower(email)`, et c'est un index d'expression.**
+Google rend l'adresse en minuscules, Microsoft ne le promet pas : un `unique` ordinaire aurait
+laissé entrer deux lignes pour une même personne, et le rapprochement de la règle d'entrée 2 en
+aurait trouvé une au hasard. `drizzle-kit` a généré l'index sans broncher —
+`CREATE UNIQUE INDEX … USING btree (lower("email"))` —, le repli prévu au plan n'a pas servi, et
+`findSuperAdminByEmail` compare du même côté que l'index.
+
+**Un piège de contre-épreuve, payé une fois.** Neutraliser la clé étrangère de `domain_identities`
+laisse en base la **ligne orpheline** que le test a forgée — `domain_id` inexistant. Le nettoyage du
+fichier efface par `domain_id`, le balayage de `vitest.global-setup.ts` aussi : **ni l'un ni l'autre
+ne peut voir une ligne dont le domaine n'existe pas**. La contrainte a donc refusé de se rétablir,
+et la contre-épreuve suivante a tourné sur une base encore trouée — deux tests tombés au lieu d'un,
+diagnostic faux pendant une minute. La ligne a été effacée à la main, la clé remise, la
+contre-épreuve rejouée : un test tombé, le sien. **Rétablir une contrainte se vérifie, ça ne se
+suppose pas.**
+
+**`super_admins` échappe aux deux nettoyages, et c'est structurel.** La table n'a pas de
+`domain_id` — c'est sa raison d'être —, or le `teardownOrder` du fichier efface par domaine et le
+balayage de `vitest.global-setup.ts` lit les tables au catalogue **sur cette même colonne**. Une
+exécution tuée y laisse donc une ligne que rien ne ramasse. Le nettoyage se fait dans l'`afterAll`,
+sur le suffixe aléatoire de l'e-mail ; le résidu resterait inoffensif — aucune connexion réelle ne
+rapprochera `unique.k3f9a2@exemple.test` —, mais **le balayage général ne couvre plus toutes les
+tables du dépôt**, et il ne le dit pas. → **au prochain ticket qui ouvre `vitest.global-setup.ts`.**
+
+**Une réserve mesurée sur `AUTH_SECRET`, hors périmètre du ticket.** La valeur posée dans
+`.env.local` fait **23 caractères** quand `openssl rand -base64 32` en rend 44 : moins de 17 octets
+d'entropie pour signer le cookie que T9.2 posera, là où le stub ne signait rien. Constaté par la
+longueur seule, jamais par la valeur. → **action humaine avant T9.2.**
+
+**Un point laissé ouvert plutôt que tranché en passant.** `findDomainIdentity` rend le rattachement
+sans juger de l'état du domaine : *un domaine suspendu ouvre-t-il une session ?* n'est **aucune des
+six règles d'entrée** écrites dans `tickets-C9.md`. Trancher ici aurait posé une septième règle dans
+une fonction de lecture, là où les six autres se relisent au même endroit. → **T9.2.**

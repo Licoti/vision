@@ -7364,3 +7364,61 @@ et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`.)*
   `max(coalesce(period_end, period_start))` : pour un atelier en cours en août, c'est le 31 août ;
   au mois, l'affichage reste juste. → **le jour où une période se dira au jour.**
 
+
+---
+
+## T9.1 — Le schéma de l'identité : deux tables hors du produit, et une clé qu'on n'a pas élargie — 06/09/2026
+
+**Ce que le ticket ouvre.** C9 est le premier chantier où une erreur silencieuse ouvre les données
+d'une entreprise à une autre. Deux objets dont tout le reste dépend n'avaient aucune place en base :
+le **super administrateur** — `domain_role` ne connaît que `domain_manager` et `member`, et
+`persons.domain_id` est obligatoire, donc il ne peut pas être une ligne de `persons` — et le
+**rattachement vérifié** d'une entreprise à un domaine, le claim `hd` de Google ou `tid` d'Entra.
+Sans eux, les règles d'entrée 2, 3 et 5 de T9.2 n'ont rien à interroger.
+
+### Les trois gestes, et pas un de plus
+
+**`super_admins`** — e-mail vérifié, nom, fournisseur, identifiant, `archived_at`, horodatages.
+**Sans `domain_id` et sans `created_by`**, exactement comme `domains` : ce qui est au-dessus des
+domaines ne se scope pas, et `created_by` pointerait `persons`, elle-même scopée. L'unicité porte
+sur **`lower(email)`**, par index d'expression.
+
+**`domain_identities`** — `domain_id`, fournisseur, valeur, et l'unicité sur le couple
+**(fournisseur, valeur)** : c'est elle qui rend impossible qu'une même entreprise ouvre sur deux
+domaines Vision. **Sans `archived_at`** (arbitrage humain) : la table est une `LinkTable`, `unlink`
+y est disponible à la compilation et `archive` y est un refus de typage.
+
+**`persons.identity_provider`** — la colonne qui dit *qui* a rendu `external_id`. La clé d'unicité,
+elle, n'a pas bougé : l'élargir l'aurait affaiblie (voir `JOURNAL-TECHNIQUE.md`).
+
+**Et le commentaire de `superAdmin` a cessé d'être faux.** Il annonçait *« trois fonctions, une
+seule table »* ; elles sont cinq sur trois. Il dit désormais la **propriété** — aucune de ces
+requêtes ne peut porter de filtre de domaine, parce qu'aucune ne connaît encore de domaine — plutôt
+qu'un compte, qui vieillit à chaque migration. Un commentaire faux vaut une ligne de code fausse
+(leçon de T7.5), et c'est le troisième compte retiré du dépôt après ceux de `ScopedTable` et de
+`schema.ts`.
+
+### Le critère : six écritures refusées par PostgreSQL, jamais une déclaration relue
+
+La fiche dérogeait à la discipline 1 — ce ticket ne rend aucun écran. Une contrainte déclarée dans
+Drizzle mais absente de la migration se lirait exactement comme une contrainte appliquée : seule
+une écriture refusée tranche. Chaque cas compte les lignes **avant et après** au client brut.
+
+| # | Écriture refusée | Contrainte | Test tombé à la neutralisation |
+|---|---|---|---|
+| 1 | seconde entreprise vérifiée sur le même couple | `domain_identities_provider_value_unique` | **1 seul** |
+| 2 | rattachement vers un domaine inexistant | clé étrangère | **1 seul** |
+| 3 | second super administrateur, même e-mail **et variante de casse** | `super_admins_email_unique` | **1 seul** |
+| 4 | fournisseur sans identifiant sur `super_admins` | `super_admins_provider_requires_external_id` | **1 seul** |
+| 5 | fournisseur sans identifiant sur `persons` | `persons_identity_provider_requires_external_id` | **1 seul** |
+| 6 | second identifiant d'annuaire dans un domaine | `persons_domain_external_id_unique` (inchangée) | **1 seul** |
+
+Six contre-épreuves, pas une seule : chaque contrainte a été **retirée en base sur la branche de
+test**, la suite rejouée, le test tombé lu, la contrainte remise. La 2 a coûté une reprise — la
+ligne orpheline qu'elle laisse échappe aux deux nettoyages, et a faussé la contre-épreuve suivante.
+
+**La migration `0016` a été appliquée sur la branche de test avant d'être crue**, puis sur la base
+de développement. Une seule migration, comme les interdits communs du chantier l'exigent.
+
+**Vert** : 1 646 → **1 655 tests sur 55 fichiers**, `lint` (`--max-warnings=0`) et `tsc` au vert.
+Aucun écran touché, aucune route, aucune donnée d'amorçage, aucune dépendance neuve.

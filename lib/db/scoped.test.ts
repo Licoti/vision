@@ -13,7 +13,7 @@
  * test passent par la couche.
  */
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, like, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { db } from "./client";
@@ -31,6 +31,7 @@ import {
   activityTypes,
   approaches,
   budgets,
+  domainIdentities,
   domains,
   entities,
   events,
@@ -51,6 +52,7 @@ import {
   results,
   skillLevels,
   skills,
+  superAdmins,
   tools,
 } from "./schema";
 
@@ -85,6 +87,7 @@ const teardownOrder: ScopedTable[] = [
   approaches,
   jobs,
   entities,
+  domainIdentities,
 ];
 
 type Fixture = {
@@ -163,6 +166,16 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  /* **`super_admins` n'a pas de domaine, donc rien ne la balaie.** Le
+     `teardownOrder` ci-dessus efface par `domain_id`, et le balayage de
+     `vitest.global-setup.ts` lit les tables au catalogue sur cette même colonne :
+     une ligne de super administrateur laissée par une exécution tuée survit aux
+     deux. Elle est inoffensive — son e-mail porte le suffixe aléatoire du
+     fichier, aucune connexion réelle ne le rapprochera —, mais c'est de la
+     poussière, et le fait est consigné au journal technique. Le nettoyage se
+     fait donc ici, sur le motif de l'e-mail. */
+  await db.delete(superAdmins).where(like(superAdmins.email, `%${suffix}%`));
+
   const ids = [a?.domainId, b?.domainId].filter(Boolean) as string[];
   if (ids.length === 0) return;
   for (const table of teardownOrder) {
@@ -1019,6 +1032,13 @@ describe("les garde-fous de typage", () => {
       await scope.deleteRow(projects, "…");
       // `entities` y est depuis le 21/08/2026 : sans cast, comme les deux ci-dessus.
       await scope.deleteRow(entities, "…");
+      /* **L'arbitrage de T9.1 se relit ici, à la compilation.**
+         `domain_identities` n'a pas d'`archived_at` : un rattachement se retire,
+         il ne s'archive pas — l'idiome de `person_skills`. La décision n'est pas
+         portée par un commentaire, elle est portée par ces deux lignes. */
+      await scope.unlink(domainIdentities, "…");
+      // @ts-expect-error `domain_identities` n'a pas `archived_at` : rien à archiver.
+      await scope.archive(domainIdentities, "…");
     };
     expect(typeof jamaisAppele).toBe("function");
   });
@@ -1029,7 +1049,7 @@ describe("les garde-fous de typage", () => {
    ========================================================================== */
 
 describe("superAdmin", () => {
-  test("ne donne accès qu'aux domaines", async () => {
+  test("ne donne accès qu'aux domaines et aux identités", async () => {
     const found = await superAdmin.findDomain(a.domainId);
     expect(found?.name).toContain("__test__a__");
 
@@ -1038,11 +1058,226 @@ describe("superAdmin", () => {
     expect(names).toContain(`__test__a__${suffix}`);
     expect(names).toContain(`__test__b__${suffix}`);
 
-    // Rien d'autre que `createDomain`, `findDomain`, `listDomains`.
+    /* **Cinq clés depuis T9.1, et la liste reste nominative.** Ce qui s'y
+       ajoute ne donne toujours accès à aucune donnée métier : deux lectures qui
+       rendent de quoi *choisir* un domaine, jamais de quoi le traverser. T9.3
+       interdit une sixième. */
     expect(Object.keys(superAdmin).sort()).toEqual([
       "createDomain",
       "findDomain",
+      "findDomainIdentity",
+      "findSuperAdminByEmail",
       "listDomains",
     ]);
+  });
+
+  test("l'entreprise vérifiée désigne son domaine, et elle seule", async () => {
+    const value = `identite-lue-${suffix}.example`;
+    await a.scope.insert(domainIdentities, { provider: "google", value });
+
+    const found = await superAdmin.findDomainIdentity("google", value);
+    expect(found?.domainId).toBe(a.domainId);
+
+    // Le fournisseur fait partie de la question : la valeur seule ne suffit pas.
+    expect(await superAdmin.findDomainIdentity("microsoft", value)).toBeUndefined();
+    expect(
+      await superAdmin.findDomainIdentity("google", `${value}.absent`),
+    ).toBeUndefined();
+  });
+
+  test("un super administrateur se trouve quelle que soit la casse", async () => {
+    const email = `Camille.MAJUSCULE.${suffix}@exemple.test`;
+    await db
+      .insert(superAdmins)
+      .values({ email, fullName: `Camille ${suffix}` });
+
+    expect((await superAdmin.findSuperAdminByEmail(email))?.email).toBe(email);
+    // Le fournisseur rendra l'adresse en minuscules : elle doit trouver la ligne.
+    expect(
+      (await superAdmin.findSuperAdminByEmail(email.toLowerCase()))?.email,
+    ).toBe(email);
+  });
+
+  test("un super administrateur archivé n'est plus rendu", async () => {
+    const email = `archive.${suffix}@exemple.test`;
+    const rows = await db
+      .insert(superAdmins)
+      .values({ email, fullName: `Archivé ${suffix}` })
+      .returning();
+
+    expect(await superAdmin.findSuperAdminByEmail(email)).toBeDefined();
+
+    await db
+      .update(superAdmins)
+      .set({ archivedAt: new Date() })
+      .where(eq(superAdmins.id, rows[0]!.id));
+
+    // La ligne est toujours là — c'est le droit qui est retiré, pas la donnée.
+    expect(await superAdmin.findSuperAdminByEmail(email)).toBeUndefined();
+    expect(
+      await db.select().from(superAdmins).where(eq(superAdmins.id, rows[0]!.id)),
+    ).toHaveLength(1);
+  });
+});
+
+/* ==========================================================================
+   Le schéma de l'identité — T9.1
+
+   **Les contraintes se mesurent en base, jamais dans le schéma.** Une
+   déclaration Drizzle qui n'aurait pas été portée par la migration se lirait
+   exactement comme une déclaration appliquée ; seule une écriture refusée par
+   PostgreSQL tranche.
+
+   **Un cas par contrainte**, et non plusieurs assertions dans un cas : sinon,
+   neutraliser l'une ferait tomber le même test que neutraliser les autres, et
+   la mise en défaut ne désignerait plus rien (précédent des trois clés de
+   `person_skills`). Chaque cas compte les lignes **avant et après** au client
+   brut — un rejet qui n'aurait rien empêché se lirait pareil sans ce décompte.
+   ========================================================================== */
+
+describe("l'identité", () => {
+  test("une même entreprise vérifiée n'ouvre pas sur deux domaines", async () => {
+    const value = `couple-unique-${suffix}.example`;
+    await a.scope.insert(domainIdentities, { provider: "google", value });
+
+    const witness = () =>
+      db.select().from(domainIdentities).where(eq(domainIdentities.value, value));
+    expect(await witness()).toHaveLength(1);
+
+    // Depuis l'autre domaine, avec le même couple : c'est la porte que
+    // `domain_identities_provider_value_unique` ferme.
+    await expect(
+      b.scope.insert(domainIdentities, { provider: "google", value }),
+    ).rejects.toThrow();
+
+    expect(await witness()).toHaveLength(1);
+    expect((await witness())[0]?.domainId).toBe(a.domainId);
+  });
+
+  test("un rattachement vers un domaine inexistant est refusé", async () => {
+    const value = `domaine-absent-${suffix}.example`;
+    const before = await db.select().from(domainIdentities);
+
+    /* **Écrit par le client brut, et c'est nécessaire :** la couche scopée pose
+       elle-même le `domain_id`, elle ne peut pas en forger un — c'est justement
+       sa propriété. Ce qui est sous test ici est la clé étrangère, pas la
+       couche. */
+    await expect(
+      db.insert(domainIdentities).values({
+        domainId: "00000000-0000-4000-8000-000000000000",
+        provider: "microsoft",
+        value,
+      }),
+    ).rejects.toThrow();
+
+    expect(await db.select().from(domainIdentities)).toHaveLength(before.length);
+  });
+
+  test("un second super administrateur sur le même e-mail est refusé", async () => {
+    const email = `unique.${suffix}@exemple.test`;
+    await db.insert(superAdmins).values({ email, fullName: `Unique ${suffix}` });
+
+    const witness = () =>
+      db
+        .select()
+        .from(superAdmins)
+        .where(sql`lower(${superAdmins.email}) = lower(${email})`);
+    expect(await witness()).toHaveLength(1);
+
+    await expect(
+      db.insert(superAdmins).values({ email, fullName: "Doublon exact" }),
+    ).rejects.toThrow();
+
+    /* **La variante de casse, et c'est elle qui mesure `lower(email)`.** Un
+       unique ordinaire sur `email` accepterait cette ligne : deux super
+       administrateurs pour une seule personne, et le rapprochement de la règle
+       d'entrée 2 en trouverait un au hasard. */
+    await expect(
+      db
+        .insert(superAdmins)
+        .values({ email: email.toUpperCase(), fullName: "Doublon de casse" }),
+    ).rejects.toThrow();
+
+    expect(await witness()).toHaveLength(1);
+  });
+
+  test("un fournisseur sans identifiant est refusé sur `super_admins`", async () => {
+    const email = `sans-identifiant.${suffix}@exemple.test`;
+    const before = await db.select().from(superAdmins);
+
+    await expect(
+      db.insert(superAdmins).values({
+        email,
+        fullName: "Sans identifiant",
+        identityProvider: "google",
+      }),
+    ).rejects.toThrow();
+
+    expect(await db.select().from(superAdmins)).toHaveLength(before.length);
+  });
+
+  test("un fournisseur sans identifiant est refusé sur `persons`", async () => {
+    const before = await db.select().from(persons).where(eq(persons.domainId, a.domainId));
+
+    /* `source: "manual"` isole la contrainte : avec `directory`, un échec
+       pourrait venir de `persons_external_id_requires_directory`, qui existe
+       depuis C1. Une contrainte ne se mesure que si elle est seule à pouvoir
+       refuser. */
+    await expect(
+      a.scope.insert(persons, {
+        fullName: `Sans identifiant ${suffix}`,
+        source: "manual",
+        kind: "center",
+        identityProvider: "google",
+      }),
+    ).rejects.toThrow();
+
+    expect(
+      await db.select().from(persons).where(eq(persons.domainId, a.domainId)),
+    ).toHaveLength(before.length);
+  });
+
+  test("l'identifiant d'annuaire reste unique par domaine", async () => {
+    const externalId = `annuaire-${suffix}`;
+    await a.scope.insert(persons, {
+      fullName: `Annuaire ${suffix}`,
+      source: "directory",
+      externalId,
+      identityProvider: "google",
+      kind: "center",
+    });
+
+    const witness = () =>
+      db
+        .select()
+        .from(persons)
+        .where(
+          and(eq(persons.domainId, a.domainId), eq(persons.externalId, externalId)),
+        );
+    expect(await witness()).toHaveLength(1);
+
+    /* **La clé n'a pas changé en T9.1, et c'est ce que ce cas mesure.** Le
+       fournisseur n'y est pas entré : l'y ajouter aurait rendu cette seconde
+       ligne acceptable dès que le fournisseur est nul, les `NULL` étant
+       distincts en PostgreSQL. La colonne neuve ne devait rien affaiblir. */
+    await expect(
+      a.scope.insert(persons, {
+        fullName: `Annuaire doublon ${suffix}`,
+        source: "directory",
+        externalId,
+        kind: "center",
+      }),
+    ).rejects.toThrow();
+
+    expect(await witness()).toHaveLength(1);
+
+    // Le même identifiant dans l'autre domaine reste légitime : la clé est bornée.
+    const elsewhere = await b.scope.insert(persons, {
+      fullName: `Annuaire ailleurs ${suffix}`,
+      source: "directory",
+      externalId,
+      kind: "center",
+    });
+    expect(elsewhere.domainId).toBe(b.domainId);
   });
 });

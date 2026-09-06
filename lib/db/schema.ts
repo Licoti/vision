@@ -69,6 +69,26 @@ export const personKind = pgEnum("person_kind", ["center", "stakeholder"]);
 
 export const domainRole = pgEnum("domain_role", ["domain_manager", "member"]);
 
+/**
+ * Le fournisseur d'identité qui a vérifié une entreprise ou une personne.
+ *
+ * Arbitrage (1) de `tickets-C9.md` : **deux fournisseurs, tous deux
+ * multi-tenant**. Une seule inscription d'application par fournisseur vaut pour
+ * toutes les entreprises clientes. C'est un écart à `docs/01` §141 —
+ * « environnement Microsoft » — et à la ligne de `CLAUDE.md` qui annonce Entra
+ * ID seul ; il est consigné au journal technique, l'écriture de ces deux
+ * fichiers ne se faisant pas d'ici (règle 7, `docs/` figé).
+ *
+ * **Un énuméré et non un référentiel** : le code raisonne dessus — c'est lui
+ * qui dit quel document de découverte interroger et quel claim porte
+ * l'entreprise, `hd` chez Google, `tid` chez Microsoft. Un domaine ne configure
+ * pas ses fournisseurs d'identité.
+ */
+export const identityProvider = pgEnum("identity_provider", [
+  "google",
+  "microsoft",
+]);
+
 export const activityFamily = pgEnum("activity_family", [
   "framing",
   "research",
@@ -313,6 +333,110 @@ export const domains = pgTable("domains", {
     .defaultNow(),
 });
 
+/**
+ * Le super administrateur — celui qui crée les entreprises clientes.
+ *
+ * `docs/02` §3 lui donne un rôle et `docs/04` §2 écrit « seul le super
+ * administrateur écrit dans cette table » au-dessus de `domains` ; aucune table
+ * ne le portait. **Il ne peut pas être une ligne de `persons`** : `domain_role`
+ * ne connaît que `domain_manager` et `member`, et surtout `persons.domain_id`
+ * est obligatoire — élargir `persons` casserait l'invariant qui fonde la
+ * règle 1, *toute ligne de `persons` porte un domaine*. Arbitrage (4) de
+ * `tickets-C9.md`, où sont nommées les trois autres pistes écartées.
+ *
+ * **Sans `domain_id` et sans `created_by`**, comme `domains` et pour les deux
+ * mêmes raisons : ce qui est au-dessus des domaines ne se scope pas, et
+ * `created_by` pointerait `persons`, elle-même scopée.
+ *
+ * `email` est celui que le **fournisseur** a vérifié, jamais celui qu'on aurait
+ * saisi : c'est la clé de la règle d'entrée 2, la seule exception à l'arbitrage
+ * (2) — être super administrateur avec une adresse hors entreprise, sans ouvrir
+ * la porte à personne d'autre.
+ */
+export const superAdmins = pgTable(
+  "super_admins",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull(),
+    fullName: text("full_name").notNull(),
+    /** Le fournisseur qui a rendu `external_id`. Nul avant le premier passage. */
+    identityProvider: identityProvider("identity_provider"),
+    /** L'identifiant rendu par le fournisseur — `sub` chez Google, `oid` chez Microsoft. */
+    externalId: text("external_id"),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    /* **Sur `lower(email)`, et non sur `email`.** Google rend l'adresse en
+       minuscules, Microsoft ne le promet pas : une unicité sensible à la casse
+       laisserait entrer deux lignes pour une même personne, et le rapprochement
+       de la règle 2 en trouverait une au hasard. C'est le seul endroit du
+       produit où l'exception à l'arbitrage (2) s'ouvre — elle se ferme en base,
+       pas dans la vigilance d'un appelant. */
+    uniqueIndex("super_admins_email_unique").on(sql`lower(${t.email})`),
+    check(
+      "super_admins_provider_requires_external_id",
+      sql`(${t.identityProvider} is null) or (${t.externalId} is not null)`,
+    ),
+  ],
+);
+
+/**
+ * L'entreprise **vérifiée** par un fournisseur, rattachée à un domaine Vision.
+ *
+ * Arbitrage (3) de `tickets-C9.md`. Un compte Google Workspace porte un claim
+ * `hd` — *hosted domain* —, un compte Microsoft d'organisation porte `tid` ; un
+ * compte grand public n'en porte aucun, et il est refusé au point d'entrée.
+ * **Le rattachement ne se fait jamais sur le domaine de la chaîne e-mail** :
+ * une adresse peut être un alias, quand `hd` et `tid` sont vérifiés par le
+ * fournisseur. C'est toute la différence entre une frontière et son apparence.
+ *
+ * Une entreprise peut en porter plusieurs — filiale, second nom de domaine,
+ * migration d'un fournisseur à l'autre — sans migration de schéma à chaque fois.
+ *
+ * **Le point d'architecture, et il vaut d'être écrit.** La table porte un
+ * `domain_id`, mais **elle se lit avant que le domaine soit connu : c'est elle
+ * qui le désigne**. Ses lectures ne peuvent donc pas passer par `forDomain`
+ * (`lib/db/scoped.ts`), et ce n'est pas une entorse à la règle 1 — c'est le cas
+ * de `domains`, pour la même raison. Ses **écritures**, elles, s'y rangent : qui
+ * saisit une identité connaît déjà le domaine auquel il la rattache.
+ *
+ * **Sans `archived_at`, sur arbitrage humain du 06/09/2026** : la table entre
+ * ainsi dans `LinkTable`, `unlink` y est disponible à la compilation et
+ * `archive` y devient un refus de typage. C'est l'idiome de `person_skills` —
+ * un rattachement se retire, il ne s'archive pas. La règle 4 protège la donnée
+ * métier ; une identité vérifiée est un lien. Sans `created_by` non plus, pour
+ * la raison de `domains` : c'est le super administrateur qui écrit ici.
+ */
+export const domainIdentities = pgTable(
+  "domain_identities",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    domainId: domainRef(),
+    provider: identityProvider("provider").notNull(),
+    /** Le `hd` de Google ou le `tid` d'Entra, tel que le fournisseur le rend. */
+    value: text("value").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("domain_identities_domain_id_idx").on(t.domainId),
+    /* **L'unicité porte sur le couple, pas sur le domaine.** C'est elle qui
+       rend impossible qu'une même entreprise ouvre sur deux domaines Vision :
+       sans elle, l'étanchéité dépendrait de la vigilance de qui saisit. */
+    unique("domain_identities_provider_value_unique").on(t.provider, t.value),
+  ],
+);
+
 /** Division de l'entreprise. Qualifie les produits, ne cloisonne rien. */
 export const entities = pgTable(
   "entities",
@@ -539,6 +663,19 @@ export const persons = pgTable(
     source: personSource("source").notNull(),
     /** Identifiant annuaire. Nul si `manual`. */
     externalId: text("external_id"),
+    /**
+     * Qui a rendu `external_id`.
+     *
+     * Nul tant qu'aucun fournisseur ne s'est prononcé : la colonne s'ajoute en
+     * C9, quand `external_id` existe depuis C1, et un identifiant d'annuaire
+     * importé n'a pas de fournisseur OIDC.
+     *
+     * **Deux fournisseurs peuvent rendre le même identifiant** : c'est ce que
+     * cette colonne écarte, et elle l'écarte **au rapprochement** — la règle
+     * d'entrée 6 cherchera le couple (`identity_provider`, `external_id`),
+     * jamais l'identifiant seul.
+     */
+    identityProvider: identityProvider("identity_provider"),
     fullName: text("full_name").notNull(),
     email: text("email"),
     /** Facultatif : une personne hors centre n'a pas de métier design. */
@@ -562,7 +699,20 @@ export const persons = pgTable(
   (t) => [
     index("persons_domain_id_idx").on(t.domainId),
     index("persons_job_id_idx").on(t.jobId),
+    /* **La clé n'a pas bougé, et c'est une décision mesurée** (arbitrage humain
+       du 06/09/2026). `tickets-C9.md` demandait que le fournisseur entre dans la
+       clé, « ou que le ticket écrive pourquoi il n'y entre pas » : y ajouter
+       `identity_provider` **affaiblirait** la garantie d'aujourd'hui, PostgreSQL
+       tenant les `NULL` pour distincts — deux lignes `directory` héritées, sans
+       fournisseur et portant le même `external_id`, cesseraient d'entrer en
+       conflit. `NULLS NOT DISTINCT` ferait pire : il interdirait la seconde
+       personne `manual` d'un domaine. La collision que le fournisseur écarte se
+       traite donc au rapprochement, pas dans la clé. */
     unique("persons_domain_external_id_unique").on(t.domainId, t.externalId),
+    check(
+      "persons_identity_provider_requires_external_id",
+      sql`(${t.identityProvider} is null) or (${t.externalId} is not null)`,
+    ),
     check(
       "persons_external_id_requires_directory",
       sql`(${t.source} = 'directory') or (${t.externalId} is null)`,

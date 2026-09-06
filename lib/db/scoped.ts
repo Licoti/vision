@@ -48,12 +48,15 @@ import { getTableConfig, type PgColumn, type PgTable } from "drizzle-orm/pg-core
 import { db, type Database } from "./client";
 import {
   activities,
+  domainIdentities,
   domains,
   entities,
   events,
+  identityProvider,
   persons,
   projects,
   results,
+  superAdmins,
 } from "./schema";
 
 /* ==========================================================================
@@ -880,12 +883,31 @@ export function forDomain(scope: Scope) {
 }
 
 /* ==========================================================================
-   Les domaines eux-mêmes
+   Ce qui vit avant le domaine
 
-   `domains` est la seule table sans `domain_id` : rien ne peut la scoper.
-   Plutôt qu'un contournement glissé dans l'amorçage, un objet nommé pour ce
-   qu'il est. Trois fonctions, une seule table, aucune donnée métier joignable
-   par ce chemin — un domaine créé ici ne se lit ensuite que par `forDomain`.
+   **Le compte a été retiré, il n'a pas été corrigé.** Ce bandeau annonçait
+   « trois fonctions, une seule table » ; T9.1 en fait cinq sur trois, et un
+   commentaire faux vaut une ligne de code fausse (leçon de T7.5). Ce qui se
+   relit ici est donc la **propriété**, que l'objet tient fonction par fonction :
+
+   aucune de ces requêtes ne peut porter de filtre de domaine, parce qu'aucune
+   ne connaît encore de domaine. `domains` n'a pas de `domain_id` — rien ne peut
+   la scoper. `super_admins` non plus, et pour la même raison : ce qui est
+   au-dessus des domaines ne se scope pas. `domain_identities` en porte un, mais
+   **elle se lit pour le désigner** : la confronter à un domaine courant
+   demanderait de connaître la réponse avant de poser la question.
+
+   Ce n'est donc pas un contournement de la règle 1, c'est le lieu nommé de ce
+   qu'elle ne peut pas couvrir — et sa frontière est étroite : **aucune donnée
+   métier n'est joignable par ce chemin.** Un domaine créé ici ne se lit ensuite
+   que par `forDomain`, et les deux lectures d'identité ne rendent que de quoi
+   *choisir* un domaine, jamais de quoi le traverser.
+
+   **Aucune de ces fonctions ne demande de droit**, et c'est l'objet de T9.3 :
+   les deux lectures d'identité doivent rester ouvertes — elles s'exécutent
+   *pendant* la connexion, quand aucune session n'existe encore —, quand
+   `createDomain` n'a aucune raison de l'être. La distinction s'écrit là-bas,
+   avant que T9.4 n'ouvre l'écran qui appelle.
    ========================================================================== */
 
 export const superAdmin = {
@@ -920,5 +942,68 @@ export const superAdmin = {
       .from(domains)
       .where(options.includeArchived ? undefined : isNull(domains.archivedAt))
       .orderBy(domains.name);
+  },
+
+  /**
+   * La règle d'entrée 2 — consultée **avant** toute recherche de domaine.
+   *
+   * Un super administrateur est *au-dessus* des domaines : la règle du domaine
+   * d'entreprise ne le concerne pas. C'est ce qui permet d'être super
+   * administrateur avec une adresse hors entreprise **sans ouvrir la porte à
+   * personne d'autre**, et c'est la seule exception à l'arbitrage (2) de
+   * `tickets-C9.md`.
+   *
+   * **Le rapprochement se fait sur `lower(email)`**, du même côté que l'index
+   * unique : une comparaison sensible à la casse ne trouverait pas la ligne que
+   * la base a pourtant empêché d'exister en double.
+   *
+   * **Une ligne archivée n'est pas rendue**, et ce n'est pas un filtre
+   * d'agrément : archiver un super administrateur *est* le geste qui lui retire
+   * son droit. Le rendre puis compter sur l'appelant pour l'écarter mettrait la
+   * frontière dans la vigilance de qui appelle.
+   */
+  async findSuperAdminByEmail(
+    email: string,
+  ): Promise<InferSelectModel<typeof superAdmins> | undefined> {
+    const rows = await db
+      .select()
+      .from(superAdmins)
+      .where(
+        and(
+          sql`lower(${superAdmins.email}) = lower(${email})`,
+          isNull(superAdmins.archivedAt),
+        ),
+      )
+      .limit(1);
+    return rows[0];
+  },
+
+  /**
+   * Les règles d'entrée 3 et 5 — l'entreprise du jeton, confrontée aux clientes.
+   *
+   * Rend le rattachement, donc le `domain_id` : c'est cette ligne, et elle
+   * seule, qui désigne le domaine d'une session. Aucune ligne, aucun domaine —
+   * l'entreprise n'est pas cliente, et le point d'entrée refuse.
+   *
+   * **Elle ne juge pas de l'état du domaine**, et c'est délibéré : *un domaine
+   * suspendu ouvre-t-il une session ?* n'est aucune des six règles d'entrée
+   * écrites dans `tickets-C9.md`. T9.1 ne tranche pas à la place de T9.2 ; le
+   * point est porté dans `ETAT.md` plutôt que décidé ici en silence.
+   */
+  async findDomainIdentity(
+    provider: (typeof identityProvider.enumValues)[number],
+    value: string,
+  ): Promise<InferSelectModel<typeof domainIdentities> | undefined> {
+    const rows = await db
+      .select()
+      .from(domainIdentities)
+      .where(
+        and(
+          eq(domainIdentities.provider, provider),
+          eq(domainIdentities.value, value),
+        ),
+      )
+      .limit(1);
+    return rows[0];
   },
 };
