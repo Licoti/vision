@@ -10302,3 +10302,196 @@ Le geste retenu est le plus étroit qui referme le seuil : les **cinq lignes de 
 en une ligne de chantier clos**, verbatim dans `HISTORIQUE-TICKETS.md`, et le point refermé sorti au
 même endroit. Rien d'autre n'a été touché. **249 lignes** après. C'est un écart au texte de la
 section « Session de découpage », assumé au profit du seuil, qui est le seul des deux à se contrôler.
+
+---
+
+## C9 (découpage) — 06/09/2026
+
+Six arbitrages, dont **deux délégués à Claude par l'humain**, et cinq écarts documentaires. Le
+chantier n'est pas ouvert : rien de ce qui suit n'est du code.
+
+### Le fournisseur d'identité change, et le document ne le dit nulle part
+
+`docs/` **ne nomme jamais Entra ID.** `docs/01` §141 pose *« environnement Microsoft.
+Authentification par le SSO de l'entreprise »*, `docs/05` §3 écrit *« SSO de l'entreprise »*, et D37
+parle du SSO sans fournisseur. **Le seul endroit qui nomme Entra ID est `CLAUDE.md`** — *« Entra ID
+le remplacera en C7 »* — plus une poignée de commentaires de code.
+
+L'arbitrage humain du 06/09/2026 en retient **deux**, Google et Microsoft, tous deux multi-tenant.
+La conséquence documentaire est donc mince et il faut le dire : **aucune décision de `docs/07` n'est
+rouverte** (règle 6), D37 ne portant que la *forme* du contexte et non sa source. Restent deux
+énoncés périmés, tous deux réservés à la main humaine — la ligne de `CLAUDE.md` (règle 7) et
+`docs/01` §141 (`docs/` figé). **Ni l'un ni l'autre ne bloque un ticket** : aucun code n'en dépend.
+
+### Ce qui a failli être une frontière et n'en était pas une
+
+La demande initiale était *« la connexion se fait uniquement en SSO avec le domaine de
+l'entreprise »*. La lecture naïve — **comparer le domaine de la chaîne e-mail** — a été écartée, et
+la raison mérite d'être écrite parce qu'elle ne se voit pas :
+
+- une adresse peut être un **alias**, et rien dans un jeton ne garantit que la partie droite d'un
+  e-mail désigne l'organisation qui l'a émis ;
+- **n'importe qui crée une adresse chez un fournisseur grand public**, donc un rattachement par
+  chaîne e-mail seule ouvre les données d'une entreprise à qui le demande.
+
+Retenu : le claim **`hd`** (Google, *hosted domain*) et le claim **`tid`** (Microsoft), tous deux
+**vérifiés par le fournisseur**, confrontés à une table `domain_identities`. Un compte qui n'en porte
+aucun est refusé — c'est l'arbitrage (2), et **sa seule exception est le super administrateur**, qui
+est au-dessus des domaines et se lit dans `super_admins` **avant** toute recherche de domaine.
+C'était le point qui, autrement, aurait interdit au porteur du projet de se connecter à son propre
+outil.
+
+### Arbitrage délégué (1) — `oauth4webapi` plutôt qu'`openid-client`
+
+L'humain a demandé *« la solution la plus robuste et la plus efficace dans le temps par rapport à
+notre archi »*. Relevé plutôt qu'affirmé, le 06/09/2026 : `openid-client` 6.8.8 dépend de `jose` et
+d'`oauth4webapi`, tous deux **sans dépendance transitive** — soit **trois paquets** ajoutés contre
+**un**. Le dépôt passe donc de cinq à **six** paquets de production, et non à huit.
+
+Deux raisons, et la seconde est la vraie :
+
+1. **L'API d'`oauth4webapi` suit les RFC**, qui ne bougent pas. `openid-client` a cassé la sienne
+   d'une majeure à l'autre (v5 → v6) : c'est la couche haute qui bouge, pas la basse.
+2. **Ce qu'`openid-client` nous épargnerait est le câblage — pas la cryptographie.** Découverte,
+   stockage de `state` et de `nonce` : or le câblage est exactement là où vivent **nos** règles, les
+   six refus d'entrée, `domain_identities`, `super_admins`. Les écrire et les tester vaut mieux que
+   les déduire du comportement d'une couche haute.
+
+Ce que la bibliothèque fait et que nous n'écrirons pas : vérification RS256 contre les clés JWKS,
+leur rotation, `state`, `nonce`, PKCE. **C'est le seul endroit du produit où une erreur est
+silencieuse** — un jeton forgé accepté ne produit pas une erreur, il produit une session. C'est aussi
+pourquoi l'option « zéro dépendance » a été déconseillée franchement plutôt que présentée à égalité.
+
+### Arbitrage délégué (2) — le RLS sort de C9, et change de destination · écart à D38
+
+D38 écrit : *« l'isolation par domaine est garantie par une couche d'accès obligatoire et des tests,
+pas par du RLS. **Le RLS se posera avec le SSO.** »* La seconde phrase n'est pas tenue, et voici la
+raison mesurable plutôt qu'une préférence.
+
+**`SET LOCAL` ne vit que dans une transaction**, et `neon-http` envoie chaque requête dans un appel
+HTTP séparé : la requête 2 ne se souvient pas du réglage de la requête 1. **C'est la dette de T3.6
+vue sous un autre angle** — *« `neon-http` n'a pas de transaction interactive »* —, et c'est le
+constat qui fait du RLS un point ouvert du **pilote de base** plutôt que du SSO.
+
+Les trois issues, et leur coût :
+
+- **grouper chaque lecture en lot de deux instructions** — c'est ≈ toutes les requêtes du produit à
+  récrire, pour un chantier qui n'est pas celui-là ;
+- **quitter `neon-http` pour le pool WebSocket** dans `lib/db/client.ts`, **que tout le dépôt
+  traverse** : deux fondations en mouvement en même temps, dans le chantier qui refait déjà
+  l'authentification ;
+- **Neon RLS** — vérifié le 06/09/2026 : la fonctionnalité **existe et n'est pas dépréciée**, mais
+  la documentation de `pg_session_jwt`, l'extension qui la porte, annonce elle-même que **l'API est
+  susceptible de changer**. Bâtir la frontière entre entreprises sur une API annoncée mouvante n'est
+  pas robuste dans le temps ; c'est l'inverse de ce qui était demandé. S'y ajoute qu'il faudrait y
+  déclarer **deux** fournisseurs d'identité.
+
+**Et l'argument positif, qui pèse autant que les trois coûts.** C9 durcit la frontière **là où elle
+est aujourd'hui traversable** : le domaine cesse d'être deviné par ordre alphabétique, six refus
+s'ajoutent au point d'entrée, et `superAdmin` cesse d'être appelable sans aucun droit. Le RLS est la
+ceinture d'après, pas celle qui manque le plus.
+
+**Destination récrite** : *le jour où le pilote de base expose la transaction interactive*. Les deux
+dettes se referment ensemble, et `ETAT.md` les porte désormais en **un seul point** du groupe (c),
+récrit et non augmenté d'un addendum.
+
+### Second écart à `docs/05` §6 — un chantier à la fois
+
+*« Un chantier à la fois, fermé avant d'ouvrir le suivant. »* C7 est en pause depuis le 04/09/2026,
+premier écart déjà consigné au découpage de C8, et C8 s'est clos sans que C7 reprenne. **C9 passe
+maintenant devant C7**, sur décision humaine du 06/09/2026 : c'est le second écart, et il empile.
+
+Le fait à surveiller, écrit ici pour qu'il ne se perde pas : **T7.7 → T7.10 gardent leur fiche
+entière dans `tickets-C7.md`**, et les huit points ouverts qui leur sont assignés gardent leur
+destination dans `ETAT.md`. Le risque n'est pas qu'ils soient oubliés, il est que la ligne de
+`tickets-C7.md` qui dit *« et le POC est complet »* reste fausse plus longtemps que prévu.
+
+### La condition d'un chantier descendue au rang de ticket
+
+`tickets-C8.md` écrivait *« C9 ne se découpe pas avant que l'inscription d'application Entra ID
+existe »*. Cette condition **n'a pas été levée, elle a été requalifiée**, et le geste mérite d'être
+nommé parce qu'il pourrait servir d'excuse ailleurs.
+
+Elle avait été posée quand **la forme** du chantier était indécise : ni le logement du super
+administrateur, ni le fournisseur, ni le rattachement d'une entreprise n'étaient tranchés, et
+découper là-dessus aurait été découper sur une base qui bouge. Les six arbitrages du 06/09 fixent la
+forme. **Les inscriptions ne fournissent plus que des valeurs**, et une valeur ne change aucune
+fiche : elle change ce qu'on peut **mesurer**. La condition porte donc désormais sur la
+*vérification* de T9.2, et sur elle seule — T9.1, T9.3 et T9.5 n'en dépendent pas.
+
+**Le garde-fou qui va avec** : T9.2 ne se déclare pas terminé sans ses mesures. Un ticket dont le
+critère n'est pas mesurable n'est pas un ticket livré, c'est un ticket écrit.
+
+### La contrainte de gratuité, et les trois choses qu'elle change — 06/09/2026
+
+Contrainte posée après le découpage : **aucun abonnement payant** — développement en local,
+hébergement Netlify gratuit, base Neon gratuite. Elle ne change aucune fiche de ticket, mais elle
+corrige `tickets-C9.md` sur deux points et y ajoute une limite de mesure.
+
+**Microsoft demande une carte bancaire, Google non.** Vérifié : Entra ID Free est gratuit, mais
+*« a credit card is required to verify your identity … your credit card isn't charged »*, et une
+seconde limite s'y ajoute — *« only paid customers can create a new Workforce tenant »*. Google ne
+demande ni carte, ni facturation, ni vérification pour des portées non sensibles. **Google d'abord,
+Microsoft quand un vrai client l'impose**, et c'est la première fois que l'abstraction à deux
+fournisseurs se paie plutôt qu'elle ne coûte : le ticket est livrable avec un seul branché, à
+condition que le second ne demande aucune modification de forme.
+
+**`offline_access` n'est pas demandé, et c'est un choix.** Un jeton de rafraîchissement ne sert qu'à
+rappeler l'API du fournisseur plus tard, et **Vision ne la rappelle jamais** — l'import d'annuaire
+est hors chantier. La portée retirée fait tomber avec elle **l'expiration à sept jours des jetons de
+rafraîchissement du mode *Testing* de Google**, qui aurait autrement été un piège classique : un SSO
+qui marche une semaine puis cesse, sans qu'aucune ligne de code ait changé. **Un secret de longue
+vie qu'on ne demande pas est un secret qu'on n'a pas à faire vivre.**
+
+**Le scanner de secrets de Netlify contre le cache de Turbopack — écrit maintenant pour être trouvé
+au premier build rouge.** Depuis **Next 16.3**, qui est la version du `package.json`, le cache
+persistant de Turbopack conserve entre deux exécutions l'état du build **y compris les variables
+d'environnement lues**, et l'écrit dans `.next/cache`. Le scanner de secrets de Netlify, actif par
+défaut, y retrouve la valeur d'une variable et **refuse le déploiement**. La parade est d'exclure du
+scan `.next/cache` et `.netlify/.next/cache`, **restreinte à ces chemins** — jamais une
+désactivation globale, qui reviendrait à retirer le garde-fou pour éteindre son alarme. À écrire
+dans `netlify.toml` le jour du déploiement : le dépôt n'a aucune raison de porter aujourd'hui un
+réglage pour un site qui n'existe pas.
+
+**Deux conséquences qui ne sont pas des problèmes.** Les *deploy previews* de Netlify reçoivent une
+URL unique et **aucun fournisseur n'accepte de joker** dans une URI de redirection : le SSO se
+parcourra en local ou en production, jamais sur une prévisualisation. Et une **adresse personnelle
+ne porte ni `hd` ni `tid`** : le chemin du super administrateur se parcourt en vrai, celui d'un
+membre de domaine se mesure sur claims forgés — ce qui est déjà la forme des cinq refus de T9.2, dont
+aucun ne dépend d'une connexion réelle.
+
+**Ce que le gratuit ne change pas.** Neon : deux petites tables, la branche de test existe déjà, et
+**le RLS ayant quitté C9**, rien à provisionner du côté de Neon RLS et de sa Data API. L'arbitrage
+rendu pour une raison technique se trouve être aussi le seul qui tienne sans abonnement.
+
+### T9.6 ajouté après le découpage — un trou trouvé en confrontant une question au code, 06/09/2026
+
+Question humaine : *« pourrai-je ajouter des administrateurs dans un domaine, à la fin de C9 ? »*
+La réponse lue dans les fiches était oui — T9.4 désigne le premier responsable d'un domaine neuf.
+**La réponse lue dans le code était non**, et c'est la seconde qui vaut.
+
+**Aucun écran de Vision n'écrit `has_access` ni `domain_role`.** `app/(app)/equipe/actions.ts:321`,
+seul lieu de création d'une personne, force en dur `hasAccess: false` et `domainRole: null`, sous
+un commentaire qui dit *« son compte est l'affaire de C7 »*. `lib/forms/person.ts:199` le redit :
+*« `source`, `has_access`, `domain_role` et `is_active` … appartiennent à l'authentification
+(C7) »*. **C7 ne l'a jamais fait**, et les deux commentaires sont les sixième et septième énoncés de
+la famille des promesses faites à ce chantier. Toutes les personnes connectables du dépôt viennent
+de `scripts/seed.ts`.
+
+**Le second manque, trouvé au même endroit, rend le premier inopérant.** **`email` n'est écrit par
+aucun formulaire** : le mot n'apparaît ni dans `lib/forms/person.ts` — `PersonRowInput` porte
+`fullName`, `jobId`, `kind`, `bio`, et rien d'autre — ni nulle part sous `app/(app)/equipe/`. Une
+personne créée dans Vision a donc `email = null`, et **la règle 6 de T9.2 rapproche une identité sur
+l'e-mail au premier passage**. Accorder un accès sans pouvoir saisir d'adresse n'aurait servi à
+personne : les deux manques tiennent dans un seul ticket parce qu'ils sont un seul défaut.
+
+**Ce que cela aurait coûté sans la question.** Un domaine créé par T9.4 aurait porté **exactement un
+compte, définitivement** — et le défaut ne se serait vu qu'à l'usage, T9.4 passant tous ses critères :
+il rend bien son écran, il désigne bien le premier responsable. **Un ticket peut être juste et un
+chantier incomplet**, et aucune des quatre disciplines ne l'aurait dit, parce qu'elles vérifient ce
+qu'un ticket annonce et non ce qu'un chantier promet.
+
+**La leçon, et elle vaut au-delà de C9 :** un découpage se relit **contre le code**, pas seulement
+contre `docs/` et les points ouverts. Les cinq premières fiches ont été tirées de `ETAT.md` et de
+`tickets-C8.md` — deux sources qui disaient vrai, et qui ne pouvaient pas savoir ce que
+`equipe/actions.ts` force en dur.

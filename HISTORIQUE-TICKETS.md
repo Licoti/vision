@@ -6618,6 +6618,73 @@ adresse. Elles couvrent la route, **pas le fragment** : `#projets-lies` est deve
 
 ---
 
+## Session de découpage de C9 — 06/09/2026
+
+*(geste 2 de la session : les points du groupe « À trancher » que le découpage referme sortent
+d'`ETAT.md`, avec leur rédaction longue. `ETAT.md` passe de **249 à 246 lignes**, sous son seuil.
+`tickets-C9.md` est écrit — T9.1 → T9.5.)*
+
+### Le point refermé, verbatim au 05/09/2026
+
+**Le rôle de super administrateur est dans les documents et pas dans le schéma.** `docs/02` §3 le
+définit et `docs/04` écrit *« seul le super administrateur écrit dans cette table »* ; or
+`domain_role` ne porte que `domain_manager` et `member`, **et `persons.domain_id` est obligatoire :
+un super administrateur ne peut pas être une ligne de `persons`** telle qu'elle est. (`superAdmin`
+de `scoped.ts` n'est pas un rôle : trois fonctions sans aucune authentification.) Deux gestes
+humains avant qu'un ticket s'écrive — **lever l'exclusion de `docs/05` §4** et **trancher où vit un
+super administrateur**. → **action humaine, puis C9.**
+
+**Ce qui le referme.** La seconde moitié est tranchée le 06/09/2026 : **une table `super_admins`,
+hors domaine**, comme `domains` et pour la même raison. Trois autres logements ont été proposés et
+écartés, chacun pour une raison nommée — un rôle porté par le fournisseur d'identité devrait se
+déclarer deux fois et vivrait hors de Vision · une liste d'e-mails en variable d'environnement ne
+laisse aucune trace et demande un redéploiement pour ajouter quelqu'un · élargir `persons`
+(`domain_id` nullable + `super_admin` dans l'énuméré) casserait l'invariant qui fonde la règle 1,
+*toute ligne de `persons` porte un domaine*. **La première moitié n'est pas refermée** : la levée de
+l'exclusion de `docs/05` §4 reste une écriture humaine, et elle est récrite dans `ETAT.md` comme
+condition d'ouverture de **T9.4**, seul ticket qu'elle bloque.
+
+### Le point récrit, verbatim au 05/09/2026
+
+**C9 attend quatre choses qui ne sont pas du code** : un tenant, un client, un secret, une URI de
+redirection. Le SSO est sorti de C7 le 27/08 (écart à D37 consigné), puis de C8 le 04/09 pour
+former **C9 avec l'administration multi-domaine** — les deux tiennent ensemble, `session.ts`
+retenant **le premier domaine actif trouvé en base** tant que l'authentification est un stub.
+**C9 ne se découpe pas avant que l'inscription existe.** → **action humaine, puis C9.**
+
+**Ce qui le récrit.** La liste des quatre **était fausse deux fois**. Un **tenant en trop** : les
+deux inscriptions sont multi-tenant, et une inscription Entra multi-tenant s'autorise sur
+`login.microsoftonline.com/organizations/v2.0` — c'est le claim `tid`, confronté à
+`domain_identities`, qui désigne l'entreprise, pas une variable d'environnement. Un **`AUTH_SECRET`
+en moins** : le cookie du stub n'avait pas besoin d'être signé, celui du SSO authentifie et se
+signe, et aucune console de fournisseur ne donne cette valeur. Les six valeurs sont nommées en tête
+de `tickets-C9.md`.
+
+**Et la condition change de rang.** *« C9 ne se découpe pas avant que l'inscription existe »* avait
+été posée dans `tickets-C8.md` **quand la forme du chantier était indécise**. Les six arbitrages du
+06/09 la fixent ; les inscriptions ne fournissent plus que des **valeurs**, qui ne changent aucune
+fiche. La condition **descend du chantier au ticket** — elle porte sur T9.2, et sur lui seul.
+
+### Le point déplacé, verbatim au 05/09/2026
+
+Dans le bloc C9 du groupe (b) : **le RLS que D38 rattache au SSO**.
+
+**Ce qui le déplace.** Il sort de C9 le 06/09/2026, et **change de nature en changeant de
+destination** : ce n'est pas un point ouvert de C9, c'est un point ouvert du **pilote de base**. Il
+rejoint dans le groupe (c) la dette de T3.6 — la création de projet non atomique —, dont il partage
+la cause unique, `neon-http` sans transaction interactive. **Les deux se refermeront ensemble.**
+Écart à D38 consigné au journal technique, avec sa raison mesurable.
+
+### Les quatre lignes de `CLAUDE.md` et de `docs/`, regroupées
+
+Le point de vocabulaire de `CLAUDE.md` — « Statut de projet », l'entrée « Projet » — reçoit deux
+écarts de plus, du même ordre et de la même main : *« Entra ID le remplacera en C7 »* quand C9 en
+porte **deux**, Google et Microsoft, et `docs/01` §141, *« environnement Microsoft »*. Ils sont
+**récrits en un seul point** plutôt qu'empilés (geste 3), et aucun des trois ne bloque un ticket :
+le code n'en dépend pas.
+
+---
+
 ## Instantané d'`ETAT.md` au balayage du 04/09/2026 — session de découpage de C8
 
 *(geste 1 de la session de découpage de C8. `ETAT.md` faisait **744 lignes** pour un seuil de 250 :
