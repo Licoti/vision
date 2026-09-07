@@ -7853,3 +7853,118 @@ avec sa destination.
 
 **Vert** : 1 697 → **1 750 tests sur 61 fichiers** (+53, +3 fichiers), `lint` (`--max-warnings=0`) et
 `tsc` au vert. Aucune migration, aucune dépendance, aucun composant de socle réécrit.
+
+---
+
+## T9.5 — L'amorçage d'un domaine neuf : une extraction, et un neuvième référentiel qui n'en était pas un — 07/09/2026
+
+**Ce que T9.4 laissait vide.** L'écran créait une entreprise ; elle naissait sans un métier, sans un
+statut, sans un type d'activité. Le responsable désigné pouvait s'y connecter et n'avait rien à
+saisir : le premier formulaire de produit lui aurait demandé une entité qu'aucun référentiel ne
+proposait. `docs/04` §2 l'écrit depuis le cadrage — *« créer un domaine déclenche l'amorçage de ses
+référentiels par défaut »* — et c'était `scripts/seed.ts`, lancé à la main sur un domaine nommé en
+dur.
+
+**Le ticket est une extraction, et rien d'autre n'a été écrit.** Les référentiels et le mécanisme de
+rapprochement de T8.4 sortent du script ; l'action de création les appelle ; le script les appelle
+aussi et pose ses données factices par-dessus. **Aucune migration, aucune dépendance, aucun écran,
+aucun composant.**
+
+### Le décompte de la fiche était faux, et la vérification l'a établi avant l'écriture
+
+La fiche annonçait *« les neuf référentiels d'un domaine neuf »*. `scripts/seed.ts` en semait bien
+neuf — `entities`, `jobs`, `skills`, `skill_levels`, `approaches`, `project_statuses`, `tools`,
+`activity_types`, `starters` — mais le premier porte le commentaire `/** Brief §7. */`, la même
+provenance que les personnes et les projets du jeu de démonstration. Ce sont les divisions de
+« Groupe Meridian ». Les semer chez un vrai client serait **inventer son organigramme**, et la
+règle 4 rendrait la faute durable : une entité inutile ne se supprime pas.
+
+**Un domaine neuf naît donc sans entité**, et l'état était déjà écrit sans avoir jamais servi :
+`« Aucune entité dans ce domaine »` existe depuis C2 sur `/produits/nouveau`, et depuis T7.3 dans
+`/administration`. **Huit référentiels, 68 lignes.** Quatrième énoncé de fiche mis en défaut depuis
+C8, second de ce chantier.
+
+Le second arbitrage a suivi le même raisonnement : les sept outils portaient six adresses
+`example.com`, provisoires depuis le 20/08/2026. **`base_url` appartient au client, pas au
+référentiel** — un lien profond qui ne mène nulle part *sans le dire* est pire qu'une adresse
+absente, et « Outil budget » servait déjà l'état. Les adresses sont devenues un argument
+(`toolBaseUrls`) que le script seul passe.
+
+### Trois fichiers, et une frontière qui se lit
+
+| Fichier | Ce qu'il porte |
+|---|---|
+| `lib/db/reconcile.ts` | le mécanisme de T8.4, **déplacé sans une ligne de logique changée** — `Seed`, `ensureAll`, `sameValue`, `positionAnchor`, `positionOf`, `idOf` |
+| `lib/db/bootstrap.ts` | les **huit référentiels** et leur pose, dans l'ordre contraint : `tools` avant `activity_types` et `starters`, qui y prennent leur clé |
+| `scripts/seed.ts` | **1 846 → 1 248 lignes.** Ne garde que ce qui est factice : le domaine, les entités, `TOOL_BASE_URLS`, les huit personnes, les produits, les projets, les activités, les traces |
+
+**Le seul changement de forme de l'extraction** : les deux globales de compte rendu du script —
+`tallies` et `renames` — deviennent un objet créé par appel (`createReconciler()`). La signature
+d'`ensureAll` n'a pas bougé d'un caractère, et les vingt-deux appels du script non plus. Sans cela,
+une requête HTTP qui crée une entreprise et un script lancé au même moment auraient écrit dans le
+même décompte.
+
+### Le mécanisme n'était pas non testé, il était intestable
+
+`ETAT.md` portait depuis T8.4 que *« `ensureAll` n'a aucun test »*. La cause tenait en une ligne de
+`vitest.config.mts` : `include` ne couvre que `lib/**` et `app/**`, donc **`scripts/` est hors du
+champ de la suite**. Le déplacement vers `lib/` le rend mesurable sans qu'on ait écrit quoi que ce
+soit pour cela, et les trois temps sont désormais éprouvés séparément.
+
+### Les mesures — un décompte en base, jamais un écran
+
+Le ticket **déroge au premier point du protocole et le dit**, comme T9.1 et T9.3 : il ne rend aucun
+écran, son critère est un décompte.
+
+| Table | Lignes | Ancre |
+|---|---|---|
+| `jobs` · `skills` · `skill_levels` · `approaches` | 6 · 11 · 4 · 7 | `position` |
+| `project_statuses` · `activity_types` · `starters` | 4 · 25 · 4 | `position` |
+| `tools` | 7 | **aucune** — `formerKeys` seuls |
+| **total** | **68** | |
+| `entities` | **0** | *hors module* |
+
+**Sur le chemin de l'écran** (`app/domaines/actions.test.ts`, cookie réellement scellé) : une
+entreprise créée par l'action porte ses 68 lignes · elle ne porte **ni entité, ni personne, ni
+compte** · ses outils n'ont **aucune adresse** · deux créations successives portent chacune les
+siennes, et aucune ligne ne traverse · une création **refusée** — couple d'identité déjà pris —
+n'amorce rien, et le domaine qui tenait le couple n'a pas gagné de ligne.
+
+**Sur le module** (`lib/db/bootstrap.test.ts`) : les rattachements sont résolus — « Audit UX » porte
+Ergonome, la piste « Audit d'accessibilité » porte Everyone, et la méthode sans outil porte `null` ·
+**un second amorçage ne double rien**, et le décompte de lignes **ne suffisait pas** à le prouver :
+c'est le compte rendu qui tranche — rien de créé, rien de mis à jour, rien de renommé, sans quoi un
+amorçage qui réécrirait tout à chaque passage rendrait les mêmes chiffres.
+
+### Cinq neutralisations, chacune isolée
+
+| Neutralisation | Ce qui tombe |
+|---|---|
+| `STARTERS` retiré de la pose | **7** — les décomptes des deux fichiers et le rattachement des pistes ; `reconcile.test.ts` intact |
+| Une ligne retirée d'`ACTIVITY_TYPES` | **4** — les nombres écrits en clair. *« chacun porte exactement ce que le module déclare »* **tient**, ce test lisant sa valeur sur la constante |
+| L'appel retiré de `createDomain` | **4** — le chemin de l'écran seul ; `bootstrap.test.ts` **entier au vert**, ce qui prouve que le module ne dépend pas de l'écran |
+| La route d'ancre neutralisée | **1** — le test d'ancre ; le témoin `formerKeys` tient |
+| La route `formerKeys` neutralisée | **1** — le sien ; le témoin d'ancre tient |
+
+L'asymétrie de la seconde ligne est voulue : un test qui dérive sa valeur attendue de ce qu'il mesure
+vérifie la cohérence, pas le contenu. Il en fallait un de chaque sorte.
+
+### La preuve qu'aucun test ne pouvait donner
+
+`npm run db:seed` a été rejoué sur la base de développement **semée par le code d'avant
+l'extraction**, et il a rendu *« Rien à faire : le domaine était déjà à jour »* — vingt-huit tables à
+zéro créé, zéro mis à jour, zéro renommé, dont les huit référentiels déplacés et les sept outils avec
+leurs adresses intactes. Une extraction se prouve contre l'état que le code d'avant a laissé.
+
+### Ce que le ticket n'a pas fait
+
+**Aucun geste ne répare un amorçage partiel.** `createDomain` écrit désormais dix tables sans
+transaction ; une panne après l'identité laisserait une entreprise complète en apparence et vide de
+référentiels. L'ordre a été pesé — amorcer *avant* l'identité aurait élargi la fenêtre de course que
+T9.4 avait raisonnée, et le geste de réparation existant aurait alors rendu « complète » une
+entreprise vide. **L'ordre de T9.4 est laissé intact** (règles 3 et 6) ; le point part dans
+`ETAT.md`. **`tools` reste le seul des huit sans ordinal**, et le résidu mesuré par T8.4 voyage avec
+le code.
+
+**Vert** : 1 750 → **1 771 tests sur 63 fichiers** (+21, +2 fichiers), `lint` (`--max-warnings=0`) et
+`tsc` au vert.

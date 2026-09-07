@@ -1,17 +1,30 @@
 /**
- * L'amorçage du domaine — référentiels et données factices.
+ * L'amorçage du domaine de démonstration — les données factices, et elles
+ * seules.
  *
  * `docs/05` §3 : « un domaine amorcé avec ses référentiels. Pas d'interface
  * d'administration : amorçage par script. » `docs/04` §6 le dit autrement :
  * créer un domaine implique de créer ses entités, métiers, statuts, types
  * d'activité, approches et outils.
  *
+ * **Depuis T9.5, ce fichier n'est plus seul à amorcer.** L'écran au-dessus des
+ * domaines crée des entreprises, et celle qu'il crée doit naître utilisable :
+ * les **référentiels** sont donc partis dans `lib/db/bootstrap.ts`, et le
+ * **rapprochement** de T8.4 dans `lib/db/reconcile.ts`. Ce script les appelle
+ * comme l'action le fait, puis pose par-dessus ce que lui seul porte.
+ *
  * Deux sources, et pas une de plus :
  *   — les **référentiels** viennent de `docs/02` §3-4, `docs/03` §2 et
- *     `docs/04` §2. Ce sont des données du domaine, jamais des listes codées
- *     en dur ailleurs que dans ce fichier ;
+ *     `docs/04` §2. Ils vivent dans `lib/db/bootstrap.ts`, et un domaine créé
+ *     par l'écran reçoit exactement les mêmes ;
  *   — les **données factices** viennent de `docs/design/brief-design.md` §7,
  *     et de nulle part ailleurs. Un champ que le brief ne donne pas reste nul.
+ *     **Elles restent ici, et un domaine créé par l'écran n'en reçoit aucune.**
+ *
+ * **Deux choses de ce fichier tiennent à la fixture et non au référentiel**, et
+ * c'est l'arbitrage de T9.5 : les **entités** — les cinq divisions de
+ * « Groupe Meridian », qu'on n'irait pas semer chez un vrai client — et les
+ * **adresses des outils** (`TOOL_BASE_URLS`), qui appartiennent au client.
  *
  * **Règle 1 sans exception.** Ce script n'importe pas `lib/db/client.ts` : il
  * passe par `forDomain`, comme le reste du produit. `superAdmin` sert à la
@@ -20,53 +33,36 @@
  * `actorId` est nul : l'amorçage n'a pas de personne courante. C'est
  * exactement ce que `created_by` nullable prévoyait.
  *
- * **Rejouable, et ce qui reconnaît une ligne se lit ici** (T8.4). Le
- * rapprochement va en trois temps, du plus sûr au plus faible :
- *
- *   1. la **clé naturelle** — un libellé, un nom, un titre ;
- *   2. l'**ancre**, quand la table en porte une : la `position`, colonne
- *      qu'aucun renommage ne touche. C'est elle qui fait qu'un libellé changé —
- *      en base par l'écran d'administration, ou ici par le fichier — est
- *      **reconnu et corrigé** au lieu d'être recréé à côté de l'ancien ;
- *   3. les **anciens libellés déclarés** (`formerKeys`), là où le fichier sait
- *      qu'il a renommé une de ses propres lignes.
- *
- * Ce qui manque ensuite est créé, ce qui a dérivé est remis à la valeur du
- * fichier, le reste est laissé tel quel. Deux exécutions successives laissent
- * la base dans le même état.
- *
- * **Le résidu, et il est mesuré.** Huit référentiels portent une `position` et
- * sont donc refermés. **`tools` n'en porte aucune** — un renommage en base y
- * recrée encore —, et il en va de même de `products`, `projects`, `persons`,
- * `indicators`, `resources`, `use_cases` et `personas`. Les refermer demanderait
- * une colonne, donc une migration, que l'arbitrage (a) de C8 pose en signal
- * d'arrêt. Le fait est écrit dans `ETAT.md` plutôt que contourné.
+ * **Rejouable** : ce qui manque est créé, ce qui a dérivé est remis à la valeur
+ * du fichier, le reste est laissé tel quel. Deux exécutions successives
+ * laissent la base dans le même état, et la seconde dit « Rien à faire ». Les
+ * trois temps du rapprochement — clé naturelle, ancre, anciens libellés — et le
+ * résidu mesuré de `tools` se lisent désormais dans `lib/db/reconcile.ts`.
  *
  *   npm run db:seed
  */
 
+import { bootstrapReferentials } from "../lib/db/bootstrap";
+import {
+  createReconciler,
+  idOf,
+  positionAnchor,
+  positionOf,
+} from "../lib/db/reconcile";
 import {
   asSuperAdmin,
   forDomain,
   superAdmin,
   withoutAnySession,
-  type InsertValues,
-  type Row,
-  type ScopedDb,
-  type ScopedTable,
 } from "../lib/db/scoped";
 import {
   activities,
-  activityFamily,
   activityParticipants,
   activityState,
-  activityTypes,
-  approaches,
   domainRole,
   entities,
   indicatorReadings,
   indicators,
-  jobs,
   personaKind,
   personaTraitKind,
   personaTraits,
@@ -77,18 +73,10 @@ import {
   projectIndicators,
   projectJobs,
   projectMembers,
-  projectStatusNature,
-  projectStatuses,
   products,
   projects,
   resources,
   results,
-  skillLevels,
-  skills,
-  starterKind,
-  starters,
-  toolKind,
-  tools,
   useCasePersonas,
   useCases,
 } from "../lib/db/schema";
@@ -115,256 +103,28 @@ const ENTITIES = [
   "RH & Interne",
 ];
 
-/** `docs/02` §3 — le métier est une propriété de la personne. */
-const JOBS = [
-  "Product Design",
-  "UX Research",
-  "UI Design",
-  "Design System",
-  "UX Writing",
-  "Accessibilité",
-];
-
 /**
- * Les onze compétences de la demande du 17/08/2026.
+ * Les adresses des outils du domaine de démonstration — la fixture, et elle
+ * seule.
  *
- * Elles ne se confondent pas avec `JOBS` : le métier qualifie la personne, la
- * compétence dit ce qu'elle sait faire, et une personne en porte plusieurs.
- */
-const SKILLS = [
-  "UI Design",
-  "UX Design",
-  "User Research",
-  "Architecture de l'information",
-  "Facilitation",
-  "Prototypage",
-  "UX Audit",
-  "Accessibilité",
-  "Design System",
-  "Design Strategy",
-  "Service Design",
-];
-
-/**
- * L'échelle de maîtrise. Le `rank` porte l'ordre, le `label` se renomme.
- * Garde-fou 1 — le niveau est **déclaré**, jamais mesuré par Vision.
- */
-const SKILL_LEVELS: { label: string; rank: number }[] = [
-  { label: "Débutant", rank: 1 },
-  { label: "Intermédiaire", rank: 2 },
-  { label: "Avancé", rank: 3 },
-  { label: "Expert", rank: 4 },
-];
-
-/** Brief §3 et `docs/02` §4 — la manière d'accompagner. */
-const APPROACHES = [
-  "Research",
-  "Design Thinking",
-  "Lean",
-  "Audit UX",
-  "Audit d'accessibilité",
-  "Audit d'éco-conception",
-  "Mesure des usages",
-];
-
-/**
- * `docs/02` §4 — statuts d'amorçage, modifiables par le domaine. Seule la
- * `nature` porte la logique : elle, ne se renomme pas.
- */
-const STATUSES: { label: string; nature: Nature }[] = [
-  { label: "Cadrage", nature: "framing" },
-  { label: "En cours", nature: "active" },
-  { label: "En pause", nature: "paused" },
-  { label: "Terminé", nature: "done" },
-];
-
-/**
- * `docs/04` §2 — brancher un outil coûte une ligne, pas un module.
+ * **Le référentiel des outils vit désormais dans `lib/db/bootstrap.ts`, sans
+ * adresse** (T9.5) : `base_url` appartient au client, pas au référentiel. Ce
+ * qui reste ici est ce que le brief ne donne pas et que le bloc « Démarrage »
+ * exige — une adresse pour ouvrir quelque chose.
  *
- * **Deux écarts à la règle de tête, arbitrés le 20/08/2026 avec l'humain**, et
- * tous deux appelés par le bloc « Démarrage », qui a besoin d'une adresse pour
- * ouvrir quoi que ce soit.
- *
- * (1) **Les adresses sont provisoires.** Le brief nomme les outils et jamais
- * leurs adresses ; celles-ci sont posées sur `example.com`, le domaine réservé
- * à la documentation — la seule forme qui soit plausible dans sa structure et
+ * **Elles sont provisoires**, et posées sur `example.com`, le domaine réservé à
+ * la documentation : la seule forme qui soit plausible dans sa structure et
  * prouvablement provisoire, incapable d'atteindre un tiers réel par accident.
- * « Outil budget » reste sans adresse : aucune piste ne le désigne, et le
- * budget est en C7 (D28).
- *
- * (2) **« Audit d'accessibilité » s'appelle désormais « Everyone »**, du nom de
- * la plateforme. Le renommage a semé une ligne neuve et laissé l'ancienne
- * orpheline en base de développement — le défaut que T8.4 referme. Il est
- * désormais **déclaré** (`formerNames`) : le fichier dit ses propres
- * renommages, et l'amorçage reprend la ligne au lieu d'en créer une seconde.
- *
- * **`tools` est le seul des neuf référentiels qui reste ouvert**, et c'est
- * mesuré : la table ne porte **pas** de `position`, donc aucune ancre ne
- * survivrait à un renommage fait **en base** depuis `/administration`. Les huit
- * autres sont refermés par leur position ; celui-ci demanderait une colonne,
- * donc une migration, que l'arbitrage (a) de C8 pose en signal d'arrêt.
+ * « Outil budget » reste sans adresse — aucune piste ne le désigne.
  */
-const TOOLS: {
-  name: string;
-  kind: ToolKind;
-  baseUrl?: string;
-  /** Les noms portés avant celui-ci, dans ce fichier. */
-  formerNames?: string[];
-}[] = [
-  { name: "Ergonome", kind: "audit", baseUrl: "https://ergonome.example.com" },
-  {
-    name: "Everyone",
-    kind: "audit",
-    baseUrl: "https://everyone.example.com",
-    formerNames: ["Audit d'accessibilité"],
-  },
-  {
-    name: "Portail analytics",
-    kind: "analytics",
-    baseUrl: "https://analytics.example.com",
-  },
-  /* **Trois outils de mesure**, ajoutés le 01/09/2026 avec le dispositif de
-     mesure : sans eux, son panneau n'aurait qu'une option à proposer, et la
-     souplesse annoncée — « un outil de plus est une ligne » — ne se verrait
-     nulle part. Ils n'ont rien de particulier : ce sont des lignes du
-     référentiel, saisissables en administration comme les quatre autres. */
-  {
-    name: "Google Analytics 4",
-    kind: "analytics",
-    baseUrl: "https://analytics.google.com",
-  },
-  { name: "Matomo", kind: "analytics", baseUrl: "https://matomo.example.com" },
-  {
-    name: "Microsoft Clarity",
-    kind: "analytics",
-    baseUrl: "https://clarity.microsoft.com",
-  },
-  { name: "Outil budget", kind: "budget" },
-];
-
-/**
- * `docs/03` §2 — le référentiel de départ, en six familles.
- *
- * `produces_result` est vrai pour les audits (`docs/04` §2), et pour eux
- * seuls : c'est ce drapeau qui conditionnera la saisie d'un résultat.
- *
- * `defaultTool` n'est posé que sur les deux types dont le brief documente
- * l'outil — « résultat 62/100, lien Ergonome », « 68 % de conformité, lien
- * vers l'outil ». Les autres restent nuls plutôt que devinés.
- *
- * « Atelier de priorisation » ne figure pas dans `docs/03` : il vient du
- * brief §7, et le type est une donnée du domaine. Arbitrage rendu avec
- * l'humain en ouverture du ticket, consigné au journal.
- */
-const ACTIVITY_TYPES: {
-  label: string;
-  family: Family;
-  producesResult?: boolean;
-  defaultTool?: string;
-}[] = [
-  { label: "Atelier de cadrage", family: "framing" },
-  { label: "Benchmark", family: "framing" },
-  { label: "Analyse de l'existant", family: "framing" },
-  { label: "Entretien commanditaire", family: "framing" },
-
-  { label: "Entretiens utilisateurs", family: "research" },
-  { label: "Test utilisateur", family: "research" },
-  { label: "Questionnaire", family: "research" },
-  { label: "Observation terrain", family: "research" },
-  { label: "Analyse de verbatims", family: "research" },
-
-  { label: "Atelier de co-conception", family: "design" },
-  { label: "Sprint de conception", family: "design" },
-  { label: "Maquettage", family: "design" },
-  { label: "Revue de conception", family: "design" },
-  { label: "Atelier de priorisation", family: "design" },
-
-  {
-    label: "Audit UX",
-    family: "evaluation",
-    producesResult: true,
-    defaultTool: "Ergonome",
-  },
-  {
-    label: "Audit d'accessibilité",
-    family: "evaluation",
-    producesResult: true,
-    defaultTool: "Everyone",
-  },
-  { label: "Audit d'éco-conception", family: "evaluation", producesResult: true },
-  { label: "Revue experte", family: "evaluation" },
-
-  { label: "Définition d'indicateurs", family: "measurement" },
-  { label: "Analyse des usages", family: "measurement" },
-  { label: "Restitution de mesure", family: "measurement" },
-
-  { label: "Restitution", family: "transfer" },
-  { label: "Formation", family: "transfer" },
-  { label: "Documentation", family: "transfer" },
-  { label: "Passation", family: "transfer" },
-];
-
-/**
- * Les **pistes de démarrage** — le référentiel du bloc « Démarrage »
- * (20/08/2026).
- *
- * **Troisième source de ce fichier**, après les `docs/` et le brief §7 : elles
- * viennent de la demande humaine, qui nomme les trois premières mot pour mot —
- * audit UX vers Ergonome, audit d'accessibilité vers Everyone, mise en place du
- * tracking vers le portail analytics. Le précédent est celui des deux use cases
- * du 19/08/2026.
- *
- * **La quatrième est une invention assumée**, signalée avant écriture et non
- * découverte après. Elle paie deux fois : elle est la preuve que le référentiel
- * accueille une **méthode sans outil**, ce que la demande réclame explicitement
- * pour la suite ; et elle est la seule ligne qui **rende visible la branche
- * « piste sans lien »** du bloc, qui rejoindrait sinon les états vides
- * qu'aucun HTML servi ne montre.
- *
- * Le texte long reste nul sur la quatrième : une piste sans texte long est un
- * état normal, et il fallait qu'une ligne le serve.
- */
-const STARTERS: {
-  label: string;
-  kind: StarterKind;
-  summary: string;
-  guidance?: string;
-  tool?: string;
-}[] = [
-  {
-    label: "Audit UX",
-    kind: "tool",
-    tool: "Ergonome",
-    summary:
-      "Mesurer la qualité d'usage du produit sur une grille heuristique, et repartir d'un état des lieux daté.",
-    guidance:
-      "À envisager quand l'accompagnement s'ouvre sur un produit déjà en ligne : l'audit donne un point de départ chiffré, auquel les mesures suivantes se compareront. Ergonome produit le rapport ; Vision en reporte la valeur, sa date et son lien, et rien de plus — le détail reste dans l'outil.",
-  },
-  {
-    label: "Audit d'accessibilité",
-    kind: "tool",
-    tool: "Everyone",
-    summary:
-      "Situer le produit face au référentiel d'accessibilité, et savoir ce qui bloque avant de concevoir.",
-    guidance:
-      "À envisager tôt : un écran conçu sans cette lecture se reprend deux fois. Everyone rend un taux de conformité que l'accompagnement peut adopter comme indicateur du produit, puis suivre dans le temps.",
-  },
-  {
-    label: "Mise en place du tracking",
-    kind: "tool",
-    tool: "Portail analytics",
-    summary:
-      "Poser les mesures d'usage avant de changer le produit, pour que l'effet du travail soit lisible après.",
-    guidance:
-      "À envisager avant toute refonte : sans mesure d'avant, il n'y aura pas d'après. Le portail documente la pose des marqueurs ; les valeurs reviennent ensuite dans Vision comme relevés d'indicateur, avec leur date.",
-  },
-  {
-    label: "Entretiens utilisateurs",
-    kind: "method",
-    summary:
-      "Aller chercher chez les utilisateurs ce qu'aucune mesure ne dit : leurs raisons, leurs contournements, leurs mots.",
-  },
-];
+const TOOL_BASE_URLS: Readonly<Record<string, string>> = {
+  Ergonome: "https://ergonome.example.com",
+  Everyone: "https://everyone.example.com",
+  "Portail analytics": "https://analytics.example.com",
+  "Google Analytics 4": "https://analytics.google.com",
+  Matomo: "https://matomo.example.com",
+  "Microsoft Clarity": "https://clarity.microsoft.com",
+};
 
 /**
  * Brief §7 — les huit personnes nommées, et rien de plus.
@@ -938,257 +698,10 @@ const USE_CASE_PERSONAS: {
    Types dérivés du schéma — jamais réécrits à la main
    ========================================================================== */
 
-type Nature = (typeof projectStatusNature.enumValues)[number];
-type ToolKind = (typeof toolKind.enumValues)[number];
-type StarterKind = (typeof starterKind.enumValues)[number];
-type Family = (typeof activityFamily.enumValues)[number];
 type ActivityState = (typeof activityState.enumValues)[number];
 type DomainRole = (typeof domainRole.enumValues)[number];
 type PersonaKind = (typeof personaKind.enumValues)[number];
 type TraitKind = (typeof personaTraitKind.enumValues)[number];
-
-/* ==========================================================================
-   Le rapprochement
-
-   Une seule lecture par table, puis un seul lot d'insertions. Ce qui existe
-   déjà est reconnu par sa clé naturelle, ce qui a dérivé est remis à la
-   valeur du fichier.
-   ========================================================================== */
-
-type Tally = {
-  created: number;
-  updated: number;
-  /** Reconnue par son ancre ou par un ancien libellé, donc **pas** recréée. */
-  renamed: number;
-  unchanged: number;
-};
-
-const tallies = new Map<string, Tally>();
-
-function record(table: string, outcome: keyof Tally, count = 1): void {
-  const tally = tallies.get(table) ?? {
-    created: 0,
-    updated: 0,
-    renamed: 0,
-    unchanged: 0,
-  };
-  tally[outcome] += count;
-  tallies.set(table, tally);
-}
-
-/**
- * Les renommages reconnus, nommés des deux côtés.
- *
- * **Une correction silencieuse est une correction qu'on redécouvre.** Le compte
- * rendu dit le chiffre ; ces lignes disent *quelle* ligne a été reprise et
- * depuis quel libellé, faute de quoi le geste de T8.4 serait invisible le jour
- * où il agit.
- */
-const renames: string[] = [];
-
-/**
- * Deux valeurs de colonne sont-elles la même ?
- *
- * `numeric` revient de PostgreSQL en chaîne cadrée — `"62.0000"` pour un
- * `"62"` écrit. Les comparer telles quelles ferait réécrire la ligne à chaque
- * exécution, et le script ne serait plus rejouable, seulement bavard.
- */
-function sameValue(left: unknown, right: unknown): boolean {
-  if (left === null || left === undefined) return right === null || right === undefined;
-  if (right === null || right === undefined) return false;
-
-  const leftNumber = Number(left);
-  const rightNumber = Number(right);
-  if (
-    typeof left !== "boolean" &&
-    typeof right !== "boolean" &&
-    !Number.isNaN(leftNumber) &&
-    !Number.isNaN(rightNumber) &&
-    String(left).trim() !== "" &&
-    String(right).trim() !== ""
-  ) {
-    return leftNumber === rightNumber;
-  }
-
-  return String(left) === String(right);
-}
-
-/** Ce que le fichier déclare pour une ligne, et ce qui la reconnaît. */
-type Seed<T extends ScopedTable> = {
-  /** La clé naturelle : le libellé, le nom, le titre. Celle qui se renomme. */
-  key: string;
-  /**
-   * Ce qu'un renommage ne touche pas — la `position`, pour les huit
-   * référentiels qui en portent une. Nulle là où la table n'a rien de tel.
-   */
-  anchor?: string;
-  /**
-   * Les libellés que cette ligne a portés avant, dans le fichier.
-   *
-   * C'est la fixture qui déclare ses propres renommages : sans cela, changer un
-   * nom ici sème une ligne neuve et laisse l'ancienne orpheline — ce qui est
-   * arrivé le 20/08/2026 avec « Audit d'accessibilité » → « Everyone ».
-   */
-  formerKeys?: string[];
-  values: InsertValues<T>;
-};
-
-/** Toute ligne scopée porte un identifiant : le typage générique l'ignore. */
-const rowId = (row: unknown): string => (row as { id: string }).id;
-
-/**
- * Amène une table à l'état décrit par le fichier, et rend ses lignes indexées
- * par clé naturelle — c'est cet index qui sert ensuite à résoudre les
- * rattachements sans jamais écrire un identifiant à la main.
- */
-async function ensureAll<T extends ScopedTable>(
-  scope: ScopedDb,
-  table: T,
-  name: string,
-  keyOfRow: (row: Row<T>) => string,
-  seeds: Seed<T>[],
-  /** L'ancre d'une ligne en base. Absente : la table n'en porte pas. */
-  anchorOfRow?: (row: Row<T>) => string | null,
-): Promise<Map<string, Row<T>>> {
-  const seen = new Set<string>();
-  for (const seed of seeds) {
-    if (seen.has(seed.key)) {
-      throw new Error(
-        `Clé naturelle en double dans la fixture ${name} : « ${seed.key} ». ` +
-          "Deux lignes indiscernables rendraient l'amorçage non rejouable.",
-      );
-    }
-    seen.add(seed.key);
-  }
-
-  const rows = await scope.list(table, { includeArchived: true });
-  const existing = new Map<string, Row<T>>();
-  for (const row of rows) existing.set(keyOfRow(row), row);
-
-  /* La reconnaissance se fait **avant toute écriture** : on résout d'abord les
-     lignes, on écrit ensuite. Une ligne déjà revendiquée par un `seed` ne peut
-     plus l'être par un autre — sans quoi deux lignes du fichier se
-     disputeraient la même ligne en base. */
-  const claimed = new Set<string>();
-  const matched = new Map<string, Row<T>>();
-  const renamedFrom = new Map<string, string>();
-
-  for (const seed of seeds) {
-    const row = existing.get(seed.key);
-    if (!row) continue;
-    claimed.add(rowId(row));
-    matched.set(seed.key, row);
-  }
-
-  /** Une ligne que ni la fixture ni un autre `seed` ne désigne déjà. */
-  const free = (row: Row<T>): boolean =>
-    !claimed.has(rowId(row)) && !seen.has(keyOfRow(row));
-
-  for (const seed of seeds) {
-    if (matched.has(seed.key)) continue;
-
-    /* L'ancre. **Deux candidates n'en désignent aucune** : le script ne devine
-       jamais entre deux lignes, il insère et laisse la base telle quelle. */
-    let found: Row<T> | undefined;
-    if (anchorOfRow && seed.anchor !== undefined) {
-      const candidates = rows.filter(
-        (row) => free(row) && anchorOfRow(row) === seed.anchor,
-      );
-      if (candidates.length === 1) found = candidates[0];
-    }
-
-    /* Les anciens libellés, dans l'ordre déclaré. */
-    if (!found) {
-      for (const former of seed.formerKeys ?? []) {
-        const row = existing.get(former);
-        if (row && free(row)) {
-          found = row;
-          break;
-        }
-      }
-    }
-
-    if (!found) continue;
-    claimed.add(rowId(found));
-    matched.set(seed.key, found);
-    renamedFrom.set(seed.key, keyOfRow(found));
-  }
-
-  const missing = seeds.filter((seed) => !matched.has(seed.key));
-
-  for (const seed of seeds) {
-    const row = matched.get(seed.key);
-    if (!row) continue;
-
-    const former = renamedFrom.get(seed.key);
-    const current = row as unknown as Record<string, unknown>;
-    const wanted = seed.values as unknown as Record<string, unknown>;
-    const drifted = Object.keys(wanted).filter(
-      (column) => !sameValue(current[column], wanted[column]),
-    );
-
-    if (drifted.length === 0 && former === undefined) {
-      record(name, "unchanged");
-      continue;
-    }
-
-    const updated = await scope.update(table, rowId(row), seed.values);
-    if (updated) {
-      existing.set(seed.key, updated);
-      matched.set(seed.key, updated);
-    }
-
-    if (former === undefined) {
-      record(name, "updated");
-      continue;
-    }
-
-    /* La ligne existait sous un autre nom : elle est reprise, jamais doublée. */
-    existing.delete(former);
-    record(name, "renamed");
-    renames.push(`${name} : « ${former} » reconnu, et rendu à « ${seed.key} ».`);
-  }
-
-  if (missing.length > 0) {
-    // `insertMany` attend `InsertValues<NoInfer<T>>` : derrière un `T` non
-    // résolu, TypeScript ne sait pas rapprocher les deux formes du même type.
-    // Le cast est confiné à cette ligne, et le résultat retypé aussitôt.
-    const inserted = (await scope.insertMany(
-      table,
-      missing.map((seed) => seed.values) as never,
-    )) as Row<T>[];
-    inserted.forEach((row) => existing.set(keyOfRow(row), row));
-    record(name, "created", inserted.length);
-  }
-
-  return existing;
-}
-
-/**
- * L'ancre d'un référentiel ordonné : sa `position`, normalisée.
- *
- * PostgreSQL rend un `numeric(10,2)` cadré — `"3.00"` pour un `"3"` écrit —, et
- * comparer les deux chaînes telles quelles ne rapprocherait jamais rien. C'est
- * la raison d'être de `sameValue` juste au-dessus, resservie ici.
- */
-const positionAnchor = (row: { position: string }): string =>
-  String(Number(row.position));
-
-/** L'identifiant d'une ligne attendue, ou une erreur qui nomme ce qui manque. */
-function idOf<T extends ScopedTable>(
-  index: Map<string, Row<T>>,
-  key: string,
-  what: string,
-): string {
-  const row = index.get(key);
-  if (!row) {
-    throw new Error(`${what} introuvable après amorçage : « ${key} ».`);
-  }
-  return rowId(row);
-}
-
-/** La position d'un référentiel : l'ordre du fichier fait foi. */
-const positionOf = (index: number): string => String(index + 1);
 
 /* ==========================================================================
    L'amorçage
@@ -1199,6 +712,13 @@ async function seed(): Promise<void> {
     ? new URL(process.env.DATABASE_URL).host
     : "(inconnu)";
   console.log(`Amorçage de « ${DOMAIN.name} » sur ${host}\n`);
+
+  /* Le rapprochement de T8.4 et son compte rendu, créés pour cette exécution.
+     Ils vivaient en globales de ce fichier jusqu'à T9.5 ; ils sont désormais
+     dans `lib/db/reconcile.ts`, que l'écran au-dessus des domaines appelle
+     aussi. */
+  const reconciler = createReconciler();
+  const { ensureAll, record, tallies, renames } = reconciler;
 
   /* --- Le domaine ------------------------------------------------------- */
 
@@ -1225,139 +745,21 @@ async function seed(): Promise<void> {
     positionAnchor,
   );
 
-  const jobIndex = await ensureAll(
-    scope,
-    jobs,
-    "jobs",
-    (row) => row.label,
-    JOBS.map((label, index) => ({
-      key: label,
-      anchor: positionOf(index),
-      values: { label, position: positionOf(index) },
-    })),
-    positionAnchor,
-  );
+  /* Les huit référentiels du domaine, posés par `lib/db/bootstrap.ts` — le
+     module que l'écran au-dessus des domaines appelle aussi (T9.5). La fixture
+     n'y ajoute que les adresses de ses outils, qui appartiennent au client et
+     non au référentiel. */
+  const referentials = await bootstrapReferentials(scope, reconciler, {
+    toolBaseUrls: TOOL_BASE_URLS,
+  });
 
-  const skillIndex = await ensureAll(
-    scope,
-    skills,
-    "skills",
-    (row) => row.label,
-    SKILLS.map((label, index) => ({
-      key: label,
-      anchor: positionOf(index),
-      values: { label, position: positionOf(index) },
-    })),
-    positionAnchor,
-  );
-
-  const levelIndex = await ensureAll(
-    scope,
-    skillLevels,
-    "skill_levels",
-    (row) => row.label,
-    SKILL_LEVELS.map((level, index) => ({
-      key: level.label,
-      anchor: positionOf(index),
-      values: {
-        label: level.label,
-        rank: level.rank,
-        position: positionOf(index),
-      },
-    })),
-    positionAnchor,
-  );
-
-  const approachIndex = await ensureAll(
-    scope,
-    approaches,
-    "approaches",
-    (row) => row.label,
-    APPROACHES.map((label, index) => ({
-      key: label,
-      anchor: positionOf(index),
-      values: { label, position: positionOf(index) },
-    })),
-    positionAnchor,
-  );
-
-  const statusIndex = await ensureAll(
-    scope,
-    projectStatuses,
-    "project_statuses",
-    (row) => row.label,
-    STATUSES.map((status, index) => ({
-      key: status.label,
-      anchor: positionOf(index),
-      values: {
-        label: status.label,
-        nature: status.nature,
-        position: positionOf(index),
-      },
-    })),
-    positionAnchor,
-  );
-
-  const toolIndex = await ensureAll(
-    scope,
-    tools,
-    "tools",
-    (row) => row.name,
-    TOOLS.map((tool) => ({
-      key: tool.name,
-      formerKeys: tool.formerNames,
-      values: {
-        name: tool.name,
-        kind: tool.kind,
-        // Provisoire, et nulle là où aucune piste n'en réclame : voir TOOLS.
-        baseUrl: tool.baseUrl ?? null,
-      },
-    })),
-  );
-
-  const typeIndex = await ensureAll(
-    scope,
-    activityTypes,
-    "activity_types",
-    (row) => row.label,
-    ACTIVITY_TYPES.map((type, index) => ({
-      key: type.label,
-      anchor: positionOf(index),
-      values: {
-        label: type.label,
-        family: type.family,
-        producesResult: type.producesResult ?? false,
-        position: positionOf(index),
-        defaultToolId: type.defaultTool
-          ? idOf(toolIndex, type.defaultTool, "Outil")
-          : null,
-      },
-    })),
-    positionAnchor,
-  );
-
-  /* Les pistes de démarrage. Elles viennent après les outils, dont elles
-     tirent leur lien, et la clé naturelle est le libellé — celui que l'écran
-     affiche, comme partout ailleurs dans ce fichier. */
-  await ensureAll(
-    scope,
-    starters,
-    "starters",
-    (row) => row.label,
-    STARTERS.map((starter, index) => ({
-      key: starter.label,
-      anchor: positionOf(index),
-      values: {
-        label: starter.label,
-        kind: starter.kind,
-        summary: starter.summary,
-        guidance: starter.guidance ?? null,
-        position: positionOf(index),
-        toolId: starter.tool ? idOf(toolIndex, starter.tool, "Outil") : null,
-      },
-    })),
-    positionAnchor,
-  );
+  const jobIndex = referentials.jobs;
+  const skillIndex = referentials.skills;
+  const levelIndex = referentials.skillLevels;
+  const approachIndex = referentials.approaches;
+  const statusIndex = referentials.projectStatuses;
+  const toolIndex = referentials.tools;
+  const typeIndex = referentials.activityTypes;
 
   /* --- Les personnes ----------------------------------------------------- */
 

@@ -10838,3 +10838,72 @@ ticket. Ce n'est pas l'intermittent que `ETAT.md` attribue au réseau — celui-
 `NeonDbError: fetch failed`, sans écart d'assertion — c'est un défaut d'écriture : *une assertion de
 non-présence ne se pose pas contre une chaîne dont on ne contrôle pas le contenu*. Le fichier est
 hors du périmètre de la fiche ; le point part dans `ETAT.md` avec sa destination.
+
+---
+
+## T9.5 — L'amorçage d'un domaine neuf : une extraction, et un décompte de fiche qui tombe (07/09/2026)
+
+**T9.5 — La fiche disait « les neuf référentiels », et il y en a huit.** Le décompte a été
+confronté à `scripts/seed.ts` avant l'écriture, et il n'a pas tenu : `ENTITIES` y porte le
+commentaire `/** Brief §7. */`, c'est-à-dire la même provenance que les personnes, les produits et
+les projets du jeu de démonstration. Ce sont les cinq divisions de « Groupe Meridian » — *Banque de
+détail*, *Assurance*, *Corporate*, *Digital Factory*, *RH & Interne*. Les semer chez un vrai client
+serait inventer son organigramme, ce que l'interdit du ticket refuse mot pour mot : *« aucune donnée
+factice dans un domaine créé par l'écran »*. Et la règle 4 rendrait la faute coûteuse — une entité
+inutile ne se supprime pas, elle s'archive. **Un domaine neuf naît donc sans entité**, et ce n'est
+pas un manque : l'état vide existait déjà et n'avait jamais eu d'occasion de servir —
+`« Aucune entité dans ce domaine »` sur `/produits/nouveau` comme dans `/administration`.
+**Quatrième énoncé de fiche mis en défaut depuis C8**, et le second de ce chantier après le critère
+de `superAdmin` renommé par T9.4.
+
+**T9.5 — Une adresse fausse est pire qu'une adresse absente.** Les sept outils portaient six
+adresses `example.com`, consignées comme provisoires depuis le 20/08/2026. Les faire voyager dans le
+module d'amorçage aurait donné à chaque entreprise réelle des liens profonds qui ne mènent nulle
+part **sans le dire** — un lien mort qui a l'air d'un lien. `base_url` est donc sorti du référentiel
+et devenu un argument (`toolBaseUrls`), que `scripts/seed.ts` seul passe. La forme évitait aussi un
+piège mesurable : un module qui aurait posé `null` puis un script qui aurait reposé l'adresse
+auraient fait **deux écritures par outil à chaque exécution**, et `npm run db:seed` n'aurait plus
+jamais dit *« Rien à faire »* — la propriété d'idempotence se serait perdue en silence, sans qu'un
+décompte de lignes le montre.
+
+**T9.5 — Le code intestable ne l'était pas par négligence, mais par emplacement.** `ETAT.md` portait
+depuis T8.4 que *« `ensureAll` n'a aucun test »*. La cause s'est lue en une ligne :
+`vitest.config.mts` n'inclut que `lib/**/*.test.ts` et `app/**/*.test.ts` — **`scripts/` est hors
+du champ de la suite**, donc le mécanisme de rapprochement était structurellement hors d'atteinte.
+Le déplacement vers `lib/db/reconcile.ts` le rend mesurable sans qu'on ait rien écrit pour cela, et
+les trois temps — clé naturelle, ancre, anciens libellés — sont désormais éprouvés **séparément**,
+chacun neutralisable sans entraîner les deux autres. La leçon vaut au-delà : *un fichier qu'aucun
+glob n'atteint n'est pas non testé, il est intestable, et la différence se lit dans la
+configuration, pas dans le fichier.*
+
+**T9.5 — Le décompte d'un test se lit sur sa source, ou en clair, et ce n'est pas la même mesure.**
+`lib/db/bootstrap.test.ts` lit les huit longueurs sur les constantes du module (`JOBS.length`…) :
+retirer une ligne d'`ACTIVITY_TYPES` y reste **cohérent**, donc muet. `app/domaines/actions.test.ts`
+porte les mêmes nombres **écrits en clair** : la même neutralisation l'y fait tomber. L'asymétrie
+est voulue et mesurée — la contre-épreuve n° 2 a fait tomber quatre tests, dont *aucun* n'était
+« chacun porte exactement ce que le module déclare ». *Un test qui dérive sa valeur attendue de ce
+qu'il mesure vérifie la cohérence, pas le contenu ; il en faut un des deux sortes.*
+
+**T9.5 — L'amorçage n'est pas atomique, et il n'a pas de filet.** `createDomain` écrit désormais
+**dix tables** sans transaction — `neon-http` n'en offre pas (dette de T3.6). La parade de T3.6
+— *tout se confronte avant d'écrire* — couvre le couple d'identité, pas l'amorçage : une panne après
+l'identité laisserait une entreprise **complète en apparence et vide de référentiels**, qu'aucun
+geste de l'écran ne complète, `npm run db:seed` ne visant que le domaine de démonstration. L'ordre a
+été pesé : amorcer *avant* l'identité aurait élargi la fenêtre de course que T9.4 avait raisonnée, et
+le geste de réparation existant aurait alors rendu « complète » une entreprise vide — pire, pas
+mieux. **L'ordre de T9.4 est donc laissé intact** (règles 3 et 6), et le fait part dans `ETAT.md`
+avec sa destination. Ce qui adoucit le cas : le rapprochement de T8.4 rend l'amorçage **rejouable
+sans rien doubler** — il ne manque qu'un appelant, pas un mécanisme.
+
+**T9.5 — Une assertion de renommage écrite de mémoire, et la base a tranché.** Le test d'ancre
+attendait `« Recherche utilisateur » … rendu à « Product Design »`. C'est `« UX Research »` que la
+position 2 désigne, et le test est tombé sur ce seul écart. Rien de grave, et c'est le point : *une
+assertion sur une valeur calculée par le code se lit dans la sortie, jamais dans la tête de qui
+l'écrit* — la même discipline que les quatre du protocole, à l'échelle d'une ligne.
+
+**T9.5 — La preuve la plus forte n'était pas un test.** `npm run db:seed` a été rejoué sur la base
+de développement **semée par le code d'avant l'extraction**, et il a rendu *« Rien à faire : le
+domaine était déjà à jour »* — vingt-huit tables à zéro créé, zéro mis à jour, zéro renommé, dont
+les huit référentiels déplacés et les sept outils avec leurs adresses intactes. Aucun test n'aurait
+pu dire cela : il aurait fallu une base semée par l'ancien code, et c'est exactement ce qu'était la
+base de développement. *Une extraction se prouve contre l'état que le code d'avant a laissé.*
