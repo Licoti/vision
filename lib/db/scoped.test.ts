@@ -1071,25 +1071,33 @@ describe("superAdmin", () => {
     expect(names).toContain(`__test__a__${suffix}`);
     expect(names).toContain(`__test__b__${suffix}`);
 
-    /* **Sept clés depuis T9.2, et la liste reste nominative** — c'est
-       exactement ce que ce sceau sert à obtenir : une clé de plus est une
-       décision qui se prend, jamais un ajout qui passe.
+    /* **La liste reste nominative** — c'est exactement ce que ce sceau sert à
+       obtenir : une clé de plus est une décision qui se prend, jamais un ajout
+       qui passe.
 
        **La propriété qu'il garde n'a pas bougé** : aucune de ces fonctions ne
-       donne accès à une donnée métier. Les deux qui s'ajoutent écrivent et
-       lisent `super_admins`, qui vit *au-dessus* des domaines et n'en traverse
-       aucun — elles amorcent le droit que rien, dans le produit, ne peut
-       s'accorder à lui-même (`scripts/auth:super-admin`, T9.2). Les faire vivre
-       dans un script à connexion propre aurait contourné la règle 1 plutôt que
-       sa contrainte, et **laissé T9.3 sans rien à garder**.
+       donne accès à une donnée métier. Ce qui touche `super_admins` vit
+       *au-dessus* des domaines et n'en traverse aucun — c'est l'amorçage du
+       droit que rien, dans le produit, ne peut s'accorder à lui-même
+       (`scripts/auth:super-admin`, T9.2). Le faire vivre dans un script à
+       connexion propre aurait contourné la règle 1 plutôt que sa contrainte, et
+       **laissé T9.3 sans rien à garder**.
 
-       **Le sceau s'est dédoublé, et c'est la distinction que T9.3 devait
-       écrire.** La liste portait sept clés dont deux écrivaient ; elle en porte
-       six, qui toutes lisent. Les deux écrivains vivent derrière
-       `asSuperAdmin`, et on ne les tient qu'en ayant nommé son autorité.
+       **Le sceau s'est dédoublé en T9.3, et T9.4 a déplacé sa frontière d'un
+       cran.** Le critère n'est pas *lire contre écrire* mais *avec ou sans
+       autorité nommable* : `superAdmin` ne garde que ce qui tourne pendant la
+       connexion — et dans `/dev/session`, qui par construction n'a pas
+       d'autorité. `listSuperAdmins` est passée de l'autre côté : elle dit **qui
+       détient le droit**, et son seul appelant tient déjà un grant.
+
+       **Cinq clés, et chacune est nommée par une règle d'entrée** : `findDomain`
+       et `listDomains` pour le chargement de session, `findSuperAdminByEmail`
+       pour la règle 2, `findSuperAdminById` pour la seconde barrière,
+       `findDomainIdentity` pour les règles 3 et 5. Une sixième qui ne saurait
+       pas dire la sienne n'aurait rien à faire ici.
 
        **Les deux listes se relisent ensemble**, et c'est la raison de la
-       seconde : une écriture qui reviendrait se poser sur `superAdmin`
+       seconde : une fonction qui reviendrait se poser sur `superAdmin`
        quitterait la garde sans qu'aucun autre test ne le dise. */
     expect(Object.keys(superAdmin).sort()).toEqual([
       "findDomain",
@@ -1097,11 +1105,22 @@ describe("superAdmin", () => {
       "findSuperAdminByEmail",
       "findSuperAdminById",
       "listDomains",
-      "listSuperAdmins",
     ]);
 
+    /* **Huit clés depuis T9.4, dont trois lisent** — et c'est le déplacement de
+       frontière ci-dessus, rendu constatable. Les trois écritures neuves ne
+       touchent que `domains` : suspendre, ranger, rétablir. **Aucun
+       `updateDomain`**, et ce n'est pas un oubli — la fiche de T9.4 ne liste pas
+       le renommage, et trois fonctions nommées le rendent impossible par
+       construction plutôt que par vigilance. */
     expect(Object.keys(outsideAnySession).sort()).toEqual([
+      "archiveDomain",
       "createDomain",
+      "listDomainIdentities",
+      "listDomainsForAdmin",
+      "listSuperAdmins",
+      "restoreDomain",
+      "setDomainStatus",
       "upsertSuperAdmin",
     ]);
   });
@@ -1220,7 +1239,7 @@ describe("superAdmin", () => {
     });
 
     expect(
-      (await superAdmin.listSuperAdmins()).map((admin) => admin.id),
+      (await outsideAnySession.listSuperAdmins()).map((admin) => admin.id),
     ).toContain(row.id);
 
     await db
@@ -1229,7 +1248,7 @@ describe("superAdmin", () => {
       .where(eq(superAdmins.id, row.id));
 
     expect(
-      (await superAdmin.listSuperAdmins()).map((admin) => admin.id),
+      (await outsideAnySession.listSuperAdmins()).map((admin) => admin.id),
     ).not.toContain(row.id);
   });
 });
@@ -1348,6 +1367,229 @@ describe("l'autorité d'une écriture au-dessus des domaines", () => {
       expect(await countDomains(name)).toBe(1);
     } finally {
       await db.delete(domains).where(eq(domains.id, domain.id));
+    }
+  });
+
+  /* ------------------------------------------------------------------------
+     Les six clés que T9.4 ajoute — trois lectures, trois écritures
+
+     **La même garde les tient toutes**, et c'est pourquoi elles se mesurent en
+     deux cas et non en six : `assertAuthority` neutralisée doit faire tomber
+     ceux-ci et rien d'autre. Ce qui se mesure séparément, ce sont les
+     conditions **propres** à chaque geste — le `is null` de la bascule, celui du
+     rangement —, qui n'ont rien à voir avec l'autorité.
+     ------------------------------------------------------------------------ */
+
+  /** Un domaine jetable, rendu avec de quoi le reprendre en base. */
+  async function throwawayDomain(label: string): Promise<{ id: string }> {
+    const { grant } = await grantOf(`porteur-${label}`);
+    const domain = await asSuperAdmin(grant).createDomain({
+      name: `__test__${label}__${suffix}`,
+      competenceCenterName: `Centre ${label}`,
+    });
+    return { id: domain.id };
+  }
+
+  const domainRow = async (id: string) =>
+    (await db.select().from(domains).where(eq(domains.id, id)))[0];
+
+  async function dropDomain(id: string): Promise<void> {
+    await db.delete(persons).where(eq(persons.domainId, id));
+    await db.delete(domainIdentities).where(eq(domainIdentities.domainId, id));
+    await db.delete(domains).where(eq(domains.id, id));
+  }
+
+  test("une autorité forgée ne bascule, ne range ni ne rétablit un domaine", async () => {
+    const { id } = await throwawayDomain("autorite-forgee");
+    const forged: SuperAdminGrant = {
+      kind: "super_admin",
+      superAdminId: crypto.randomUUID(),
+    };
+
+    try {
+      /* L'étape témoin : l'état d'avant est lu, sinon « toujours actif » ne
+         distinguerait pas un refus d'une bascule qui n'a jamais pu porter. */
+      expect((await domainRow(id))?.status).toBe("active");
+      expect((await domainRow(id))?.archivedAt).toBeNull();
+
+      await expect(
+        asSuperAdmin(forged).setDomainStatus(id, "suspended"),
+      ).rejects.toThrow(SuperAdminRequiredError);
+      await expect(asSuperAdmin(forged).archiveDomain(id)).rejects.toThrow(
+        SuperAdminRequiredError,
+      );
+      await expect(asSuperAdmin(forged).restoreDomain(id)).rejects.toThrow(
+        SuperAdminRequiredError,
+      );
+
+      expect((await domainRow(id))?.status).toBe("active");
+      expect((await domainRow(id))?.archivedAt).toBeNull();
+    } finally {
+      await dropDomain(id);
+    }
+  });
+
+  test("une autorité forgée ne lit rien au-dessus des domaines", async () => {
+    const forged: SuperAdminGrant = {
+      kind: "super_admin",
+      superAdminId: crypto.randomUUID(),
+    };
+
+    await expect(asSuperAdmin(forged).listSuperAdmins()).rejects.toThrow(
+      SuperAdminRequiredError,
+    );
+    await expect(asSuperAdmin(forged).listDomainsForAdmin()).rejects.toThrow(
+      SuperAdminRequiredError,
+    );
+    await expect(
+      asSuperAdmin(forged).listDomainIdentities(a.domainId),
+    ).rejects.toThrow(SuperAdminRequiredError);
+  });
+
+  /* **La mesure qui prouve que les trois gestes servent à quelque chose.** */
+  test("un super administrateur en exercice suspend, range et rétablit", async () => {
+    const { grant } = await grantOf("trois-gestes");
+    const { id } = await throwawayDomain("trois-gestes");
+
+    try {
+      expect((await asSuperAdmin(grant).setDomainStatus(id, "suspended"))?.status).toBe(
+        "suspended",
+      );
+      expect((await domainRow(id))?.status).toBe("suspended");
+
+      expect(await asSuperAdmin(grant).archiveDomain(id)).toBeDefined();
+      expect((await domainRow(id))?.archivedAt).not.toBeNull();
+
+      expect(await asSuperAdmin(grant).restoreDomain(id)).toBeDefined();
+      expect((await domainRow(id))?.archivedAt).toBeNull();
+
+      /* **Le statut ne bouge pas au rétablissement** : une entreprise suspendue
+         puis rangée revient suspendue. Rétablir défait un rangement, il ne
+         rouvre pas une porte fermée pour une autre raison. */
+      expect((await domainRow(id))?.status).toBe("suspended");
+    } finally {
+      await dropDomain(id);
+    }
+  });
+
+  test("un domaine rangé ne bascule plus de statut", async () => {
+    const { grant } = await grantOf("range-fige");
+    const { id } = await throwawayDomain("range-fige");
+
+    try {
+      await asSuperAdmin(grant).archiveDomain(id);
+      expect((await domainRow(id))?.status).toBe("active");
+
+      /* Rend `undefined`, comme un identifiant qui ne désigne rien : sans cette
+         condition, « suspendu et archivé » existerait, et aucun écran ne
+         saurait quoi en dire. */
+      expect(
+        await asSuperAdmin(grant).setDomainStatus(id, "suspended"),
+      ).toBeUndefined();
+      expect((await domainRow(id))?.status).toBe("active");
+    } finally {
+      await dropDomain(id);
+    }
+  });
+
+  test("un second rangement ne récrit pas la date du premier", async () => {
+    const { grant } = await grantOf("range-deux-fois");
+    const { id } = await throwawayDomain("range-deux-fois");
+
+    try {
+      const first = await asSuperAdmin(grant).archiveDomain(id);
+      expect(first?.archivedAt).toBeDefined();
+
+      expect(await asSuperAdmin(grant).archiveDomain(id)).toBeUndefined();
+      expect((await domainRow(id))?.archivedAt?.getTime()).toBe(
+        first?.archivedAt?.getTime(),
+      );
+    } finally {
+      await dropDomain(id);
+    }
+  });
+
+  test("la liste dit ce qui manque à une entreprise pour être joignable", async () => {
+    const { grant } = await grantOf("joignable");
+    const { id } = await throwawayDomain("joignable");
+    const scope = forDomain({ domainId: id });
+
+    const rowOf = async () =>
+      (await asSuperAdmin(grant).listDomainsForAdmin()).find(
+        (domain) => domain.id === id,
+      );
+
+    try {
+      /* Un domaine neuf n'est joignable par personne : aucun jeton ne le
+         désigne, et aucun compte ne l'ouvre. */
+      expect(await rowOf()).toMatchObject({
+        hasIdentity: false,
+        hasAccount: false,
+      });
+
+      await scope.insert(domainIdentities, {
+        provider: "google",
+        value: `joignable-${suffix}.example`,
+      });
+      expect(await rowOf()).toMatchObject({
+        hasIdentity: true,
+        hasAccount: false,
+      });
+
+      /* **Une personne sans accès ne compte pas** : être référencé et pouvoir se
+         connecter sont deux choses distinctes (D19). */
+      const referenced = await scope.insert(persons, {
+        fullName: `Référencée ${suffix}`,
+        source: "manual",
+        kind: "stakeholder",
+      });
+      expect((await rowOf())?.hasAccount).toBe(false);
+
+      await scope.insert(persons, {
+        fullName: `Responsable ${suffix}`,
+        source: "manual",
+        kind: "center",
+        email: `responsable.${suffix}@exemple.test`,
+        hasAccess: true,
+        domainRole: "domain_manager",
+      });
+      expect((await rowOf())?.hasAccount).toBe(true);
+
+      /* Archiver le seul compte rend l'entreprise injoignable : c'est la règle 6
+         qui le dit, et la lecture doit dire la même chose qu'elle. */
+      await db
+        .update(persons)
+        .set({ archivedAt: new Date() })
+        .where(and(eq(persons.domainId, id), eq(persons.hasAccess, true)));
+      expect((await rowOf())?.hasAccount).toBe(false);
+
+      expect(referenced.domainId).toBe(id);
+    } finally {
+      await dropDomain(id);
+    }
+  });
+
+  test("les identités d'un domaine ne rendent que les siennes", async () => {
+    const { grant } = await grantOf("identites");
+    const { id } = await throwawayDomain("identites");
+    const scope = forDomain({ domainId: id });
+
+    try {
+      await scope.insert(domainIdentities, {
+        provider: "google",
+        value: `sienne-${suffix}.example`,
+      });
+      await a.scope.insert(domainIdentities, {
+        provider: "microsoft",
+        value: `voisine-${suffix}`,
+      });
+
+      const rows = await asSuperAdmin(grant).listDomainIdentities(id);
+      expect(rows.map((row) => row.value)).toEqual([
+        `sienne-${suffix}.example`,
+      ]);
+    } finally {
+      await dropDomain(id);
     }
   });
 });

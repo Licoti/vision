@@ -50,6 +50,7 @@ import {
   activities,
   domainIdentities,
   domains,
+  domainStatus,
   entities,
   events,
   identityProvider,
@@ -906,23 +907,40 @@ export function forDomain(scope: Scope) {
    **La distinction que T9.3 devait écrire, la voici — et elle est portée par
    deux objets, pas par un commentaire.**
 
-     `superAdmin`            ce qui se **lit** avant le domaine. Ouvert, et il
-                             doit l'être : ces lectures s'exécutent *pendant* la
-                             connexion, quand aucune session n'existe encore.
-                             Une garde ici fermerait la porte à qui vient
-                             l'ouvrir.
+     `superAdmin`            ce qui tourne quand **aucune autorité n'est
+                             nommable**. Ouvert, et il doit l'être : ces
+                             lectures s'exécutent *pendant* la connexion, avant
+                             qu'une session existe, et dans `/dev/session`, qui
+                             par construction n'en a aucune. Une garde ici
+                             fermerait la porte à qui vient l'ouvrir.
 
-     `asSuperAdmin(grant)`   ce qui s'**écrit** au-dessus des domaines. Fermé :
-                             on ne l'obtient qu'en nommant son autorité.
+     `asSuperAdmin(grant)`   ce qui se lit et s'écrit **au-dessus des domaines**,
+                             une fois l'autorité nommée. Fermé : on ne l'obtient
+                             qu'en la nommant.
 
-   **C'est le geste de `forDomain`, appliqué un cran plus haut.** On n'écrit pas
-   dans une table métier sans avoir nommé un domaine ; on n'écrit pas au-dessus
-   des domaines sans avoir nommé une autorité. La preuve se passe en argument
-   plutôt que de se vérifier par un sceau ESLint, et la raison est écrite dans
-   `ETAT.md` à propos d'`uiLayerSeal` : *une garde qui désigne une liste plutôt
-   qu'une propriété vieillit à chaque ajout*. Un sceau nommant `createDomain` et
-   `upsertSuperAdmin` laisserait passer le troisième écrivain venu ; le typage,
-   lui, le refuse sans qu'on ait à y penser.
+   **Le critère n'est pas lire contre écrire, et T9.4 est le ticket qui l'a
+   montré.** T9.3 avait écrit « ce qui se lit » d'un côté, « ce qui s'écrit » de
+   l'autre — les deux formulations coïncidaient tant qu'il n'y avait que deux
+   écritures et six lectures de connexion. Elles se séparent dès qu'une lecture
+   ne sert plus la connexion : `listSuperAdmins`, qui **dit qui détient le
+   droit** et n'a qu'un script pour appelant, et les deux lectures d'écran que
+   T9.4 ajoute. La raison que T9.3 donnait de l'ouverture — *« ces lectures
+   s'exécutent pendant la connexion »* — est donc le critère lui-même, et c'est
+   elle qui est écrite ci-dessus. Un commentaire faux vaut une ligne de code
+   fausse (leçon de T7.5).
+
+   **C'est le geste de `forDomain`, appliqué un cran plus haut.** On ne touche
+   pas une table métier sans avoir nommé un domaine ; on ne touche pas ce qui
+   vit au-dessus des domaines sans avoir nommé une autorité. La preuve se passe
+   en argument plutôt que de se vérifier par un sceau ESLint, et la raison est
+   écrite dans `ETAT.md` à propos d'`uiLayerSeal` : *une garde qui désigne une
+   liste plutôt qu'une propriété vieillit à chaque ajout*. Un sceau nommant
+   `createDomain` et `upsertSuperAdmin` laisserait passer le troisième écrivain
+   venu ; le typage, lui, le refuse sans qu'on ait à y penser.
+
+   **Ce que la frontière garantit n'a pas bougé** : aucune donnée métier n'est
+   joignable par ce chemin. `listDomainsForAdmin` ne rend que de quoi *nommer*
+   un domaine et dire s'il est joignable — jamais de quoi le traverser.
    ========================================================================== */
 
 /**
@@ -1061,21 +1079,6 @@ export const superAdmin = {
   },
 
   /**
-   * Les super administrateurs en exercice — **la liste que le script relit**.
-   *
-   * Les archivés n'y figurent pas, pour la raison de `findSuperAdminByEmail` :
-   * archiver *est* le geste qui retire le droit, et une liste qui les montrerait
-   * demanderait à son lecteur de refaire le tri.
-   */
-  async listSuperAdmins(): Promise<InferSelectModel<typeof superAdmins>[]> {
-    return db
-      .select()
-      .from(superAdmins)
-      .where(isNull(superAdmins.archivedAt))
-      .orderBy(superAdmins.email);
-  },
-
-  /**
    * Les règles d'entrée 3 et 5 — l'entreprise du jeton, confrontée aux clientes.
    *
    * Rend le rattachement, donc le `domain_id` : c'est cette ligne, et elle
@@ -1124,6 +1127,32 @@ export const superAdmin = {
  * d'arrêt (interdits communs de C9). L'autorité est une **preuve**, pas une
  * provenance.
  */
+/**
+ * Une entreprise cliente, telle que l'écran au-dessus des domaines la lit (T9.4).
+ *
+ * **Deux booléens, et pas deux décomptes.** Ce que l'écran doit dire est *cette
+ * entreprise peut-elle ouvrir une session ?* — une identité vérifiée la
+ * désigne (règles d'entrée 3 et 5), un compte la reçoit (règle 6). Combien elle
+ * en porte ne qualifie rien et ne commande aucun geste ; rendre le nombre
+ * serait l'indice calculé que D39 refuse. La couche ne rend donc pas de quoi le
+ * former.
+ *
+ * **Aucune donnée métier n'entre ici** : ni produit, ni accompagnement, ni
+ * personne — seulement l'existence d'une ligne. C'est la frontière que le
+ * bandeau ci-dessus promet, et elle se lit dans ce type.
+ */
+export type AdminDomainRow = {
+  id: string;
+  name: string;
+  competenceCenterName: string;
+  status: (typeof domainStatus.enumValues)[number];
+  archivedAt: Date | null;
+  /** Au moins une ligne `domain_identities` : sans elle, aucun jeton ne la désigne. */
+  hasIdentity: boolean;
+  /** Au moins une personne vivante à `has_access` : sans elle, personne n'entre. */
+  hasAccount: boolean;
+};
+
 export function asSuperAdmin(grant: SuperAdminGrant) {
   /**
    * La garde, appelée avant chaque écriture et par elles seules.
@@ -1145,6 +1174,107 @@ export function asSuperAdmin(grant: SuperAdminGrant) {
   }
 
   return {
+    /**
+     * Les super administrateurs en exercice — **la liste que le script relit**.
+     *
+     * **Elle a changé de côté en T9.4**, et le bandeau ci-dessus dit pourquoi :
+     * elle ne tourne pas pendant la connexion, et elle dit *qui détient le
+     * droit*. La laisser parmi les lectures ouvertes tenait à l'inertie du
+     * découpage de T9.3, pas à sa règle. Son seul appelant, `scripts/super-admin`,
+     * tient déjà un grant : le déplacement lui coûte un mot.
+     *
+     * Les archivés n'y figurent pas, pour la raison de `findSuperAdminByEmail` :
+     * archiver *est* le geste qui retire le droit, et une liste qui les
+     * montrerait demanderait à son lecteur de refaire le tri.
+     */
+    async listSuperAdmins(): Promise<InferSelectModel<typeof superAdmins>[]> {
+      await assertAuthority();
+
+      return db
+        .select()
+        .from(superAdmins)
+        .where(isNull(superAdmins.archivedAt))
+        .orderBy(superAdmins.email);
+    },
+
+    /**
+     * Les entreprises clientes, pour l'écran qui les administre (T9.4).
+     *
+     * **Les archivées y sont**, seule liste du produit avec celle de
+     * l'administration à le faire, et pour la même raison : *un écran de gestion
+     * doit montrer ce qu'il a rangé — sans cela l'archivage serait une
+     * disparition, et le rétablissement n'aurait aucun point d'entrée.*
+     *
+     * **Deux `exists`, jamais deux `count`.** La question posée est
+     * d'existence ; un décompte rendrait un nombre dont l'écran n'a que faire et
+     * que quelqu'un finirait par afficher. Ce que la couche ne rend pas ne peut
+     * pas devenir un indice.
+     *
+     * Le rangement est celui de `listDomains` — par nom. Aucun tri par
+     * fraîcheur ni par volume : `docs/06` §10 proscrit le classement, et ranger
+     * des entreprises par activité serait exactement cela.
+     */
+    async listDomainsForAdmin(): Promise<AdminDomainRow[]> {
+      await assertAuthority();
+
+      return db
+        .select({
+          id: domains.id,
+          name: domains.name,
+          competenceCenterName: domains.competenceCenterName,
+          status: domains.status,
+          archivedAt: domains.archivedAt,
+          /* **Les deux sous-requêtes portent un alias, et ce n'est pas un
+             ornement.** Dans un gabarit `sql`, Drizzle rend une colonne **sans
+             son qualificatif** : `${domainIdentities.domainId} = ${domains.id}`
+             produit `where "domain_id" = "id"`, deux noms que PostgreSQL
+             résout tous deux **dans la sous-requête**. La condition compare
+             alors `domain_identities.domain_id` à `domain_identities.id`, ne
+             lève rien, et rend `false` — un résultat plausible, qu'aucun test
+             de forme n'aurait attrapé. Mesuré par sonde le 06/09/2026. */
+          hasIdentity: sql<boolean>`exists (
+            select 1 from ${domainIdentities} as identity
+            where identity.domain_id = ${domains}.id
+          )`,
+          /* `is_active` n'entre pas dans la condition, et c'est délibéré : elle
+             suit `loadSession`, qui refuse une personne archivée **et** une
+             personne inactive. Une désactivation d'annuaire se défait sans
+             qu'un super administrateur ait à revenir ; un domaine dont tous les
+             comptes sont archivés, non. La condition dit donc ce que la règle 6
+             dit du **droit**, pas ce qu'un annuaire dit d'un jour donné. */
+          hasAccount: sql<boolean>`exists (
+            select 1 from ${persons} as account
+            where account.domain_id = ${domains}.id
+              and account.has_access
+              and account.archived_at is null
+          )`,
+        })
+        .from(domains)
+        .orderBy(domains.name);
+    },
+
+    /**
+     * Les identités vérifiées d'un domaine — la lecture du panneau de T9.4.
+     *
+     * **Elle prend un `domainId` sans passer par `forDomain`**, et ce n'est pas
+     * une entorse : l'appelant n'a pas de session, un super administrateur
+     * n'ayant ni domaine ni ligne `persons` (arbitrage (4) de `tickets-C9.md`).
+     * Ce qui tient la frontière ici est l'autorité relue juste au-dessus, et le
+     * fait que la table ne porte rien de métier — un fournisseur et une valeur
+     * publiée par lui.
+     */
+    async listDomainIdentities(
+      domainId: string,
+    ): Promise<InferSelectModel<typeof domainIdentities>[]> {
+      await assertAuthority();
+
+      return db
+        .select()
+        .from(domainIdentities)
+        .where(eq(domainIdentities.domainId, domainId))
+        .orderBy(domainIdentities.provider, domainIdentities.value);
+    },
+
     async createDomain(values: {
       name: string;
       competenceCenterName: string;
@@ -1157,6 +1287,93 @@ export function asSuperAdmin(grant: SuperAdminGrant) {
         throw new IntegrityError("La création du domaine n'a rien renvoyé.");
       }
       return row;
+    },
+
+    /**
+     * Suspendre une entreprise, ou la rétablir (T9.4).
+     *
+     * **Le statut est reçu, jamais deviné** — l'énuméré est le vocabulaire
+     * entier, et une bascule `suspendre()` / `rétablir()` aurait figé « deux
+     * états » dans deux fonctions le jour où il y en aurait trois. L'appelant
+     * rétrécit la valeur avant d'arriver ici : elle vient d'un formulaire, donc
+     * elle est réécrivable, donc elle ne prouve rien.
+     *
+     * **Ce geste ferme la session de tous les membres du domaine**, et
+     * immédiatement : `loadSession` refuse un domaine dont le `status` n'est pas
+     * `active`, et il relit le domaine à chaque requête. C'est pourquoi l'écran
+     * le fait confirmer.
+     *
+     * **Une ligne archivée ne bascule pas.** Le statut d'un domaine rangé ne
+     * veut rien dire, et le laisser changer ferait exister « suspendu et
+     * archivé », un état dont aucun écran ne saurait quoi dire. Rend `undefined`
+     * dans ce cas, comme sur un identifiant qui ne désigne rien.
+     */
+    async setDomainStatus(
+      id: string,
+      status: (typeof domainStatus.enumValues)[number],
+    ): Promise<InferSelectModel<typeof domains> | undefined> {
+      await assertAuthority();
+
+      const rows = await db
+        .update(domains)
+        .set({ status, updatedAt: new Date() })
+        .where(and(eq(domains.id, id), isNull(domains.archivedAt)))
+        .returning();
+      return rows[0];
+    },
+
+    /**
+     * Ranger une entreprise. **Jamais l'effacer** — règle 4, qui vaut pour un
+     * domaine comme pour le reste, et `domains` n'entre pas dans
+     * `DeletableTable` : ajouter une table à cette liste est un arbitrage
+     * humain, jamais une décision de ticket.
+     *
+     * **La condition `is null` n'est pas un confort** : sans elle, un second
+     * archivage récrirait la date et ferait mentir la seule trace du geste —
+     * `domains` n'a pas de journal, `event_target_type` n'ayant pas de valeur
+     * pour elle et en ajouter une étant une migration. Rend `undefined` quand la
+     * ligne était déjà rangée, ce qui dit à l'appelant qu'il n'a rien à
+     * annoncer.
+     */
+    async archiveDomain(
+      id: string,
+    ): Promise<InferSelectModel<typeof domains> | undefined> {
+      await assertAuthority();
+
+      const rows = await db
+        .update(domains)
+        .set({ archivedAt: new Date(), updatedAt: new Date() })
+        .where(and(eq(domains.id, id), isNull(domains.archivedAt)))
+        .returning();
+      return rows[0];
+    },
+
+    /**
+     * Le geste inverse — **et il fait partie de l'archivage, pas d'un cinquième
+     * geste**.
+     *
+     * *« Un écran de gestion doit montrer ce qu'il a rangé : sans cela
+     * l'archivage serait une disparition, et le rétablissement n'aurait aucun
+     * point d'entrée »* (`app/(app)/administration/page.tsx`). Un domaine
+     * archivé par erreur et non rétablissable serait la seule donnée du produit
+     * qu'un geste rend définitivement inatteignable — l'inverse de ce que la
+     * règle 4 protège.
+     *
+     * **Le statut ne bouge pas** : une entreprise suspendue puis archivée
+     * revient suspendue. Rétablir défait un rangement, il ne rouvre pas une
+     * porte que quelqu'un avait fermée pour une autre raison.
+     */
+    async restoreDomain(
+      id: string,
+    ): Promise<InferSelectModel<typeof domains> | undefined> {
+      await assertAuthority();
+
+      const rows = await db
+        .update(domains)
+        .set({ archivedAt: null, updatedAt: new Date() })
+        .where(and(eq(domains.id, id), isNotNull(domains.archivedAt)))
+        .returning();
+      return rows[0];
     },
 
     /**

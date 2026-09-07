@@ -13,10 +13,16 @@
  * Réunir l'entrée et le refus tient donc en une phrase — on n'apprend rien de
  * plus en étant refusé qu'en arrivant.
  *
- * **Trois états, dont un qui n'existe que le temps d'un chantier.** Un super
- * administrateur n'a ni domaine ni ligne `persons` (arbitrage 4) : sa
- * connexion aboutit sans produire de `Session`, et l'écran qui le concerne est
- * T9.4. Sans cet état, il boucherait entre `/` et cette adresse.
+ * **Deux états, et le troisième a duré le temps d'un chantier.** Un super
+ * administrateur n'a ni domaine ni ligne `persons` (arbitrage 4) : sa connexion
+ * aboutit sans produire de `Session`, et il bouclerait entre `/` et cette
+ * adresse. T9.2 l'a retenu par un état vide qui disait *« l'administration des
+ * domaines n'est pas encore ouverte »* ; **T9.4 l'a ouverte**, et cet état a
+ * cédé la place à la redirection qu'il annonçait.
+ *
+ * **Aucune boucle entre les deux écrans**, et la raison tient en une phrase :
+ * celui-ci ne renvoie vers `/domaines` que **muni** d'une autorité, quand
+ * `/domaines` ne renvoie ici que faute d'en avoir une.
  *
  * **Il vit hors du groupe `(app)`** : ni coquille, ni navigation. La barre
  * latérale suppose un domaine, et il n'y en a pas ici.
@@ -34,6 +40,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { buttonClass } from "@/components/ui/button";
 import { AUTH_ROUTES, getSession, readPrincipal } from "@/lib/auth/provider";
 import { PROVIDERS, type ProviderId } from "@/lib/auth/oidc";
+import { ROUTES } from "@/lib/navigation";
 
 /* La session se lit à chaque requête : rien à mettre en cache. */
 export const dynamic = "force-dynamic";
@@ -50,7 +57,12 @@ export default async function AccessPage() {
      indistinct, comme si elle n'avait jamais eu de cookie. */
   if (await getSession()) redirect("/");
 
+  /* Un super administrateur n'a pas de `Session` — `getSession` rend `null`
+     pour lui —, et ce n'est donc pas la garde ci-dessus qui l'écarte d'ici :
+     c'est celle-ci. Son écran est `/domaines`, où `requireSuperAdmin()` relira
+     sa ligne. */
   const principal = await readPrincipal();
+  if (principal?.kind === "super_admin") redirect(ROUTES.domains);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-160 flex-col justify-center gap-8 px-10 py-18">
@@ -68,40 +80,25 @@ export default async function AccessPage() {
         </p>
       </header>
 
-      {principal?.kind === "super_admin" ? (
-        <EmptyState
-          title="Vous êtes connecté comme super administrateur"
-          description="L'administration des domaines n'est pas encore ouverte. Un super administrateur vit au-dessus des entreprises clientes : il n'entre dans aucune d'elles."
-          action={
-            <Link
-              href={AUTH_ROUTES.signOut}
-              className={buttonClass({ variant: "secondary" })}
-            >
-              Se déconnecter
-            </Link>
-          }
-        />
-      ) : (
-        <EmptyState
-          title="Aucun accès"
-          description="Cet espace est réservé aux personnes que leur entreprise y a inscrites. Se connecter avec un compte professionnel :"
-          action={
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              {ORDER.map((provider) => (
-                <Link
-                  key={provider}
-                  href={AUTH_ROUTES.signIn(provider)}
-                  className={buttonClass({
-                    variant: provider === "google" ? "primary" : "secondary",
-                  })}
-                >
-                  {PROVIDERS[provider].label}
-                </Link>
-              ))}
-            </div>
-          }
-        />
-      )}
+      <EmptyState
+        title="Aucun accès"
+        description="Cet espace est réservé aux personnes que leur entreprise y a inscrites. Se connecter avec un compte professionnel :"
+        action={
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {ORDER.map((provider) => (
+              <Link
+                key={provider}
+                href={AUTH_ROUTES.signIn(provider)}
+                className={buttonClass({
+                  variant: provider === "google" ? "primary" : "secondary",
+                })}
+              >
+                {PROVIDERS[provider].label}
+              </Link>
+            ))}
+          </div>
+        }
+      />
     </main>
   );
 }

@@ -7701,3 +7701,155 @@ détruire ce qu'elle mesure.
 
 **Vert** : 1 689 → **1 697 tests sur 58 fichiers** (+8, +1 fichier), `lint` (`--max-warnings=0`) et
 `tsc` au vert. Aucune migration, aucune dépendance, **aucun écran**.
+
+---
+
+## T9.4 — L'écran au-dessus des domaines : le premier appelant, et un critère qui change de nom — 07/09/2026
+
+**Le ticket qui rend utile tout ce que C9 avait posé.** `requireSuperAdmin()` n'avait aucun
+appelant, et les deux écritures d'`asSuperAdmin` n'en avaient que des scripts. Le schéma était là
+(T9.1), le point d'entrée aussi (T9.2), le droit également (T9.3) — il manquait l'écran, et sans lui
+**aucune seconde entreprise ne pouvait exister** : depuis que le domaine se lit dans le jeton, une
+entreprise cliente naît d'une ligne `domains` *et* d'une ligne `domain_identities`, et rien dans
+Vision ne les écrivait.
+
+Sa condition d'ouverture était remplie avant d'être vérifiée : `docs/05` §4 porte
+« ~~Interface d'administration multi-domaine~~ — **Levé le 06/09/2026 (C9)** », §3 est amendé de la
+même main, et le premier super administrateur réel avait été posé.
+
+### Les cinq décisions de forme
+
+Elles ont été déléguées, et chacune s'appuie sur ce que le dépôt avait déjà écrit contre lui-même.
+
+| Décision | Ce qui la fonde |
+|---|---|
+| `/domaines`, **hors du groupe `(app)`**, sans layout | `app/auth/acces/page.tsx` l'écrit déjà : *« ni coquille, ni navigation — la barre latérale suppose un domaine »*, et `getSession()` rend `null` pour un super administrateur |
+| Le refus **redirige**, il ne rend pas 404 | `requireSuperAdmin()` redirigeait déjà, et trois tests le mesuraient. `/administration` rend 404 parce qu'on l'atteint de l'intérieur d'un domaine ; celui-ci s'atteint sans session |
+| Le **premier responsable** est un geste séparé, offert tant qu'aucun compte n'existe | Le super administrateur amorce ; T9.6 prend le relais de l'intérieur. La condition écrit l'interdit *« il ne les traverse pas »* dans le code, pas dans la discipline |
+| Les identités **s'ajoutent et se retirent**, jamais la dernière | T9.1 avait retiré `archived_at` de la table **exprès**, pour que `unlink` compile. Les trois cas de l'arbitrage (3) — filiale, second nom, migration — seraient restés sans issue |
+| `listSuperAdmins` passe derrière l'autorité, **`withoutAnySession` reste** | La refermer demandait d'ouvrir `eslint.config.mjs`, ce qui réveille la dette d'`uiLayerSeal`. Un second chantier dans un ticket d'écran (règle 3) |
+
+### Le geste que le ticket n'avait pas prévu : renommer le critère
+
+`superAdmin` disait *« ce qui se **lit** »*, `asSuperAdmin` *« ce qui s'**écrit** »*. Mais la raison
+que T9.3 donnait de l'ouverture était autre : *« ces lectures s'exécutent pendant la connexion,
+quand aucune session n'existe encore »*. **Les deux formulations coïncidaient tant qu'il n'y avait
+que deux écritures.** T9.4 apporte deux lectures qui ne servent pas la connexion, et `ETAT.md` lui
+assignait déjà `listSuperAdmins`, qui n'y servait pas davantage.
+
+Le bandeau est donc récrit sur le critère réel — **ce qui tourne quand aucune autorité n'est
+nommable** : la connexion, et `/dev/session`, qui par construction n'en a pas. `superAdmin` passe de
+six clés à **cinq**, chacune nommée par une règle d'entrée ; `asSuperAdmin` de deux à **huit**.
+Les deux sceaux nominatifs de `scoped.test.ts` ont forcé chaque mouvement à être une décision.
+
+### Ce qui a été écrit
+
+**Onze fichiers neufs** — l'écran (`page.tsx`, `actions.ts`, `drawers.tsx`), le résolveur
+`lib/drawers/domains.tsx`, quatre panneaux dans `components/admin/`, deux modules de formulaire et
+leurs tests. **Neuf modifiés**, dont `lib/db/scoped.ts` (le bandeau, une lecture déplacée, deux
+lectures et trois écritures neuves), `lib/navigation.ts`, `lib/format.ts`, `lib/drawers/types.ts`,
+et `app/auth/acces/page.tsx`, dont l'état vide provisoire de T9.2 a cédé la place à la redirection
+qu'il annonçait. **Aucune migration, aucune dépendance, aucun composant de socle touché.**
+
+**Le compilateur a de nouveau désigné les appelants** du déplacement de `listSuperAdmins` : trois,
+dans deux fichiers, et pas un de plus à chercher.
+
+### Trois pièges, dont un silencieux
+
+**Drizzle rend une colonne sans son qualificatif dans un gabarit `sql`.** La sous-requête corrélée
+qui dit si une entreprise porte une identité produisait `where "domain_id" = "id"` — deux noms
+résolus *dans* la sous-requête, donc une comparaison de `domain_identities.domain_id` à
+`domain_identities.id`. **Aucune erreur, un `false` parfaitement plausible.** Trouvé par sonde, pas
+par le typage ; refermé par un alias et une qualification à la main. Le gabarit voisin,
+`lastActivityExpression`, a été **vérifié plutôt que supposé** : ses tests assertent des dates
+exactes et passent.
+
+**`Panel` a imposé le dédoublement du panneau des identités.** Il enveloppe ses enfants dans un
+`<form>`, et un retrait par ligne y aurait été un formulaire imbriqué. Le partage retenu est celui
+que la page produit tient déjà — une liste serveur, une saisie cliente : six panneaux au lieu de
+cinq, les mêmes gestes, aucun composant du socle réécrit.
+
+**La création écrit deux tables sans transaction.** La parade est celle de T3.6 : tout se confronte
+**avant** d'écrire. Une course reste possible ; c'est pourquoi une entreprise sans identité **se lit
+dans la liste et se répare par un geste**, plutôt que de rester invisible.
+
+### Les mesures — quatre disciplines, et aucune affirmée
+
+**Le HTML servi**, `<script>` retirés, sous un cookie **réellement scellé** par le sceau du produit :
+
+| Ce qui frappe | Relevé |
+|---|---|
+| `/domaines` sans cookie | **307 → `/auth/acces`** |
+| `/auth/acces` sous super administrateur | **307 → `/domaines`** — l'état vide de T9.2 a cédé |
+| `/domaines` sous autorité | la liste, ses trois entreprises, leur état |
+| une entreprise désignée sans compte | « Aucun compte — personne ne peut se connecter » |
+| une entreprise sans identité | « Aucune identité — aucun jeton ne la désigne » |
+| les six adresses de panneau | les six s'ouvrent |
+| `?domaine=forge` | n'ouvre rien |
+| deux clés de panneau ensemble | n'ouvrent rien |
+| `?responsable=` sur une entreprise **qui a un compte** | n'ouvre rien |
+| `?identites=` sur un identifiant qui ne désigne rien | n'ouvre rien |
+| `?identites=n-importe-quoi` | **200**, et non 500 : la forme se vérifie avant la base |
+
+**Le contraste, mesuré** sur les huit couples de l'écran — et le fond de page est bien
+`surface-neutral-lightest` dans les deux groupes de routes, vérifié plutôt que supposé, ce qui rend
+les jetons de `/administration` réemployables à l'identique. De 4,73:1 (surtitre) à 17,87:1 (nom de
+l'entreprise) ; **aucun couple sous 4,5:1, et aucun jeton neuf inventé.** L'état se lit en texte, pas
+en pastille — le rendu de la page Administration, dans la même position et sur le même fond.
+
+**Le droit par l'action**, avec étape témoin et décompte en base — et c'est le **premier ticket du
+chantier qui pouvait faire la mesure littéralement** : T9.3 n'avait aucun point d'entrée à frapper,
+celui-ci en crée huit.
+
+**La mise en défaut — sept gardes, sept passes, une par garde.** Chacune neutralisée **seule**, la
+suite entière relancée à chaque fois, l'arbre restauré par copie et **relu pour être comparé à sa
+sauvegarde**.
+
+| Garde neutralisée | Tombés | Isolement |
+|---|---|---|
+| **A** · le refus de `requireSuperAdmin` | **9** | tous des tests de droit, dans les deux seuls fichiers qui l'éprouvent — les cinq de T9.4, les trois de T9.3, plus le geste d'état |
+| **B** · `assertAuthority` de la couche | **5** | `scoped.test.ts` seul ; `app/domaines/actions.test.ts` reste vert — les deux barrières sont indépendantes |
+| **C** · la relecture de la ligne (`getSuperAdmin`) | **2** | les deux « super administrateur archivé », un par fichier — la propriété que *le cookie vit huit heures, la ligne se relit à chaque passage* |
+| **D** · le refus de retirer la dernière identité | **1** | son test seul |
+| **E** · le refus d'un second responsable | **1** | son test seul |
+| **F** · le couple déjà pris, à la création | **1** | son test seul |
+| **G** · le couple déjà pris, à l'ajout | **1** | son test seul |
+
+**Aucune neutralisation n'a fait tomber le test d'une autre garde.** La ligne de base est
+1 750 verts sur 1 750, et chaque passe s'y compare : 1 741, 1 745, 1 748, 1 749, 1 749, 1 749 — les
+décomptes se referment à l'unité près.
+
+### Deux incidents de méthode, et le second était le premier, en pire
+
+**La sortie de la première sonde passait par `tail -60`**, qui ne rend rien avant la fin du
+processus **et rogne le début**. Le résultat de la garde A a été perdu, et les quatre dernières
+passes ont rendu un décompte illisible. Une mesure qu'on ne peut pas relire n'est pas une mesure :
+la reprise écrit chaque passe dans un fichier, et garde la sortie brute de vitest à côté.
+
+**La reprise a été tuée faute de mémoire pendant la passe E — donc hors de son `finally`.** La
+neutralisation `staffed > 99` est **restée dans l'arbre**, exactement le défaut que T9.3 avait
+consigné et corrigé par un `finally`. La leçon de T9.3 était juste et insuffisante : *un `finally`
+ne protège que d'une exception, jamais d'un processus tué*. Retrouvée par relecture des ancres avant
+toute autre chose, remise en état, `lint` et `tsc` revérifiés. La reprise suivante écrit un **jeton
+de restauration sur le disque avant de patcher** — le chemin de la cible et celui de sa sauvegarde —
+si bien qu'une sonde tuée n'importe où laisse de quoi remettre l'arbre en état **sans deviner ce
+qu'elle avait touché**.
+
+**Et une cascade qui n'en était pas une.** La première sonde avait rendu 918 verts sur 1 750 pour la
+garde C, une trentaine de fichiers en échec : de quoi conclure que la garde n'isolait rien. La
+reprise, dans les mêmes conditions mais sans la pression mémoire, rend **2 tombés sur 1 750**. La
+cascade était un artefact de l'environnement, pas un résultat — et c'est précisément pourquoi une
+mesure aberrante se **rejoue** avant d'être crue.
+
+### Un test faux par construction, trouvé au passage
+
+La passe E a fait tomber un second test, étranger à la garde :
+`app/(app)/produits/[id]/actions.test.ts:1490` assère qu'un résumé de journal **ne contient pas
+`"62"`**, et le suffixe aléatoire de cette passe était `44j62a0w`. Le test est donc **faux une fois
+sur cinquante environ**, et il l'était avant ce ticket. Ce n'est pas l'intermittent que `ETAT.md`
+attribue au réseau — celui-là est un `NeonDbError: fetch failed` — c'est un défaut d'écriture. Laissé
+intact : le fichier est hors du périmètre de la fiche (règle 3), et le point part dans `ETAT.md`
+avec sa destination.
+
+**Vert** : 1 697 → **1 750 tests sur 61 fichiers** (+53, +3 fichiers), `lint` (`--max-warnings=0`) et
+`tsc` au vert. Aucune migration, aucune dépendance, aucun composant de socle réécrit.

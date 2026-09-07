@@ -730,6 +730,54 @@ export function formatProjectStatusNature(nature: ProjectStatusNature): string {
 }
 
 /**
+ * Le nom d'un fournisseur d'identité — T9.4.
+ *
+ * **Il vit ici et non dans `lib/auth/oidc.ts`**, qui porte déjà un libellé :
+ * ce module-là importe `oauth4webapi` et lit des variables d'environnement, et
+ * un panneau client qui le toucherait entraînerait tout cela dans le bundle. Ce
+ * qu'un `<select>` a besoin de savoir est un mot, pas une découverte OIDC.
+ */
+const IDENTITY_PROVIDERS: Record<"google" | "microsoft", string> = {
+  google: "Google Workspace",
+  microsoft: "Microsoft Entra",
+};
+
+export function formatIdentityProvider(
+  provider: "google" | "microsoft",
+): string {
+  return IDENTITY_PROVIDERS[provider];
+}
+
+/**
+ * L'état d'une entreprise cliente, tel que l'écran au-dessus des domaines le
+ * dit — T9.4.
+ *
+ * **Trois états lus dans deux colonnes**, et l'ordre de lecture est la règle :
+ * `archived_at` l'emporte sur `status`. Une entreprise rangée puis suspendue
+ * n'existe pas dans le vocabulaire de l'écran — elle est rangée, et son statut
+ * attend qu'on la rétablisse. C'est ce que `setDomainStatus` refuse en base
+ * (`lib/db/scoped.ts`) ; cette fonction dit la même chose, et les deux ne
+ * peuvent pas diverger puisqu'elles disent une **absence de cas**, pas une
+ * priorité d'affichage.
+ *
+ * **La date du rangement est dite**, comme la ligne archivée d'un référentiel
+ * la dit : un état qui ne porte pas sa date se lit comme un état de toujours.
+ *
+ * Ces trois mots sont le nom de la logique, pas un libellé de référentiel : un
+ * domaine ne les renomme pas, il ne se lit pas lui-même.
+ */
+export function formatDomainStatus(domain: {
+  status: "active" | "suspended";
+  archivedAt: Date | null;
+}): string {
+  if (domain.archivedAt) {
+    return `Archivée en ${formatMonth(domain.archivedAt)}`;
+  }
+
+  return domain.status === "suspended" ? "Suspendue" : "Active";
+}
+
+/**
  * Les six familles d'activité de `docs/03` §2, dans l'ordre de l'énuméré.
  *
  * La famille est un **regroupement d'affichage** et rien d'autre : elle donne au

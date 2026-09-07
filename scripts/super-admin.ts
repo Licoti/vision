@@ -27,7 +27,7 @@
  * serait inventer (même raisonnement que `scripts/seed.ts` sur `persons`).
  */
 
-import { asSuperAdmin, superAdmin, withoutAnySession } from "../lib/db/scoped";
+import { asSuperAdmin, withoutAnySession } from "../lib/db/scoped";
 
 /* L'amorçage écrit hors de toute session — l'échappée nommée de T9.3. */
 const outsideAnySession = asSuperAdmin(
@@ -64,7 +64,11 @@ async function main(): Promise<void> {
       : `Super administrateur mis à jour : ${fullName} <${email}> — ${row.id}`,
   );
 
-  const all = await superAdmin.listSuperAdmins();
+  /* **La liste se lit depuis le grant depuis T9.4**, et non plus depuis
+     `superAdmin` : elle dit qui détient le droit, et elle ne tourne pas pendant
+     une connexion. Le script tient déjà l'autorité qui lui a servi à écrire — le
+     déplacement lui coûte un mot, et c'est la mesure du bon endroit. */
+  const all = await outsideAnySession.listSuperAdmins();
   console.log(
     `\n${all.length} super administrateur(s) en exercice : ` +
       all.map((admin) => admin.email).join(", "),

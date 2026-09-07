@@ -2,15 +2,16 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 06/09/2026, **T9.3 terminé** — le droit du super administrateur. La
-preuve se passe **en argument**, sur le patron de `forDomain` : `superAdmin` garde six lectures,
-`asSuperAdmin(grant)` tient les deux écritures, et **le compilateur a désigné les trente-six sites
-d'appel** qu'un sceau ESLint aurait laissés passer. **Trois gardes mises en défaut séparément.**
-**Chantier en cours :** **C9 — SSO et administration multi-domaine** (`tickets-C9.md`).
-**C7 garde ses quatre tickets** T7.7 → T7.10 (`tickets-C7.md`) et passe après C9 — second écart à
-`docs/05` §6. **Vert de référence : 1 697 tests sur 58 fichiers, `lint` et `tsc` au vert** (1 689
-avant T9.3) — chaque ticket y compare le sien, jamais à un souvenir. **Ticket suivant : T9.4 —
-l'écran au-dessus des domaines**, premier appelant de `requireSuperAdmin()`.
+**Dernière mise à jour :** 07/09/2026, **T9.4 terminé** — l'écran au-dessus des domaines, premier
+appelant de `requireSuperAdmin()`. **Le critère de `superAdmin` a changé de nom** : non plus *lire
+contre écrire* mais *avec ou sans autorité nommable* — cinq clés ouvertes, huit fermées. Six
+panneaux, aucune migration. **Sept gardes mises en défaut séparément**, et une sonde tuée hors de
+son `finally` a laissé une neutralisation dans l'arbre — retrouvée, consignée. **Chantier en
+cours :** **C9** (`tickets-C9.md`) ; **C7 garde ses quatre tickets** T7.7 → T7.10 et passe après —
+second écart à `docs/05` §6. **Vert de référence : 1 750 tests sur 61 fichiers, `lint` et `tsc` au
+vert** (1 697 avant T9.4) — chaque ticket y compare le sien, jamais à un souvenir. **Ticket
+suivant : T9.5 — l'amorçage d'un domaine neuf**, qui fait naître utilisable ce que T9.4 fait naître
+vide.
 
 ---
 
@@ -29,7 +30,7 @@ l'écran au-dessus des domaines**, premier appelant de `requireSuperAdmin()`.
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
 | C7 — Finitions | T7.1 → T7.10 | **en pause** — T7.1 → T7.6 livrés, T7.7 → T7.10 après C9 |
 | C8 — Dette | T8.1 → T8.5 | **terminé** |
-| C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **en cours** — T9.1 → T9.3 livrés ; plus aucun ticket bloqué |
+| C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **en cours** — T9.1 → T9.4 livrés ; plus aucun ticket bloqué |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
 
 ---
@@ -38,37 +39,33 @@ l'écran au-dessus des domaines**, premier appelant de `requireSuperAdmin()`.
 
 *(une ligne par **chantier clos**, une par ticket du chantier en cours. Récit : `HISTORIQUE-TICKETS.md` ; pièges et dettes : `JOURNAL-TECHNIQUE.md`.)*
 
-- **C1 — Socle technique — T1.1 → T1.6, 11-12/08.** Schéma, couche scopée, contexte de session,
-  référentiels, coquille. Rien de visible, tout le reste en dépend.
-- **C2 — Produits et projets — T2.1 → T2.6, 12-13/08.** Quatre écrans de lecture, deux formulaires.
-- **C3 — Activités et roadmap — T3.1 → T3.6, 13/08.** Clôt le POC minimal démontrable.
-- **C4 et C4bis — T4.1 → T4.4 puis T4bis.1 → T4bis.6, 13-15/08.** La boucle de `docs/05` §2 est
-  fermée ; un seul `canWrite` fait tomber sept gestes.
+- **C1 à C3 — T1.1 → T3.6, 11-13/08.** Le socle (schéma, couche scopée, contexte de session), puis
+  quatre écrans de lecture et deux formulaires, puis les activités : le POC minimal démontrable.
+- **C4 et C4bis — T4.1 → T4bis.6, 13-15/08.** La boucle de `docs/05` §2 est fermée.
 - **C5 — Indicateurs et temps long — T5.1 → T5.6, 16-17/08.** **Tout a depuis été refait hors
-  ticket** (17/08), neuf dérogations au journal technique.
-- **TD — Dette et couche de présentation — TD.1 → TD.6, 17-19/08.** **Hors chantier** : socle des
-  panneaux (**−644 lignes nettes**), bouton, garde-fous ESLint (`--max-warnings=0`).
-- **C5bis — Équipe — T5bis.1 → T5bis.7, 17-25/08.** Chantier non prévu par `docs/05` §5, intercalé
-  sans décaler C6 ni C7 : trois tables, l'entrée « Équipe », le radar, six gestes.
+  ticket** (17/08), neuf dérogations au journal.
+- **TD — Dette et présentation — TD.1 → TD.6, 17-19/08.** **Hors chantier** : socle des panneaux
+  (**−644 lignes nettes**), bouton, garde-fous ESLint (`--max-warnings=0`).
+- **C5bis — Équipe — T5bis.1 → T5bis.7, 17-25/08.** Chantier non prévu par `docs/05` §5 : trois
+  tables, l'entrée « Équipe », le radar, six gestes.
 - **C6 — Liens et journal — T6.1 → T6.7, 26-27/08.** `events` reçoit sa première ligne après six
-  chantiers au schéma : cinq verbes, six `target_type`, dix-neuf points d'appel. Puis le bloc
-  « Journal », les liens déduits **en SQL**, les déclarés, la vue d'ensemble entière.
-- **C7 — Finitions — T7.1 → T7.6 livrés, 28-30/08, puis en pause.** Le budget, les deux filtres
-  manquants, l'administration passée d'**un référentiel sur neuf à neuf sur neuf**, la coquille et
-  ses ancres, et les petits écrans — **19 formes sur 31 en défaut à 375 px** avant, aucune après.
+  chantiers au schéma : cinq verbes, six `target_type`, dix-neuf points d'appel. Puis les liens
+  déduits **en SQL**, les déclarés, la vue d'ensemble.
+- **C7 — Finitions — T7.1 → T7.6 livrés, 28-30/08, puis en pause.** Le budget, deux filtres,
+  l'administration passée d'**un référentiel sur neuf à neuf sur neuf**, la coquille, et les petits
+  écrans — **19 formes sur 31 en défaut à 375 px** avant, aucune après.
 - **C8 — Dette — T8.1 → T8.5, 04-05/09.** Le premier chantier que `docs/05` §5 n'a pas écrit, tiré
   des seuls points ouverts — et **quatre énoncés de fiche sur cinq y ont été mis en défaut**, du
   domaine de tests résiduel à la redirection redondante. 1 582 → 1 646 tests.
-- **C9 — T9.1 → T9.3, 06/09.** Le schéma de l'identité — deux tables hors du produit, une clé
-  **laissée intacte plutôt qu'élargie**. Puis le SSO : le stub tombe, le domaine cesse d'être
-  *trouvé* pour être *désigné*, **aucun écran du produit ne bouge**. Puis le droit du super
-  administrateur : **la preuve se passe en argument**, et le compilateur désigne les trente-six
-  appels. 1 646 → 1 689 → **1 697 tests sur 58 fichiers**.
-- **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, tous détaillés dans
-  `HISTORIQUE-TICKETS.md` et `JOURNAL-TECHNIQUE.md`. **Cinq portent une migration, `0010` à `0014`** :
-  disponibilité déduite, cible unique portée par le produit, période déduite des activités,
-  dispositif de mesure, repères de contexte. Le reste est de la reprise d'ergonomie, **le bouton
-  aligné sur le design system de référence** (01-02/09), et le **renommage de « Projets » en
+- **C9 — T9.1 → T9.4, 06-07/09.** Deux tables hors du produit, une clé **laissée intacte plutôt
+  qu'élargie**. Puis le SSO : le domaine cesse d'être *trouvé* pour être *désigné*, **aucun écran du
+  produit ne bouge**. Puis le droit : **la preuve se passe en argument**, et le compilateur désigne
+  les trente-six appels. Puis l'écran, **premier appelant de la garde**, qui renomme le critère de
+  `superAdmin` et trouve par sonde que **Drizzle rend une colonne sans son qualificatif** dans un
+  gabarit `sql`. 1 646 → 1 689 → 1 697 → **1 750 tests sur 61 fichiers**.
+- **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, détaillés dans
+  `HISTORIQUE-TICKETS.md`. **Cinq portent une migration, `0010` à `0014`.** Le reste est de la
+  reprise d'ergonomie, le bouton aligné sur le design system, et le **renommage de « Projets » en
   « Accompagnements »** (02/09), qui **rouvre D35** sur demande humaine explicite.
 
 ---
@@ -85,10 +82,6 @@ refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le
   la découverte aboutit, l'adresse d'autorisation est juste. Ce qui **ne l'est pas** : l'échange du
   code, et la substitution d'émetteur que son gabarit `{tenantid}` impose. **La promesse « deux
   valeurs de plus, jamais une reprise » est une hypothèse non éprouvée.** → **action humaine.**
-- **Le premier super administrateur réel reste à poser** — `npm run auth:super-admin --
-  --email=… --nom="…"`. Sans lui, personne ne créera le premier domaine en T9.4, et le seul chemin
-  parcourable au navigateur (une adresse sans `hd`, arbitrage 2) ne se parcourt pas. La ligne de
-  mesure a été retirée après usage. → **action humaine.**
 - **Les secrets Neon n'ont jamais été tournés.** Deux chaînes ont transité en clair le 12/08, hors
   dépôt mais valides. **Reportés quatre fois**, et la raison ne tient plus : **C9 touche aux secrets
   de toute façon.** → **action humaine.**
@@ -104,15 +97,20 @@ refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le
 
 ### b. Assignés à un ticket
 
-**C9 — T9.1 à T9.3 sont faits ; les trois autres gardent leur fiche entière** (`tickets-C9.md`).
-**T9.4** l'écran au-dessus des domaines, **premier appelant de `requireSuperAdmin()`** · **T9.5**
-l'amorçage d'un domaine neuf · **T9.6** les comptes d'un domaine, dont **`email`, sans lequel aucune
-personne saisie dans Vision ne peut se connecter** — le jeu de démonstration lui-même a
-`email = null`, donc **aucun de ses comptes n'est joignable par le SSO** (mesuré en T9.2).
-**La garde de T9.3 a deux limites nommées** : `withoutAnySession()` est importable depuis `app/`,
-rien ne l'en empêche mécaniquement — seul son nom le dit ; et **`listSuperAdmins` reste ouverte**
-alors qu'elle dit qui détient le droit, la fiche ne gardant que ce qui écrit. → **T9.4**, le premier
-écran qui appelle la garde.
+**C9 — T9.1 à T9.4 sont faits ; les deux autres gardent leur fiche entière** (`tickets-C9.md`).
+**T9.5** l'amorçage d'un domaine neuf — créé par l'écran, il naît **vide** · **T9.6** les comptes
+d'un domaine, dont **`email`, sans lequel aucune personne saisie dans Vision ne peut se connecter** —
+le jeu de démonstration a `email = null`, donc **aucun de ses comptes n'est joignable par le SSO**
+(T9.2). **T9.6 réemploiera `isEmailAddress`** (`lib/forms/domain-manager.ts`), exportée par T9.4.
+**`listSuperAdmins` est refermée** — passée derrière `asSuperAdmin(grant)` par T9.4, qui a renommé le
+critère du partage. **`withoutAnySession()` reste importable depuis `app/`**, rien ne l'en empêchant
+mécaniquement : la refermer demande une clause dans `eslint.config.mjs`, ce qui réveille la dette
+d'`uiLayerSeal` — deux sujets pour un seul geste. → **le prochain ticket qui ouvre
+`eslint.config.mjs`**, avec la clause auto-portante d'`uiLayerSeal`.
+**Une identité vérifiée est rangée en minuscules à la saisie, et lue en `eq`** : `resolveDomainId`
+ne rabaisse pas la casse du `hd` reçu. Google le rend en minuscules et le `tid` d'Entra est un GUID
+minuscule — le cas n'est pas atteignable aujourd'hui, mais **la garantie tient à un usage, pas à une
+règle**. → **T9.6**, ou le premier ticket qui ouvre `lib/auth/session.ts`.
 **`persons.identity_provider` n'a aucun écrivain, et T9.2 a écrit pourquoi** : l'inscrire sur une
 ligne trouvée par e-mail buterait sur `persons_external_id_requires_directory`, toutes les personnes
 saisies dans Vision étant `manual`. Le geste n'a d'objet qu'avec un import d'annuaire, que C9
@@ -147,15 +145,14 @@ secondaire · les props d'icône de `Button` n'ont aucun appelant.
 
 ### c. Dettes assumées — le fait et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`
 
-- **Une carte ne se détache d'aucun fond.** Quatre positions de 1,04:1 à 1,24:1 quand le seuil d'un
-  composant est 3:1, et le plus franc des `surface-neutral-*` plafonne à **2,22:1** ; tous les
-  couples de **texte** passent 4,5:1. Depuis le 29/08 le manque coûte **un état d'interaction** et
-  non plus un contour. **C8 ne le referme pas : aucun neuvième jeton ne s'invente.** → **design system.**
-- **Le design system a huit manques, et aucun n'a été inventé** — trois élévations, deux gradients,
-  aucun jeton de bordure de contrôle (`form-field.tsx` tient à 3,88:1), d'erreur, d'interlettrage,
-  de voile, de séparateur, de mouvement ; **`--number-*` s'arrête à 100 px** pour dix-neuf valeurs
-  légitimes. Six substituts mesurés. Et **les points d'arrêt sont posés à la main, écran par écran**,
-  hors de la clause 2 de `spacingScaleLock` (T1.6). → **design system.**
+- **Le design system a neuf manques, et aucun n'a été inventé.** **Une carte ne se détache d'aucun
+  fond** — quatre positions de 1,04:1 à 1,24:1 quand le seuil d'un composant est 3:1, le plus franc
+  des `surface-neutral-*` plafonnant à **2,22:1** ; tous les couples de **texte** passent 4,5:1, et
+  le manque coûte un état d'interaction. S'y ajoutent trois élévations, deux gradients, aucun jeton
+  de bordure de contrôle (`form-field.tsx` tient à 3,88:1), d'erreur, d'interlettrage, de voile, de
+  séparateur, de mouvement ; **`--number-*` s'arrête à 100 px** pour dix-neuf valeurs légitimes. Six
+  substituts mesurés. Et **les points d'arrêt sont posés à la main, écran par écran**, hors de la
+  clause 2 de `spacingScaleLock` (T1.6). → **design system.**
 - **Six points attendent une main humaine, et aucun ne se referme par un ticket.** Le **filtre de la
   roadmap** ne se partage plus par son adresse (côté client depuis le 21/08) · la **page produit
   porte deux langages d'en-tête**, `northstar-v2` contre `BlockHeader` · **`docs/06` §3 porte deux
@@ -166,8 +163,7 @@ secondaire · les props d'icône de `Button` n'ont aucun appelant.
   → **arbitrage humain.**
 - **La liste close de `docs/06` §5 porte trois écarts** (28/08, à la demande) — « Projets liés »
   n'est plus rendu, « Démarrage » ne l'est que sans activité, « Budget » est un rang de la fiche
-  d'identité. **Rien n'est supprimé**, tout reste testé. → **assumés** ; le geste restant est en
-  T7.10.
+  d'identité. **Rien n'est supprimé**, tout reste testé. → **assumés**, geste restant en T7.10.
 - **Quatre dettes sans échéance.** Sans JavaScript, **les gestes d'une carte de roadmap ne sont plus
   atteignables** — le menu « … » décide de son ouverture, seule exception arbitrée à D30, et les
   quatre actions serveur n'ont aucun repli · **`disabled:opacity-40` est servi sur douze balises qui
@@ -182,9 +178,14 @@ secondaire · les props d'icône de `Button` n'ont aucun appelant.
   → **sans échéance.**
 - **Un référentiel sur neuf reste ouvert au renommage, et c'est structurel.** T8.4 reconnaît une
   ligne par sa `position` — **huit refermés, mesurés** —, mais `tools` n'a pas d'ordinal (**mesuré
-  8 → 9**). Refermer demande une colonne, donc une migration. **L'orpheline « Audit
-  d'accessibilité » reste**, et **`ensureAll` n'a aucun test**. → **le jour où une colonne
-  s'autorise.**
+  8 → 9**) : refermer demande une migration. **L'orpheline « Audit d'accessibilité » reste**, et
+  **`ensureAll` n'a aucun test**. → **le jour où une colonne s'autorise.**
+- **Un test est faux par construction, et il l'était avant T9.4** :
+  `app/(app)/produits/[id]/actions.test.ts:1490` assère qu'un résumé ne contient pas `"62"` ni
+  `"88"`, contre un suffixe de fixture **aléatoire**. Tombé sur `44j62a0w` pendant une sonde,
+  **environ une fois sur cinquante** — ce n'est pas l'intermittent réseau, qui ne porte aucun écart
+  d'assertion. Laissé intact, hors périmètre de la fiche. → **le prochain ticket qui ouvre ce
+  fichier.**
 - **La base de développement a dérivé de la fixture, et elle est jetable** — la règle 4 protège la
   donnée métier, pas une fixture locale. Pas de `db:reset`. → **outillage si besoin réel.**
 - **Deux dettes, une seule cause : `neon-http` n'a pas de transaction interactive.** La **création
@@ -196,8 +197,7 @@ secondaire · les props d'icône de `Button` n'ont aucun appelant.
   exposera la transaction interactive ; les deux se referment ensemble.**
 - **Deux règles de période voisines vivent à deux endroits** — `lastActivityExpression` et
   `projectPeriods` — **et divergent sur un point voulu** : la seconde compte les `planned`, la
-  première les écarte. L'une dit l'étendue, l'autre la fraîcheur ; deux témoins tiennent l'accord, et
-  une activité `in_progress` porte de ce fait une fin de période à venir, juste au mois.
+  première les écarte. L'une dit l'étendue, l'autre la fraîcheur ; deux témoins tiennent l'accord.
   → **à reposer si une troisième lecture de période apparaît.**
 - **Trois dettes que seul l'usage tranchera** : les filtres ne survivent pas à un aller-retour par
   la navigation principale (`docs/06` §9 les veut conservés) · le référentiel des personnes reste

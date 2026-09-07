@@ -178,11 +178,44 @@ export type AdminDrawerRequest =
   | { kind: "archive"; referential: Referential; id: string }
   | { kind: "delete"; id: string };
 
+/**
+ * Les cinq panneaux de l'écran **au-dessus des domaines** — T9.4.
+ *
+ * **Une écriture, une lecture-écriture, et deux confirmations**, et aucun
+ * panneau de détail : cet écran ne s'ouvre qu'au super administrateur, il n'a
+ * donc pas la paire « une clé pour lire, une clé pour écrire » des pages produit
+ * et Équipe.
+ *
+ * `domain` **ne porte aucun identifiant**, et ce n'est pas un oubli : la fiche
+ * de T9.4 liste quatre gestes, et le renommage n'en est pas. La couche n'expose
+ * aucun `updateDomain` — il n'y a rien à corriger, donc rien à désigner. C'est
+ * la forme d'`archive` sur la page produit, pour une raison inverse : là l'objet
+ * est celui de la page, ici il n'existe pas.
+ *
+ * `identities`, `manager`, `suspend` et `archive` portent tous l'identifiant
+ * **d'un domaine** : `/domaines` n'a pas d'objet de page, comme
+ * `/administration` et `/equipe`.
+ *
+ * **`manager` porte une condition que le type ne dit pas** — il n'ouvre que sur
+ * un domaine sans aucun compte —, et c'est délibéré : une condition qui dépend
+ * de la base ne se prouve pas dans un type. `resolveDomainDrawer` la vérifie, et
+ * l'action la revérifie sur ce qu'elle reçoit. Un panneau absent du rendu n'a
+ * jamais protégé le point d'entrée qui l'accompagne.
+ */
+export type DomainDrawerRequest =
+  | { kind: "domain" }
+  | { kind: "identities"; id: string }
+  | { kind: "identity"; id: string }
+  | { kind: "manager"; id: string }
+  | { kind: "suspend"; id: string }
+  | { kind: "archive"; id: string };
+
 export type DrawerRequest =
   | ProductDrawerRequest
   | ProjectDrawerRequest
   | TeamDrawerRequest
-  | AdminDrawerRequest;
+  | AdminDrawerRequest
+  | DomainDrawerRequest;
 
 /**
  * Ce que le serveur renvoie, et ce que la coquille sait afficher.
@@ -272,6 +305,15 @@ const TEAM_KINDS = [
 
 const ADMIN_KINDS = ["row", "archive", "delete"] as const;
 
+const DOMAIN_KINDS = [
+  "domain",
+  "identities",
+  "identity",
+  "manager",
+  "suspend",
+  "archive",
+] as const;
+
 export function asProductRequest(
   request: DrawerRequest,
 ): ProductDrawerRequest | null {
@@ -328,6 +370,27 @@ export function asTeamRequest(
  * bornée aux entités —, et c'est pourquoi la condition ne vaut que pour les deux
  * autres.
  */
+/**
+ * Le cinquième jumeau, pour l'écran au-dessus des domaines (T9.4).
+ *
+ * **`archive` reste la clé commune**, et ce rétrécissement ne la distingue donc
+ * pas : une demande `{ kind: "archive" }` forgée depuis la page produit — qui
+ * n'y porte aucun identifiant — passe ce filtre. C'est `resolveDomainDrawer` qui
+ * la refuse, en vérifiant la forme de l'UUID avant toute lecture, puis
+ * l'autorité avant toute chose.
+ *
+ * Le rétrécissement écarte le reste : une demande `row` venue de la page
+ * Administration n'ouvre rien ici, et c'est tout ce qu'un filtre de forme peut
+ * promettre.
+ */
+export function asDomainRequest(
+  request: DrawerRequest,
+): DomainDrawerRequest | null {
+  return (DOMAIN_KINDS as readonly string[]).includes(request.kind)
+    ? (request as DomainDrawerRequest)
+    : null;
+}
+
 export function asAdminRequest(
   request: DrawerRequest,
 ): AdminDrawerRequest | null {

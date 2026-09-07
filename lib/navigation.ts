@@ -597,6 +597,77 @@ export const DELETE_PANEL_PARAM = "supprimer";
 /** La valeur qui ouvre la confirmation sur une page qui a un objet. */
 export const DELETE_PANEL_CONFIRM = "confirmation";
 
+/* ==========================================================================
+   L'écran au-dessus des domaines — T9.4
+
+   **Quatre clés neuves, et une reprise.** `archiver` sert ici sa cinquième
+   page : ce qui interdirait le réemploi serait deux sens sur un **même** écran,
+   jamais deux écrans qui rangent chacun leur objet.
+
+   **Aucune clé de correction.** La fiche de T9.4 liste quatre gestes, et le
+   renommage n'en est pas : la couche n'expose aucun `updateDomain`, l'URL n'a
+   donc rien à ouvrir. Ce que le type refuse, l'adresse ne le propose pas.
+   ========================================================================== */
+
+/**
+ * Le panneau de **création** d'une entreprise cliente.
+ *
+ * **Une seule valeur, `nouveau`**, là où `ligne` en accepte deux : un domaine ne
+ * se corrige pas depuis cet écran, donc aucun identifiant n'a de sens ici. La
+ * clé garde pourtant la forme des autres — c'est ce qui lui permettra d'ouvrir
+ * une correction le jour où le renommage sera décidé, sans changer d'adresse.
+ */
+export const DOMAIN_PANEL_PARAM = "domaine";
+
+/** La valeur qui ouvre le panneau vide. La seule que la clé accepte. */
+export const DOMAIN_PANEL_NEW = "nouveau";
+
+/**
+ * Le panneau des **identités vérifiées** d'une entreprise.
+ *
+ * La valeur porte l'identifiant du domaine : `/domaines` n'a pas d'objet de
+ * page, comme `/administration` et `/equipe`. Le panneau lit, ajoute et retire
+ * — un seul droit gouverne l'écran, il n'y a donc rien à séparer en deux clés.
+ */
+export const DOMAIN_IDENTITIES_PANEL_PARAM = "identites";
+
+/**
+ * Le panneau qui **ajoute** une identité vérifiée. La valeur porte le domaine.
+ *
+ * **Deux clés voisines, et c'est le partage de `readings`/`reading` sur la page
+ * produit** : l'une gère la série, l'autre en saisit un élément. Le panneau de
+ * gestion reste **serveur** — il ne fait que lister —, la saisie est cliente,
+ * `useActionState` étant le seul moyen de faire revenir une saisie refusée avec
+ * ses valeurs. Les fondre en une clé aurait demandé de rendre l'un des deux
+ * générique sur ce qu'il n'est pas.
+ *
+ * **Le retrait n'a pas de clé**, et c'est le même précédent : il se fait par un
+ * formulaire muet dans la liste, comme l'archivage d'un relevé. Un geste qui se
+ * défait n'a rien à faire annoncer — et celui-ci se défait, une identité
+ * retirée se ressaisit.
+ */
+export const DOMAIN_IDENTITY_PANEL_PARAM = "identite";
+
+/**
+ * Le panneau qui désigne le **premier responsable** d'une entreprise.
+ *
+ * **Il n'ouvre que sur un domaine qui n'a aucun compte**, et c'est le résolveur
+ * qui le vérifie, jamais l'URL : coller l'adresse sur un domaine déjà pourvu
+ * n'ouvre rien. Une clé d'ouverture ne prouve jamais un droit ni une condition.
+ */
+export const DOMAIN_MANAGER_PANEL_PARAM = "responsable";
+
+/**
+ * Le panneau de **confirmation de suspension**.
+ *
+ * **Il se confirme, à la différence du rétablissement**, et la raison est dans
+ * la conséquence : suspendre ferme la session de **tous** les membres du
+ * domaine à la requête suivante — `loadSession` refuse un domaine dont le
+ * statut n'est pas `active`, et il le relit à chaque passage. Rétablir défait ;
+ * un geste qui se défait n'a rien à faire annoncer.
+ */
+export const DOMAIN_STATUS_PANEL_PARAM = "suspendre";
+
 /**
  * Le panneau du **lien déclaré** (T6.5), huitième et dernière clé d'ouverture de
  * la page projet — la première qui écrive dans une table de liaison entre deux
@@ -1201,6 +1272,44 @@ export const ROUTES = {
    * adresse littérale, comme les cinq autres.
    */
   journeys: "/macro-parcours",
+  /**
+   * L'écran au-dessus des domaines — T9.4.
+   *
+   * **Hors du groupe `(app)`, et ce n'est pas un rangement de fichiers.** La
+   * coquille de l'application lit une session ; un super administrateur n'en a
+   * pas — il n'a ni domaine ni ligne `persons` (arbitrage (4) de
+   * `tickets-C9.md`), et `getSession()` rend `null` pour lui. La barre latérale
+   * n'aurait rien à afficher. C'est le précédent d'`/auth/acces`, qui l'écrit :
+   * *« ni coquille, ni navigation — la barre latérale suppose un domaine. »*
+   *
+   * **Elle n'entre dans aucune navigation** : `MAIN_NAV` ne se rend que dans
+   * `(app)`, où un super administrateur ne va jamais. L'entrée se fait par
+   * `/auth/acces`, qui l'y renvoie dès que la connexion aboutit.
+   */
+  domains: "/domaines",
+  /** L'écran, panneau de création ouvert. Un paramètre, pas un écran de plus. */
+  domainNew: `/domaines?${DOMAIN_PANEL_PARAM}=${DOMAIN_PANEL_NEW}`,
+  /** L'écran, panneau des identités ouvert sur une entreprise. */
+  domainIdentities: (domainId: string) =>
+    `/domaines?${DOMAIN_IDENTITIES_PANEL_PARAM}=${domainId}`,
+  /** L'écran, panneau d'ajout d'une identité ouvert sur une entreprise. */
+  domainIdentityNew: (domainId: string) =>
+    `/domaines?${DOMAIN_IDENTITY_PANEL_PARAM}=${domainId}`,
+  /** L'écran, panneau du premier responsable ouvert sur une entreprise. */
+  domainManager: (domainId: string) =>
+    `/domaines?${DOMAIN_MANAGER_PANEL_PARAM}=${domainId}`,
+  /** L'écran, confirmation de suspension ouverte sur une entreprise. */
+  domainSuspend: (domainId: string) =>
+    `/domaines?${DOMAIN_STATUS_PANEL_PARAM}=${domainId}`,
+  /**
+   * L'écran, confirmation d'archivage ouverte sur une entreprise — **cinquième
+   * page à reprendre le couple `ConfirmPanel` + `ARCHIVE_PANEL_PARAM`**.
+   *
+   * La valeur porte l'identifiant, comme `teamPersonArchive` et à la différence
+   * de `productArchive` : cet écran n'a pas d'objet de page.
+   */
+  domainArchive: (domainId: string) =>
+    `/domaines?${ARCHIVE_PANEL_PARAM}=${domainId}`,
 } as const;
 
 /**

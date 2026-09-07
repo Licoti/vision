@@ -10715,3 +10715,126 @@ avant `scoped.ts`, fichier remis en état, `tsc` et `lint` revérifiés. **La re
 copie, restaure dans un `finally`, et relit le fichier pour le comparer à sa sauvegarde.** La règle
 qui en sort : *une neutralisation se défait par où elle s'est faite* — jamais par un outil qui
 connaît un autre état de référence que celui d'avant la sonde.
+
+**T9.4 — Dans un gabarit `sql`, Drizzle rend une colonne sans son qualificatif, et une
+sous-requête corrélée devient fausse en silence.** `listDomainsForAdmin` devait dire si une
+entreprise porte au moins une identité vérifiée. Écrit sur le patron évident —
+
+```ts
+sql`exists (select 1 from ${domainIdentities}
+            where ${domainIdentities.domainId} = ${domains.id})`
+```
+
+— le SQL produit est `where "domain_id" = "id"` : **les deux noms sont nus**, et PostgreSQL les
+résout tous deux *dans* la sous-requête. La condition compare donc
+`domain_identities.domain_id` à `domain_identities.id`, ne lève rien, et rend `false`. **Aucune
+erreur, aucun avertissement, un résultat parfaitement plausible** — et c'est ce qui rend le piège
+grave : un test de forme l'aurait laissé passer, seul un test qui *pose une identité puis relit*
+l'attrape. Trouvé par sonde le 06/09/2026, après un `hasIdentity: false` sur une ligne dont le
+client brut montrait la ligne. **La reprise donne un alias à la table interne et qualifie l'externe**
+— `from ${domainIdentities} as identity where identity.domain_id = ${domains}.id` —, si bien
+qu'aucun nom ne dépend plus de la résolution de portée. La règle qui en sort : *dans un gabarit
+`sql`, une corrélation se qualifie à la main ; l'interpolation d'une colonne Drizzle ne porte pas sa
+table.* **Le gabarit voisin a été vérifié et il est juste** : `lastActivityExpression` a la même
+forme, mais ses tests assertent des dates exactes (`2026-01-30`, `2026-04-30`, `2026-06-30`) et
+passent — sa position dans un `update` ne place pas la table externe dans la portée interne. Vérifié
+plutôt que supposé.
+
+**T9.4 — Le panneau des identités s'est dédoublé, et c'est `Panel` qui l'a imposé.** Le plan
+annonçait un panneau « gérer les identités » unique : lister, ajouter, retirer. Impossible tel quel
+— `Panel` (TD.1) enveloppe ses `children` dans un `<form>`, et un retrait par ligne y aurait été un
+formulaire imbriqué, que le navigateur réécrit. Trois issues ont été pesées : un `formAction` sur
+chaque bouton de retrait, qui court-circuite `useActionState` et fait perdre le message de refus
+d'ajout ; rendre `Panel` générique sur ce qu'il n'est pas ; ou **le partage que la page produit tient
+déjà** — `readings`/`reading`, une liste serveur et une saisie cliente. C'est la troisième. Six
+panneaux au lieu de cinq, **les mêmes gestes**, et aucun composant du socle touché. L'écart au plan
+est de forme, pas de périmètre.
+
+**T9.4 — Le critère de `superAdmin` n'était pas *lire contre écrire*, et ce ticket l'a montré.**
+T9.3 avait écrit la distinction en deux mots — ce qui se lit d'un côté, ce qui s'écrit de l'autre —
+mais la **raison** qu'il donnait de l'ouverture en était une autre : *« ces lectures s'exécutent
+pendant la connexion, quand aucune session n'existe encore »*. Les deux formulations coïncidaient
+tant qu'il n'y avait que deux écritures. T9.4 apporte deux lectures qui ne servent pas la connexion,
+et `ETAT.md` lui assignait déjà `listSuperAdmins`, qui n'y servait pas non plus. Le bandeau est
+récrit sur le critère réel — **ce qui tourne quand aucune autorité n'est nommable**, ce qui couvre
+la connexion et `/dev/session`, qui par construction n'en a pas. `superAdmin` passe de six clés à
+cinq, `asSuperAdmin` de deux à huit. Un commentaire faux vaut une ligne de code fausse (T7.5).
+
+**T9.4 — Le rétablissement d'un domaine archivé a été livré, et la fiche ne le listait pas.** Ses
+quatre gestes sont *liste · création · suspension et rétablissement · archivage*. L'archivage y
+figure seul. Il a été lu comme comprenant son inverse, sur l'argument que l'écran voisin porte déjà
+écrit : *« un écran de gestion doit montrer ce qu'il a rangé : sans cela l'archivage serait une
+disparition, et le rétablissement n'aurait aucun point d'entrée »*. Sans lui, un domaine archivé par
+erreur serait **la seule donnée du produit qu'un geste rend définitivement inatteignable**, ce qui
+est l'inverse de ce que la règle 4 protège. Écart assumé, signalé plutôt que fondu dans le lot.
+
+**T9.4 — Le renommage d'une entreprise n'existe pas, et c'est tenu par le type.** La fiche liste
+quatre gestes ; le renommage n'en est pas. Plutôt qu'un `updateDomain(id, patch)` dont il aurait
+fallu se rappeler de ne pas se servir, la couche expose **trois fonctions nommées** —
+`setDomainStatus`, `archiveDomain`, `restoreDomain` — et aucune ne touche `name`. L'URL n'ouvre donc
+rien à corriger, et `DOMAIN_PANEL_PARAM` n'accepte que `nouveau`. Ce que le type refuse, l'adresse
+ne le propose pas.
+
+**T9.4 — Une identité vérifiée est normalisée à la saisie, et la comparaison ne l'est pas.**
+`domain_identities_provider_value_unique` porte sur le couple **brut** : `ACME.COM` et `acme.com` y
+sont deux valeurs distinctes et ouvriraient deux domaines Vision pour la même entreprise —
+exactement l'étanchéité que la contrainte existe pour tenir. `lib/forms/domain.ts` abaisse donc la
+casse et rogne avant d'écrire. **Le côté lecture n'a pas bougé** : `resolveDomainId` interroge
+`findDomainIdentity` en `eq`, sans `lower()`, et un fournisseur qui rendrait un `hd` en capitales ne
+trouverait pas la ligne. Google le rend en minuscules et le `tid` d'Entra est un GUID minuscule, si
+bien que le cas n'est pas atteignable aujourd'hui ; mais la garantie tient à un usage, pas à une
+règle. Le toucher demandait d'ouvrir `lib/auth/session.ts`, hors du périmètre de la fiche (règle 3).
+Point porté dans `ETAT.md` avec sa destination plutôt que refermé en silence.
+
+**T9.4 — L'écran est le septième, et `docs/06` §2 en dessine six.** La carte des écrans pose *« six
+écrans, dont deux formulaires et un panneau — c'est le plancher : chaque écran supplémentaire doit
+être justifié par une question à laquelle aucun autre ne répond »*. Celui-ci répond à *qui sont les
+entreprises clientes, et laquelle peut ouvrir une session ?*, à laquelle aucun écran du produit ne
+peut répondre : ils vivent tous **dans** un domaine, et celui-ci vit au-dessus. La levée de
+`docs/05` §4 du 06/09/2026 l'autorise explicitement ; `docs/06` n'a pas été amendé, `docs/` étant
+figé (règle 7). L'écart est ici, daté, avec sa justification.
+
+**T9.4 — Les gestes de domaine n'écrivent pas au journal, et c'est une contrainte.** `domains` n'est
+pas une valeur d'`event_target_type`, et en ajouter une serait une migration d'énuméré — signal
+d'arrêt des interdits communs de C9. Créer, suspendre, archiver ou rétablir une entreprise ne
+laisse donc **aucune trace dans Vision**. La désignation du premier responsable, elle, en laisse
+une : `person` est déjà une valeur de l'énuméré. Son acteur est nul — un super administrateur n'a
+pas de ligne `persons` —, et les deux écrans qui rendent le journal lisent déjà cet acteur nul comme
+**« l'amorçage »**, ce qui décrit exactement le geste. Aucun libellé n'a eu à s'inventer.
+
+**T9.4 — Un `finally` ne protège que d'une exception, jamais d'un processus tué.** T9.3 avait
+consigné qu'une mise en défaut ne doit pas pouvoir détruire ce qu'elle mesure, et posé la règle :
+sauvegarde par copie, restauration dans un `finally`, relecture pour comparer. **La règle était
+juste et insuffisante.** La sonde de T9.4 a été tuée par le système, faute de mémoire, **au milieu
+de la passe E** : le `finally` n'a jamais tourné, et la neutralisation `staffed > 99` est restée dans
+`app/domaines/actions.ts`. Elle a été retrouvée en relisant les ancres avant toute autre chose —
+premier geste après la notification —, remise en état, `lint` et `tsc` revérifiés. **La reprise
+écrit un jeton de restauration sur le disque *avant* de patcher** : le chemin de la cible, celui de
+sa sauvegarde, la lettre de la sonde. Tuée n'importe où, elle laisse de quoi remettre l'arbre en
+état sans deviner ce qu'elle avait touché. Règle élargie : *une neutralisation se déclare avant de
+se faire ; ce qui n'est écrit que dans la mémoire d'un processus meurt avec lui.*
+
+**T9.4 — Une sortie de sonde ne passe jamais par `tail`.** La première mise en défaut envoyait sa
+sortie dans `tail -60` : rien n'est apparu avant la fin du processus — donc aucune passe n'était
+lisible en cours de route — et **le début a été rogné**, emportant le résultat de la première garde.
+Les quatre dernières passes ont en outre rendu un décompte illisible, que le format de sortie de
+vitest expliquait à lui seul. *Une mesure qu'on ne peut pas relire n'est pas une mesure* : chaque
+passe écrit désormais son résultat dans un fichier, et garde la sortie brute à côté.
+
+**T9.4 — Une mesure aberrante se rejoue avant d'être crue.** La première sonde a rendu **918 verts
+sur 1 750** pour la neutralisation de `getSuperAdmin`, une trentaine de fichiers en échec : de quoi
+conclure que la garde n'isolait rien, et récrire le test. La reprise, sans la pression mémoire, rend
+**2 tombés** — les deux « super administrateur archivé », un par fichier. La cascade était un
+artefact de l'environnement. C'est le pendant de la leçon de T8.1 sur l'intermittent réseau : un
+résultat qui ne ressemble à rien de ce que le code peut produire est d'abord une hypothèse sur
+l'environnement, pas sur le code.
+
+**T9.4 — Un test faux par construction, trouvé par une sonde et laissé intact (règle 3).**
+`app/(app)/produits/[id]/actions.test.ts:1490` assère qu'un résumé de journal **ne contient pas
+`"62"`** ni `"88"`, alors que le suffixe de fixture est un aléatoire base36 de huit caractères
+mêlant chiffres et lettres. La passe E a tiré `44j62a0w`, et le test est tombé sans qu'aucune règle
+du produit ait bougé. **Il est donc faux environ une fois sur cinquante**, et il l'était avant ce
+ticket. Ce n'est pas l'intermittent que `ETAT.md` attribue au réseau — celui-là est un
+`NeonDbError: fetch failed`, sans écart d'assertion — c'est un défaut d'écriture : *une assertion de
+non-présence ne se pose pas contre une chaîne dont on ne contrôle pas le contenu*. Le fichier est
+hors du périmètre de la fiche ; le point part dans `ETAT.md` avec sa destination.
