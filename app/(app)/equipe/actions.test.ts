@@ -36,7 +36,7 @@
  * redécouvrir.
  */
 
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
 import { SESSION_COOKIE, sealPrincipal } from "@/lib/auth/cookie";
@@ -861,7 +861,25 @@ describe("grantPersonAccess — le couple se pose ensemble", () => {
   });
 });
 
-describe("grantPersonAccess — les quatre refus, éprouvés séparément", () => {
+/**
+ * Quelle contrainte a refusé cette écriture ?
+ *
+ * **Un `toThrow()` nu passe pour n'importe quelle levée** — une colonne
+ * manquante, un réseau coupé — et cesse alors de dire ce qu'il prétend dire.
+ * Le nom de la contrainte, lui, ne peut venir que d'elle. Il vit dans la
+ * **cause** : `drizzle` enveloppe la levée du pilote dans un « Failed query »,
+ * si bien que le message ne le porte pas.
+ */
+async function refusedBy(write: Promise<unknown>): Promise<string | undefined> {
+  try {
+    await write;
+    return undefined;
+  } catch (error) {
+    return (error as { cause?: { constraint?: string } }).cause?.constraint;
+  }
+}
+
+describe("grantPersonAccess — les refus, éprouvés séparément", () => {
   /**
    * **Garde-fou 1** — `docs/05` §4 exclut *« l'accès des commanditaires côté
    * entité »*, décidé en F1 (D2). Le refus est dans l'action : la fiche d'un
@@ -945,45 +963,58 @@ describe("grantPersonAccess — les quatre refus, éprouvés séparément", () =
    * sous l'identité de l'autre. Aucune contrainte de base ne l'interdit ; ce refus
    * est ce qui tient la promesse en attendant qu'une unicité s'autorise.
    */
-  test("une adresse déjà portée dans le domaine est refusée", async () => {
+  /**
+   * **Ce refus a changé de gardien, et les deux tests qui l'éprouvaient ne
+   * peuvent plus s'écrire.**
+   *
+   * T9.6 comptait les jumelles dans l'action, `ETAT.md` notant en regard que
+   * *« rien n'interdit en base deux adresses identiques dans un domaine »*, avec
+   * pour destination *« le jour où une contrainte s'autorise »*. T11.1 est ce
+   * jour : `persons_domain_email_unique` porte sur `(domain_id, lower(email))`,
+   * **sans clause partielle**, donc archivées comprises.
+   *
+   * **La conséquence est que l'état qu'on refusait ne peut plus naître.** Les
+   * deux fixtures d'alors — deux jumelles vivantes, une jumelle rangée et une
+   * vivante — sont refusées par la base **avant** d'atteindre l'action. Le
+   * `twins > 0` de `grantPersonAccess` ne peut donc plus valoir vrai : c'est un
+   * contrôle **inatteignable**, conservé comme filet sur décision humaine du
+   * 08/09/2026, et **aucun test ne peut plus l'exercer**. Le fait est consigné
+   * au journal technique plutôt que masqué par un test qui feindrait de le
+   * couvrir.
+   *
+   * **La propriété, elle, n'est pas perdue — elle a trois lecteurs** : les deux
+   * cas de l'index dans `lib/db/scoped.test.ts` (vivante et archivée), et les
+   * trois cas du formulaire en bas de ce fichier, où la garde rend un message
+   * là où la base rendait une levée.
+   */
+  test("une adresse déjà portée ne peut plus naître, donc l'accès n'a plus à la refuser", async () => {
     currentPerson = f.managerId;
     const shared = `jumelle.${suffix}@acme.com`;
 
     const first = await freshPerson("Première jumelle", { email: shared });
-    const second = await freshPerson("Seconde jumelle", { email: shared });
 
-    const state = await grantPersonAccess(
-      second.id,
-      NO_ACCESS_STATE,
-      accessForm("member"),
+    /* Le refus est **en base**, et il tombe avant l'action : c'est ce que ce
+       test constate, et c'est ce qui rend le contrôle de l'action mort. */
+    expect(await refusedBy(freshPerson("Seconde jumelle", { email: shared }))).toBe(
+      "persons_domain_email_unique",
     );
 
-    expect(state.message).toBeDefined();
-    expect(await accountOf(second.id)).toMatchObject({ hasAccess: false });
+    /* **Et il tient sur une jumelle archivée**, parce que le rapprochement la
+       lit — `findPerson` passe `includeArchived: true`. Un index partiel aurait
+       laissé passer exactement le cas qu'il prétend fermer. */
+    await f.scope.archive(persons, first.id);
+    expect(await refusedBy(freshPerson("Jumelle d'après", { email: shared }))).toBe(
+      "persons_domain_email_unique",
+    );
+
+    /* **Le décompte en base tranche** : une seule ligne porte l'adresse, et
+       elle n'a pas d'accès — le geste n'a jamais eu lieu. */
+    const twins = await f.scope.count(persons, {
+      where: sql`lower(${persons.email}) = lower(${shared})`,
+      includeArchived: true,
+    });
+    expect(twins).toBe(1);
     expect(await accountOf(first.id)).toMatchObject({ hasAccess: false });
-  });
-
-  /**
-   * **Et la jumelle archivée compte aussi**, parce que le rapprochement la lit :
-   * `findPerson` passe `includeArchived: true`. Un refus qui n'écarterait que les
-   * vivantes laisserait passer exactement le cas qu'il prétend fermer.
-   */
-  test("même archivée, la jumelle interdit l'accès", async () => {
-    currentPerson = f.managerId;
-    const shared = `jumelle.rangee.${suffix}@acme.com`;
-
-    const archived = await freshPerson("Jumelle rangée", { email: shared });
-    await f.scope.archive(persons, archived.id);
-    const alive = await freshPerson("Jumelle vivante", { email: shared });
-
-    const state = await grantPersonAccess(
-      alive.id,
-      NO_ACCESS_STATE,
-      accessForm("member"),
-    );
-
-    expect(state.message).toBeDefined();
-    expect(await accountOf(alive.id)).toMatchObject({ hasAccess: false });
   });
 
   /**
@@ -1230,5 +1261,92 @@ describe("le journal du compte", () => {
     const written = await traced(() => revokePersonAccess(target.id));
 
     expect(written).toHaveLength(0);
+  });
+});
+
+/* ==========================================================================
+   L'adresse en double — le formulaire, pas seulement l'action
+   ========================================================================== */
+
+/**
+ * **Mesure du défaut, avant sa réparation.**
+ *
+ * `persons_domain_email_unique` (T11.1) referme en base ce que T9.6 refusait
+ * dans l'action. Le gain est réel, et il a un prix qu'aucune lecture de code ne
+ * dispense de constater : `createPerson` et `updatePerson` écrivent l'adresse
+ * sans garde, et `scopeRefusal` n'attrape que `DomainScopeError` — il **relève**
+ * tout le reste. Une adresse en double saisie au formulaire cessait donc de
+ * rendre un message pour rendre une erreur non rattrapée.
+ *
+ * Ce bloc est écrit dans cet ordre : le défaut d'abord, mesuré, puis la garde.
+ */
+describe("l'adresse en double se refuse au formulaire", () => {
+  test("une seconde saisie de la même adresse rend un message, jamais une levée", async () => {
+    currentPerson = f.managerId;
+    const shared = `saisie.doublon.${suffix}@acme.com`;
+
+    const first = await createPerson(
+      NO_PERSON_STATE,
+      personForm({ fullName: `Saisie une ${suffix}`, email: shared }),
+    );
+    expect(first.ok).toBe(true);
+
+    /* **La casse ne sauve pas** : l'index porte sur `lower(email)`, et la garde
+       doit lire du même côté — sans quoi elle laisserait passer ce que la base
+       refuse, et le message redeviendrait une levée. */
+    const second = await createPerson(
+      NO_PERSON_STATE,
+      personForm({
+        fullName: `Saisie deux ${suffix}`,
+        email: shared.toUpperCase(),
+      }),
+    );
+    expect(second.ok).toBeUndefined();
+    expect(second.message).toBeDefined();
+
+    /* **Le décompte en base tranche**, jamais le retour de l'action : une
+       seconde ligne écrite puis annoncée refusée serait le pire des deux. */
+    const twins = await f.scope.count(persons, {
+      where: sql`lower(${persons.email}) = lower(${shared})`,
+      includeArchived: true,
+    });
+    expect(twins).toBe(1);
+  });
+
+  test("la correction d'une personne vers une adresse déjà prise rend un message", async () => {
+    currentPerson = f.managerId;
+    const taken = `correction.prise.${suffix}@acme.com`;
+    await freshPerson("Porteuse", { email: taken });
+    const other = await freshPerson("Corrigée");
+
+    const state = await updatePerson(
+      other.id,
+      NO_PERSON_STATE,
+      personForm({ fullName: `Corrigée ${suffix}`, email: taken }),
+    );
+
+    expect(state.ok).toBeUndefined();
+    expect(state.message).toBeDefined();
+    expect((await f.scope.find(persons, other.id))?.email).toBeNull();
+  });
+
+  test("garder sa propre adresse n'est pas un doublon", async () => {
+    currentPerson = f.managerId;
+    const own = `sienne.${suffix}@acme.com`;
+    const person = await freshPerson("Sienne", { email: own });
+
+    /* **La garde compte les *autres*, jamais soi-même** — c'est la forme du
+       décompte des responsables, resservie. Sans le `ne(persons.id, …)`, une
+       personne ne pourrait plus corriger son nom sans changer son adresse. */
+    const state = await updatePerson(
+      person.id,
+      NO_PERSON_STATE,
+      personForm({ fullName: `Sienne corrigée ${suffix}`, email: own }),
+    );
+
+    expect(state.ok).toBe(true);
+    expect((await f.scope.find(persons, person.id))?.fullName).toBe(
+      `Sienne corrigée ${suffix}`,
+    );
   });
 });

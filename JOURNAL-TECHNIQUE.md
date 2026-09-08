@@ -11000,3 +11000,61 @@ fixture (`meridian.example`) n'est portée par aucun compte réel, et aucune adr
 démonstration ne rendra ce domaine connectable. Le chemin d'un membre de domaine ne s'ouvre qu'avec
 un **vrai** domaine Workspace — c'est la limite que T9.2 avait écrite d'avance, et elle survit à
 T9.6. Le point reste donc ouvert pour la **cohérence** de la fixture, jamais pour l'épreuve du SSO.
+
+**T11.1, 08/09/2026 — la fiche est venue après le code, et c'est un manquement au protocole.**
+`tickets-C11.md` a été écrit **après** que T11.1 fut codé, à partir d'un plan validé par l'humain
+mais vivant hors du dépôt. Le protocole de `CLAUDE.md` demande l'inverse : *un chantier ne s'ouvre
+pas sans session de découpage, et elle écrit `tickets-C<n>.md`*. Ce qui a manqué n'est pas la
+validation humaine — elle a eu lieu — mais **le contrat opposable** : pendant tout le ticket, il n'y
+avait ni critère écrit d'avance, ni interdits, ni périmètre. C'est exactement ce que la fiche sert à
+empêcher, et l'extension de périmètre qui a suivi l'a montré : sans fiche, une extension ne se
+distingue pas d'un « pendant que j'y suis ». Le fait est écrit en tête de `tickets-C11.md` plutôt
+que masqué par une fiche antidatée.
+
+**T11.1 — l'ordre entre la migration et sa mise en défaut n'est pas indifférent, et l'inverser
+bloque la migration.** Les tests de la contrainte d'unicité ont été lancés **avant** que `0017` soit
+appliqué, pour vérifier qu'ils tombaient pour la bonne raison. Ils tombaient bien pour la bonne
+raison — mais deux d'entre eux, en tombant, **ont écrit le doublon que la contrainte allait
+interdire** : un test qui attend un refus produit l'état qu'il refuse, tant que rien ne le refuse.
+`CREATE UNIQUE INDEX` a donc échoué ensuite sur la base de test, et il a fallu le balayage de
+`vitest.global-setup.ts` pour la rendre applicable. **La migration d'abord, la mise en défaut
+ensuite.**
+
+**T11.1 — `drizzle-kit migrate` ne distingue pas un succès d'un échec à l'œil.** Les deux sorties
+sont identiques jusqu'à l'avertissement `websocket` du pilote, et l'échec de l'index n'a pas atteint
+le terminal de l'humain. C'est la version base de données de la leçon de T6.1 déjà consignée — *le
+code HTTP ne dit jamais ce qui a été écrit* : ici, **c'est la sortie de l'outil qui ne dit rien**, et
+seuls `to_regclass`, `pg_indexes` et le décompte de `drizzle.__drizzle_migrations` ont tranché. Trois
+allers-retours ont été payés faute d'aller lire le catalogue au premier doute.
+
+**T11.1 — une contrainte en base tue le contrôle applicatif qui la doublait, et ses tests avec.**
+`persons_domain_email_unique` porte sur `lower(email)`, l'expression exacte que compte
+`grantPersonAccess` : le décompte ne peut plus valoir plus de un, le refus de T9.6 est
+**inatteignable**, et ses deux tests ne peuvent plus **construire leur fixture** — la base la refuse
+avant l'action. Le filet est conservé sur décision humaine du 08/09 ; il reste donc dans le dépôt
+**du code qu'aucun test ne peut exercer**, et c'est le prix nommé de la décision. La propriété, elle,
+a trois lecteurs neufs : les deux cas de l'index dans `lib/db/scoped.test.ts`, et les trois cas du
+formulaire dans `app/(app)/equipe/actions.test.ts`.
+
+**T11.1 — la même contrainte a transformé une faute de frappe en 500, et il a fallu le mesurer.**
+`createPerson` et `updatePerson` écrivaient l'adresse sans garde, et `scopeRefusal` n'attrape que
+`DomainScopeError` : tout le reste est **relevé**. Une adresse en double saisie au formulaire rendait
+donc une erreur non rattrapée — même famille que le 500 du fournisseur non raccordé, corrigé la
+veille. **Le défaut a été écrit en test et constaté avant d'être réparé**, `NeonDbError` traversant
+l'action serveur : une lecture de code annonçait le défaut, elle ne le prouvait pas. Leçon générale :
+**une contrainte neuve rend 500 partout où une écriture la touche sans garde** — la poser demande de
+recenser ses écrivains, pas seulement ses lecteurs.
+
+**T11.1 — `toThrow()` nu ne dit pas ce qu'il prétend dire, et le nom de la contrainte vit dans la
+cause.** Une assertion `rejects.toThrow()` passe pour n'importe quelle levée — une colonne manquante,
+un réseau coupé, l'intermittent `fetch failed` déjà au journal. Nommer la contrainte la rend
+infalsifiable, mais **`drizzle` enveloppe la levée du pilote** dans un « Failed query : insert
+into… » : le nom n'est pas dans `error.message`, il est dans `error.cause.constraint`. D'où
+`refusedBy()`, qui lit la cause et rend le nom — trois index et une contrainte s'assèrent ainsi par
+leur nom, dans les deux fichiers de tests.
+
+**T11.1 — deux cas de test qui partagent une personne se gênent par l'index qu'ils éprouvent.**
+`invitations_pending_unique` porte sur `(domain_id, person_id)` : les quatre cas d'invitation
+utilisaient la personne de la fixture, si bien que le premier laissait une invitation vivante et que
+les suivants tombaient **pour la raison du premier**. Le couplage par l'ordre est un faux positif qui
+attend son heure ; chaque cas crée maintenant sa propre personne.

@@ -120,6 +120,13 @@
       "when": 1788710040751,
       "tag": "0016_parched_alex_power",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1788850332259,
+      "tag": "0017_harsh_chamber",
+      "breakpoints": true
     }
   ]
 }

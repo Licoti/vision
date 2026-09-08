@@ -176,6 +176,54 @@ function accessRefusal(
 }
 
 /**
+ * L'adresse est-elle déjà portée par **quelqu'un d'autre** dans ce domaine ?
+ *
+ * **La règle vit en base depuis T11.1** — `persons_domain_email_unique`, sur
+ * `(domain_id, lower(email))` et sans clause partielle. Cette fonction ne la
+ * réécrit pas : elle **l'anticipe**, pour que la saisie rende un message plutôt
+ * qu'une levée. Sans elle, `scopeRefusal` ne rattrape rien — il ne connaît que
+ * `DomainScopeError` — et le formulaire de personne rend une erreur non
+ * rattrapée sur une faute de frappe. **Mesuré avant d'être réparé.**
+ *
+ * **Trois propriétés, et chacune vient de l'index qu'elle double :**
+ *
+ *   — `lower()` des deux côtés, comme l'expression indexée : lire d'un seul
+ *     côté laisserait passer ce que la base refuse, et le message redeviendrait
+ *     une levée ;
+ *   — **les archivées comptent**, l'index n'étant pas partiel — et c'est le
+ *     rapprochement de la règle d'entrée 6 qui l'impose, `findPerson` lisant
+ *     `includeArchived: true` ;
+ *   — **on compte les *autres***, jamais soi-même : sans `ne(…)`, personne ne
+ *     pourrait plus corriger son nom sans changer son adresse. C'est la forme
+ *     du décompte des responsables, resservie.
+ *
+ * **Elle ne remplace pas la base, elle la précède.** L'index reste le gardien :
+ * une écriture qui arriverait par un autre chemin y buterait quand même — un
+ * message d'écran n'a jamais protégé un point d'entrée.
+ */
+async function emailAlreadyTaken(
+  session: Session,
+  email: string | null | undefined,
+  exceptPersonId?: string,
+): Promise<boolean> {
+  if (!email) return false;
+  const twins = await session.db.count(persons, {
+    where: exceptPersonId
+      ? and(
+          sql`lower(${persons.email}) = lower(${email})`,
+          ne(persons.id, exceptPersonId),
+        )
+      : sql`lower(${persons.email}) = lower(${email})`,
+    includeArchived: true,
+  });
+  return twins > 0;
+}
+
+/** Ce que l'écran dit d'une adresse déjà prise. Écrit une fois, servi deux. */
+const EMAIL_TAKEN =
+  "Une autre personne de ce domaine porte déjà cette adresse e-mail : le rapprochement au premier passage ne saurait pas laquelle désigner. Corrigez l'une des deux adresses.";
+
+/**
  * Le second filet : une référence a franchi la vérification et la couche l'a
  * refusée. L'écran le dit plutôt que de rendre une page en erreur.
  *
@@ -415,6 +463,10 @@ export async function createPerson(
   });
   if (!input) return { values, errors };
 
+  if (await emailAlreadyTaken(session, input.email)) {
+    return refusal(formData, EMAIL_TAKEN);
+  }
+
   try {
     const created = await session.db.insert(persons, {
       source: "manual",
@@ -491,6 +543,10 @@ export async function updatePerson(
     emailRequired: gate.person.hasAccess,
   });
   if (!input) return { values, errors };
+
+  if (await emailAlreadyTaken(session, input.email, personId)) {
+    return refusal(formData, EMAIL_TAKEN);
+  }
 
   try {
     const updated = await session.db.update(persons, personId, input);

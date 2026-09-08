@@ -41,6 +41,7 @@ import {
   events,
   indicatorReadings,
   indicators,
+  invitations,
   jobs,
   personSkills,
   persons,
@@ -85,6 +86,7 @@ const teardownOrder: ScopedTable[] = [
   projects,
   products,
   personSkills,
+  invitations,
   persons,
   skills,
   skillLevels,
@@ -1046,6 +1048,13 @@ describe("les garde-fous de typage", () => {
       await scope.unlink(domainIdentities, "…");
       // @ts-expect-error `domain_identities` n'a pas `archived_at` : rien à archiver.
       await scope.archive(domainIdentities, "…");
+      /* **Le même arbitrage, un chantier plus tard.** `invitations` n'a pas
+         d'`archived_at` : une invitation se **révoque** — une date de plus sur
+         la ligne —, elle ne s'archive pas. La règle 4 protège la donnée métier,
+         et un jeton n'en est pas une. Deux lignes, pas un commentaire. */
+      await scope.unlink(invitations, "…");
+      // @ts-expect-error `invitations` n'a pas `archived_at` : rien à archiver.
+      await scope.archive(invitations, "…");
       /* **La garde de T9.3 se relit ici, à la compilation.** `createDomain` a
          quitté `superAdmin` : on ne l'obtient qu'en ayant nommé son autorité.
          C'est ce qui a rattrapé les trente-six sites d'appel du jour du ticket,
@@ -1090,11 +1099,20 @@ describe("superAdmin", () => {
        d'autorité. `listSuperAdmins` est passée de l'autre côté : elle dit **qui
        détient le droit**, et son seul appelant tient déjà un grant.
 
-       **Cinq clés, et chacune est nommée par une règle d'entrée** : `findDomain`
-       et `listDomains` pour le chargement de session, `findSuperAdminByEmail`
-       pour la règle 2, `findSuperAdminById` pour la seconde barrière,
-       `findDomainIdentity` pour les règles 3 et 5. Une sixième qui ne saurait
-       pas dire la sienne n'aurait rien à faire ici.
+       **Six clés, et chacune dit la sienne** : `findDomain` et `listDomains`
+       pour le chargement de session, `findSuperAdminByEmail` pour la règle 2,
+       `findSuperAdminById` pour la seconde barrière, `findDomainIdentity` pour
+       les règles 3 et 5. Une septième qui ne saurait pas dire la sienne n'aurait
+       rien à faire ici.
+
+       **La sixième est la première qui ne vient pas d'une règle d'entrée**, et
+       le sceau a fait ce qu'on lui demande : il l'a arrêtée, et elle est entrée
+       par une décision. `findInvitationByTokenHash` tourne au même endroit que
+       les cinq autres — *pendant* la connexion, avant qu'une session existe :
+       sur la page publique d'invitation, qui doit nommer le domaine où l'on
+       attend quelqu'un, et au retour du fournisseur, avant que le cookie ne
+       soit posé. Le critère du bloc est *avec ou sans autorité nommable*, pas
+       *lire contre écrire* ni *les six règles* — et elle est du bon côté.
 
        **Les deux listes se relisent ensemble**, et c'est la raison de la
        seconde : une fonction qui reviendrait se poser sur `superAdmin`
@@ -1102,6 +1120,7 @@ describe("superAdmin", () => {
     expect(Object.keys(superAdmin).sort()).toEqual([
       "findDomain",
       "findDomainIdentity",
+      "findInvitationByTokenHash",
       "findSuperAdminByEmail",
       "findSuperAdminById",
       "listDomains",
@@ -1779,6 +1798,238 @@ describe("l'identité", () => {
       source: "directory",
       externalId,
       kind: "center",
+    });
+    expect(elsewhere.domainId).toBe(b.domainId);
+  });
+});
+
+/* ==========================================================================
+   L'invitation
+   ========================================================================== */
+
+/**
+ * Quelle contrainte a refusé cette écriture ?
+ *
+ * **Un `toThrow()` nu passe pour n'importe quelle levée** — une colonne
+ * manquante, un réseau coupé — et cesse alors de dire ce qu'il prétend dire.
+ * Le nom de la contrainte, lui, ne peut venir que d'elle. Il vit dans la
+ * **cause** : `drizzle` enveloppe la levée du pilote dans un « Failed query »,
+ * si bien que le message ne le porte pas.
+ */
+async function refusedBy(write: Promise<unknown>): Promise<string | undefined> {
+  try {
+    await write;
+    return undefined;
+  } catch (error) {
+    return (error as { cause?: { constraint?: string } }).cause?.constraint;
+  }
+}
+
+describe("l'invitation", () => {
+  /** Une invitation vivante, prête à être insérée. */
+  const pending = (personId: string, tokenHash: string) => ({
+    personId,
+    email: `invite-${tokenHash}@exemple.test`,
+    role: "member" as const,
+    tokenHash,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  });
+
+  /**
+   * **Une personne par cas, jamais celle de la fixture.**
+   *
+   * `invitations_pending_unique` porte sur `(domain_id, person_id)` : deux cas
+   * qui partageraient une personne se gêneraient par l'index même qu'ils
+   * éprouvent, et le second tomberait pour la raison du premier. Le couplage
+   * par l'ordre est un faux positif qui attend son heure.
+   */
+  const freshPerson = async (scope: typeof a.scope, label: string) =>
+    scope.insert(persons, {
+      fullName: `Invitée ${label} ${suffix}`,
+      source: "manual",
+      kind: "center",
+    });
+
+  test("une empreinte de jeton ne désigne qu'une invitation", async () => {
+    const tokenHash = `hash-unique-${suffix}`;
+    const person = await freshPerson(a.scope, "empreinte");
+    await a.scope.insert(invitations, pending(person.id, tokenHash));
+
+    /* **L'unicité est ce qui rend la lecture par lien non ambiguë.** Sans elle,
+       `findInvitationByTokenHash` ferait un `limit 1` sans ordre sur deux
+       candidates — exactement le piège que T9.6 a mesuré sur l'adresse. */
+    const elsewhere = await freshPerson(b.scope, "empreinte ailleurs");
+    /* **La contrainte se nomme dans l'assertion.** Un `toThrow()` nu passe pour
+       n'importe quelle levée — une colonne manquante, un réseau coupé — et
+       cesse alors de dire ce qu'il prétend dire. */
+    expect(
+      await refusedBy(b.scope.insert(invitations, pending(elsewhere.id, tokenHash))),
+    ).toBe("invitations_token_hash_unique");
+
+    const rows = await db
+      .select()
+      .from(invitations)
+      .where(eq(invitations.tokenHash, tokenHash));
+    expect(rows).toHaveLength(1);
+  });
+
+  test("une seule invitation vivante par personne, et les refermées s'accumulent", async () => {
+    const person = await freshPerson(a.scope, "vivante");
+    const first = await a.scope.insert(
+      invitations,
+      pending(person.id, `hash-vivante-1-${suffix}`),
+    );
+
+    expect(
+      await refusedBy(
+        a.scope.insert(invitations, pending(person.id, `hash-vivante-2-${suffix}`)),
+      ),
+    ).toBe("invitations_pending_unique");
+
+    /* Révoquer libère la place : c'est ce qui fait de « réinviter » un geste
+       sûr — le lien précédent cesse de valoir avant que le suivant existe. */
+    await a.scope.update(invitations, first.id, { revokedAt: new Date() });
+    const second = await a.scope.insert(
+      invitations,
+      pending(person.id, `hash-vivante-2-${suffix}`),
+    );
+
+    /* Accepter la libère de même, et l'index étant **partiel**, les deux
+       refermées restent en base : une invitation acceptée est une trace. */
+    await a.scope.update(invitations, second.id, { acceptedAt: new Date() });
+    await a.scope.insert(invitations, pending(person.id, `hash-vivante-3-${suffix}`));
+
+    const rows = await db
+      .select()
+      .from(invitations)
+      .where(eq(invitations.personId, person.id));
+    expect(rows).toHaveLength(3);
+  });
+
+  test("une personne d'un autre domaine est refusée avant l'écriture", async () => {
+    /* La clé étrangère PostgreSQL, elle, accepterait : elle ignore le domaine.
+       C'est `assertPreconditions` qui refuse, et il le fait **avant** d'écrire. */
+    await expect(
+      a.scope.insert(invitations, pending(b.personId, `hash-etranger-${suffix}`)),
+    ).rejects.toThrow(DomainScopeError);
+
+    const rows = await db
+      .select()
+      .from(invitations)
+      .where(eq(invitations.personId, b.personId));
+    expect(rows).toHaveLength(0);
+  });
+
+  test("`findInvitationByTokenHash` rend la ligne sans juger de son état", async () => {
+    const tokenHash = `hash-lecture-${suffix}`;
+    const person = await freshPerson(a.scope, "lecture");
+    const row = await a.scope.insert(invitations, {
+      ...pending(person.id, tokenHash),
+      /* **Périmée à la seconde où elle est écrite** : la lecture doit la rendre
+         quand même. Filtrer ici rendrait un refus *sans cause*, et les sept
+         causes de `lib/auth/entry.ts` sont ce qui permet de les isoler à la
+         mise en défaut. Le tri appartient à l'appelant. */
+      expiresAt: new Date(Date.now() - 1000),
+    });
+
+    const found = await superAdmin.findInvitationByTokenHash(tokenHash);
+    expect(found?.id).toBe(row.id);
+    expect(found?.domainId).toBe(a.domainId);
+
+    /* **Elle ne rend que de quoi désigner un domaine.** C'est la frontière du
+       bloc non scopé : l'acceptation, elle, repassera par `forDomain`. */
+    expect(
+      await superAdmin.findInvitationByTokenHash(`${tokenHash}-absent`),
+    ).toBeUndefined();
+  });
+});
+
+/* ==========================================================================
+   L'adresse d'une personne
+   ========================================================================== */
+
+describe("l'adresse d'une personne", () => {
+  test("deux fois la même adresse dans un domaine sont refusées, casse comprise", async () => {
+    const email = `Doublon.${suffix}@exemple.test`;
+    await a.scope.insert(persons, {
+      fullName: `Adresse une ${suffix}`,
+      source: "manual",
+      kind: "center",
+      email,
+    });
+
+    /* **Le refus de T9.6 vivait dans l'action seule.** Il vit maintenant en
+       base, et il y vit en `lower()` : une unicité sensible à la casse
+       laisserait entrer le doublon qu'elle prétend écarter, quand le
+       rapprochement de la règle d'entrée 6 lit `lower()` des deux côtés. */
+    expect(
+      await refusedBy(
+        a.scope.insert(persons, {
+          fullName: `Adresse deux ${suffix}`,
+          source: "manual",
+          kind: "center",
+          email: email.toUpperCase(),
+        }),
+      ),
+    ).toBe("persons_domain_email_unique");
+  });
+
+  test("une personne archivée retient toujours son adresse", async () => {
+    const email = `Archivee.${suffix}@exemple.test`;
+    const row = await a.scope.insert(persons, {
+      fullName: `Adresse archivée ${suffix}`,
+      source: "manual",
+      kind: "center",
+      email,
+    });
+    await a.scope.archive(persons, row.id);
+
+    /* **C'est la raison exacte que le point ouvert donnait**, et c'est pourquoi
+       l'index n'est pas partiel : le rapprochement de la règle 6 lit
+       `includeArchived`, si bien qu'une ligne archivée reste une candidate.
+       Une unicité qui les laisserait passer ne protégerait rien. */
+    expect(
+      await refusedBy(
+        a.scope.insert(persons, {
+          fullName: `Adresse ressuscitée ${suffix}`,
+          source: "manual",
+          kind: "center",
+          email,
+        }),
+      ),
+    ).toBe("persons_domain_email_unique");
+  });
+
+  test("sans adresse, aucune personne n'en gêne une autre", async () => {
+    /* D19 — être référencé n'est pas se connecter. Les `NULL` restent
+       distincts pour PostgreSQL, et c'est ce qui laisse un domaine porter
+       autant de personnes sans compte qu'il en accompagne. */
+    for (const rank of [1, 2, 3]) {
+      const row = await a.scope.insert(persons, {
+        fullName: `Sans adresse ${rank} ${suffix}`,
+        source: "manual",
+        kind: "stakeholder",
+      });
+      expect(row.email).toBeNull();
+    }
+  });
+
+  test("la même adresse dans deux domaines reste légitime", async () => {
+    /* La clé est bornée au domaine, comme `persons_domain_external_id_unique` :
+       une même personne peut intervenir pour deux entreprises clientes, et
+       chacune n'en voit jamais que sa ligne. */
+    const email = `Partagee.${suffix}@exemple.test`;
+    await a.scope.insert(persons, {
+      fullName: `Partagée a ${suffix}`,
+      source: "manual",
+      kind: "center",
+      email,
+    });
+    const elsewhere = await b.scope.insert(persons, {
+      fullName: `Partagée b ${suffix}`,
+      source: "manual",
+      kind: "center",
+      email,
     });
     expect(elsewhere.domainId).toBe(b.domainId);
   });

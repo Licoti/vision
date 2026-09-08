@@ -437,6 +437,88 @@ export const domainIdentities = pgTable(
   ],
 );
 
+/**
+ * L'invitation à rejoindre l'espace d'un domaine — le lien qu'on envoie à
+ * quelqu'un à qui l'on ouvre un accès.
+ *
+ * **Le jeton n'authentifie jamais.** Il transporte une intention que le SSO
+ * vient valider : les six règles d'entrée statuent d'abord, et l'invitation ne
+ * peut réparer qu'un seul de leurs sept refus — `no_access`, celui d'une ligne
+ * `persons` qui existe déjà, dans le bon domaine, vivante et active. Une
+ * invitation ne fait donc naître aucune personne à la volée (`docs/04` §7),
+ * n'ouvre aucun domaine non client (règle d'entrée 5), et ne ressuscite
+ * personne d'archivé.
+ *
+ * **Seule l'empreinte est stockée**, et c'est pourquoi il n'existe aucune
+ * colonne `token`. `token_hash` porte le SHA-256 des trente-deux octets qui
+ * voyagent dans le lien : une lecture de la base — un export, une capture, un
+ * journal de requêtes — ne rend jamais un lien utilisable.
+ *
+ * **Sans `archived_at`, comme `domain_identities` et `person_skills`** : la
+ * table entre ainsi dans `LinkTable` (`lib/db/scoped.ts`), où `archive` est un
+ * refus de typage. Une invitation ne s'archive pas, elle **se révoque** — la
+ * règle 4 protège la donnée métier, et un jeton n'en est pas une.
+ *
+ * **Quatre horodatages, et aucun statut.** L'état se lit dans les dates plutôt
+ * que dans un énuméré qu'il faudrait ensuite tenir d'accord avec elles :
+ * `sent_at` nul dit qu'aucun courriel n'est parti et que le lien reste à
+ * transmettre, `accepted_at` fait l'usage unique, `revoked_at` le retrait,
+ * `expires_at` la péremption. C'est l'idiome d'`archived_at`, appliqué à un
+ * objet qui en demande quatre.
+ */
+export const invitations = pgTable(
+  "invitations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    domainId: domainRef(),
+    /**
+     * La personne invitée — elle existe **avant** l'invitation.
+     *
+     * `restrict`, comme partout où une ligne retient une autre : une personne
+     * qu'on a invitée ne se supprime pas sans que le geste le dise.
+     */
+    personId: uuid("person_id")
+      .notNull()
+      .references((): AnyPgColumn => persons.id, { onDelete: "restrict" }),
+    /**
+     * L'adresse au moment de l'invitation. **Copiée, et non jointe.**
+     *
+     * C'est elle que l'acceptation confronte à l'e-mail vérifié par le
+     * fournisseur : corriger le profil ensuite ne doit pas déplacer la cible
+     * d'un lien déjà parti. Une adresse qui change se traite en révoquant
+     * l'invitation et en la refaisant, jamais en silence.
+     */
+    email: text("email").notNull(),
+    /** L'énuméré existant : aucun troisième rôle ne s'invente ici. */
+    role: domainRole("role").notNull(),
+    /** SHA-256, en hexadécimal, des trente-deux octets du lien. Jamais le jeton. */
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    /** Nul tant qu'aucun courriel n'est parti. */
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    ...stamps,
+  },
+  (t) => [
+    index("invitations_domain_id_idx").on(t.domainId),
+    index("invitations_person_id_idx").on(t.personId),
+    /* **L'unicité porte sur l'empreinte**, qui est ce que la base connaît du
+       lien. C'est elle qui rend la lecture par jeton non ambiguë : une
+       empreinte désigne une invitation, et le `limit 1` de la lecture cesse
+       d'être un choix au hasard — le piège que T9.6 a mesuré sur l'adresse. */
+    unique("invitations_token_hash_unique").on(t.tokenHash),
+    /* **Une seule invitation vivante par personne.** Réinviter révoque la
+       précédente ; sans cet index, deux liens ouvriraient le même accès et
+       n'en révoquer qu'un laisserait l'autre valide. Il est **partiel** : les
+       invitations acceptées et les révoquées s'accumulent sans se gêner, ce
+       qui est exactement ce qu'on demande à une trace. */
+    uniqueIndex("invitations_pending_unique")
+      .on(t.domainId, t.personId)
+      .where(sql`${t.acceptedAt} is null and ${t.revokedAt} is null`),
+  ],
+);
+
 /** Division de l'entreprise. Qualifie les produits, ne cloisonne rien. */
 export const entities = pgTable(
   "entities",
@@ -709,6 +791,29 @@ export const persons = pgTable(
        personne `manual` d'un domaine. La collision que le fournisseur écarte se
        traite donc au rapprochement, pas dans la clé. */
     unique("persons_domain_external_id_unique").on(t.domainId, t.externalId),
+    /* **Une adresse, une personne, dans un domaine — et les archivées comptent.**
+       Le point était ouvert depuis T9.6, qui avait mesuré le refus dans
+       `grantPersonAccess` et laissé la base muette : *« rien n'interdit en base
+       deux adresses identiques dans un domaine »*, avec pour destination *« le
+       jour où une contrainte s'autorise »*. Ce jour est celui de l'invitation,
+       qui **se rapproche par l'adresse** — deux lignes homonymes rendraient
+       l'acceptation ambiguë, et le hasard d'un `limit 1` déciderait à qui l'on
+       ouvre un accès.
+
+       **Sur `lower(email)`**, du même côté que les trois autres lectures
+       d'identité (`findSuperAdminByEmail`, `findDomainIdentity`, le
+       rapprochement de `lib/auth/entry.ts`) : une unicité sensible à la casse
+       laisserait entrer le doublon qu'elle prétend écarter.
+
+       **Sans clause partielle, donc archivées comprises**, et c'est la raison
+       exacte que le point ouvert donnait : le rapprochement de la règle 6 lit
+       `includeArchived`, si bien qu'une ligne archivée reste une candidate.
+       Les `NULL` restent distincts pour PostgreSQL — une personne sans adresse
+       n'entre en conflit avec personne, ce qui est la règle de D19. */
+    uniqueIndex("persons_domain_email_unique").on(
+      t.domainId,
+      sql`lower(${t.email})`,
+    ),
     check(
       "persons_identity_provider_requires_external_id",
       sql`(${t.identityProvider} is null) or (${t.externalId} is not null)`,

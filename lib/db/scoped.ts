@@ -54,6 +54,7 @@ import {
   entities,
   events,
   identityProvider,
+  invitations,
   persons,
   projects,
   results,
@@ -901,7 +902,7 @@ export function forDomain(scope: Scope) {
    Ce n'est donc pas un contournement de la règle 1, c'est le lieu nommé de ce
    qu'elle ne peut pas couvrir — et sa frontière est étroite : **aucune donnée
    métier n'est joignable par ce chemin.** Un domaine créé ici ne se lit ensuite
-   que par `forDomain`, et les deux lectures d'identité ne rendent que de quoi
+   que par `forDomain`, et les trois lectures d'identité ne rendent que de quoi
    *choisir* un domaine, jamais de quoi le traverser.
 
    **La distinction que T9.3 devait écrire, la voici — et elle est portée par
@@ -1115,6 +1116,40 @@ export const superAdmin = {
           sql`lower(${domainIdentities.value}) = lower(${value})`,
         ),
       )
+      .limit(1);
+    return rows[0];
+  },
+
+  /**
+   * L'invitation désignée par un lien — **la troisième lecture qui précède le
+   * domaine**, et elle a exactement le statut des deux autres.
+   *
+   * Elle s'exécute là où aucune session n'existe encore : sur la page publique
+   * `/invitation/[jeton]`, qui doit nommer le domaine pour que l'invité sache
+   * où on l'attend, et au retour du fournisseur, avant que le cookie ne soit
+   * posé. Elle ne rend donc **que de quoi désigner un domaine**, jamais de quoi
+   * le traverser — c'est la frontière que l'en-tête de ce bloc décrit, et la
+   * raison pour laquelle l'acceptation, elle, repasse par `forDomain`.
+   *
+   * **On interroge l'empreinte, jamais le jeton** : `token_hash` est tout ce
+   * que la base connaît du lien, et l'appelant (`lib/auth/invitation.ts`) hache
+   * avant d'appeler. Le jeton ne descend pas jusqu'ici.
+   *
+   * **Elle ne juge de rien** — ni de l'expiration, ni de la révocation, ni de
+   * l'acceptation déjà faite, ni de l'état du domaine. C'est délibéré, et c'est
+   * la leçon de `findDomainIdentity`, qui ne juge pas non plus de l'état du
+   * domaine qu'elle désigne : une lecture qui filtre en silence rend un refus
+   * *sans cause*, et les causes doivent s'isoler pour se mettre en défaut. Le
+   * tri se fait chez l'appelant, qui les distingue une à une pour ses tests et
+   * n'en dit aucune à l'écran.
+   */
+  async findInvitationByTokenHash(
+    tokenHash: string,
+  ): Promise<InferSelectModel<typeof invitations> | undefined> {
+    const rows = await db
+      .select()
+      .from(invitations)
+      .where(eq(invitations.tokenHash, tokenHash))
       .limit(1);
     return rows[0];
   },

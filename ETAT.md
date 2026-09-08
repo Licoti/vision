@@ -2,15 +2,15 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 08/09/2026, **T9.6 terminé — et C9 est clos.** Les comptes d'un domaine :
-**aucun écran n'écrivait `has_access` ni `domain_role`**, et un domaine créé par T9.4 portait un seul
-compte, définitivement. L'e-mail entre au formulaire — facultatif sans accès, obligatoire dès qu'un
-accès existe, **la bascule venant de la ligne relue** —, l'accès s'accorde avec son rôle et se retire
-muet. **Un quatrième refus est venu d'une mesure** : le rapprochement lit l'e-mail en `limit 1`
-**sans ordre**, donc un doublon d'adresse est refusé, archivées comprises. **Huit neutralisations
-isolées, dont deux ont d'abord dit autre chose.** **Puis, hors ticket le 08/09, un 500 mesuré** :
-l'écran d'entrée proposait Microsoft, qui n'a pas ses valeurs. **Vert de référence : 1 824 tests sur
-64 fichiers, `lint` et `tsc` au vert** (1 771 avant T9.6). **Ticket suivant : T7.7**, et C7 reprend.
+**Dernière mise à jour :** 08/09/2026, **T11.1 terminé — une avance prise sur C11, hors de son
+rang.** La table `invitations` : aucune colonne `token`, seule l'empreinte est stockée ; pas
+d'`archived_at`, donc `archive` est un refus de typage ; **quatre horodatages et aucun statut**.
+`superAdmin` reçoit sa **sixième** clé — la première qui ne vient pas d'une règle d'entrée — et
+**son sceau nominatif l'a arrêtée**. L'unicité `(domain_id, lower(email))` referme un point ouvert
+et **en a ouvert deux** : un **500 mesuré** au formulaire de personne, réparé par une garde, et le
+décompte de jumelles de T9.6 devenu **inatteignable**. **Périmètre étendu à deux fichiers d'équipe,
+sur demande.** **Vert : 1 834 tests sur 64 fichiers** (1 824 avant), `lint` et `tsc` au vert.
+**Ticket suivant : T7.7** — C7 reprend, et C11 attend sa clôture.
 
 ---
 
@@ -31,6 +31,7 @@ l'écran d'entrée proposait Microsoft, qui n'a pas ses valeurs. **Vert de réf�
 | C8 — Dette | T8.1 → T8.5 | **terminé** |
 | C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **terminé** |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
+| C11 — L'invitation | T11.1 → T11.3 | **T11.1 livré en avance** — T11.2, T11.3 après C7 |
 
 ---
 
@@ -59,11 +60,12 @@ l'écran d'entrée proposait Microsoft, qui n'a pas ses valeurs. **Vert de réf�
 - **C9 — SSO et administration multi-domaine — T9.1 → T9.6, 06-07/09.** Deux tables hors du produit,
   le SSO — le domaine cesse d'être *trouvé* pour être *désigné*, **aucun écran du produit ne bouge**
   —, le droit dont **la preuve se passe en argument**, l'écran au-dessus des domaines, l'amorçage
-  extrait du script, et les comptes. **Trois énoncés de fiche mis en défaut.**
-  1 646 → **1 816 tests sur 63 fichiers**.
-- **Hors ticket, 08/09 — le fournisseur non raccordé.** Trouvé par une question, pas par une
-  relecture : `?fournisseur=microsoft` rendait **500**, l'aller n'attrapant pas la levée que le
-  retour attrape depuis T9.2. **1 816 → 1 824 tests sur 64 fichiers.**
+  extrait du script, et les comptes. **Trois énoncés de fiche mis en défaut.** 1 646 → **1 816**.
+- **Hors ticket, 08/09 — le fournisseur non raccordé.** Trouvé par une question : `?fournisseur=`
+  `microsoft` rendait **500**, l'aller n'attrapant pas la levée que le retour attrape. **→ 1 824.**
+- **C11 — L'invitation — T11.1, 08/09.** Écrit **avant sa fiche** (manquement consigné). La
+  contrainte d'adresse a fait tomber deux tests de T9.6 et **révélé un 500** au formulaire — mesuré,
+  puis réparé. 1 824 → **1 834 tests**.
 - **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, détaillés dans
   `HISTORIQUE-TICKETS.md`. **Cinq portent une migration, `0010` à `0014`.** Le reste est de la
   reprise d'ergonomie, le bouton aligné sur le design system, et le **renommage de « Projets » en
@@ -87,11 +89,11 @@ refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le
   → **action humaine : `git add -A` avant le prochain commit**, ou un `git add` des dix-neuf puis un
   commit de rattrapage.
 
-- **Microsoft est écrit et n'est pas branché.** Entra ID Free demande une carte bancaire.
-  **Mesuré** : la découverte aboutit, l'adresse d'autorisation est juste. **Pas mesuré** : l'échange
-  du code, et la substitution d'émetteur qu'impose le gabarit `{tenantid}` — **« deux valeurs de
-  plus, jamais une reprise » reste une hypothèse.** **Son bouton ne rend plus 500** (08/09) : les
-  deux valeurs le feront reparaître sans une ligne de code. → **action humaine.**
+- **Microsoft est écrit et n'est pas branché** — Entra ID Free demande une carte bancaire, et
+  `ENTRA_CLIENT_ID`/`_SECRET` manquent de `.env.local`. **Mesuré** : la découverte aboutit, l'adresse
+  d'autorisation est juste. **Pas mesuré** : l'échange du code, et la substitution d'émetteur du
+  gabarit `{tenantid}` — **« deux valeurs, jamais une reprise » reste une hypothèse.** Son bouton ne
+  rend plus 500 (08/09). → **action humaine.**
 - **Les secrets Neon n'ont jamais été tournés.** Deux chaînes ont transité en clair le 12/08, hors
   dépôt mais valides. **Reportés cinq fois, et C9 est passé** — la raison qui les reportait n'existe
   plus. → **action humaine, et c'est la plus vieille de la liste.**
@@ -99,10 +101,9 @@ refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le
   production n'est enregistrée nulle part, et les trois secrets ne sont pas dans Netlify. **Le SSO ne
   peut pas fonctionner en ligne avant ces quatre gestes** (`ACTIONS-HUMAINES-C9.md` §4).
   → **action humaine, avant tout déploiement.**
-- **`CLAUDE.md` porte trois énoncés périmés** : « Statut de projet » quand l'écran dit « Statuts
-  d'accompagnement » · l'entrée « Projet », quand le menu affiche « Accompagnements » · *« Entra ID
-  le remplacera en C7 »*, quand **c'est Google qui l'a remplacé, en C9** — même écart dans `docs/01`
-  §141. Règle 7, `docs/` figé, **aucun ne bloque un ticket.** → **action humaine.**
+- **`CLAUDE.md` porte trois énoncés périmés** : « Statut de projet » contre « Statuts
+  d'accompagnement » · l'entrée « Projet » contre « Accompagnements » · *« Entra ID le remplacera en
+  C7 »*, quand **c'est Google, en C9** (même écart dans `docs/01` §141). → **action humaine.**
 - **Ce qu'un macro-parcours relie reste à trancher**, et avec lui **« macro-parcours » contre le
   « Réseau de liens entre produits » de `docs/02` §10**, même direction sous un autre nom. L'entrée
   de menu et l'écran vide restent tels quels — ni table, ni objet, ni droit ; le concept devra entrer
@@ -115,9 +116,9 @@ vérifiée** — `scripts/seed.ts` n'en écrit pas. **Cela ne l'empêche pas d'�
 l'empêche d'être cohérent** : le `hd` vient de Google, jamais de nous, et **seul un vrai domaine
 Workspace ouvre le chemin d'un membre de domaine** — la limite que T9.2 avait écrite d'avance.
 → **le prochain ticket qui ouvre `scripts/seed.ts`, pour la fixture et non pour le SSO.**
-**Rien n'interdit en base deux adresses identiques dans un domaine** : le refus de T9.6 vit dans
-l'action, et l'unicité `(domain_id, lower(email))` — archivées comprises, le rapprochement les lisant
-— serait une migration. → **le jour où une contrainte s'autorise.**
+**Le décompte de jumelles de `grantPersonAccess` est inatteignable** depuis T11.1 : il lit
+`lower(email)`, l'expression même de l'index, qui ne peut plus valoir plus de un. Filet conservé sur
+décision du 08/09, **et aucun test ne peut plus l'exercer**. → **le jour où l'on ôte un filet.**
 **Le libellé des deux rôles est écrit à trois endroits**, plus deux mots que `lib/journal.ts` récrit
 exprès, étant pur. → **T7.9**, avec les quatre libellés hors de `lib/format.ts`.
 **`withoutAnySession()` reste importable depuis `app/`**, rien ne l'en empêchant mécaniquement : la
@@ -130,10 +131,9 @@ amorçage partiel** — `npm run db:seed` ne vise que la démonstration, quand l
 rend le geste rejouable sans rien doubler : il ne manque qu'un appelant. → **avec la dette de T3.6.**
 **Le RLS a quitté C9** : voir le groupe (c).
 
-**C7 reprend maintenant, et ses huit points vivent dans `tickets-C7.md`** — T7.7 l'accessibilité,
-T7.8 les états vides et `/a-propos`, T7.9 les colonnes sans lecteur et les libellés, T7.10
-l'ergonomie. **La liste cesse d'être recopiée ici** : elle y a doublé une fiche quatre chantiers
-durant.
+**C7 reprend maintenant, ses huit points vivant dans `tickets-C7.md`** (T7.7 à T7.10), et **C11 le
+suit, sa fiche écrite.** Aucune des deux listes n'est recopiée ici : elle y a doublé une fiche quatre
+chantiers durant.
 
 **Le journal reste incomplet** (T8.3, laissé intact — règle 3) : **quatre familles écrivent sans
 trace** — le produit, l'adoption, la compétence portée, et les huit référentiels autres que l'entité
@@ -246,5 +246,5 @@ sur quatre met « Annuler » au rang secondaire · les props d'icône de `Button
 - **Une écriture au-dessus des domaines se prouve.** `superAdmin` ne porte que des lectures ; les
   deux écrivains vivent derrière `asSuperAdmin(grant)`, et la couche **relit la ligne** — un grant
   forgé ne vaut rien. `requireSuperAdmin()` depuis une session, `withoutAnySession(motif)` hors.
-- **Les maquettes `docs/design/maquettes/` sont une référence visuelle**, jamais branchées, et **le
+- **Les maquettes `docs/design/maquettes/` sont une référence visuelle**, jamais branchées ; **le
   levier n'est pas le modèle mais les quatre disciplines de vérification.**
