@@ -9,6 +9,13 @@ ce qui resterait ouvert repartirait alors dans le groupe (a) d'`ETAT.md`, qui en
 Établi le 06/09/2026, après T9.2. Chaque point dit **ce qui est bloqué** sans lui.
 **Plus aucun point n'empêche un ticket de s'ouvrir** depuis la levée du 06/09/2026, en bas de page.
 
+**Relu et mesuré le 08/09/2026, C9 étant clos** (T9.1 → T9.6, 1 824 tests sur 64 fichiers). Deux
+points sont tombés — le premier super administrateur **existe en base**, et le refus de Microsoft
+n'est plus une panne. **Quatre restent, tous humains** : les secrets Neon, les énoncés périmés de
+`CLAUDE.md` et `docs/01`, l'adresse de rappel de production, et Microsoft le jour où un client
+l'impose. Le fichier ne se supprime donc pas encore : ce qui reste ici doit d'abord passer dans le
+groupe (a) d'`ETAT.md`, qui en est la source.
+
 ---
 
 ## 1. Poser le premier super administrateur — **bloque l'usage de T9.4**
@@ -23,7 +30,11 @@ l'arbitrage (2) refuse un tel compte **sauf** s'il est super administrateur (rè
 chemin est donc **le seul parcourable en vrai au navigateur** aujourd'hui.
 
 Le script est rejouable : une seconde pose met le nom à jour et rétablit une ligne archivée.
-La ligne de mesure de T9.2 a été retirée après usage — **la table est vide.**
+
+**Fait — mesuré le 08/09/2026 : `super_admins` porte une ligne vivante.** Cette page disait *« la
+table est vide »*, ce qui était vrai à l'écriture de T9.2 et faux depuis. **Le chemin du super
+administrateur est donc le seul parcourable en vrai au navigateur aujourd'hui**, et il l'est
+vraiment : connexion Google, puis `/domaines`.
 
 > Sans lui : personne ne crée le premier domaine en T9.4, et l'écran resterait invérifiable.
 
@@ -85,6 +96,14 @@ new Workforce tenant »* : les valeurs n'existent pas.
 **Ce qui ne l'a pas été** : l'échange du code, la substitution d'émetteur que son gabarit
 `{tenantid}` impose, et le claim `tid`. **La promesse « deux valeurs de plus, jamais une reprise »
 est donc une hypothèse, pas un fait.**
+
+**Et jusqu'au 08/09/2026, l'écran d'entrée proposait quand même son bouton** :
+`GET /auth/connexion?fournisseur=microsoft` rendait **500** — `required()` levait
+`ProviderConfigError`, et cette route n'avait personne pour la rattraper. **Mesuré, puis corrigé
+hors ticket** : l'écran ne propose que les fournisseurs **raccordés**, et un fournisseur sans ses
+deux valeurs se traite comme un fournisseur inconnu — retour à l'écran d'entrée, jamais une erreur
+(règle 5). Le jour où les deux valeurs entrent dans `.env.local`, **le bouton reparaît sans qu'on
+touche à une ligne** : c'est ce que `isProviderConnected` achète.
 
 Quand le moment viendra, quatre réglages de console qui ne sont pas des valeurs :
 

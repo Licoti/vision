@@ -2,17 +2,15 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 07/09/2026, **T9.6 terminé — et C9 est clos.** Les comptes d'un domaine :
+**Dernière mise à jour :** 08/09/2026, **T9.6 terminé — et C9 est clos.** Les comptes d'un domaine :
 **aucun écran n'écrivait `has_access` ni `domain_role`**, et un domaine créé par T9.4 portait un seul
 compte, définitivement. L'e-mail entre au formulaire — facultatif sans accès, obligatoire dès qu'un
-accès existe, **la bascule venant de la ligne relue** —, l'accès s'accorde avec son rôle par une clé
-d'URL à lui, et se retire muet. **Un quatrième refus est venu d'une mesure** : le rapprochement lit
-l'e-mail en `limit 1` **sans ordre**, donc un doublon d'adresse est refusé, archivées comprises.
-**Huit neutralisations isolées, dont deux ont d'abord dit autre chose** — un test qui passait garde
-retirée, six qui tombaient en cascade —, et le refus de la personne archivée d'`openPerson` **reçoit
-son premier témoin depuis T5bis.6**. **Vert de référence : 1 816 tests sur 63 fichiers, `lint` et
-`tsc` au vert** (1 771 avant T9.6). **Chantier suivant : C7 reprend** — **ticket suivant : T7.7,
-accessibilité et navigation au clavier**, et le POC est complet le jour où C7 se referme.
+accès existe, **la bascule venant de la ligne relue** —, l'accès s'accorde avec son rôle et se retire
+muet. **Un quatrième refus est venu d'une mesure** : le rapprochement lit l'e-mail en `limit 1`
+**sans ordre**, donc un doublon d'adresse est refusé, archivées comprises. **Huit neutralisations
+isolées, dont deux ont d'abord dit autre chose.** **Puis, hors ticket le 08/09, un 500 mesuré** :
+l'écran d'entrée proposait Microsoft, qui n'a pas ses valeurs. **Vert de référence : 1 824 tests sur
+64 fichiers, `lint` et `tsc` au vert** (1 771 avant T9.6). **Ticket suivant : T7.7**, et C7 reprend.
 
 ---
 
@@ -59,11 +57,13 @@ accessibilité et navigation au clavier**, et le POC est complet le jour où C7 
   des seuls points ouverts — et **quatre énoncés de fiche sur cinq y ont été mis en défaut**, du
   domaine de tests résiduel à la redirection redondante. 1 582 → 1 646 tests.
 - **C9 — SSO et administration multi-domaine — T9.1 → T9.6, 06-07/09.** Deux tables hors du produit,
-  puis le SSO — le domaine cesse d'être *trouvé* pour être *désigné*, **aucun écran du produit ne
-  bouge** —, puis le droit dont **la preuve se passe en argument**, l'écran au-dessus des domaines,
-  l'amorçage extrait du script, et les comptes. **Trois énoncés de fiche mis en défaut** : neuf
-  référentiels qui étaient huit, une condition de matériel qui portait sur un ticket et non sur le
-  chantier, un périmètre incomplet de huit fichiers. 1 646 → **1 816 tests sur 63 fichiers**.
+  le SSO — le domaine cesse d'être *trouvé* pour être *désigné*, **aucun écran du produit ne bouge**
+  —, le droit dont **la preuve se passe en argument**, l'écran au-dessus des domaines, l'amorçage
+  extrait du script, et les comptes. **Trois énoncés de fiche mis en défaut.**
+  1 646 → **1 816 tests sur 63 fichiers**.
+- **Hors ticket, 08/09 — le fournisseur non raccordé.** Trouvé par une question, pas par une
+  relecture : `?fournisseur=microsoft` rendait **500**, l'aller n'attrapant pas la levée que le
+  retour attrape depuis T9.2. **1 816 → 1 824 tests sur 64 fichiers.**
 - **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, détaillés dans
   `HISTORIQUE-TICKETS.md`. **Cinq portent une migration, `0010` à `0014`.** Le reste est de la
   reprise d'ergonomie, le bouton aligné sur le design system, et le **renommage de « Projets » en
@@ -78,29 +78,43 @@ refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le
 
 ### a. À trancher — sinon les tickets suivants héritent du problème · gestes détaillés : `ACTIONS-HUMAINES-C9.md`
 
-- **Microsoft est écrit et n'est pas branché.** Entra ID Free demande une carte bancaire, et
-  *« only paid customers can create a new Workforce tenant »*. **Mesuré** : la découverte aboutit,
-  l'adresse d'autorisation est juste. **Pas mesuré** : l'échange du code, et la substitution
-  d'émetteur qu'impose le gabarit `{tenantid}` — **« deux valeurs de plus, jamais une reprise »
-  reste une hypothèse.** → **action humaine.**
+- **Les trois derniers commits ne portent aucun fichier neuf, et `HEAD` ne compile pas.**
+  **Dix-neuf fichiers non suivis** (mesuré le 08/09) — tout `app/domaines/`, les quatre panneaux de
+  domaine, `lib/db/bootstrap.ts`, `lib/db/reconcile.ts`, `lib/forms/domain*.ts`,
+  `components/team/access-panel.tsx`, `lib/auth/oidc.test.ts` —, quand `lib/drawers/team.tsx` et
+  `app/domaines/actions.ts` **les importent**. `.gitignore` ne les exclut pas : c'est
+  `git commit -am` qui ne prend que le suivi. **C9 est écrit, il n'est pas dans le dépôt.**
+  → **action humaine : `git add -A` avant le prochain commit**, ou un `git add` des dix-neuf puis un
+  commit de rattrapage.
+
+- **Microsoft est écrit et n'est pas branché.** Entra ID Free demande une carte bancaire.
+  **Mesuré** : la découverte aboutit, l'adresse d'autorisation est juste. **Pas mesuré** : l'échange
+  du code, et la substitution d'émetteur qu'impose le gabarit `{tenantid}` — **« deux valeurs de
+  plus, jamais une reprise » reste une hypothèse.** **Son bouton ne rend plus 500** (08/09) : les
+  deux valeurs le feront reparaître sans une ligne de code. → **action humaine.**
 - **Les secrets Neon n'ont jamais été tournés.** Deux chaînes ont transité en clair le 12/08, hors
-  dépôt mais valides. **Reportés quatre fois**, et la raison ne tient plus : **C9 touche aux secrets
-  de toute façon.** → **action humaine.**
-- **`CLAUDE.md` porte trois énoncés périmés**, et le troisième a empiré : « Statut de projet »
-  quand l'écran dit « Statuts d'accompagnement » · l'entrée « Projet », qui tait que le menu affiche
-  « Accompagnements » · *« Entra ID le remplacera en C7 »*, quand **c'est Google qui l'a remplacé,
-  en C9** — même écart dans `docs/01` §141. Règle 7, et `docs/` figé. **Aucun ne bloque un
-  ticket.** → **action humaine.**
+  dépôt mais valides. **Reportés cinq fois, et C9 est passé** — la raison qui les reportait n'existe
+  plus. → **action humaine, et c'est la plus vieille de la liste.**
+- **Rien n'est prêt côté production.** `AUTH_URL` vaut `localhost:3000`, l'URI de rappel de
+  production n'est enregistrée nulle part, et les trois secrets ne sont pas dans Netlify. **Le SSO ne
+  peut pas fonctionner en ligne avant ces quatre gestes** (`ACTIONS-HUMAINES-C9.md` §4).
+  → **action humaine, avant tout déploiement.**
+- **`CLAUDE.md` porte trois énoncés périmés** : « Statut de projet » quand l'écran dit « Statuts
+  d'accompagnement » · l'entrée « Projet », quand le menu affiche « Accompagnements » · *« Entra ID
+  le remplacera en C7 »*, quand **c'est Google qui l'a remplacé, en C9** — même écart dans `docs/01`
+  §141. Règle 7, `docs/` figé, **aucun ne bloque un ticket.** → **action humaine.**
 - **Ce qu'un macro-parcours relie reste à trancher**, et avec lui **« macro-parcours » contre le
-  « Réseau de liens entre produits » de `docs/02` §10**, qui dit la même direction sous un autre nom.
-  L'entrée de menu et l'écran vide restent tels quels — ni table, ni objet, ni droit ; le concept
-  devra entrer dans `docs/02` §2, figé. → **session de découpage de C10.**
+  « Réseau de liens entre produits » de `docs/02` §10**, même direction sous un autre nom. L'entrée
+  de menu et l'écran vide restent tels quels — ni table, ni objet, ni droit ; le concept devra entrer
+  dans `docs/02` §2, figé. → **session de découpage de C10.**
 
 ### b. Assignés à un ticket
 
-**C9 est clos ; six points lui survivent.** **Le jeu de démonstration n'a aucune adresse** —
-`scripts/seed.ts` n'en écrit pas —, donc **aucun de ses comptes n'est joignable par le SSO** (T9.2) ;
-l'écran Équipe sait désormais l'écrire. → **le prochain ticket qui ouvre `scripts/seed.ts`.**
+**C9 est clos ; six points lui survivent.** **Le jeu de démonstration n'a ni adresse ni identité
+vérifiée** — `scripts/seed.ts` n'en écrit pas. **Cela ne l'empêche pas d'être connectable, cela
+l'empêche d'être cohérent** : le `hd` vient de Google, jamais de nous, et **seul un vrai domaine
+Workspace ouvre le chemin d'un membre de domaine** — la limite que T9.2 avait écrite d'avance.
+→ **le prochain ticket qui ouvre `scripts/seed.ts`, pour la fixture et non pour le SSO.**
 **Rien n'interdit en base deux adresses identiques dans un domaine** : le refus de T9.6 vit dans
 l'action, et l'unicité `(domain_id, lower(email))` — archivées comprises, le rapprochement les lisant
 — serait une migration. → **le jour où une contrainte s'autorise.**
@@ -125,61 +139,50 @@ durant.
 trace** — le produit, l'adoption, la compétence portée, et les huit référentiels autres que l'entité
 (trente-deux gestes), chacune **fixée par un test qui tombera**. → **prochaine session de découpage.**
 
-**Au prochain ticket qui ouvre le fichier** — **destination qui a déjà échoué une fois**, et T8.4 a dû
-recevoir un ticket pour ce seul motif. **`uiLayerSeal` garde une liste de six dossiers, pas une
-propriété** : un septième lui échappera (`eslint.config.mjs`) ·
-**`listProductsWithCounts` ne rejoue pas la jointure de statut** (`lib/queries/products.ts`) : sa
-colonne « Accompagnements » compte `projects.id` sans confronter le statut au domaine — **le
-quatrième décompte de la famille**, trouvé par la ligne forgée de T8.2 et laissé intact, son fichier
-étant hors du périmètre de la fiche (règle 3) · `listResultToolOptions` sert trois panneaux et son nom
-n'en dit qu'un (`lib/queries/activities.ts`) · `sameReferentialLabel` et `sameEntityLabel` disent la
-même règle deux fois, et `entities.position` ne se saisit pas (`lib/forms/entity.ts`) · la carte
-radio est écrite deux fois, et le formulaire de produit ne dit pas « (obligatoire) » quand celui de
-projet le dit (`product-form.tsx`) · le bloc des personnes retenues n'a pas d'état vide
-(`picker.tsx`, **les deux appelants**) · un pied de formulaire sur quatre met « Annuler » au rang
-secondaire · les props d'icône de `Button` n'ont aucun appelant.
+**Au prochain ticket qui ouvre le fichier** — **destination qui a déjà échoué une fois**, T8.4 ayant
+dû recevoir un ticket pour ce seul motif. **`uiLayerSeal` garde une liste de six dossiers, pas une
+propriété** : un septième lui échappera · **`listProductsWithCounts` ne rejoue pas la jointure de
+statut** (`lib/queries/products.ts`) — **le quatrième décompte de la famille**, trouvé par la ligne
+forgée de T8.2, son fichier étant hors périmètre (règle 3) · `listResultToolOptions` sert trois
+panneaux et son nom n'en dit qu'un · `sameReferentialLabel` et `sameEntityLabel` disent la même règle
+deux fois, et `entities.position` ne se saisit pas · la carte radio est écrite deux fois, et le
+formulaire de produit ne dit pas « (obligatoire) » quand celui de projet le dit · le bloc des
+personnes retenues n'a pas d'état vide (`picker.tsx`, **les deux appelants**) · un pied de formulaire
+sur quatre met « Annuler » au rang secondaire · les props d'icône de `Button` n'ont aucun appelant.
 
 ### c. Dettes assumées — le fait et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`
 
 - **Le design system a neuf manques, et aucun n'a été inventé.** **Une carte ne se détache d'aucun
-  fond** — quatre positions de 1,04:1 à 1,24:1 quand le seuil d'un composant est 3:1, le plus franc
-  des `surface-neutral-*` plafonnant à **2,22:1** ; tous les couples de **texte** passent 4,5:1. S'y
-  ajoutent trois élévations, deux gradients, aucun jeton de bordure de contrôle (`form-field.tsx`
-  tient à 3,88:1), d'erreur, d'interlettrage, de voile, de séparateur, de mouvement ;
-  **`--number-*` s'arrête à 100 px** pour dix-neuf valeurs légitimes. Six substituts mesurés. Et
-  **les points d'arrêt sont posés à la main**, hors de la clause 2 de `spacingScaleLock` (T1.6).
-  → **design system.**
+  fond** — quatre positions de 1,04:1 à 1,24:1 quand le seuil d'un composant est 3:1 ; tous les
+  couples de **texte** passent 4,5:1. S'y ajoutent trois élévations, deux gradients, aucun jeton de
+  bordure de contrôle, d'erreur, d'interlettrage, de voile, de séparateur, de mouvement, et
+  **`--number-*` s'arrête à 100 px**. Six substituts mesurés ; les points d'arrêt restent posés à la
+  main, hors de `spacingScaleLock` (T1.6). → **design system.**
 - **Six points attendent une main humaine, et aucun ne se referme par un ticket.** Le **filtre de la
   roadmap** ne se partage plus par son adresse (21/08) · la **page produit porte deux langages
-  d'en-tête**, `northstar-v2` contre `BlockHeader` · **`docs/06` §3 porte deux écarts** du 29/08 —
-  l'ordre des blocs et « Accès direct » —, et **si le document suit ou si l'écart tient** reste à
-  trancher · les **deux listes de l'accueil** partagent le mot « activité » pour `events` d'un côté
-  et `activities` de l'autre · la **page projet ne consomme pas `PageHeader.facts`** (D39) ·
-  **« +N » sur `/equipe`** est un décompte que T5bis.2 interdit. → **arbitrage humain.**
+  d'en-tête** · **`docs/06` §3 porte deux écarts** du 29/08, et *si le document suit ou si l'écart
+  tient* reste à trancher · les **deux listes de l'accueil** partagent le mot « activité » pour deux
+  tables · la **page projet ne consomme pas `PageHeader.facts`** (D39) · **« +N » sur `/equipe`** est
+  un décompte que T5bis.2 interdit. → **arbitrage humain.**
 - **La liste close de `docs/06` §5 porte trois écarts** (28/08, à la demande) — « Projets liés »
   n'est plus rendu, « Démarrage » ne l'est que sans activité, « Budget » est un rang de la fiche
-  d'identité. **Rien n'est supprimé**, tout reste testé. → **assumés**, geste restant en T7.10.
-- **Quatre dettes sans échéance.** Sans JavaScript, **les gestes d'une carte de roadmap ne sont plus
-  atteignables** — le menu « … » décide de son ouverture, seule exception arbitrée à D30, et les
-  quatre actions serveur n'ont aucun repli · **`disabled:opacity-40` est servi sur douze balises qui
-  ne peuvent pas être désactivées**, à **2,35:1** composé, WCAG 1.4.3 exemptant les composants
-  inactifs · **rien en base ne retient un outil**, ses quatre clés entrantes étant `set null` quand
-  les huit autres butent sur un `restrict`, son refus d'archivage vivant dans l'action seule
-  (`refusalOfToolUsage`) · **la fixture est incomplète sur les ressources et les résultats** — deux
-  résultats sans lien profond, et **six adresses d'outil sur `example.com`**, désormais dans
-  `TOOL_BASE_URLS` seul (T9.5) · **le réseau fait tomber la suite** : l'intermittent de T8.1 est
-  **`NeonDbError: fetch failed`**, une fois sur dix **sans aucun écart d'assertion**, et le remède
-  serait un réessai dans `lib/db/client.ts`. → **sans échéance.**
+  d'identité. Rien n'est supprimé, tout reste testé. → **assumés**, geste en T7.10.
+- **Cinq dettes sans échéance.** Sans JavaScript, **les gestes d'une carte de roadmap ne sont plus
+  atteignables** — seule exception arbitrée à D30 · **`disabled:opacity-40` est servi sur douze
+  balises qui ne peuvent pas être désactivées**, à 2,35:1 composé · **rien en base ne retient un
+  outil**, ses quatre clés entrantes étant `set null`, son refus d'archivage vivant dans l'action
+  seule · **la fixture est incomplète sur les ressources et les résultats** — deux résultats sans
+  lien profond, six adresses sur `example.com` · **le réseau fait tomber la suite** : l'intermittent
+  de T8.1 est **`NeonDbError: fetch failed`**, une fois sur dix **sans écart d'assertion** — revu le
+  07/09, une fois sur deux passages complets. → **sans échéance.**
 - **Un référentiel sur neuf reste ouvert au renommage, et c'est structurel.** T8.4 reconnaît une
-  ligne par sa `position` — **huit refermés, mesurés** —, mais `tools` n'a pas d'ordinal (**mesuré
-  8 → 9**) : refermer demande une migration. **L'orpheline « Audit d'accessibilité » reste** en base
-  de développement. `ensureAll` **a désormais ses tests** (T9.5) : le mécanisme vit dans
-  `lib/db/reconcile.ts`, que `vitest` atteint. → **le jour où une colonne s'autorise.**
+  ligne par sa `position` — **huit refermés, mesurés** —, mais `tools` n'a pas d'ordinal : refermer
+  demande une migration. L'orpheline « Audit d'accessibilité » reste en base de développement, et
+  `ensureAll` a ses tests depuis T9.5. → **le jour où une colonne s'autorise.**
 - **Un test est faux par construction, et il l'était avant T9.4** :
   `app/(app)/produits/[id]/actions.test.ts:1490` assère qu'un résumé ne contient pas `"62"` ni
-  `"88"`, contre un suffixe de fixture **aléatoire** — tombé sur `44j62a0w` pendant une sonde,
-  **environ une fois sur cinquante**. Ce n'est pas l'intermittent réseau, qui ne porte aucun écart
-  d'assertion. → **le prochain ticket qui ouvre ce fichier.**
+  `"88"`, contre un suffixe de fixture **aléatoire** — **une fois sur cinquante environ**, et ce
+  n'est pas l'intermittent réseau. → **le prochain ticket qui ouvre ce fichier.**
 - **La base de développement a dérivé de la fixture, et elle est jetable** — la règle 4 protège la
   donnée métier, pas une fixture locale. Pas de `db:reset`. → **outillage si besoin réel.**
 - **Deux dettes, une seule cause : `neon-http` n'a pas de transaction interactive.** La **création
@@ -190,9 +193,8 @@ secondaire · les props d'icône de `Button` n'ont aucun appelant.
   tests, et C9 la durcit au **point d'entrée**. Écart à D38 consigné. → **le jour où le pilote
   exposera la transaction interactive ; les deux se referment ensemble.**
 - **Deux règles de période voisines vivent à deux endroits** — `lastActivityExpression` et
-  `projectPeriods` — **et divergent sur un point voulu** : la seconde compte les `planned`, la
-  première les écarte. L'une dit l'étendue, l'autre la fraîcheur ; deux témoins tiennent l'accord.
-  → **à reposer si une troisième lecture de période apparaît.**
+  `projectPeriods` — **et divergent sur un point voulu** : la seconde compte les `planned`. L'une dit
+  l'étendue, l'autre la fraîcheur. → **à reposer si une troisième lecture apparaît.**
 - **Trois dettes que seul l'usage tranchera** : les filtres ne survivent pas à un aller-retour par
   la navigation principale (`docs/06` §9 les veut conservés) · le référentiel des personnes reste
   servi **en entier** dans les deux formulaires · la liste transverse n'est pas plafonnée. → **si
@@ -237,12 +239,10 @@ secondaire · les props d'icône de `Button` n'ont aucun appelant.
   et `requireSession` redirige vers `/auth/acces`. **`/dev/session` reste**, 404 en production :
   une adresse personnelle ne porte ni `hd` ni `tid`, donc le chemin d'un membre de domaine ne se
   parcourt pas au navigateur.
-- **Un accès et son rôle ne se séparent jamais.** `persons_role_requires_access` refuse *accès sans
-  rôle* et *rôle sans accès* : les deux colonnes s'écrivent dans la même instruction, et la base
-  refuse chaque moitié écrite seule — mesuré, pas supposé. **Le dernier responsable d'un domaine ne
-  se rétrograde ni ne se retire** : le décompte porte sur les *autres* responsables vivants, et comme
-  qui exerce le geste en est un, il ne vaut zéro que sur soi-même. **Un intervenant côté entité n'en
-  reçoit jamais** (`docs/05` §4, D2).
+- **Un accès et son rôle ne se séparent jamais** : `persons_role_requires_access` refuse chaque
+  moitié écrite seule — mesuré. **Le dernier responsable ne se rétrograde ni ne se retire** : le
+  décompte porte sur les *autres* responsables vivants, et comme qui exerce le geste en est un, il ne
+  vaut zéro que sur soi-même. **Un intervenant côté entité n'en reçoit jamais** (D2).
 - **Une écriture au-dessus des domaines se prouve.** `superAdmin` ne porte que des lectures ; les
   deux écrivains vivent derrière `asSuperAdmin(grant)`, et la couche **relit la ligne** — un grant
   forgé ne vaut rien. `requireSuperAdmin()` depuis une session, `withoutAnySession(motif)` hors.

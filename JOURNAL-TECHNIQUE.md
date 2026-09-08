@@ -10972,3 +10972,31 @@ cible est l'acteur. Sur n'importe qui d'autre, l'acteur suffit à le rendre non 
 d'un accès laissé sur une **ligne archivée** reste donc possible, ce qui est précisément la
 contradiction qu'on veut pouvoir corriger. La porte du retrait ne regarde pas l'archivage
 (`openPersonIgnoringArchive`), celle de l'accord si.
+
+**Hors ticket, 08/09/2026 — un bouton qui rendait 500, et la question qui l'a trouvé.** À la
+question humaine *« le chantier C9 est-il terminé ? »*, la réponse tirée des fiches était oui —
+six tickets sur six. La réponse tirée de la **mesure** ne l'était pas : `GET
+/auth/connexion?fournisseur=microsoft` rendait **500**. L'écran d'entrée proposait les deux
+fournisseurs de `PROVIDERS`, `required()` levait `ProviderConfigError` pour celui qui n'a pas ses
+valeurs, et l'aller n'avait personne pour la rattraper — quand le **retour**, lui, l'attrapait
+depuis toujours, son `try` embrassant tout ce que le jeton peut avoir de faux. Le défaut vivait
+donc à l'unique endroit du couple qui ne parle pas à un jeton. **La route énonçait déjà la règle
+pour un fournisseur *inconnu*** — *« ramène à l'écran d'entrée, jamais à une erreur »* — et il a
+suffi de l'étendre au *non raccordé* : `isProviderConnected` lit les **deux** valeurs, l'écran ne
+propose que les fournisseurs qui les ont, et le premier proposé porte le bouton principal plutôt que
+« Google toujours ». *Une fiche dit ce qu'un ticket a voulu faire ; seul un appel dit ce que le
+produit fait.*
+
+**Hors ticket, 08/09/2026 — le secret compte autant que l'identifiant, et ce n'est pas de la
+symétrie.** L'aller n'a besoin que du `client_id`. Ne vérifier que lui aurait laissé un fournisseur
+à demi renseigné conduire l'utilisateur jusque chez Google, **et échouer au retour, après
+consentement** — le pire des deux moments pour découvrir un réglage manquant. Le test qui pose une
+seule des deux valeurs, dans un sens puis dans l'autre, est celui qui fixe ce raisonnement.
+
+**Hors ticket, 08/09/2026 — ce que le jeu de démonstration ne pourra jamais prouver.** Le point
+ouvert *« le jeu de démonstration n'a aucune adresse »* semblait la clé du parcours SSO ; il ne
+l'est pas. **Le `hd` vient de Google, pas de nous** : une identité vérifiée posée sur un domaine de
+fixture (`meridian.example`) n'est portée par aucun compte réel, et aucune adresse ajoutée au jeu de
+démonstration ne rendra ce domaine connectable. Le chemin d'un membre de domaine ne s'ouvre qu'avec
+un **vrai** domaine Workspace — c'est la limite que T9.2 avait écrite d'avance, et elle survit à
+T9.6. Le point reste donc ouvert pour la **cohérence** de la fixture, jamais pour l'épreuve du SSO.

@@ -7,11 +7,22 @@
  * ses causes à l'écran est un oracle offert à qui frappe — les sept causes
  * d'`entry.ts` nomment des tests, pas des messages.
  *
- * **Les deux liens de connexion vivent ici, et nulle part ailleurs.**
+ * **Les liens de connexion vivent ici, et nulle part ailleurs.**
  * `/auth/connexion?fournisseur=…` est une redirection, pas un écran : sans cet
  * écran, rien ne permettrait de *démarrer* une connexion au navigateur.
  * Réunir l'entrée et le refus tient donc en une phrase — on n'apprend rien de
  * plus en étant refusé qu'en arrivant.
+ *
+ * **Ils ne sont proposés que raccordés** (08/09/2026). L'écran offrait les deux
+ * fournisseurs de la table quand un seul a ses valeurs — arbitrage (1) : *la
+ * couche s'écrit pour deux fournisseurs et en sert un*. Le bouton Microsoft
+ * menait à un **500** (mesuré), là où la règle 5 veut un écran. Ce n'est pas un
+ * oracle : ce qui se révèle ici est la configuration de Vision, jamais si une
+ * entreprise est cliente ni si une personne existe.
+ *
+ * **Aucun fournisseur raccordé reste un état, pas une erreur** : l'écran le dit
+ * et ne propose rien. Le cas ne s'atteint que sur un environnement sans aucune
+ * valeur — et c'est exactement là qu'un écran muet coûterait le plus cher.
  *
  * **Deux états, et le troisième a duré le temps d'un chantier.** Un super
  * administrateur n'a ni domaine ni ligne `persons` (arbitrage 4) : sa connexion
@@ -39,7 +50,11 @@ import { redirect } from "next/navigation";
 import { EmptyState } from "@/components/ui/empty-state";
 import { buttonClass } from "@/components/ui/button";
 import { AUTH_ROUTES, getSession, readPrincipal } from "@/lib/auth/provider";
-import { PROVIDERS, type ProviderId } from "@/lib/auth/oidc";
+import {
+  isProviderConnected,
+  PROVIDERS,
+  type ProviderId,
+} from "@/lib/auth/oidc";
 import { ROUTES } from "@/lib/navigation";
 
 /* La session se lit à chaque requête : rien à mettre en cache. */
@@ -64,6 +79,11 @@ export default async function AccessPage() {
   const principal = await readPrincipal();
   if (principal?.kind === "super_admin") redirect(ROUTES.domains);
 
+  /* Lu à la requête, jamais figé au module : l'écran doit dire l'état de
+     **cet** environnement, et un environnement se déploie avec d'autres
+     valeurs que celui d'à côté. */
+  const offered = ORDER.filter(isProviderConnected);
+
   return (
     <main className="mx-auto flex min-h-screen max-w-160 flex-col justify-center gap-8 px-10 py-18">
       <header className="flex flex-col gap-2">
@@ -82,22 +102,35 @@ export default async function AccessPage() {
 
       <EmptyState
         title="Aucun accès"
-        description="Cet espace est réservé aux personnes que leur entreprise y a inscrites. Se connecter avec un compte professionnel :"
-        action={
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            {ORDER.map((provider) => (
-              <Link
-                key={provider}
-                href={AUTH_ROUTES.signIn(provider)}
-                className={buttonClass({
-                  variant: provider === "google" ? "primary" : "secondary",
-                })}
-              >
-                {PROVIDERS[provider].label}
-              </Link>
-            ))}
-          </div>
+        description={
+          offered.length > 0
+            ? "Cet espace est réservé aux personnes que leur entreprise y a inscrites. Se connecter avec un compte professionnel :"
+            : "Cet espace est réservé aux personnes que leur entreprise y a inscrites. Aucun fournisseur d'identité n'est raccordé à cet environnement : la connexion n'y est pas possible."
         }
+        {...(offered.length > 0
+          ? {
+              action: (
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  {offered.map((provider, index) => (
+                    <Link
+                      key={provider}
+                      href={AUTH_ROUTES.signIn(provider)}
+                      /* **Le premier proposé porte le bouton principal**, et non
+                         « Google toujours » : le jour où Google se retire d'un
+                         environnement, un écran sans aucun bouton principal
+                         serait un écran sans chemin évident. L'ordre est celui
+                         d'`ORDER`, jamais celui de la table. */
+                      className={buttonClass({
+                        variant: index === 0 ? "primary" : "secondary",
+                      })}
+                    >
+                      {PROVIDERS[provider].label}
+                    </Link>
+                  ))}
+                </div>
+              ),
+            }
+          : {})}
       />
     </main>
   );

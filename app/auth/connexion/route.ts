@@ -21,7 +21,11 @@ import {
   HANDSHAKE_TTL_SECONDS,
   sealHandshake,
 } from "@/lib/auth/cookie";
-import { beginAuthorization, isProviderId } from "@/lib/auth/oidc";
+import {
+  beginAuthorization,
+  isProviderConnected,
+  isProviderId,
+} from "@/lib/auth/oidc";
 import { AUTH_ROUTES, sessionCookieOptions } from "@/lib/auth/provider";
 
 /* Une redirection tirée d'un secret et d'un aléa : rien à mettre en cache. */
@@ -30,10 +34,17 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const asked = request.nextUrl.searchParams.get("fournisseur");
 
-  /* Un fournisseur absent ou inconnu ramène à l'écran d'entrée, jamais à une
-     erreur : l'adresse est publique, et un message d'erreur y renseignerait
-     sur ce qui existe. */
-  if (!isProviderId(asked)) {
+  /* Un fournisseur absent, inconnu **ou non raccordé** ramène à l'écran
+     d'entrée, jamais à une erreur : l'adresse est publique, et un message
+     d'erreur y renseignerait sur ce qui existe.
+
+     **Le troisième cas est arrivé après les deux autres** (08/09/2026), et il
+     rendait `500` : `beginAuthorization` lève `ProviderConfigError` pour un
+     fournisseur sans valeurs, et cette route n'avait personne pour la
+     rattraper. Le traiter **comme un inconnu** plutôt que comme une panne est ce
+     que la règle 5 demande — et cela ne renseigne sur rien de plus que l'écran
+     d'entrée, qui ne propose déjà que les fournisseurs raccordés. */
+  if (!isProviderId(asked) || !isProviderConnected(asked)) {
     return NextResponse.redirect(new URL(AUTH_ROUTES.entry, request.nextUrl));
   }
 

@@ -127,6 +127,40 @@ export function isProviderId(value: string | null): value is ProviderId {
   return value === "google" || value === "microsoft";
 }
 
+/**
+ * Ce fournisseur est-il **raccordé à cet environnement** ? — 08/09/2026.
+ *
+ * **Deux questions, et elles ne se confondent pas.** `isProviderId` demande *ce
+ * mot désigne-t-il un fournisseur que Vision sait parler* ; celle-ci demande *ce
+ * fournisseur a-t-il ses deux valeurs*. La couche s'écrit pour deux fournisseurs
+ * et en sert un — c'est l'arbitrage (1) de `tickets-C9.md`, et Entra ID demande
+ * une carte bancaire que le POC n'a pas donnée.
+ *
+ * **Elle existe parce que l'écran d'entrée proposait les deux, et que le second
+ * rendait 500** (mesuré le 08/09/2026 : `GET /auth/connexion?fournisseur=microsoft`
+ * → `500`, `required()` levant `ProviderConfigError` sans personne pour la
+ * rattraper). Un bouton qui mène à une erreur de serveur n'est pas un fournisseur
+ * absent, c'est une panne — et la règle 5 veut un **écran**, jamais un cas
+ * d'erreur. Le retour, lui, ne souffrait pas du défaut : son `try` embrasse déjà
+ * tout ce que le jeton peut avoir de faux.
+ *
+ * **Elle ne remplace pas `required()`, elle la précède.** La levée nommée reste
+ * le dernier mot pour qui appelle `beginAuthorization` sans passer par ici : *un
+ * fournisseur sans identifiant client ne marche pas moins bien, il ne marche
+ * pas*.
+ *
+ * **Le secret compte autant que l'identifiant** : l'aller n'a besoin que du
+ * premier, mais un fournisseur à demi renseigné mènerait l'utilisateur chez
+ * Google pour le faire échouer **au retour**, après consentement — le pire des
+ * deux moments pour découvrir un réglage manquant.
+ */
+export function isProviderConnected(provider: ProviderId): boolean {
+  const record = PROVIDERS[provider];
+  return Boolean(
+    process.env[record.clientIdEnv] && process.env[record.clientSecretEnv],
+  );
+}
+
 /* ==========================================================================
    Les réglages, lus à l'usage
 

@@ -8017,3 +8017,29 @@ moitié écrite seule** — la contrainte n'est pas une discipline de l'appelant
 créée par l'écran avec une adresse, dotée de `member`, elle **entre dans `listAccounts`**, donc dans
 `/dev/session` ; l'accès retiré, elle en sort. **1 771 → 1 816 tests sur 63 fichiers**, `lint` et
 `tsc` au vert. **Aucune migration, aucune dépendance, aucun troisième rôle.**
+
+## Hors ticket — 08/09/2026 — le fournisseur non raccordé, et un bouton qui rendait 500
+
+**Trouvé par une question, pas par une relecture.** *« Le chantier C9 est-il terminé ? »* — six
+tickets sur six, oui. Le parcours réel, non : l'écran d'entrée proposait **Google et Microsoft**,
+et `GET /auth/connexion?fournisseur=microsoft` rendait **500**. `required()` lève
+`ProviderConfigError` pour un fournisseur sans valeurs, et l'aller n'avait personne pour la
+rattraper — le retour, lui, l'attrapait depuis T9.2.
+
+**Trois gestes, aucune dépendance, aucune migration.** `isProviderConnected` (`lib/auth/oidc.ts`)
+lit les **deux** valeurs du fournisseur — un fournisseur à demi renseigné mènerait l'utilisateur
+jusque chez Google pour échouer **au retour**, après consentement. L'aller traite un fournisseur non
+raccordé **comme un inconnu** : retour à l'écran d'entrée, la règle que la route énonçait déjà pour
+l'inconnu. L'écran ne propose que les fournisseurs raccordés, **le premier proposé portant le bouton
+principal** plutôt que « Google toujours », et l'absence totale reste un **écran** — « Aucun
+fournisseur d'identité n'est raccordé à cet environnement » — jamais une page vide (règle 5).
+
+**Mesuré, avant et après** : `microsoft` **500 → 307** vers `/auth/acces` · `google` inchangé, 307
+vers `accounts.google.com` avec le bon `client_id` · l'écran ne rend plus qu'un lien, `>Google<` ·
+et sur un environnement démarré **sans les valeurs Google**, zéro lien, le titre « Aucun accès » et
+la phrase qui dit pourquoi. **Mise en défaut** : la règle neutralisée fait tomber cinq des huit
+tests du fichier neuf, et `lib/auth/oidc.test.ts` est le premier test de cette couche — la
+découverte et l'échange du code restent hors de portée d'un test unitaire.
+
+**1 816 → 1 824 tests sur 64 fichiers**, `lint` et `tsc` au vert. `ACTIONS-HUMAINES-C9.md` corrigé
+au passage : il disait `super_admins` vide, la table porte une ligne vivante depuis le geste humain.
