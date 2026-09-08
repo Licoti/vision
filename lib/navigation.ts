@@ -646,9 +646,12 @@ export const DELETE_PANEL_CONFIRM = "confirmation";
    page : ce qui interdirait le réemploi serait deux sens sur un **même** écran,
    jamais deux écrans qui rangent chacun leur objet.
 
-   **Aucune clé de correction.** La fiche de T9.4 liste quatre gestes, et le
-   renommage n'en est pas : la couche n'expose aucun `updateDomain`, l'URL n'a
-   donc rien à ouvrir. Ce que le type refuse, l'adresse ne le propose pas.
+   **Aucune clé de correction sur cet écran-ci**, et la phrase a changé de
+   portée avec T11.5. Elle disait *« la couche n'expose aucun `updateDomain` »* :
+   elle en expose un depuis, mais il vit sur `ScopedDb` et n'écrit que **trois
+   colonnes descriptives**, sous le droit `manageDomain` — c'est-à-dire depuis
+   `/administration`, jamais d'ici. Le super administrateur ne renomme toujours
+   pas une entreprise, et l'adresse de cet écran ne le propose pas.
    ========================================================================== */
 
 /**
@@ -661,8 +664,25 @@ export const DELETE_PANEL_CONFIRM = "confirmation";
  */
 export const DOMAIN_PANEL_PARAM = "domaine";
 
-/** La valeur qui ouvre le panneau vide. La seule que la clé accepte. */
+/** La valeur qui ouvre le panneau vide, sur `/domaines`. */
 export const DOMAIN_PANEL_NEW = "nouveau";
+
+/**
+ * La valeur qui ouvre le panneau **du domaine courant**, sur `/administration`
+ * — T11.5.
+ *
+ * **La même clé, sur un second écran**, et c'est le réemploi d'`archiver`, qui
+ * en occupe cinq : ce qui l'interdirait serait deux sens sur un **même** écran.
+ * Ici les deux écrans parlent du même objet, un domaine, et chacun de celui
+ * qu'il a le droit de toucher — `nouveau` en crée un depuis `/domaines`,
+ * `modifier` corrige le sien depuis `/administration`. Les deux valeurs sont
+ * disjointes : aucune adresse ne peut valoir les deux.
+ *
+ * **Elle ne porte aucun identifiant**, à la différence de `ligne` : il n'y a
+ * qu'un domaine à corriger depuis l'intérieur, celui de la session. Le désigner
+ * serait offrir un identifiant à vérifier.
+ */
+export const DOMAIN_PANEL_EDIT = "modifier";
 
 /**
  * Le panneau des **identités vérifiées** d'une entreprise.
@@ -1324,6 +1344,16 @@ export const ROUTES = {
    */
   adminEntityDelete: (entityId: string) =>
     `/administration?${DELETE_PANEL_PARAM}=${entityId}`,
+  /**
+   * La page Administration, panneau **du domaine courant** ouvert — T11.5.
+   *
+   * Elle porte le référentiel comme les trois adresses ci-dessus : le panneau
+   * s'ouvre sur l'écran tel qu'il est, et sa fermeture rend l'onglet qu'on
+   * regardait. Le bloc « Ce domaine », lui, est en tête des neuf référentiels —
+   * il n'appartient à aucun.
+   */
+  adminOwnDomain: (referential: Referential) =>
+    adminWith(referential, DOMAIN_PANEL_PARAM, DOMAIN_PANEL_EDIT),
   about: "/a-propos",
   /**
    * Les macro-parcours — la lecture qui traverse les produits.

@@ -4,13 +4,22 @@
  * **Ni base, ni Next, ni React**, comme les dix-neuf modules voisins. C'est ce
  * qui rend la règle énonçable et vérifiable seule, sans branche Neon.
  *
- * **Deux formulaires dans un module, et une règle d'identité écrite une fois.**
+ * **Trois formulaires dans un module, et deux règles écrites une fois.**
  * La création saisit une entreprise, sa première identité *et son premier
- * administrateur* (T11.4) ; le panneau des identités n'en saisit qu'une. Les séparer en deux fichiers aurait fait vivre
- * la même règle de normalisation à deux endroits — *« deux copies divergent un
- * jour, et c'est celle qu'on a oublié de corriger qui laisse passer »*. Ce qui
- * les réunit n'est pas la commodité, c'est que la seconde est un morceau de la
- * première.
+ * administrateur* (T11.4) ; le panneau des identités n'en saisit qu'une ; et le
+ * troisième, celui de T11.5, corrige les trois champs descriptifs **depuis
+ * l'intérieur du domaine**. Les séparer en trois fichiers aurait fait vivre la
+ * même règle de normalisation et les mêmes deux obligations de nommage à
+ * plusieurs endroits — *« deux copies divergent un jour, et c'est celle qu'on a
+ * oublié de corriger qui laisse passer »*. Ce qui les réunit n'est pas la
+ * commodité, c'est que chacun est un morceau du premier.
+ *
+ * **Le troisième n'est pas le premier amputé, et c'est ce qui le rend
+ * lisible.** Ce que l'administrateur d'un domaine ne saisit pas — le
+ * fournisseur, l'identité vérifiée, le premier administrateur — n'est pas
+ * « facultatif ici » : c'est **hors de son autorité** (arbitrage (10) de
+ * `tickets-C11.md`). Un formulaire commun avec des champs masqués aurait fait
+ * de cette frontière une propriété d'affichage.
  *
  * **Pourquoi la création exige une identité.** Un domaine sans
  * `domain_identities` n'est désigné par aucun jeton : les règles d'entrée 3 et 5
@@ -96,6 +105,32 @@ export function addressDomainsOf(
   return identities
     .filter((identity) => identity.provider === "google")
     .map((identity) => identity.value);
+}
+
+/**
+ * Les deux obligations de nommage, partagées par le formulaire de création et
+ * par celui de correction (T11.5).
+ *
+ * **Aucune longueur maximale, aucune forme** : les trois colonnes sont des
+ * `text` sans contrainte, et en inventer une ici serait une règle produit que
+ * ni `docs/02` ni `docs/04` ne portent — la règle de `lib/forms/vision.ts`.
+ */
+function validateNaming(values: {
+  name: string;
+  competenceCenterName: string;
+}): { name?: string; competenceCenterName?: string } {
+  const errors: { name?: string; competenceCenterName?: string } = {};
+
+  if (!values.name) {
+    errors.name = "Le nom de l'entreprise est obligatoire.";
+  }
+
+  if (!values.competenceCenterName) {
+    errors.competenceCenterName =
+      "Le libellé du centre de compétence est obligatoire.";
+  }
+
+  return errors;
 }
 
 /** La règle de forme d'une identité, partagée par les deux formulaires. */
@@ -221,16 +256,7 @@ export function readDomainForm(formData: FormData): DomainFormValues {
  * formulaire** : c'est la seule que l'entreprise portera à sa naissance.
  */
 export function validateDomainForm(values: DomainFormValues): DomainFormErrors {
-  const errors: DomainFormErrors = {};
-
-  if (!values.name) {
-    errors.name = "Le nom de l'entreprise est obligatoire.";
-  }
-
-  if (!values.competenceCenterName) {
-    errors.competenceCenterName =
-      "Le libellé du centre de compétence est obligatoire.";
-  }
+  const errors: DomainFormErrors = { ...validateNaming(values) };
 
   const identity = validateIdentity(values.provider, values.identityValue);
   if (identity.provider) errors.provider = identity.provider;
@@ -256,11 +282,9 @@ export function validateDomainForm(values: DomainFormValues): DomainFormErrors {
   if (manager.fullName) errors.managerFullName = manager.fullName;
   if (manager.email) errors.managerEmail = manager.email;
 
-  /* Aucune longueur maximale : les trois colonnes sont des `text` sans
-     contrainte, et en inventer une ici serait une règle produit que ni `docs/02`
-     ni `docs/04` ne portent — la règle de `lib/forms/vision.ts`. La description
-     n'a pas non plus d'obligation : c'est la seule colonne facultative du
-     formulaire. */
+  /* La description n'a aucune obligation : c'est la seule colonne facultative
+     du formulaire. Les deux règles de longueur vivent sur `validateNaming`, qui
+     les tient pour les deux formulaires. */
 
   return errors;
 }
@@ -383,5 +407,131 @@ export function parseDomainIdentityForm(formData: FormData): {
     values,
     errors,
     input: { provider: values.provider, value: values.value },
+  };
+}
+
+/* ==========================================================================
+   Le formulaire du domaine vu par son administrateur — T11.5
+   ========================================================================== */
+
+/**
+ * Les trois champs descriptifs, et **c'est tout ce dont l'administrateur d'un
+ * domaine dispose sur la ligne qui le nomme**.
+ *
+ * Ni le fournisseur, ni l'identité vérifiée, ni le statut, ni l'archivage : la
+ * raison n'est pas hiérarchique, elle est d'étanchéité (arbitrage (10)). Une
+ * identité vérifiée dit *quelle entreprise Google ouvre ce domaine* — qui
+ * pourrait en ajouter une rattacherait le `hd` d'une autre entreprise à son
+ * propre domaine.
+ */
+export type OwnDomainFormValues = {
+  /** « Acme ». Obligatoire — `not null`. */
+  name: string;
+  /** « Studio Design ». Obligatoire — `not null`. */
+  competenceCenterName: string;
+  /** Ce que fait l'entreprise, en une phrase. **Facultative** — T11.4. */
+  description: string;
+};
+
+export type OwnDomainFormErrors = Partial<
+  Record<keyof OwnDomainFormValues, string>
+>;
+
+export type OwnDomainFormState = {
+  values: OwnDomainFormValues;
+  errors: OwnDomainFormErrors;
+  /** Un empêchement qui n'appartient à aucun champ : un droit, un domaine rangé. */
+  message?: string;
+  /** L'écriture a eu lieu : le panneau se referme (TD.2). */
+  ok?: boolean;
+};
+
+export const EMPTY_OWN_DOMAIN_VALUES: OwnDomainFormValues = {
+  name: "",
+  competenceCenterName: "",
+  description: "",
+};
+
+/**
+ * La ligne déjà enregistrée, ramenée aux trois chaînes du formulaire — le
+ * pré-remplissage du panneau.
+ *
+ * **La description nulle redevient vide**, et c'est le chemin inverse de
+ * `parseOwnDomainForm` : une colonne nulle n'a pas de `defaultValue` à donner à
+ * un `<textarea>`.
+ */
+export function toOwnDomainFormValues(row: {
+  name: string;
+  competenceCenterName: string;
+  description: string | null;
+}): OwnDomainFormValues {
+  return {
+    name: row.name,
+    competenceCenterName: row.competenceCenterName,
+    description: row.description ?? "",
+  };
+}
+
+/**
+ * Les trois champs de ce formulaire, et pas un de plus.
+ *
+ * L'action ne construit jamais sa ligne par étalement d'un `FormData` : un champ
+ * caché ajouté par n'importe qui deviendrait une colonne écrite — et `status`
+ * est précisément la colonne qu'un tel champ atteindrait, celle qui décide qui
+ * peut ouvrir une session. `archived_at` est le second nom qu'il viserait.
+ */
+export function readOwnDomainForm(formData: FormData): OwnDomainFormValues {
+  return {
+    name: referentialField(formData, "name"),
+    competenceCenterName: referentialField(formData, "competenceCenterName"),
+    description: referentialField(formData, "description"),
+  };
+}
+
+/**
+ * Les deux mêmes obligations qu'à la création, par la **même** fonction : un
+ * nom d'entreprise vide y est refusé pour la même raison, et la phrase du refus
+ * n'existe qu'à un endroit.
+ */
+export function validateOwnDomainForm(
+  values: OwnDomainFormValues,
+): OwnDomainFormErrors {
+  return validateNaming(values);
+}
+
+/** Les trois colonnes que ce formulaire écrit, **dans une seule table**. */
+export type OwnDomainRowInput = {
+  name: string;
+  competenceCenterName: string;
+  /** Nulle plutôt que vide : une description effacée n'est pas une phrase vide. */
+  description: string | null;
+};
+
+/**
+ * Lit le formulaire, le valide, et rend la ligne prête à écrire.
+ *
+ * `input` est non nul **si et seulement si** `errors` est vide : la propriété
+ * posée en T2.5.
+ */
+export function parseOwnDomainForm(formData: FormData): {
+  values: OwnDomainFormValues;
+  errors: OwnDomainFormErrors;
+  input: OwnDomainRowInput | null;
+} {
+  const values = readOwnDomainForm(formData);
+  const errors = validateOwnDomainForm(values);
+
+  if (Object.keys(errors).length > 0) {
+    return { values, errors, input: null };
+  }
+
+  return {
+    values,
+    errors,
+    input: {
+      name: values.name,
+      competenceCenterName: values.competenceCenterName,
+      description: values.description || null,
+    },
   };
 }

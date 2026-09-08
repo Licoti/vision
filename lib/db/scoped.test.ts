@@ -1018,6 +1018,114 @@ describe("`deleteRow`", () => {
   });
 });
 
+/* ==========================================================================
+   La ligne qui nomme le domaine — T11.5
+   ========================================================================== */
+
+describe("le domaine vu de l'intérieur", () => {
+  test("`findOwnDomain` rend la ligne du domaine courant, et elle seule", async () => {
+    const own = await a.scope.findOwnDomain();
+
+    expect(own?.id).toBe(a.domainId);
+    expect(own?.name).toBe(`__test__a__${suffix}`);
+    /* Elle rend la ligne **entière** : la description en fait partie, et c'est
+       ce qui permet à l'écran de la pré-remplir sans seconde lecture. */
+    expect(own).toHaveProperty("description");
+
+    const other = await b.scope.findOwnDomain();
+    expect(other?.id).toBe(b.domainId);
+  });
+
+  /**
+   * **L'étanchéité tient par une absence, et c'est elle qu'on mesure.**
+   * `updateOwnDomain` n'a aucun paramètre de cible : il n'existe donc aucune
+   * charge, forgée ou non, par laquelle le domaine `a` atteindrait le `b`. Le
+   * constat se fait par le client brut, sur les deux lignes.
+   */
+  test("une correction ne touche que le domaine de son appelant", async () => {
+    const before = await db
+      .select()
+      .from(domains)
+      .where(eq(domains.id, b.domainId));
+
+    const updated = await a.scope.updateOwnDomain({
+      name: `__test__a__${suffix}__corrigé`,
+      competenceCenterName: "Centre corrigé",
+      description: "Ce que fait cette entreprise.",
+    });
+
+    expect(updated?.id).toBe(a.domainId);
+
+    const [rowA] = await db
+      .select()
+      .from(domains)
+      .where(eq(domains.id, a.domainId));
+    expect(rowA?.name).toBe(`__test__a__${suffix}__corrigé`);
+    expect(rowA?.competenceCenterName).toBe("Centre corrigé");
+    expect(rowA?.description).toBe("Ce que fait cette entreprise.");
+    /* Ni le statut ni l'archivage n'ont bougé : le type ne les propose pas, et
+       la requête ne les nomme pas. */
+    expect(rowA?.status).toBe("active");
+    expect(rowA?.archivedAt).toBeNull();
+
+    const [rowB] = await db
+      .select()
+      .from(domains)
+      .where(eq(domains.id, b.domainId));
+    expect(rowB).toEqual(before[0]);
+
+    /* La fixture est laissée telle qu'elle a été trouvée : le nom porte le
+       préfixe que le balayage de `vitest.global-setup.ts` reconnaît, et les
+       tests qui suivent n'ont pas à savoir que celui-ci est passé. */
+    await a.scope.updateOwnDomain({
+      name: `__test__a__${suffix}`,
+      competenceCenterName: "Centre a",
+      description: null,
+    });
+  });
+
+  test("une description effacée redevient nulle, jamais une phrase vide", async () => {
+    await a.scope.updateOwnDomain({ description: "Une phrase." });
+    await a.scope.updateOwnDomain({ description: null });
+
+    const [row] = await db
+      .select()
+      .from(domains)
+      .where(eq(domains.id, a.domainId));
+    expect(row?.description).toBeNull();
+  });
+
+  /**
+   * **Un domaine archivé ne se corrige plus**, et le refus se lit en base.
+   *
+   * Le cas est hors d'atteinte depuis un écran — `loadSession` refuse déjà
+   * d'ouvrir une session sur un domaine qui n'est pas actif —, et c'est
+   * précisément pourquoi il se mesure ici : la couche peut le rendre, donc elle
+   * doit le tenir.
+   */
+  test("un domaine archivé rend `undefined` et n'écrit rien", async () => {
+    const doomed = await outsideAnySession.createDomain({
+      name: `__test__archivé__${suffix}`,
+      competenceCenterName: "Centre archivé",
+    });
+    await outsideAnySession.archiveDomain(doomed.id);
+
+    const scope = forDomain({ domainId: doomed.id });
+    expect(await scope.updateOwnDomain({ name: "Renommé" })).toBeUndefined();
+
+    const [row] = await db
+      .select()
+      .from(domains)
+      .where(eq(domains.id, doomed.id));
+    expect(row?.name).toBe(`__test__archivé__${suffix}`);
+
+    /* **La lecture, elle, ne juge de rien** : elle rend la ligne rangée. */
+    expect((await scope.findOwnDomain())?.id).toBe(doomed.id);
+
+    await db.delete(domains).where(eq(domains.id, doomed.id));
+  });
+});
+
 describe("les garde-fous de typage", () => {
   test("`unlink` refuse une table archivable, `archive` une table de liaison", () => {
     const jamaisAppele = async (scope: ScopedDb) => {
@@ -1061,6 +1169,21 @@ describe("les garde-fous de typage", () => {
          et c'est ce qui rattrapera le trente-septième. */
       // @ts-expect-error `createDomain` ne s'obtient que par `asSuperAdmin`.
       await superAdmin.createDomain({ name: "…", competenceCenterName: "…" });
+      /* **L'arbitrage (10) de `tickets-C11.md` se relit ici, à la
+         compilation.** Un administrateur de domaine gère trois champs
+         descriptifs ; `status` et `archived_at` disent qui peut ouvrir une
+         session, et `id` désigne le domaine — les trois sont hors de son
+         autorité. Ce n'est pas la vigilance qui les tient, c'est le type :
+         `OwnDomainValues` étant *faible* — toutes ses propriétés sont
+         facultatives —, TypeScript refuse un objet qui n'en partage aucune. */
+      await scope.updateOwnDomain({ name: "…" });
+      await scope.updateOwnDomain({ description: null });
+      // @ts-expect-error `status` n'appartient pas au responsable de domaine.
+      await scope.updateOwnDomain({ status: "suspended" });
+      // @ts-expect-error `archived_at` non plus : un domaine se range d'au-dessus.
+      await scope.updateOwnDomain({ archivedAt: null });
+      // @ts-expect-error La cible ne se désigne pas : elle vient de la fermeture.
+      await scope.updateOwnDomain({ id: "…" });
     };
     expect(typeof jamaisAppele).toBe("function");
   });

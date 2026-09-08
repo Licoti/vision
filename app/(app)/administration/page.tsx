@@ -58,8 +58,10 @@ import { ActionMenu, MENU_ITEM, MENU_ITEM_DANGER } from "@/components/ui/action-
 import { buttonClass } from "@/components/ui/button";
 import { DrawerHost, DrawerLink } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Field } from "@/components/ui/field";
 import { List, ListHeader, ListRow } from "@/components/ui/list";
 import { Page, PageHeader } from "@/components/ui/page";
+import { Section, SectionHeader } from "@/components/ui/section";
 import { requireSession } from "@/lib/auth/provider";
 import {
   ADMIN_PANEL_PARAMS,
@@ -86,6 +88,7 @@ import {
   ARCHIVE_PANEL_PARAM,
   asReferential,
   DELETE_PANEL_PARAM,
+  DOMAIN_PANEL_PARAM,
   REFERENTIAL_PARAM,
   REFERENTIAL_ROW_PARAM,
   REFERENTIALS,
@@ -269,6 +272,12 @@ export default async function AdminPage({
         }))
       : await listReferentialForAdmin(session.db, referential);
 
+  /* **La ligne qui nomme le domaine** — T11.5. Elle ne vient pas de la session :
+     `SessionDomain` porte le nom et le centre de compétence, jamais la
+     description. La lecture est scopée par construction — `findOwnDomain` n'a
+     aucun paramètre par lequel désigner un autre domaine. */
+  const ownDomain = await session.db.findOwnDomain();
+
   /* **L'URL reste une adresse, elle n'est plus le mécanisme** (TD.2). Coller
      `?referentiel=metiers&ligne=<identifiant>` ouvre encore le panneau, ici, au
      rendu serveur ; le clic, lui, passe par `DrawerHost` et n'écrit plus rien.
@@ -283,6 +292,10 @@ export default async function AdminPage({
     [REFERENTIAL_ROW_PARAM]: one(params[REFERENTIAL_ROW_PARAM]),
     [ARCHIVE_PANEL_PARAM]: one(params[ARCHIVE_PANEL_PARAM]),
     [DELETE_PANEL_PARAM]: one(params[DELETE_PANEL_PARAM]),
+    /* La quatrième clé — T11.5. Elle entre au décompte comme les trois autres :
+       une adresse qui porterait `domaine` **et** `ligne` n'ouvre rien, plutôt
+       que de choisir. */
+    [DOMAIN_PANEL_PARAM]: one(params[DOMAIN_PANEL_PARAM]),
   };
   const conflict =
     Object.values(panelKeys).filter((value) => value !== undefined).length > 1;
@@ -320,6 +333,50 @@ export default async function AdminPage({
           lead="Comment adapter le vocabulaire du domaine ? Chaque référentiel se renomme, se réordonne et se range sans qu'aucune donnée déjà saisie ne bouge."
           action={addRowLink}
         />
+
+        {/* **Le bloc « Ce domaine », en tête et hors des neuf référentiels** —
+            T11.5. Ce n'est pas un sixième écran (`docs/06` §2) : c'est l'objet
+            dont cette page parle, et l'arbitrage (f) de `tickets-C7.md` a tenu
+            l'administration à un seul écran pour neuf référentiels.
+
+            Il est **au-dessus** de la barre de choix parce qu'il n'appartient à
+            aucun onglet : le référentiel change sous lui, il ne bouge pas.
+
+            **Aucun couple de couleurs neuf par la position** : `Field` dans
+            `Section` est la forme de `components/projects/identity.tsx`, et la
+            rangée nue y est reprise telle quelle — le filet supérieur de
+            `FieldRow` appartient au bas d'une carte de titre, et il n'y en a
+            pas ici. */}
+        {ownDomain ? (
+          <Section>
+            <SectionHeader
+              title="Ce domaine"
+              note="L'entreprise accompagnée, telle qu'elle se nomme. Ses identités vérifiées et son statut appartiennent au super administrateur."
+              action={
+                <DrawerLink
+                  href={ROUTES.adminOwnDomain(referential)}
+                  request={{ kind: "ownDomain" }}
+                  className={buttonClass({ variant: "secondary" })}
+                >
+                  Modifier
+                </DrawerLink>
+              }
+            />
+
+            <dl className="flex flex-wrap gap-x-10 gap-y-6">
+              <Field label="Nom">{ownDomain.name}</Field>
+              <Field label="Centre de compétence">
+                {ownDomain.competenceCenterName}
+              </Field>
+              {/* Un champ sans valeur ne se masque pas : « Non renseignée » est
+                  une information, un trou n'en est pas une
+                  (`components/ui/field.tsx`). */}
+              <Field label="Description">
+                {ownDomain.description ?? "Non renseignée"}
+              </Field>
+            </dl>
+          </Section>
+        ) : null}
 
         <ReferentialNav active={referential} />
 

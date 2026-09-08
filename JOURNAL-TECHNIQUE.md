@@ -11395,3 +11395,79 @@ mesure et qu'archiver aurait suffi à neutraliser.
 **`ETAT.md` reste au-dessus du seuil**, à 253 lignes avant ce ticket. Une ligne de ticket et deux
 points ouverts neufs y entrent, deux points existants se récrivent. **Un ticket ne balaie pas** —
 `CLAUDE.md` réserve le geste à la session de découpage —, et le dépassement reste su.
+
+## T11.5 — Le domaine vu par son administrateur (08/09/2026)
+
+**Une extension de périmètre de trois fichiers, demandée avant d'être prise.** La fiche nomme quatre
+fichiers et demande un panneau ; le mécanisme d'ouverture d'un panneau — clé d'URL, `kind`,
+résolution — ne vit dans aucun des quatre. `lib/navigation.ts`, `lib/drawers/types.ts` et
+`lib/drawers/admin.tsx` ont donc été annoncés au plan, avec l'alternative : un formulaire nu dans le
+bloc, sans panneau ni adresse, tenu au mot du périmètre mais en écart au mot de la fiche. **Le
+panneau a été choisi par l'humain.** Aucun des trois fichiers n'a de test propre — la page et la
+résolution les couvrent, comme pour les treize autres clés.
+
+**La clé `domaine` sert un second écran, et la règle du réemploi est celle d'`archiver`.** Ce qui
+l'interdirait serait deux sens sur un **même** écran ; ici, deux écrans parlent du même objet et
+chacun de celui qu'il a le droit de toucher — `nouveau` crée une entreprise depuis `/domaines`,
+`modifier` corrige la sienne depuis `/administration`. Les deux valeurs sont disjointes, et c'est
+mesuré : `?domaine=nouveau` sur `/administration` n'ouvre **rien**.
+
+**Le `kind` du tiroir ne pouvait pas s'appeler `domain`.** `DomainDrawerRequest` porte déjà ce nom, et
+les deux types vivent dans la même union `DrawerRequest` : deux branches ne peuvent pas porter le même
+discriminant. `ownDomain` dit d'ailleurs mieux ce qu'il est — le domaine **de l'appelant**, jamais un
+domaine désigné.
+
+**La borne des trois colonnes est un refus de compilation, et elle repose sur une propriété de
+TypeScript qu'il faut connaître avant d'y toucher.** `OwnDomainValues` a **toutes ses propriétés
+facultatives** : c'est un *weak type*, et le compilateur refuse pour cela un objet qui n'en partage
+aucune — `{ status: "suspended" }` est rejeté **littéral comme variable**. Le jour où une quatrième
+colonne obligatoire y entrerait, cette propriété tomberait et la borne ne vaudrait plus que pour les
+littéraux. Le fait est écrit ici plutôt que découvert alors.
+
+**La mesure 3 vit dans `tsc`, pas dans `vitest`, et la mise en défaut l'établit.** La borne retirée,
+les trois directives `@ts-expect-error` deviennent inutiles — trois erreurs `tsc` — et **aucun test
+d'exécution ne tombe** : `vitest` ne typant pas, la suite reste verte. C'est l'idiome que `LinkTable`
+et `DeletableTable` portaient déjà, et il ne protège que si `tsc` tourne. L'autre mise en défaut tient
+au mot de la fiche : le contrôle de `manageDomain` neutralisé fait tomber **un seul** test.
+
+**Le décompte de la fiche est faux, et c'est le sixième énoncé mis en défaut du chantier.** Elle écrit
+que le geste rejoint *« avec un cinquième nom »* la famille des écritures sans trace ouverte par
+T8.3 ; la liste en compte **six** depuis T11.2, qui y a mis les trois gestes de l'invitation. Le
+nombre datait de l'écriture de la fiche, la propriété tient — et c'est encore un **nombre** qui a
+vieilli, comme les quatre autres du chantier.
+
+**La boucle a été mesurée en HTTP réel, sans une ligne de JavaScript, et c'est le formulaire servi qui
+l'a permis.** React 19 rend les champs `$ACTION_REF_1`, `$ACTION_1:0`, `$ACTION_1:1` et `$ACTION_KEY`
+dans le HTML : repostés tels quels en `multipart/form-data` sur la même adresse, ils exécutent
+l'action. La description est entrée en base, l'écran l'a relue, et la même charge avec une description
+vide l'a **remise à `null`**.
+
+**Ce que le POST ne prouve pas, et il faut le dire.** Sous le cookie d'un membre, le POST rend **404**
+— mais c'est la **route** qui refuse, pas l'action : `/administration` tombe pour qui n'administre
+pas. Le vecteur qui contournerait la route — poster la même action sur `/produits` — n'est pas
+exerçable en développement : Next rend *« Failed to find Server Action »* et **500**, l'étape témoin
+comprise, l'action n'étant pas au manifeste de cette route. **Un 500 sur le témoin dit que le harnais
+échoue, pas que l'application refuse** ; la mesure est donc écartée. Ce qui prouve le droit reste le
+test qui appelle la fonction serveur sous un cookie de membre **réellement scellé**, avec le décompte
+en base et l'étape témoin — la méthode du dépôt depuis T9.4.
+
+**La lecture du domaine n'a pas été mise dans la session, et c'est un arbitrage.** `SessionDomain`
+porte le nom et le libellé du centre, jamais la description ; l'y ajouter aurait mis un champ de plus
+dans un type que tout le produit lit, pour un seul écran, et fait sortir `lib/auth/session.ts` du
+périmètre. `findOwnDomain` est donc la lecture jumelle de l'écriture, bornée de la même façon —
+**une requête de plus au rendu de `/administration`**, et c'est le prix nommé.
+
+**Le bloc est une cinquième position de la dette « une carte ne se détache d'aucun fond ».** Les
+couples de texte sont mesurés et passent — intitulé 4,98:1, valeur 8,12:1, titre 17,87:1, bouton
+secondaire 13,65:1, tous sur `surface-neutral-pale` —, mais le filet de la carte reste à **1,24:1**
+sur le fond de page, comme les quatre positions déjà comptées. Aucun couple neuf n'a été inventé, et
+aucun jeton non plus : `Section`, `SectionHeader` et `Field` sont repris tels quels.
+
+**Une trace laissée puis ôtée dans la base de développement.** La sonde a écrit une description sur le
+domaine « Groupe Meridian », l'a relue dans le HTML servi, puis l'a **remise à `null`** par le même
+chemin — le geste du produit, pas une écriture de fixture.
+
+**`ETAT.md` reste au-dessus du seuil.** Le fichier passe de **269 à 277 lignes**. Une ligne de ticket
+y entre, quatre points se récrivent, aucun point neuf n'est ouvert. **Un ticket ne balaie
+pas** — `CLAUDE.md` réserve le geste à la session de découpage —, et le dépassement reste su. **C11
+étant clos, la prochaine session de découpage est celle qui devra le faire.**

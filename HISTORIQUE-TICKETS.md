@@ -8250,3 +8250,88 @@ chemin qui rouvre une entreprise close. **Troisième exception à D30**, non arb
 `ETAT.md` avec sa destination.
 
 **1 910 → 1 940 tests sur 68 fichiers**, `lint` (`--max-warnings=0`) et `tsc` au vert.
+
+## T11.5 — Le domaine vu par son administrateur — 08/09/2026
+
+**Le dernier maillon du parcours d'entrée, et il tient une phrase déjà écrite à l'écran.** T9.4 avait
+fermé la porte en toutes lettres — *« aucun `updateDomain`, et ce n'est pas un oubli »* —, et T11.4
+avait pourtant promis le geste dans la note de son propre panneau : *« Facultative — elle se corrige
+ensuite depuis l'intérieur du domaine »*. Depuis ce ticket, la phrase est vraie.
+
+**Une quatrième forme d'écriture, et elle porte sa borne dans son type.** `superAdmin` tourne sans
+autorité nommable, `asSuperAdmin(grant)` écrit au-dessus des domaines, `forDomain(scope)` écrit les
+tables métier — et `updateOwnDomain` est une autorité **à l'intérieur** d'un domaine qui touche la
+ligne qui le nomme. Aucune des trois ne pouvait convenir : `domains` est la seule table sans
+`domain_id`, donc pas un `ScopedTable`, donc hors d'atteinte de `find` et d'`update`. **La cible n'est
+jamais un argument** — `domainId` vient de la fermeture, et il n'existe aucun paramètre par lequel un
+appelant désignerait un autre domaine : la règle 1 tient ici par une **absence**, pas par un filtre
+qu'on pourrait oublier de poser.
+
+**`OwnDomainValues` borne par inclusion, à rebours d'`UpdateValues`.** Les tables métier retirent ce
+qui appartient à la couche et laissent passer le reste ; `domains` porte `status` et `archived_at`,
+c'est-à-dire les deux colonnes qui décident **qui peut ouvrir une session**. Une liste d'exclusions
+les aurait laissées entrer le jour où une colonne s'ajouterait ; une liste d'inclusions repose la
+question à chaque fois. Le refus est un refus de **compilation** — le type est *faible* au sens de
+TypeScript, donc un objet qui n'en partage aucune propriété est rejeté, littéral comme variable.
+
+**Une extension de périmètre de trois fichiers, demandée au plan et validée.** La fiche nomme quatre
+fichiers et demande *« un bloc en tête de l'écran Administration, **et son panneau** »* : le mécanisme
+d'ouverture d'un panneau ne vit dans aucun des quatre. `lib/navigation.ts` reçoit la valeur
+`modifier` sur la clé `domaine` **déjà écrite** pour `/domaines` — le réemploi d'`archiver`, qui en
+occupe cinq —, `lib/drawers/types.ts` une quatrième branche `ownDomain`, `lib/drawers/admin.tsx` sa
+résolution et sa clé. Aucun des trois n'a de test propre : la page et la résolution les couvrent,
+comme pour les treize autres clés de panneau.
+
+**Le bloc lit sa ligne, il ne la déduit pas de la session.** `SessionDomain` porte le nom et le
+libellé du centre, **jamais la description** : `findOwnDomain` est donc la lecture jumelle de
+l'écriture, bornée de la même façon. L'étendre à `lib/auth/session.ts` aurait mis un champ de plus
+dans un type que tout le produit lit, pour un écran.
+
+**Le geste ne laisse aucune trace, et c'est un arbitrage.** Aucun `event_target_type` ne dit
+« domaine » ; l'élargir demanderait une migration d'énuméré pour un seul objet — l'arbitrage (d) de
+`tickets-C7.md`, tenu —, et le poser sur `person` mentirait sur l'objet. Un test le **fixe**, et il
+tombera le jour où le journal recevra ce nom.
+
+**Six énoncés de fiche mis en défaut du chantier, et le sixième est un décompte.** La fiche annonce
+que le geste rejoint *« avec un cinquième nom »* la famille des écritures sans trace ; elle en compte
+**six** depuis T11.2, qui y a mis les trois gestes de l'invitation. Le nombre de la fiche datait de
+son écriture, la propriété tient.
+
+**Les mesures, et ce que chacune prouve.** **Lu dans le HTML servi**, `<script>` retirés, sous un
+cookie **réellement scellé** : le bloc porte le nom, le centre et *« Non renseignée »*, et
+`?domaine=modifier` ouvre le panneau **au rendu serveur** — trois champs, `status` et `archived_at`
+n'y étant pas. **Puis la boucle entière par HTTP réel, sans une ligne de JavaScript** : le formulaire
+servi porte ses champs `$ACTION_…`, repostés tels quels en `multipart/form-data` ; la base prend la
+description, et l'écran la relit. Une description vidée par le même chemin **redevient nulle**.
+**L'exclusivité des clés est mesurée** : `?domaine=modifier&ligne=nouvelle` n'ouvre **rien**, et
+`?domaine=nouveau` — la valeur de l'autre écran — n'ouvre rien non plus.
+
+**Le droit s'éprouve par l'action, et l'écran ne prouve rien.** Un membre reçoit **404** sur
+`/administration` et sur le POST qui y mène ; cela ne dit pas que l'action refuse, cela dit que la
+route refuse. C'est le test qui appelle la fonction serveur sous le cookie d'un membre qui le montre :
+message de refus, **ligne de `domains` inchangée relue par le client brut**, puis la **même** charge
+sous le responsable, qui écrit. La charge forgée — `status=suspended`, `archivedAt`, `id` — passe par
+le même chemin : le champ légitime est écrit, les trois autres ne le sont pas.
+
+**Deux mises en défaut, et les deux tiennent au mot de la fiche.** Le contrôle de `manageDomain`
+neutralisé fait tomber **un seul** test, celui du membre. La borne des trois colonnes retirée fait
+tomber **la seule** mesure 3 — trois directives `@ts-expect-error` devenues inutiles, donc trois
+erreurs `tsc` — et **aucun test d'exécution** : `vitest` ne typant pas, la mesure 3 vit dans `tsc`,
+et c'est l'idiome que `LinkTable` et `DeletableTable` portaient déjà.
+
+**Le contraste est mesuré, et aucun couple n'est neuf.** Intitulé 4,98:1, valeur 8,12:1, titre
+17,87:1, bouton secondaire 13,65:1 — tous sur `surface-neutral-pale`. Le filet de la carte, lui, reste
+à **1,24:1** sur le fond de page : c'est la dette de design system déjà nommée, et le bloc en est la
+**cinquième** position, pas une position neuve.
+
+**Le parcours entier a été rejoué**, comme la fiche du chantier le demande — en mesure **temporaire**,
+écrite pour l'occasion puis retirée, la règle 3 interdisant d'ajouter un fichier que le périmètre ne
+nomme pas. Six étapes, toutes vertes : le super administrateur crée l'entreprise et désigne son
+administrateur · celui-ci suit le lien et passe le SSO, `has_access` et `domain_manager` **en base** ·
+**il corrige les informations de son domaine** · il crée un membre et l'invite · le membre entre,
+`has_access` et `member` · **et ce membre, frappant l'action de correction, est refusé, la ligne de
+`domains` inchangée**. Aucun résidu en base après la mesure — domaine, identité, personnes,
+invitations et super administrateur retirés.
+
+**1 940 → 1 956 tests sur 68 fichiers**, `lint` (`--max-warnings=0`) et `tsc` au vert. **C11 est
+clos** : le parcours du 08/09/2026 tient de bout en bout, et C7 ferme le POC.

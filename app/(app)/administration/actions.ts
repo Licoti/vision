@@ -138,6 +138,11 @@ import {
   type EntityFormState,
 } from "@/lib/forms/entity";
 import {
+  parseOwnDomainForm,
+  readOwnDomainForm,
+  type OwnDomainFormState,
+} from "@/lib/forms/domain";
+import {
   parseActivityTypeForm,
   readActivityTypeForm,
   type ActivityTypeFormState,
@@ -1725,4 +1730,91 @@ export async function restoreStarter(starterId: string): Promise<void> {
   await session.db.restore(starters, starterId);
 
   revalidateReferential("pistes");
+}
+
+/* ==========================================================================
+   Le domaine lui-même — T11.5
+
+   **Le dernier maillon du parcours d'entrée**, et la seule écriture de ce
+   fichier qui ne vise pas un référentiel : *« gérer les informations de son
+   domaine »*, la ligne que T9.4 avait laissée sans écrivain — *« aucun
+   `updateDomain`, et ce n'est pas un oubli »*.
+
+   **Trois champs descriptifs, et la borne n'est pas ici.** `updateOwnDomain`
+   n'accepte que `name`, `competence_center_name` et `description` : `status` et
+   `archived_at` sont des refus **de typage** (arbitrage (10)). Ce que cette
+   action ajoute est le droit et la lecture champ par champ — la frontière, elle,
+   est tenue un étage plus bas, où l'on ne peut pas l'oublier.
+
+   **Ce geste ne laisse aucune trace, et c'est un arbitrage, pas un oubli.**
+   Aucun `event_target_type` ne dit « domaine » ; l'élargir demanderait une
+   migration d'énuméré pour un seul objet — ce que l'arbitrage (d) de
+   `tickets-C7.md` refuse déjà pour le budget —, et le poser sur `person`
+   mentirait sur l'objet, ce qui est pire qu'un silence. Le geste rejoint donc la
+   famille des écritures sans trace ouverte par T8.3, avec un **cinquième** nom,
+   et le point est écrit comme tel dans `ETAT.md`.
+   ========================================================================== */
+
+/** Le refus du droit, quand il porte sur la ligne qui nomme le domaine. */
+const RESERVED_DOMAIN =
+  "La modification des informations du domaine est réservée au responsable de domaine.";
+
+/**
+ * Un refus qui n'appartient à aucun champ. La saisie revient telle quelle,
+ * comme pour les trente-sept autres points d'entrée de ce fichier.
+ */
+function ownDomainRefusal(
+  formData: FormData,
+  message: string,
+): OwnDomainFormState {
+  return { values: readOwnDomainForm(formData), errors: {}, message };
+}
+
+/**
+ * Corrige le nom, le libellé du centre de compétence et la description du
+ * domaine courant.
+ *
+ * **Aucune porte `openX`** : les quatre gestes ciblés de ce fichier lisent une
+ * ligne **reçue**, et la confrontent au domaine. Ici il n'y a rien à recevoir —
+ * la cible est le domaine de la session, et la couche la prend dans sa
+ * fermeture. Un identifiant de plus serait un identifiant à vérifier.
+ *
+ * **Le droit s'énonce avant toute lecture**, comme partout : il ne dépend
+ * d'aucun identifiant. Que `/administration` rende 404 à qui n'administre pas ne
+ * protège pas ce point d'entrée-ci, qui vit à côté de la route et non derrière
+ * elle.
+ */
+export async function updateOwnDomain(
+  _previous: OwnDomainFormState,
+  formData: FormData,
+): Promise<OwnDomainFormState> {
+  const session = await requireSession();
+
+  if (!session.can.manageDomain) {
+    return ownDomainRefusal(formData, RESERVED_DOMAIN);
+  }
+
+  const { values, errors, input } = parseOwnDomainForm(formData);
+  if (!input) return { values, errors };
+
+  const updated = await session.db.updateOwnDomain(input);
+  /* `undefined` dit qu'aucune ligne vivante ne porte cet identifiant — un
+     domaine archivé. Le cas est hors d'atteinte depuis un écran, `loadSession`
+     refusant déjà toute session sur un domaine qui n'est pas actif ; le refus
+     est écrit parce que la couche peut le rendre, pas parce qu'un chemin y
+     mène. */
+  if (!updated) {
+    return ownDomainRefusal(
+      formData,
+      "Ce domaine n'est plus actif : ses informations ne se corrigent plus.",
+    );
+  }
+
+  /* **Aucune ligne de journal** : voir le bandeau de section ci-dessus.
+
+     Un seul écran est invalidé, et la barre latérale n'en fait pas partie : elle
+     porte le nom du domaine, mais elle est rendue sous session — donc
+     dynamiquement — à chaque requête, et suit sans qu'on l'y invite. */
+  revalidatePath(ROUTES.admin);
+  return { values, errors: {}, ok: true };
 }

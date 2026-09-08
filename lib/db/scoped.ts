@@ -216,6 +216,32 @@ export type UpdateValues<T extends ScopedTable> = Partial<
   >
 >;
 
+/**
+ * Les trois colonnes descriptives d'un domaine — ce qu'une autorité **à
+ * l'intérieur** du domaine peut corriger (T11.5).
+ *
+ * **Une borne d'inclusion, là où `UpdateValues` borne par exclusion.** Les
+ * tables métier retirent ce qui appartient à la couche et laissent passer le
+ * reste ; ici c'est l'inverse qu'il faut, parce que `domains` porte `status` et
+ * `archived_at` — les deux colonnes qui décident **qui peut ouvrir une
+ * session**. Une liste d'exclusions les laisserait entrer le jour où une
+ * colonne s'ajouterait sans qu'on y pense ; une liste d'inclusions repose la
+ * question à chaque colonne neuve.
+ *
+ * **Le refus est de typage, pas de vigilance** (arbitrage (10) de
+ * `tickets-C11.md`) : toutes les propriétés étant facultatives, TypeScript
+ * traite ce type comme *faible* et refuse un objet qui n'en partage aucune —
+ * `{ status: "suspended" }` ne compile pas, littéral comme variable. C'est
+ * l'idiome de `LinkTable` et de `DeletableTable`, resservi un cran plus haut :
+ * l'étanchéité ne se délègue pas, et elle ne se surveille pas non plus.
+ */
+export type OwnDomainValues = Partial<
+  Pick<
+    InferInsertModel<typeof domains>,
+    "name" | "competenceCenterName" | "description"
+  >
+>;
+
 export type Row<T extends ScopedTable> = InferSelectModel<T>;
 
 /**
@@ -859,6 +885,65 @@ export function forDomain(scope: Scope) {
    * de trace, et rien ne le signale.** On préfère une phrase juste qu'on peut
    * oublier à une phrase creuse qu'on ne peut pas.
    */
+  /* ---------------------------------------------------------------------
+     La ligne qui nomme le domaine — T11.5
+
+     **La quatrième forme d'écriture du fichier, et elle mérite son nom.**
+     `superAdmin` tourne sans autorité nommable ; `asSuperAdmin(grant)` écrit
+     **au-dessus** des domaines ; tout ce qui précède ici écrit les tables
+     métier. Ces deux fonctions-ci sont une autorité **à l'intérieur** d'un
+     domaine qui touche la ligne qui le nomme — et aucune des trois autres ne
+     convient, `domains` étant la seule table sans `domain_id` : elle n'est pas
+     un `ScopedTable`, donc ni `list`, ni `find`, ni `update` ne l'atteignent,
+     ce que `scoped.test.ts` fixe déjà à la compilation.
+
+     **La cible n'est jamais un argument.** `domainId` vient de la fermeture :
+     il n'existe aucun paramètre par lequel un appelant désignerait un autre
+     domaine. La règle 1 tient ici par une **absence**, et non par un filtre
+     qu'on pourrait oublier de poser.
+     --------------------------------------------------------------------- */
+
+  /**
+   * La ligne du domaine courant.
+   *
+   * **Elle ne juge de rien** — ni le statut, ni l'archivage : une lecture dit
+   * ce qui est, et une lecture qui filtre en silence rend un refus *sans
+   * cause*. C'est la discipline de `findInvitationByTokenHash` (T11.1).
+   */
+  async function findOwnDomain(): Promise<
+    InferSelectModel<typeof domains> | undefined
+  > {
+    const rows = await db
+      .select()
+      .from(domains)
+      .where(eq(domains.id, domainId))
+      .limit(1);
+    return rows[0];
+  }
+
+  /**
+   * Corrige les trois colonnes descriptives du domaine courant — et rien
+   * d'autre : ni `domain_identities`, ni `status`, ni `archived_at`
+   * (arbitrage (10)).
+   *
+   * **Un domaine archivé ne se corrige plus**, et la clause est celle de
+   * `setDomainStatus`. La ligne rendue est `undefined` plutôt qu'une levée :
+   * l'appelant en fait un message, comme il le fait déjà pour `update`.
+   *
+   * **`updated_at` appartient à la couche**, ici comme dans `update` : un
+   * appelant n'a pas à y penser, et le type ne le lui propose pas.
+   */
+  async function updateOwnDomain(
+    values: OwnDomainValues,
+  ): Promise<InferSelectModel<typeof domains> | undefined> {
+    const rows = await db
+      .update(domains)
+      .set({ ...values, updatedAt: new Date() })
+      .where(and(eq(domains.id, domainId), isNull(domains.archivedAt)))
+      .returning();
+    return rows[0];
+  }
+
   async function record(entry: JournalEntry): Promise<Row<typeof events>> {
     return insert(events, { ...entry, actorId } as InsertValues<typeof events>);
   }
@@ -881,6 +966,8 @@ export function forDomain(scope: Scope) {
     unlink,
     deleteRow,
     record,
+    findOwnDomain,
+    updateOwnDomain,
   };
 }
 

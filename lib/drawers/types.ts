@@ -195,11 +195,20 @@ export type TeamDrawerRequest =
  * confondre en une clé aurait mis l'écart à la règle 4 derrière un booléen.
  * **Il ne porte aucun référentiel**, et c'est l'arbitrage (g) écrit dans le
  * type : la suppression reste bornée aux entités.
+ *
+ * **`ownDomain` ne porte rien du tout** — T11.5. Ni référentiel, ni
+ * identifiant : le bloc « Ce domaine » n'appartient à aucune des neuf tables, et
+ * il n'y a qu'un domaine à corriger, celui de la session. C'est la forme de
+ * `{ kind: "domain" }` sur `/domaines`, et **son nom en diffère exprès** : deux
+ * branches d'une même union ne peuvent pas porter le même `kind`, et les deux
+ * gestes ne sont pas le même — l'un crée une entreprise depuis au-dessus des
+ * domaines, l'autre corrige le sien depuis l'intérieur.
  */
 export type AdminDrawerRequest =
   | { kind: "row"; referential: Referential; id?: string | undefined }
   | { kind: "archive"; referential: Referential; id: string }
-  | { kind: "delete"; id: string };
+  | { kind: "delete"; id: string }
+  | { kind: "ownDomain" };
 
 /**
  * Les cinq panneaux de l'écran **au-dessus des domaines** — T9.4.
@@ -328,7 +337,7 @@ const TEAM_KINDS = [
   "delete",
 ] as const;
 
-const ADMIN_KINDS = ["row", "archive", "delete"] as const;
+const ADMIN_KINDS = ["row", "archive", "delete", "ownDomain"] as const;
 
 const DOMAIN_KINDS = [
   "domain",

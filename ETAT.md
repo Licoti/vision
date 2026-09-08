@@ -2,16 +2,17 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 08/09/2026, **T11.4 terminé — le premier maillon du parcours existe**.
-Une entreprise et son administrateur naissent **d'un seul geste**, qui écrit **quatre tables** et
-**invite** au lieu d'ouvrir. **Six gestes pour cinq attendus** : la révocation depuis `/domaines` n'y
-était pas nommée, et sans elle la mesure 3 était inatteignable — une entreprise dont l'administrateur
-ne vient jamais restait close. **La règle d'adresse ne vaut que sous Google**, le `tid` d'Entra
-n'étant pas un nom de domaine (décision humaine). **Deux mises en défaut, l'une contredit la fiche**
-— la règle retirée fait tomber **5** tests, non « la mesure 2 et aucune autre » (5ᵉ énoncé de fiche
-mis en défaut du chantier) —, **et l'autre a montré que rien en base ne double l'extension
-d'`ALREADY_STAFFED`**. **Périmètre étendu à quatre fichiers, annoncés au plan.** **Vert : 1 940 tests
-sur 68 fichiers** (1 910 avant). **Suivant : T11.5 — le domaine vu par son administrateur.**
+**Dernière mise à jour :** 08/09/2026, **T11.5 terminé — C11 est clos, le parcours tient de bout en
+bout**. Un administrateur corrige les **trois champs descriptifs** de son domaine, et pas un de plus :
+`updateOwnDomain` est une **quatrième forme d'écriture** — une autorité *à l'intérieur* d'un domaine
+sur la seule table sans `domain_id` —, **sa cible n'est jamais un argument**, et `status` comme
+`archived_at` sont des refus **de compilation**. **Périmètre étendu à trois fichiers**, ceux du
+mécanisme des panneaux, demandés au plan et validés. **La boucle est mesurée en HTTP réel, sans une
+ligne de JavaScript** ; **le 404 du membre ne prouve rien**, c'est la route qui refuse, et c'est le
+test d'action qui établit le droit. **Deux mises en défaut au mot de la fiche**, dont la mesure 3 qui
+vit dans `tsc` et non dans `vitest`. **6ᵉ énoncé de fiche mis en défaut du chantier**, un décompte
+encore. **Vert : 1 956 tests sur 68 fichiers** (1 940 avant). **Suivant : C7 — T7.7 → T7.10, qui
+ferme le POC.**
 
 ---
 
@@ -28,11 +29,11 @@ sur 68 fichiers** (1 910 avant). **Suivant : T11.5 — le domaine vu par son adm
 | TD — Dette technique et couche de présentation | TD.1 → TD.6 | **terminé** |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
-| C7 — Finitions | T7.1 → T7.10 | **en dernier** — T7.1 → T7.6 livrés, T7.7 → T7.10 après C11 |
+| C7 — Finitions | T7.1 → T7.10 | **le suivant** — T7.1 → T7.6 livrés, T7.7 → T7.10 ferment le POC |
 | C8 — Dette | T8.1 → T8.5 | **terminé** |
 | C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **terminé** |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
-| C11 — Le parcours d'entrée | T11.1 → T11.5 | **en cours** — T11.1 → T11.4 livrés, T11.5 suit |
+| C11 — Le parcours d'entrée | T11.1 → T11.5 | **terminé** |
 
 ---
 
@@ -77,6 +78,11 @@ sur 68 fichiers** (1 910 avant). **Suivant : T11.5 — le domaine vu par son adm
 - **C11 — L'amorçage d'un domaine — T11.4, 08/09.** Un geste, quatre tables, et l'administrateur qui
   **naît sans accès**. **La fiche demandait cinq gestes et son critère en exigeait un sixième** : la
   révocation, sans laquelle une entreprise close le restait. 1 910 → **1 940 tests**.
+- **C11 — Le domaine vu par son administrateur — T11.5, 08/09.** Trois champs, une **quatrième forme
+  d'écriture** dont la cible n'est jamais un argument, et deux colonnes refusées **à la compilation**.
+  **La boucle mesurée en HTTP réel, sans JavaScript** ; le 404 du membre ne prouve rien — la route
+  refuse, l'action est éprouvée à part. **Le parcours entier rejoué en six étapes**, mesure temporaire
+  retirée après coup. 1 940 → **1 956 tests**. **C11 est clos.**
 - **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, détaillés dans
   `HISTORIQUE-TICKETS.md`. **Cinq portent une migration, `0010` à `0014`** ; le reste est de
   l'ergonomie, plus le **renommage de « Projets » en « Accompagnements »**, qui **rouvre D35**.
@@ -135,7 +141,7 @@ un amorçage partiel** : le rapprochement de T8.4 le rendrait rejouable sans rie
 qu'un appelant. → **avec la dette de T3.6.**
 **Le RLS a quitté C9** : voir le groupe (c).
 
-**C11 continue** (T11.4 et T11.5), **et C7 ferme le POC après**.
+**C11 est clos ; C7 ferme le POC** — T7.7 → T7.10.
 
 **Deux points de T11.2, dont un récrit par sa mesure.** **Sans JavaScript, le lien d'invitation est
 perdu** — mesuré en T11.3, harnais éprouvé par étape témoin : `resolveTeamDrawer` ferme le panneau
@@ -156,11 +162,13 @@ applicatif est le seul gardien, là où celui d'`invitePerson` en a deux. → **
 un test le fixe, et il tombera le jour où quelqu'un « sécurisera » le module — **un seul témoin isole
 l'ordre des six règles**, le domaine suspendu. → **à relire avant de corriger, jamais après.**
 
-**Le journal reste incomplet** (T8.3, laissé intact — règle 3) : **cinq familles écrivent sans
+**Le journal reste incomplet** (T8.3, laissé intact — règle 3) : **six familles écrivent sans
 trace** — le produit, l'adoption, la compétence portée, les huit référentiels autres que l'entité
-(trente-deux gestes), et **les trois gestes de l'invitation** (T11.2, arbitrage assumé : l'acceptation
-n'a ni session ni acteur). Chacune est **fixée par un test qui tombera**.
-→ **prochaine session de découpage.**
+(trente-deux gestes), **les trois gestes de l'invitation** (T11.2, arbitrage assumé : l'acceptation
+n'a ni session ni acteur), et **la correction des informations du domaine** (T11.5, arbitrage : aucun
+`event_target_type` ne dit « domaine », et le poser sur `person` mentirait). Chacune est **fixée par
+un test qui tombera** — **et la fiche de T11.5 annonçait un cinquième nom là où c'est le sixième**,
+son décompte datant de son écriture. → **prochaine session de découpage.**
 
 **Au prochain ticket qui ouvre le fichier** — **destination qui a déjà échoué une fois**, T8.4 ayant
 dû recevoir un ticket pour ce seul motif. **`uiLayerSeal` garde une liste de six dossiers, pas une
@@ -176,8 +184,8 @@ sur quatre met « Annuler » au rang secondaire · les props d'icône de `Button
 ### c. Dettes assumées — le fait et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`
 
 - **Le design system a neuf manques, et aucun n'a été inventé.** **Une carte ne se détache d'aucun
-  fond** — quatre positions de 1,04:1 à 1,24:1 quand le seuil d'un composant est 3:1 ; tous les
-  couples de **texte** passent 4,5:1. S'y ajoutent trois élévations, deux gradients, aucun jeton de
+  fond** — **cinq** positions de 1,04:1 à 1,27:1 depuis le bloc « Ce domaine » (T11.5), quand le seuil
+  d'un composant est 3:1 ; tous les couples de **texte** passent 4,5:1. S'y ajoutent trois élévations, deux gradients, aucun jeton de
   bordure de contrôle, d'erreur, d'interlettrage, de voile, de séparateur, de mouvement, et
   **`--number-*` s'arrête à 100 px**. Six substituts mesurés ; les points d'arrêt restent posés à la
   main, hors de `spacingScaleLock` (T1.6). → **design system.**

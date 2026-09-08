@@ -144,6 +144,7 @@ const {
   updateApproach,
   updateEntity,
   updateJob,
+  updateOwnDomain,
   updateProjectStatus,
   updateSkill,
   updateSkillLevel,
@@ -1974,6 +1975,200 @@ describe("le journal de l'entité", () => {
       await archiveJob(f.freeJobId, ...confirm());
       await restoreJob(f.freeJobId);
     });
+
+    expect(written).toHaveLength(0);
+  });
+});
+
+/* ==========================================================================
+   Le domaine lui-même — T11.5
+
+   **La seule écriture de cet écran qui ne vise pas un référentiel**, et elle
+   touche la ligne qui décide de tout le reste : le domaine. Deux sujets, et pas
+   un de plus — le **droit**, éprouvé par l'action et non par l'écran, et la
+   **borne des trois colonnes**, éprouvée par une charge forgée.
+
+   La borne, elle, est d'abord un refus de **typage** — `lib/db/scoped.test.ts`
+   la relit à la compilation. Ce qui se mesure ici est ce qu'un type ne peut pas
+   dire : qu'une soumission portant un champ `status` ne l'écrit pas.
+   ========================================================================== */
+
+/** L'appel de correction, tel qu'une soumission le fait. */
+function ownDomainForm(entries: Record<string, string>): FormData {
+  const data = new FormData();
+  for (const [key, value] of Object.entries(entries)) data.append(key, value);
+  return data;
+}
+
+const EMPTY_OWN_DOMAIN = {
+  values: { name: "", competenceCenterName: "", description: "" },
+  errors: {},
+};
+
+/** La ligne du domaine, lue **par le client brut** : le décompte tranche. */
+async function domainRow() {
+  const rows = await db.select().from(domains).where(eq(domains.id, f.domainId));
+  return rows[0];
+}
+
+describe("les informations du domaine", () => {
+  test("le responsable corrige les trois champs, et la base le dit", async () => {
+    currentPerson = f.managerId;
+    const before = await domainRow();
+
+    const state = await updateOwnDomain(
+      EMPTY_OWN_DOMAIN,
+      ownDomainForm({
+        name: `__0__test__admin__${suffix} corrigé`,
+        competenceCenterName: `Centre corrigé ${suffix}`,
+        description: "Ce que fait cette entreprise.",
+      }),
+    );
+
+    expect(state.ok).toBe(true);
+
+    const after = await domainRow();
+    expect(after?.name).toBe(`__0__test__admin__${suffix} corrigé`);
+    expect(after?.competenceCenterName).toBe(`Centre corrigé ${suffix}`);
+    expect(after?.description).toBe("Ce que fait cette entreprise.");
+
+    /* Le nom est rendu à la fixture : les fichiers de tests d'action dépendent
+       de l'ordre alphabétique des domaines depuis T8.1, et le préfixe `__0__`
+       est ce qui trie celui-ci en tête. */
+    await updateOwnDomain(
+      EMPTY_OWN_DOMAIN,
+      ownDomainForm({
+        name: before?.name ?? "",
+        competenceCenterName: before?.competenceCenterName ?? "",
+        description: before?.description ?? "",
+      }),
+    );
+  });
+
+  test("un nom vide est refusé, et rien n'est écrit", async () => {
+    currentPerson = f.managerId;
+    const before = await domainRow();
+
+    const state = await updateOwnDomain(
+      EMPTY_OWN_DOMAIN,
+      ownDomainForm({
+        name: "",
+        competenceCenterName: `Centre ${suffix}`,
+        description: "",
+      }),
+    );
+
+    expect(state.ok).toBeUndefined();
+    expect(state.errors.name).toContain("obligatoire");
+    expect(await domainRow()).toEqual(before);
+  });
+
+  /**
+   * **Le droit s'éprouve par l'action, jamais par l'écran.**
+   *
+   * `/administration` rend 404 à un membre et la barre latérale n'y mène pas ;
+   * cela ne protège pas ce point d'entrée-ci, dont les champs se récoltent sur
+   * la page servie au responsable et se repostent sous un autre cookie. **Le
+   * décompte en base tranche, jamais le code de retour** — un refus rend un
+   * état comme une réussite.
+   */
+  test("un membre qui frappe l'action n'écrit rien", async () => {
+    const charge = ownDomainForm({
+      name: `Volé ${suffix}`,
+      competenceCenterName: `Volé centre ${suffix}`,
+      description: "Écrit par qui n'a pas le droit.",
+    });
+
+    currentPerson = f.outsiderId;
+    const before = await domainRow();
+
+    const state = await updateOwnDomain(EMPTY_OWN_DOMAIN, charge);
+
+    expect(state.ok).toBeUndefined();
+    expect(state.message).toContain("responsable de domaine");
+    /* La saisie revient telle quelle : Vision ne jette jamais en silence ce qui
+       a été tapé, y compris quand ce qu'elle refuse n'est pas la saisie. */
+    expect(state.values.name).toBe(`Volé ${suffix}`);
+    expect(await domainRow()).toEqual(before);
+
+    /* **L'étape témoin.** La **même** charge, sous l'identité du responsable,
+       écrit — sans elle, une ligne inchangée ne distinguerait pas un refus
+       d'une charge qui n'aurait de toute façon rien écrit. */
+    currentPerson = f.managerId;
+    const witness = await updateOwnDomain(EMPTY_OWN_DOMAIN, charge);
+    expect(witness.ok).toBe(true);
+    expect((await domainRow())?.name).toBe(`Volé ${suffix}`);
+
+    await updateOwnDomain(
+      EMPTY_OWN_DOMAIN,
+      ownDomainForm({
+        name: before?.name ?? "",
+        competenceCenterName: before?.competenceCenterName ?? "",
+        description: before?.description ?? "",
+      }),
+    );
+  });
+
+  /**
+   * **La charge forgée, et les deux colonnes qu'elle vise.**
+   *
+   * `status` décide qui peut ouvrir une session, `archived_at` fait disparaître
+   * une entreprise de l'écran du super administrateur : ce sont exactement les
+   * deux champs qu'un formulaire récolté puis complété à la main viserait. La
+   * lecture se fait champ par champ (`readOwnDomainForm`), et la couche ne les
+   * accepte pas davantage — ici on mesure la première des deux gardes, la
+   * seconde étant un refus de compilation.
+   */
+  test("un champ `status` ou `archived_at` forgé n'est pas écrit", async () => {
+    currentPerson = f.managerId;
+    const before = await domainRow();
+
+    const state = await updateOwnDomain(
+      EMPTY_OWN_DOMAIN,
+      ownDomainForm({
+        name: before?.name ?? "",
+        competenceCenterName: before?.competenceCenterName ?? "",
+        description: "Une description légitime.",
+        status: "suspended",
+        archivedAt: "2026-09-08T00:00:00.000Z",
+        archived_at: "2026-09-08T00:00:00.000Z",
+        id: "00000000-0000-0000-0000-000000000000",
+      }),
+    );
+
+    expect(state.ok).toBe(true);
+
+    const after = await domainRow();
+    expect(after?.id).toBe(f.domainId);
+    expect(after?.status).toBe("active");
+    expect(after?.archivedAt).toBeNull();
+    /* Le champ légitime, lui, est passé : c'est ce qui dit que la charge a bien
+       été traitée, et non ignorée en bloc. */
+    expect(after?.description).toBe("Une description légitime.");
+  });
+
+  /**
+   * **Le geste n'écrit aucune ligne de journal, et c'est un arbitrage.**
+   *
+   * Aucun `event_target_type` ne dit « domaine » ; l'élargir demanderait une
+   * migration d'énuméré pour un seul objet (arbitrage (d) de `tickets-C7.md`),
+   * et le poser sur `person` mentirait sur l'objet. **Ce test tombera** le jour
+   * où le journal recevra ce cinquième nom — c'est ce qu'on lui demande.
+   */
+  test("la correction n'écrit aucune ligne de journal", async () => {
+    currentPerson = f.managerId;
+    const before = await domainRow();
+
+    const written = await traced(() =>
+      updateOwnDomain(
+        EMPTY_OWN_DOMAIN,
+        ownDomainForm({
+          name: before?.name ?? "",
+          competenceCenterName: before?.competenceCenterName ?? "",
+          description: "Tracée, si elle l'était.",
+        }),
+      ),
+    );
 
     expect(written).toHaveLength(0);
   });

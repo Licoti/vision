@@ -15,6 +15,11 @@ import { describe, expect, test } from "vitest";
 import {
   addressDomainsOf,
   EMPTY_DOMAIN_VALUES,
+  EMPTY_OWN_DOMAIN_VALUES,
+  parseOwnDomainForm,
+  readOwnDomainForm,
+  toOwnDomainFormValues,
+  validateOwnDomainForm,
   IDENTITY_PROVIDERS,
   isIdentityProvider,
   normalizeIdentityValue,
@@ -323,5 +328,106 @@ describe("le formulaire d'une identité seule", () => {
     );
     expect(errors.value).toContain("obligatoire");
     expect(input).toBeNull();
+  });
+});
+
+/* ==========================================================================
+   Le formulaire du domaine vu par son administrateur — T11.5
+   ========================================================================== */
+
+describe("le formulaire du domaine courant", () => {
+  test("lit ses trois champs, rognés — et pas un de plus", () => {
+    const values = readOwnDomainForm(
+      form({
+        name: "  Acme  ",
+        competenceCenterName: " Studio Design ",
+        description: " Ce que fait Acme. ",
+        /* **La colonne que la charge forgée viserait.** Elle n'est pas lue :
+           la fonction nomme ses trois champs, elle n'étale pas un `FormData`. */
+        status: "suspended",
+        archivedAt: "2026-09-08",
+      }),
+    );
+
+    expect(values).toEqual({
+      name: "Acme",
+      competenceCenterName: "Studio Design",
+      description: "Ce que fait Acme.",
+    });
+  });
+
+  test("les deux noms sont obligatoires, et la description ne l'est pas", () => {
+    const errors = validateOwnDomainForm(EMPTY_OWN_DOMAIN_VALUES);
+
+    expect(errors.name).toContain("obligatoire");
+    expect(errors.competenceCenterName).toContain("obligatoire");
+    expect(errors.description).toBeUndefined();
+    expect(Object.keys(errors)).toHaveLength(2);
+  });
+
+  /**
+   * **Les deux phrases viennent de la création, et c'est le but de
+   * l'extraction** : `validateNaming` les tient pour les deux formulaires, et
+   * deux copies divergeraient un jour.
+   */
+  test("le refus est mot pour mot celui de la création", () => {
+    const atCreation = validateDomainForm({
+      ...EMPTY_DOMAIN_VALUES,
+      provider: "google",
+      identityValue: "acme.com",
+    });
+    const here = validateOwnDomainForm(EMPTY_OWN_DOMAIN_VALUES);
+
+    expect(here.name).toBe(atCreation.name);
+    expect(here.competenceCenterName).toBe(atCreation.competenceCenterName);
+  });
+
+  test("rend les trois colonnes prêtes à écrire", () => {
+    const { errors, input } = parseOwnDomainForm(
+      form({
+        name: "Acme",
+        competenceCenterName: "Studio Design",
+        description: "Ce que fait Acme.",
+      }),
+    );
+
+    expect(errors).toEqual({});
+    expect(input).toEqual({
+      name: "Acme",
+      competenceCenterName: "Studio Design",
+      description: "Ce que fait Acme.",
+    });
+  });
+
+  test("une description effacée descend nulle, jamais une phrase vide", () => {
+    const { input } = parseOwnDomainForm(
+      form({ name: "Acme", competenceCenterName: "Studio", description: "" }),
+    );
+    expect(input?.description).toBeNull();
+  });
+
+  test("une saisie refusée ne rend aucune ligne — l'invariant de T2.5", () => {
+    const { values, errors, input } = parseOwnDomainForm(
+      form({ name: "", competenceCenterName: "Studio", description: "" }),
+    );
+
+    expect(input).toBeNull();
+    expect(errors.name).toBeDefined();
+    /* La saisie revient telle quelle : le panneau la réaffiche. */
+    expect(values.competenceCenterName).toBe("Studio");
+  });
+
+  test("la ligne enregistrée se ramène aux trois chaînes du panneau", () => {
+    expect(
+      toOwnDomainFormValues({
+        name: "Acme",
+        competenceCenterName: "Studio Design",
+        description: null,
+      }),
+    ).toEqual({
+      name: "Acme",
+      competenceCenterName: "Studio Design",
+      description: "",
+    });
   });
 });

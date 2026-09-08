@@ -1,6 +1,12 @@
 /**
- * La résolution des trois panneaux de la page **Administration** (21/08/2026,
- * rendus multi-référentiels par T7.3, portés à neuf référentiels par T7.4).
+ * La résolution des **quatre** panneaux de la page **Administration**
+ * (21/08/2026, rendus multi-référentiels par T7.3, portés à neuf référentiels
+ * par T7.4, augmentés du domaine lui-même par T11.5).
+ *
+ * **Le quatrième n'est pas de la même famille que les trois autres**, et c'est
+ * la seule chose à savoir avant de lire : les trois premiers visent une ligne de
+ * référentiel désignée par le client, le dernier vise le domaine de la session
+ * et ne reçoit rien.
  *
  * **Deux chemins, une seule résolution.** L'URL reste une adresse valide —
  * coller `?referentiel=metiers&ligne=<identifiant>` ouvre encore le panneau, au
@@ -16,11 +22,12 @@
  * page nue. La cible est enfin confrontée au domaine par la lecture scopée
  * elle-même : une ligne d'un autre domaine n'existe pas, elle ne « manque » pas.
  *
- * **Trois écritures, aucune lecture.** À la différence des pages produit et
+ * **Quatre écritures, aucune lecture.** À la différence des pages produit et
  * Équipe, cet écran n'a pas la paire « une clé pour lire, une clé pour
  * écrire » : la page entière est réservée à `manageDomain`, il n'y a donc pas
  * deux droits à séparer. Une ligne de référentiel est un libellé et un ordre —
- * la ligne de liste dit tout ce qu'il y aurait à détailler.
+ * la ligne de liste dit tout ce qu'il y aurait à détailler —, et le bloc « Ce
+ * domaine » affiche déjà ses trois champs.
  *
  * **Le décompte est lu ici pour être dit, jamais pour décider.** Le panneau
  * annonce ce qui s'oppose au geste avant qu'on l'exerce, plutôt que de le
@@ -33,6 +40,7 @@ import { eq } from "drizzle-orm";
 import type { ReactNode } from "react";
 
 import { ActivityTypePanel } from "@/components/admin/activity-type-panel";
+import { OwnDomainPanel } from "@/components/admin/own-domain-panel";
 import { ReferentialPanel } from "@/components/admin/referential-panel";
 import { EntityPanel } from "@/components/admin/entity-panel";
 import { StarterPanel } from "@/components/admin/starter-panel";
@@ -55,6 +63,7 @@ import {
 import type { AdminDrawerRequest, DrawerContent } from "@/lib/drawers/types";
 import { formatProducts, REFERENTIAL_NOUN } from "@/lib/format";
 import { toActivityTypeFormValues } from "@/lib/forms/activity-type";
+import { toOwnDomainFormValues } from "@/lib/forms/domain";
 import { toEntityFormValues } from "@/lib/forms/entity";
 import { toProjectStatusFormValues } from "@/lib/forms/project-status";
 import {
@@ -68,6 +77,8 @@ import { toToolFormValues } from "@/lib/forms/tool";
 import {
   ARCHIVE_PANEL_PARAM,
   DELETE_PANEL_PARAM,
+  DOMAIN_PANEL_EDIT,
+  DOMAIN_PANEL_PARAM,
   REFERENTIAL_ROW_NEW,
   REFERENTIAL_ROW_PARAM,
   type Referential,
@@ -112,6 +123,7 @@ import {
   updateProjectStatus,
   updateSkill,
   updateSkillLevel,
+  updateOwnDomain,
   updateStarter,
   updateTool,
 } from "@/app/(app)/administration/actions";
@@ -240,7 +252,49 @@ export async function resolveAdminDrawer(
          `tickets-C7.md`, et c'est déjà ce que le type dit : cette demande ne
          porte aucun référentiel. */
       return entityDelete(session, request.id);
+
+    /* ------------------------------------------------------------------ */
+    case "ownDomain":
+      /* Le seul panneau de cet écran qui ne vise pas une ligne de référentiel
+         — T11.5. Rien à rétrécir, rien à retrouver : la cible est le domaine de
+         la session, et la couche la prend dans sa fermeture. */
+      return ownDomainForm(session);
   }
+}
+
+/* ==========================================================================
+   Le domaine lui-même — T11.5
+   ========================================================================== */
+
+/**
+ * Le panneau du domaine courant — *« gérer les informations de son domaine »*,
+ * et exactement cela.
+ *
+ * **Aucun identifiant, donc aucune forme d'UUID à vérifier et aucune ligne à
+ * confronter au domaine** : les trois autres panneaux de cet écran désignent une
+ * ligne reçue du client, celui-ci ne désigne rien. C'est `findOwnDomain` qui
+ * dit sur quoi il s'ouvre, et elle ne peut lire que le domaine de la session.
+ *
+ * **`null` sur un domaine introuvable**, comme les trois autres : un panneau qui
+ * ne trouve pas son objet ne s'ouvre pas. Le cas est hors d'atteinte depuis un
+ * écran — `loadSession` a déjà lu cette ligne pour ouvrir la session —, et il
+ * est écrit parce que la lecture peut le rendre.
+ */
+async function ownDomainForm(session: Session): Promise<DrawerContent | null> {
+  const domain = await session.db.findOwnDomain();
+  if (!domain) return null;
+
+  return {
+    titleId: "panneau-ce-domaine-titre",
+    title: "Modifier ce domaine",
+    subtitles: [domain.name],
+    body: (
+      <OwnDomainPanel
+        action={updateOwnDomain}
+        initial={toOwnDomainFormValues(domain)}
+      />
+    ),
+  };
 }
 
 /* ==========================================================================
@@ -745,8 +799,16 @@ export function adminRequestFromParams(
     ligne?: string | undefined;
     archiver?: string | undefined;
     supprimer?: string | undefined;
+    domaine?: string | undefined;
   },
 ): AdminDrawerRequest | null {
+  /* **Une valeur, et une seule** — T11.5. `domaine` porte `nouveau` sur
+     `/domaines` et `modifier` ici : une adresse qui vaudrait l'autre valeur
+     n'ouvre rien, plutôt que d'ouvrir le panneau de la mauvaise autorité. */
+  if (asked.domaine === DOMAIN_PANEL_EDIT) {
+    return { kind: "ownDomain" };
+  }
+
   if (asked.ligne !== undefined) {
     return asked.ligne === REFERENTIAL_ROW_NEW
       ? { kind: "row", referential }
@@ -771,7 +833,7 @@ export function adminRequestFromParams(
 /**
  * Les clés d'URL qui ouvrent un panneau **sur la page Administration**.
  *
- * Les trois y sont, et `referentiel` n'y est pas : c'est un **sélecteur**, pas
+ * Les quatre y sont, et `referentiel` n'y est pas : c'est un **sélecteur**, pas
  * une clé d'ouverture. C'est aussi ce qui le laisse survivre au nettoyage d'URL
  * que `DrawerHost` fait au montage — les clés de cette liste sont retirées, les
  * autres restent, comme `?de=` et `?a=` sur la page produit.
@@ -780,4 +842,5 @@ export const ADMIN_PANEL_PARAMS = [
   REFERENTIAL_ROW_PARAM,
   ARCHIVE_PANEL_PARAM,
   DELETE_PANEL_PARAM,
+  DOMAIN_PANEL_PARAM,
 ] as const;
