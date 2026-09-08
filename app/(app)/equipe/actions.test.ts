@@ -37,7 +37,15 @@
  */
 
 import { eq, inArray, sql } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  test,
+  vi,
+} from "vitest";
 
 import { SESSION_COOKIE, sealPrincipal } from "@/lib/auth/cookie";
 import { db } from "@/lib/db/client";
@@ -1616,6 +1624,240 @@ describe("invitePerson — les six refus, éprouvés séparément", () => {
 
     expect(state.message).toBeDefined();
     expect(await pendingOf(target.id)).toHaveLength(0);
+  });
+});
+
+/* ==========================================================================
+   L'envoi — T11.3
+
+   **Ce qui se mesure ici est l'effet de l'envoi sur l'invitation**, jamais
+   l'envoi lui-même : celui-ci vit dans `lib/mail/send.test.ts`, sans base. Ce
+   que la fiche demande à ce fichier tient en une phrase — *un envoi qui échoue
+   n'annule jamais l'invitation* —, et cela ne se lit qu'en base.
+
+   **Le `fetch` global n'est pas remplacé, il est intercepté.** `neon-http`
+   parle à la base **par `fetch`** : un `mockImplementation` sans condition
+   ferait tomber toute la fixture, et le fichier mesurerait un défaut qu'il
+   aurait lui-même créé. Seules les requêtes vers `api.resend.com` sont
+   détournées ; les autres passent au `fetch` d'origine.
+
+   **Aucun courriel réel ne part**, ici comme ailleurs : ce que ces cas
+   mesurent est *ce que Vision fait de la réponse*.
+   ========================================================================== */
+
+/** Le `fetch` d'avant l'espion — celui par lequel la base répond. */
+const NETWORK = globalThis.fetch;
+
+const RESEND = "https://api.resend.com/";
+
+/** Détourne les seuls appels à Resend, et laisse passer la base. */
+function interceptMail(reply: () => Promise<Response>) {
+  return vi
+    .spyOn(globalThis, "fetch")
+    .mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input instanceof Request ? input.url : input);
+      return url.startsWith(RESEND) ? reply() : NETWORK(input, init);
+    });
+}
+
+/** Ce qui est **effectivement sorti** vers Resend, et rien d'autre. */
+function mailCalls(spy: ReturnType<typeof interceptMail>) {
+  return spy.mock.calls.filter((call) =>
+    String(call[0] instanceof Request ? call[0].url : call[0]).startsWith(
+      RESEND,
+    ),
+  );
+}
+
+/** Les deux valeurs de l'envoi, posées ou retirées ensemble. */
+function connectMail(
+  values: { key?: string; from?: string } = {
+    key: "une-cle",
+    from: "vision@acme.com",
+  },
+) {
+  vi.stubEnv("RESEND_API_KEY", values.key ?? "");
+  vi.stubEnv("MAIL_FROM", values.from ?? "");
+}
+
+describe("invitePerson — l'envoi, et ce qu'il ne peut pas défaire", () => {
+  beforeAll(() => {
+    /* L'échec se nomme sur la sortie d'erreur, et deux cas l'exercent : une
+       suite verte n'a pas à écrire des lignes d'erreur qu'on cesserait de lire. */
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    /* L'espion de `fetch` se retire à chaque cas : la base parle par lui, et un
+       espion qui survivrait à son test ferait tomber le suivant. */
+    vi.restoreAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  /** **Mesure 1 de la fiche** : sans clé, rien ne sort, et tout le reste tient. */
+  test("sans clé d'envoi : l'invitation existe, `sent_at` est nul, rien ne sort", async () => {
+    currentPerson = f.managerId;
+    connectMail({});
+    const spy = interceptMail(() =>
+      Promise.resolve(new Response("{}", { status: 200 })),
+    );
+
+    const target = await freshPerson("Sans envoi", {
+      email: `sans.envoi.${suffix}@acme.com`,
+    });
+
+    const state = await invitePerson(
+      target.id,
+      NO_INVITATION_STATE,
+      inviteForm("member"),
+    );
+
+    expect(state.link).toContain("/invitation/");
+    expect(state.sent).toBe(false);
+    expect(mailCalls(spy)).toHaveLength(0);
+
+    const rows = await pendingOf(target.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.sentAt).toBeNull();
+  });
+
+  /**
+   * **Mesure 2 de la fiche**, premier échec : l'API refuse. L'invitation existe
+   * toujours, `sent_at` est nul — **et le décompte en base tranche**, l'état
+   * rendu ressemblant trait pour trait à celui du succès, le lien compris.
+   */
+  test("l'API refuse : l'invitation reste, `sent_at` reste nul", async () => {
+    currentPerson = f.managerId;
+    connectMail();
+    const spy = interceptMail(() =>
+      Promise.resolve(new Response("{}", { status: 422 })),
+    );
+
+    const target = await freshPerson("Envoi refusé", {
+      email: `envoi.refuse.${suffix}@acme.com`,
+    });
+
+    const state = await invitePerson(
+      target.id,
+      NO_INVITATION_STATE,
+      inviteForm("member"),
+    );
+
+    expect(state.message).toBeUndefined();
+    expect(state.link).toContain("/invitation/");
+    expect(state.sent).toBe(false);
+    /* La tentative a bien eu lieu : sans elle, « `sent_at` reste nul » ne
+       dirait que l'absence d'envoi. */
+    expect(mailCalls(spy)).toHaveLength(1);
+
+    const rows = await pendingOf(target.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.sentAt).toBeNull();
+  });
+
+  /** **Mesure 2**, second échec : le réseau coupe. Une levée ferait tomber ce cas. */
+  test("le réseau coupe : l'invitation reste, `sent_at` reste nul", async () => {
+    currentPerson = f.managerId;
+    connectMail();
+    const spy = interceptMail(() =>
+      Promise.reject(new TypeError("fetch failed")),
+    );
+
+    const target = await freshPerson("Envoi coupé", {
+      email: `envoi.coupe.${suffix}@acme.com`,
+    });
+
+    const state = await invitePerson(
+      target.id,
+      NO_INVITATION_STATE,
+      inviteForm("member"),
+    );
+
+    expect(state.link).toContain("/invitation/");
+    expect(state.sent).toBe(false);
+    expect(mailCalls(spy)).toHaveLength(1);
+
+    const rows = await pendingOf(target.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.sentAt).toBeNull();
+  });
+
+  /**
+   * **La contre-épreuve, et elle vaut autant que les trois mesures.** Sans un
+   * cas où l'envoi réussit, « `sent_at` reste nul » ne prouverait que l'absence
+   * d'écrivain — le 200 muet de C9, transposé à une colonne.
+   *
+   * **Et elle mesure la jointure** : le lien que le panneau affichera est
+   * **celui-là même** qui part dans le message. Les deux moitiés de la chaîne
+   * se rejoignent ici, sur la seule valeur qui les relie.
+   */
+  test("l'envoi accepté : `sent_at` est daté, et c'est ce lien-là qui part", async () => {
+    currentPerson = f.managerId;
+    connectMail();
+    const spy = interceptMail(() =>
+      Promise.resolve(new Response("{}", { status: 200 })),
+    );
+
+    const target = await freshPerson("Envoi accepté", {
+      email: `envoi.accepte.${suffix}@acme.com`,
+    });
+
+    const before = new Date();
+    const state = await invitePerson(
+      target.id,
+      NO_INVITATION_STATE,
+      inviteForm("domain_manager"),
+    );
+
+    expect(state.sent).toBe(true);
+
+    const rows = await pendingOf(target.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.sentAt).toBeInstanceOf(Date);
+    expect(rows[0]?.sentAt?.getTime()).toBeGreaterThanOrEqual(
+      before.getTime() - 1_000,
+    );
+
+    const calls = mailCalls(spy);
+    expect(calls).toHaveLength(1);
+    const body = JSON.parse(String(calls[0]?.[1]?.body)) as {
+      to: string[];
+      text: string;
+    };
+    expect(body.to).toEqual([`envoi.accepte.${suffix}@acme.com`]);
+    expect(body.text).toContain(state.link);
+  });
+
+  /**
+   * **Un envoi par invitation, jamais deux** : aucune relance, aucun réessai,
+   * aucune file (`docs/03` §8, interdit commun de C11). Le refus du sixième cas
+   * — *une invitation vit déjà* — n'écrit rien et n'envoie rien non plus.
+   */
+  test("une invitation déjà vivante ne renvoie rien", async () => {
+    currentPerson = f.managerId;
+    connectMail();
+    const spy = interceptMail(() =>
+      Promise.resolve(new Response("{}", { status: 200 })),
+    );
+
+    const target = await freshPerson("Un seul envoi", {
+      email: `un.seul.envoi.${suffix}@acme.com`,
+    });
+
+    await invitePerson(target.id, NO_INVITATION_STATE, inviteForm("member"));
+    expect(mailCalls(spy)).toHaveLength(1);
+
+    const second = await invitePerson(
+      target.id,
+      NO_INVITATION_STATE,
+      inviteForm("member"),
+    );
+
+    expect(second.message).toBeDefined();
+    expect(second.link).toBeUndefined();
+    expect(mailCalls(spy)).toHaveLength(1);
+    expect(await pendingOf(target.id)).toHaveLength(1);
   });
 });
 

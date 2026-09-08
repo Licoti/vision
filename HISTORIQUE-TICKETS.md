@@ -8124,3 +8124,68 @@ mille lignes employaient la même adresse. *Une contrainte de base fait aussi le
 fixtures qui la précèdent.*
 
 **1 834 → 1 893 tests sur 67 fichiers**, `lint` (`--max-warnings=0`) et `tsc` au vert.
+
+---
+
+## T11.3 — L'envoi — 08/09/2026
+
+**Le lien part tout seul, et son absence ne casse rien.** C'est l'objectif de la fiche, tenu dans les
+deux sens : avec les deux valeurs, un courriel part et `sent_at` se date ; sans elles, **aucune
+requête n'est tentée**, l'invitation existe quand même et le panneau affiche le lien à transmettre —
+l'état de T11.2, atteint **sans second chemin de code**.
+
+**Trois fichiers annoncés par la fiche, huit écrits — les trois écarts annoncés au plan.**
+`app/(app)/equipe/actions.test.ts`, parce que la mesure 2 de la fiche porte sur l'action et non sur
+le module d'envoi · `invitation-panel.tsx` et `lib/forms/invitation.ts`, parce que ce ticket **rend
+fausse une phrase d'écran** — *« Vision n'envoie aucun courriel »* — et qu'une phrase d'écran fausse
+est pire qu'un commentaire faux (leçon de T7.5) · `ACTIONS-HUMAINES-C11.md`, parce que l'envoi reste
+non branché et que les gestes qui le brancheraient ne tiennent pas dans une ligne d'`ETAT.md`.
+
+**Ce que le ticket a écrit.** `lib/mail/send.ts` — `isMailConnected()`, **calque exact
+d'`isProviderConnected`** (les deux valeurs comptent, et elles se lisent à l'usage) ;
+`invitationMailBody`, **pure et donc mesurable sans réseau** ; `sendInvitationMail`, un `fetch` vers
+l'API de Resend, **zéro dépendance neuve** — le dépôt reste à six paquets de production. Le corps est
+du **texte**, jamais du HTML : une mise en page demanderait des valeurs visuelles hors thème
+(règle 2), et les mots des deux rôles se **réemploient** au lieu d'en faire une quatrième copie. Dans
+l'action, l'appel et lui seul : l'envoi vient **après** l'écriture et ne peut plus la défaire, et
+`sent_at` ne se date **que** si le message est parti.
+
+**La garde d'envoi vit à un seul endroit, et c'est ce qui rend sa mise en défaut lisible.** Le
+premier jet la posait deux fois — dans l'action et dans le module. Deux gardes pour une propriété :
+neutraliser l'une n'aurait rien fait tomber. Descendue dans le module, elle **fait tomber deux
+tests, un par fichier, et rien d'autre**.
+
+**Quatre mises en défaut, et l'une contredit la fiche.** La garde retirée : **2** tests, les deux
+mesures 1. L'échec transformé en levée : **4**, les deux mesures 2 et leurs jumelles du module. La
+datation retirée : **1**, la contre-épreuve. **La clé retirée : 8**, et non « la mesure 2 et aucune
+autre » comme l'annonçait la fiche — ce sont tous les cas qui exigent un expéditeur raccordé.
+L'énoncé décrivait une mise en défaut écrite avant les tests qu'elle prescrivait ; **quatrième
+énoncé de fiche mis en défaut du chantier**.
+
+**Le `fetch` global ne se remplace pas dans un fichier qui parle à la base.** `neon-http` parle
+**par `fetch`** : l'espion **intercepte** les seules adresses `api.resend.com` et délègue le reste au
+`fetch` d'origine. Sans cette condition, le fichier aurait mesuré un défaut qu'il aurait créé.
+
+**Le point ouvert de la jointure a été mesuré, et il ne disait pas ce qu'on croyait.** La soumission
+**sans JavaScript** a été montée pour de bon — les quatre champs cachés `$ACTION_…` du balisage
+servi, en `multipart/form-data` —, **avec étape témoin** : le même harnais crée une personne, révoque
+une invitation, archive une personne, tous en 200 avec l'effet lu ensuite en base. Le harnais marche.
+**Et le lien n'est pas dans la réponse** : `resolveTeamDrawer` **ferme le panneau dès qu'une
+invitation vivante existe** — le panneau se referme donc sur l'invitation qu'il vient de créer.
+L'invitation, elle, est bien écrite (*« en attente pour le rôle Membre, jusqu'au 15 septembre
+2026 »*, lu dans le HTML servi). **Seconde exception à D30**, non arbitrée, héritée de T11.2 et hors
+périmètre : elle part dans `ETAT.md` avec sa destination.
+
+**Ce qui n'est pas mesuré, et qui est dit.** Aucune clé Resend n'existe : **aucune requête réelle n'a
+été émise vers un tiers**, et les quatre mesures portent sur un `fetch` espionné. C'est l'état exact
+du chemin Microsoft depuis C9 — écrit, non branché, et dit. Les gestes qui le brancheraient sont dans
+`ACTIONS-HUMAINES-C11.md`.
+
+**Le contraste n'avait rien de neuf à mesurer, et il fallait le montrer.** Diff des attributs
+`className` du panneau avant/après : **aucun ne bouge**, les deux phrases neuves reprenant les jetons
+déjà servis dans ce panneau, sur le même fond. Aucun couple de couleurs neuf par la position.
+
+**Une trace laissée dans la base de développement, et elle est dite.** La mesure a créé une personne
+« Mesure T11.3 », l'a invitée, a révoqué l'invitation, puis **archivé** la personne (règle 4).
+
+**1 893 → 1 910 tests sur 68 fichiers**, `lint` (`--max-warnings=0`) et `tsc` au vert.

@@ -22,9 +22,11 @@
  * sont dans l'action** : un panneau absent du rendu n'a jamais protégé le point
  * d'entrée HTTP qui l'accompagne.
  *
- * **Aucun envoi de courriel** : le lien s'affiche et se transmet à la main.
- * C'est l'interdit de ce ticket, et T11.3 le lèvera — sans second chemin de
- * code, l'état sans clé d'envoi étant exactement celui-ci.
+ * **Le courriel part quand il peut partir** (T11.3, qui a levé l'interdit de
+ * T11.2). Le panneau ne connaît pas le réglage de l'environnement et n'a pas à
+ * le connaître : l'action lui dit `sent`, un fait, et il en rend compte. Sans
+ * clé d'envoi, l'état est exactement celui de T11.2 — le lien s'affiche et se
+ * transmet à la main, sans second chemin de code.
  *
  * **Aucune relance, et le mot n'y est pas** : une invitation part une fois
  * (`docs/03` §8). Réinviter est un geste humain qui révoque d'abord, et il vit
@@ -89,8 +91,18 @@ export function InvitationPanel({
       {state.link ? (
         <div className="flex flex-col gap-3">
           <p className="text-sm text-content-neutral-darkest">
-            L&apos;invitation est créée. Transmettez ce lien à{" "}
-            {email ?? "cette personne"}.
+            {state.sent ? (
+              <>
+                L&apos;invitation est créée, et un courriel vient de partir vers{" "}
+                {email ?? "cette personne"}. Le lien ci-dessous est celui de ce
+                message : gardez-le si vous préférez le transmettre vous-même.
+              </>
+            ) : (
+              <>
+                L&apos;invitation est créée. Transmettez ce lien à{" "}
+                {email ?? "cette personne"}.
+              </>
+            )}
           </p>
 
           {/* Un champ plutôt qu'un paragraphe : un lien se sélectionne d'un
@@ -189,10 +201,16 @@ export function InvitationPanel({
             ))}
           </ul>
 
+          {/* **Ce que la phrase promet, l'action le tient dans les deux cas.**
+              Elle ne dit pas *un courriel partira* — l'envoi n'est pas raccordé
+              partout, et une promesse fausse vaudrait le silence qu'elle
+              remplace. Elle dit ce qui est vrai des deux côtés, et le panneau
+              dira ensuite lequel des deux s'est produit. */}
           <p className="text-xs text-content-neutral-dark">
-            Le lien s&apos;affichera ici une seule fois, et c&apos;est à vous de
-            le transmettre : Vision n&apos;envoie aucun courriel. Aucun accès
-            n&apos;est ouvert tant que la personne ne s&apos;est pas connectée.
+            Le lien s&apos;affichera ici une seule fois, et vous pourrez le
+            transmettre vous-même ; s&apos;il part aussi par courriel, le
+            panneau le dira. Aucun accès n&apos;est ouvert tant que la personne
+            ne s&apos;est pas connectée.
           </p>
         </>
       )}

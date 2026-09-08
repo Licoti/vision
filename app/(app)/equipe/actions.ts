@@ -109,6 +109,7 @@ import {
 } from "@/lib/db/schema";
 import { DomainScopeError, IntegrityError, type Row } from "@/lib/db/scoped";
 import { accessPhrase, objectPhrase } from "@/lib/journal";
+import { sendInvitationMail } from "@/lib/mail/send";
 import {
   parseInvitationForm,
   readInvitationForm,
@@ -1250,15 +1251,18 @@ export async function invitePerson(
     throw error;
   }
 
+  const expiresAt = invitationExpiry();
+
+  let invitation: Row<typeof invitations>;
   try {
-    await session.db.insert(invitations, {
+    invitation = await session.db.insert(invitations, {
       personId,
       /* **L'adresse est copiée, pas jointe** (T11.1) : corriger le profil
          ensuite ne doit pas déplacer la cible d'un lien déjà parti. */
       email: person.email,
       role: input.role,
       tokenHash,
-      expiresAt: invitationExpiry(),
+      expiresAt,
     });
   } catch (error) {
     if (error instanceof DomainScopeError) {
@@ -1270,11 +1274,37 @@ export async function invitePerson(
     throw error;
   }
 
+  /* **L'envoi vient après l'écriture, et il ne peut plus la défaire** (T11.3).
+
+     `sendInvitationMail` ne lève jamais : sans clé, elle ne tente aucune
+     requête ; en échec, elle rend `false`. Dans les deux cas l'invitation
+     existe, `sent_at` reste nul et le lien s'affiche — c'est l'état de T11.2,
+     atteint **sans second chemin de code**.
+
+     **L'ordre est celui de `redeemInvitation`** : l'écriture qui compte
+     d'abord, la datation ensuite. `neon-http` n'a pas de transaction (dette de
+     T3.6), et le pire des deux ordres serait un courriel parti sur une
+     invitation que rien n'aurait enregistrée. */
+  const sent = await sendInvitationMail({
+    to: person.email,
+    domainName: session.domain.name,
+    inviterName: session.person.fullName,
+    role: input.role,
+    expiresAt,
+    link,
+  });
+
+  if (sent) {
+    await session.db.update(invitations, invitation.id, { sentAt: new Date() });
+  }
+
   revalidatePath(ROUTES.team);
 
   /* **Ni `ok`, ni valeurs à ressaisir** : le panneau bascule sur le lien, et le
-     formulaire n'a plus lieu d'être. Voir l'en-tête. */
-  return { values, errors: {}, link };
+     formulaire n'a plus lieu d'être. Voir l'en-tête. `sent` ne change rien à ce
+     qui est écrit : il dit au panneau ce qui s'est passé, pour qu'il ne promette
+     ni ne taise un courriel. */
+  return { values, errors: {}, link, sent };
 }
 
 /**

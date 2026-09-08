@@ -2,16 +2,14 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 08/09/2026, **T11.2 terminé — la boucle de l'invitation est fermée, sans
-courriel**. Un responsable invite, le lien s'affiche **une fois** et se transmet à la main, le SSO le
-valide, l'accès se pose. **Une mise en défaut n'a rien fait tomber** — l'acceptation déplacée avant
-`resolvePrincipal`, 1 884 tests verts : le rappel n'avait **aucun test**, et l'arbitrage central du
-chantier n'était tenu que par la lecture. `route.test.ts` le mesure désormais, et **un seul témoin
-isole l'ordre**, le domaine suspendu. **Le panneau ne se referme pas sur son succès** (écart nommé à
-TD.2) : `ok` emporterait la seule occurrence en clair du jeton. **Quatre refus indistincts, mesurés à
-l'empreinte MD5 près.** **Périmètre étendu à neuf fichiers, annoncés au plan.** **Vert : 1 893 tests
-sur 67 fichiers** (1 834 avant), `lint` et `tsc` au vert.
-**Ticket suivant : T11.3 — l'envoi** ; puis T11.4, T11.5, et C7 ferme le POC.
+**Dernière mise à jour :** 08/09/2026, **T11.3 terminé — le lien part tout seul, et son absence ne
+casse rien**. Sans clé, **aucune requête n'est tentée** : l'état reste celui de T11.2, **sans second
+chemin de code**. **Quatre mises en défaut, et l'une contredit la fiche** — la clé retirée fait
+tomber **8** tests, non « la mesure 2 et aucune autre » (4ᵉ énoncé de fiche mis en défaut du
+chantier). **La jointure du lien, mesurée, est en défaut** : sans JavaScript, le panneau se referme
+sur l'invitation qu'il vient de créer, et le lien est perdu. **Aucune requête réelle vers un tiers**,
+la clé Resend n'existant pas. **Périmètre étendu à huit fichiers, annoncés au plan.** **Vert :
+1 910 tests sur 68 fichiers** (1 893 avant). **Suivant : T11.4 — l'amorçage d'un domaine.**
 
 ---
 
@@ -32,7 +30,7 @@ sur 67 fichiers** (1 834 avant), `lint` et `tsc` au vert.
 | C8 — Dette | T8.1 → T8.5 | **terminé** |
 | C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **terminé** |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
-| C11 — Le parcours d'entrée | T11.1 → T11.5 | **en cours** — T11.1 et T11.2 livrés, T11.3 suit |
+| C11 — Le parcours d'entrée | T11.1 → T11.5 | **en cours** — T11.1 → T11.3 livrés, T11.4 suit |
 
 ---
 
@@ -71,6 +69,9 @@ sur 67 fichiers** (1 834 avant), `lint` et `tsc` au vert.
   deux actions, un panneau, la page publique et sa route de départ, l'acceptation dans le rappel.
   **La mise en défaut de l'arbitrage central n'a rien fait tomber** — le rappel n'avait aucun test —,
   et le combler a été le neuvième écart de périmètre. 1 834 → **1 893 tests**.
+- **C11 — L'envoi — T11.3, 08/09.** Un `fetch`, deux variables, **zéro dépendance** ; l'invitation
+  ne dépend jamais de lui. **Une mise en défaut contredit la fiche** (8 tests, pas 1), et **la
+  jointure du lien est mesurée en défaut**. 1 893 → **1 910**.
 - **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, détaillés dans
   `HISTORIQUE-TICKETS.md`. **Cinq portent une migration, `0010` à `0014`** ; le reste est de
   l'ergonomie, plus le **renommage de « Projets » en « Accompagnements »**, qui **rouvre D35**.
@@ -99,6 +100,9 @@ refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le
 - **`CLAUDE.md` porte trois énoncés périmés** : « Statut de projet » contre « Statuts
   d'accompagnement » · l'entrée « Projet » contre « Accompagnements » · *« Entra ID le remplacera en
   C7 »*, quand c'est Google, en C9 (même écart `docs/01` §141). → **action humaine.**
+- **L'envoi de courriel est écrit et n'est pas branché** — ni `RESEND_API_KEY` ni `MAIL_FROM`, et
+  **aucune requête réelle n'a jamais été émise**. Rien ne casse, mais la moitié du parcours reste à
+  la main. Gestes : `ACTIONS-HUMAINES-C11.md`. → **action humaine.**
 - **Ce qu'un macro-parcours relie reste à trancher**, et avec lui **« macro-parcours » contre le
   « Réseau de liens entre produits » de `docs/02` §10**, même direction sous un autre nom. L'entrée
   de menu et l'écran vide restent tels quels — ni table, ni objet, ni droit ; le concept devra entrer
@@ -125,16 +129,16 @@ amorçage partiel** — `npm run db:seed` ne vise que la démonstration, quand l
 rend le geste rejouable sans rien doubler : il ne manque qu'un appelant. → **avec la dette de T3.6.**
 **Le RLS a quitté C9** : voir le groupe (c).
 
-**C11 continue** (T11.3 → T11.5), **et C7 ferme le POC après**. **T11.3 hérite d'un état déjà
-atteint** : sans clé d'envoi, l'invitation existe et son lien s'affiche — donc **aucun second chemin
-de code à écrire**.
+**C11 continue** (T11.4 et T11.5), **et C7 ferme le POC après**.
 
-**Deux points naissent de T11.2.** **L'état « lien affiché » du panneau ne se lit pas dans le HTML
-servi** — il naît d'une soumission React —, si bien que la chaîne est mesurée en deux morceaux dont
-la jointure ne l'est pas. → **T11.3, qui rouvre le panneau.** **`redeemInvitation` ne juge pas l'état
-du domaine, et c'est ce qui rend l'arbitrage (4) mesurable** : un test le fixe, et il tombera le jour
-où quelqu'un « sécurisera » le module — **un seul témoin isole l'ordre des six règles**, le domaine
-suspendu. → **à relire avant de corriger, jamais après.**
+**Deux points de T11.2, dont un récrit par sa mesure.** **Sans JavaScript, le lien d'invitation est
+perdu** — mesuré en T11.3, harnais éprouvé par étape témoin : `resolveTeamDrawer` ferme le panneau
+dès qu'une invitation vivante existe, donc sur celle qu'il vient de créer, et le clair n'existe nulle
+part ailleurs. L'invitation, elle, est écrite. **Seconde exception à D30**, non arbitrée.
+→ **arbitrage humain, puis le ticket qui rouvre `lib/drawers/team.tsx`.**
+**`redeemInvitation` ne juge pas l'état du domaine, et c'est ce qui rend l'arbitrage (4) mesurable** :
+un test le fixe, et il tombera le jour où quelqu'un « sécurisera » le module — **un seul témoin isole
+l'ordre des six règles**, le domaine suspendu. → **à relire avant de corriger, jamais après.**
 
 **Le journal reste incomplet** (T8.3, laissé intact — règle 3) : **cinq familles écrivent sans
 trace** — le produit, l'adoption, la compétence portée, les huit référentiels autres que l'entité

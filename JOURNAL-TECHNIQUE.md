@@ -11222,3 +11222,98 @@ porte que le formulaire, et `curl` ne peut pas atteindre l'autre état. La chaî
 deux morceaux qui se rejoignent — l'action rend un lien contenant `/invitation/` (test), et cette
 adresse servie nomme le domaine (HTML mesuré). **La jointure des deux, elle, n'est pas mesurée**, et
 c'est la seule discipline du ticket qui se rapporte plutôt qu'elle ne se lit.
+
+---
+
+## T11.3 — L'envoi (08/09/2026)
+
+**Trois écarts de périmètre, annoncés au plan et validés avant la première ligne.** La fiche ouvre
+trois fichiers ; huit ont été écrits. `app/(app)/equipe/actions.test.ts` — la mesure 2 de la fiche
+(*« avec la clé, l'envoi échouant, l'invitation existe toujours »*) porte sur l'action et ne peut
+pas vivre dans le module d'envoi, que la fiche est pourtant seule à ouvrir. `invitation-panel.tsx`
+et `lib/forms/invitation.ts` — **ce ticket rend fausse une phrase d'écran**, et une phrase d'écran
+fausse est pire qu'un commentaire faux. `ACTIONS-HUMAINES-C11.md` — l'envoi reste non branché, et
+les gestes qui le brancheraient ne tiennent pas dans une ligne d'`ETAT.md`.
+
+**La phrase que le ticket rend fausse, et pourquoi le panneau ne peut pas dire mieux.**
+`invitation-panel.tsx` écrivait *« c'est à vous de le transmettre : Vision n'envoie aucun
+courriel »*. C'est un composant client : il ne connaît pas `RESEND_API_KEY`, et lui passer le
+réglage aurait fait descendre un état de serveur dans un composant qui n'a même pas la session.
+L'action lui rend donc **un fait, pas un réglage** — `sent`, vrai si le message est parti — et le
+panneau dit *ce qui s'est passé* après le geste, quand la phrase d'avant le geste ne promet plus
+rien qu'elle ne puisse tenir des deux côtés. **Un troisième champ d'état qui n'est pas une valeur
+saisie**, après `link` : le patron des vingt-six formulaires plie une seconde fois, et le dire vaut
+mieux que de l'étendre en silence.
+
+**La garde d'envoi vit à un seul endroit, et c'est ce qui rend sa mise en défaut lisible.** Le
+premier jet appelait `isMailConnected()` dans l'action **et** dans `sendInvitationMail`. Deux gardes
+pour une propriété : neutraliser l'une n'aurait rien fait tomber, et la discipline *« les tests se
+mettent en défaut »* aurait mesuré un contrôle mort. La garde est descendue dans le module, et
+l'action ne pose plus qu'une question — *est-ce parti ?*. **Mesuré** : garde retirée, **deux** tests
+tombent, un par fichier, et aucun autre.
+
+**Le `fetch` global ne se remplace pas dans un fichier qui parle à la base.** `neon-http` **parle
+par `fetch`** : un `mockImplementation` sans condition dans `app/(app)/equipe/actions.test.ts` aurait
+fait tomber toute la fixture, et le fichier aurait mesuré un défaut qu'il aurait lui-même créé.
+L'espion **intercepte** — il détourne les seules adresses `api.resend.com` et délègue le reste au
+`fetch` d'origine, capturé avant l'espionnage. Le décompte d'envois se lit alors sur les seuls appels
+détournés, jamais sur `mock.calls.length`, qui compte aussi la base.
+
+**Un énoncé de la fiche mis en défaut : « la clé retirée fait tomber la mesure 2 et aucune autre ».**
+C'est vrai de la lettre — retirer la clé d'un cas ne touche que ce cas, chaque test posant ses
+valeurs — et **faux de la propriété** : `isMailConnected` forcée à `false`, **huit** tests tombent,
+sur les deux fichiers. Ce sont tous ceux qui exigent un expéditeur raccordé, la contre-épreuve
+comprise. La fiche décrivait une mise en défaut écrite avant les tests qu'elle prescrivait ; le
+chiffre juste est huit, et il est plus utile que le chiffre annoncé.
+
+**La contre-épreuve mesure la jointure que la fiche demandait ailleurs.** *« `sent_at` reste nul »*
+ne prouve rien sans un cas où il se date — le 200 muet de C9, transposé à une colonne. Le cas ajouté
+mesure donc l'envoi accepté, et il en profite pour confronter **le lien du corps sortant à celui que
+l'action rend** : les deux moitiés de la chaîne se rejoignent sur la seule valeur qui les relie, et
+c'est un test qui le tient, non une lecture.
+
+**Le point ouvert de la jointure a été mesuré, et il ne dit pas ce qu'on croyait.** T11.2 écrivait
+que l'état « lien affiché » n'était pas lisible au `curl` *parce qu'il naît d'une soumission React*.
+La soumission sans JavaScript a été montée pour de bon — les quatre champs cachés `$ACTION_…` du
+balisage servi, en `multipart/form-data`, sans en-tête `Next-Action` —, **avec étape témoin** : le
+même harnais crée une personne par le formulaire de profil (200, le nom se lit dans la réponse),
+révoque une invitation et archive une personne. Le harnais marche donc. **Et le lien n'est pourtant
+pas dans la réponse.** La cause est ailleurs, et elle est plus intéressante : `resolveTeamDrawer`
+ferme le panneau d'invitation dès qu'une invitation vivante existe (T11.2, *« les deux refus qui
+rendent le geste sans objet ferment le panneau »*) — **le panneau se referme sur l'invitation qu'il
+vient de créer**, et le rendu suivant ne le contient plus. **Mesuré** : l'invitation est bien créée
+(la fiche porte *« en attente pour le rôle Membre, jusqu'au 15 septembre 2026 »*), et le lien est
+perdu. Avec JavaScript, React garde l'état rendu par l'action et le lien s'affiche ; sans lui, il
+n'existe nulle part. **C'est une seconde exception à D30**, non arbitrée, et elle vient de T11.2, pas
+d'ici — la refermer demande de rouvrir la fermeture du panneau, hors périmètre (règle 3). Le point
+part dans `ETAT.md` avec sa destination.
+
+**Le chemin réseau n'est pas exercé, et aucun test ne feint le contraire.** Aucune clé Resend
+n'existe au 08/09/2026 : les quatre mesures portent sur un `fetch` espionné, et **aucune requête
+réelle n'a été émise vers un tiers** — envoyer un corps de message à un service externe pour voir
+un 401 aurait publié une adresse de la fixture pour ne rien apprendre. C'est l'état exact du chemin
+Microsoft depuis C9 : écrit, non branché, et dit.
+
+**Le corps est du texte, et c'est la règle 2 qui l'a tranché.** Un courriel mis en page demande des
+couleurs, des tailles et des marges écrites à la main dans une balise `<style>` — hors thème, donc
+hors règle 2, et l'interdit commun de C11 refuse un neuvième jeton inventé. Le texte n'a pas ce
+problème et se lit partout. Les mots des deux rôles se **réemploient** (`PERSON_ROLE_LABEL`,
+`PERSON_ROLE_NOTE`) : une quatrième copie aurait aggravé le point ouvert des trois écritures, en
+attente de T7.9.
+
+**Une borne de temps que rien n'obligeait, et qui n'est pas décorative.** `AbortSignal.timeout` sur
+le `fetch` : sans elle, un transporteur qui se tait tient l'action serveur ouverte, l'invitation est
+écrite en base et le panneau n'affiche jamais le lien qui la rend utilisable — le pire des deux
+états, pour un envoi dont l'échec est par ailleurs sans conséquence.
+
+**Une trace laissée dans la base de développement, et elle est dite.** La mesure du HTML servi a
+créé une personne « Mesure T11.3 », l'a invitée, a révoqué l'invitation puis **archivé** la personne
+(règle 4 : rien ne se supprime). Les trois lignes restent — la personne archivée, l'invitation
+révoquée, l'événement de journal. La base de développement a déjà dérivé de la fixture et n'a pas de
+`db:reset` ; le fait est consigné plutôt que masqué.
+
+**`ETAT.md` dépasse le seuil de trois lignes, et le dépassement est su.** Le fichier entrait à
+**249** lignes ; une ligne de ticket et un point ouvert neuf — l'envoi non branché — ne tiennent pas
+dans une. Il en fait **253** après deux passes de compression. **Un ticket ne peut pas balayer** :
+`CLAUDE.md` réserve ce geste à la session de découpage, et le précédent de T5bis.2 est le même. Le
+seuil est donc franchi sciemment, et il le restera jusqu'au découpage suivant.

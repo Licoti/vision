@@ -10,10 +10,12 @@
  * plus : elle est **copiée** de la ligne `persons` par l'action, ce qui laisse
  * un lien déjà parti viser ce qu'il visait au départ.
  *
- * **Un champ de plus dans l'état, et il n'est pas une valeur saisie.** `link`
+ * **Deux champs de plus dans l'état, et aucun n'est une valeur saisie.** `link`
  * porte le lien à transmettre, que l'action rend **une fois**. C'est l'arbitrage
  * (a) du 08/09/2026 : seule l'empreinte est stockée (T11.1), le clair n'existe
  * donc que dans cette réponse-là, et le panneau ne se referme pas dessus.
+ * `sent` dit si le courriel est parti (T11.3), pour que le panneau dise ce qui
+ * s'est passé au lieu de le supposer.
  */
 
 import { domainRole } from "@/lib/db/schema";
@@ -58,6 +60,20 @@ export type InvitationFormState = {
    * créer — écart nommé au patron de TD.2, consigné au journal technique.
    */
   link?: string;
+  /**
+   * Le courriel est-il **parti** ? — T11.3, et ce n'est pas une valeur saisie.
+   *
+   * **Il dit un fait, jamais un réglage.** `false` recouvre les trois façons de
+   * ne pas partir — l'envoi n'est pas raccordé à cet environnement, l'API a
+   * refusé, le réseau a coupé —, et le panneau n'a pas à les distinguer : dans
+   * les trois cas le lien est là et se transmet à la main.
+   *
+   * **Il ne change rien à ce qui est écrit.** L'invitation existe avant
+   * l'envoi et lui survit ; ce champ existe pour que le panneau ne promette ni
+   * ne taise un courriel — *un commentaire faux vaut une ligne de code fausse*,
+   * et une phrase d'interface fausse davantage.
+   */
+  sent?: boolean;
 };
 
 export const EMPTY_INVITATION_VALUES: InvitationFormValues = { role: "" };
