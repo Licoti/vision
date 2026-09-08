@@ -11058,3 +11058,44 @@ leur nom, dans les deux fichiers de tests.
 utilisaient la personne de la fixture, si bien que le premier laissait une invitation vivante et que
 les suivants tombaient **pour la raison du premier**. Le couplage par l'ordre est un faux positif qui
 attend son heure ; chaque cas crée maintenant sa propre personne.
+
+**08/09/2026 — C11 passe devant C7, et c'est le troisième écart à `docs/05` §6.** *« Un chantier à
+la fois, fermé avant d'ouvrir le suivant »* : C7 avait déjà été enjambé au découpage de C8, puis par
+C9. La raison n'est pas thématique — elle est **dans `tickets-C7.md`**, qui écrit que *« les deux
+balayages viennent après les écrans neufs, faute de quoi ils passeraient sur un produit qu'un ticket
+suivant changerait »*. T11.2 ajoute un écran neuf, la page publique d'invitation ; T7.7 est l'un de
+ces deux balayages. **Dans l'ordre inverse, cet écran n'aurait jamais été balayé** — l'ordre proposé
+applique donc à C7 le raisonnement de C7. **Et le second balayage est déjà dépensé** : T7.6, les
+petits écrans, est livré depuis le 30/08 et ne repassera pas ; la page d'invitation se fait
+responsive à la main, ce que sa fiche dit maintenant. Effet secondaire favorable à §6 : deux
+chantiers étaient ouverts à moitié, refermer C11 en deux tickets n'en laisse plus qu'un.
+
+**08/09/2026 — C11 double de taille sur une spécification, et trois manques n'étaient pas ceux qu'on
+croyait.** La spécification humaine du parcours complet — *super admin crée un domaine → désigne son
+administrateur → invitation → SSO → gestion des membres* — a été confrontée au code plutôt que crue.
+**Trois maillons sur six existaient déjà** : le cloisonnement, le SSO lié au domaine par le `hd`, et
+la gestion des utilisateurs. **Trois manquaient, et le plus gros n'était pas l'invitation** :
+`updateDomain` **n'existe pas du tout**, pas même pour le super administrateur — T9.4 l'avait écarté
+en toutes lettres (*« aucun `updateDomain`, et ce n'est pas un oubli »*), si bien que *« gérer les
+informations de son domaine »* est un ticket entier, pas une case à cocher. S'y ajoutent
+`domains.description`, qu'aucune colonne ne portait, et la règle liant l'adresse au nom de domaine.
+**Leçon : une spécification de parcours se lit maillon par maillon contre le schéma, jamais contre
+le souvenir de ce que le produit fait.**
+
+**08/09/2026 — la règle d'adresse de T11.4 n'est pas un rattachement, et la confusion serait
+grave.** L'arbitrage (2) de C9 pose que *« le rattachement ne se fait jamais sur le domaine de la
+chaîne e-mail »* : une adresse peut être un alias, quand `hd` et `tid` sont vérifiés par le
+fournisseur. La règle demandée — *l'adresse de l'administrateur doit correspondre au nom de domaine
+de l'entreprise* — n'entre pas en conflit avec elle **à condition qu'elle reste une cohérence de
+saisie** : elle attrape la faute au formulaire, elle n'ouvre aucune porte. Le rattachement continue
+de se faire sur le `hd`, et lui seul. **Sa limite est écrite dans l'arbitrage (11)** : un `hd` en
+`.com` et des adresses en `.fr` verront la saisie refusée, le contournement étant d'ajouter le second
+nom de domaine comme identité vérifiée.
+
+**08/09/2026 — une écriture qui n'a ni des trois formes existantes.** `updateOwnDomain` (T11.5) est
+une **quatrième** forme dans `lib/db/scoped.ts` : `superAdmin` tourne sans autorité nommable,
+`asSuperAdmin(grant)` écrit au-dessus des domaines, `forDomain(scope)` écrit les tables métier — et
+ici une autorité **à l'intérieur** d'un domaine écrit la ligne qui le nomme, `domains` étant la seule
+table sans `domain_id`. La borne n'est pas un commentaire : la méthode ne peut toucher que la ligne
+du domaine de son appelant, et **n'accepte que trois colonnes**, `status` et `archived_at` étant des
+refus de typage. C'est l'idiome de `LinkTable` et de `DeletableTable`, resservi à un cran plus haut.

@@ -8,7 +8,7 @@ créer aucune fonctionnalité non listée, mettre à jour `ETAT.md` en fin de ti
 
 ---
 
-# C11 — L'invitation
+# C11 — Le parcours d'entrée, de bout en bout
 
 **Le chantier qui referme le geste que C9 avait laissé ouvert.** T9.6 a donné aux domaines leurs
 comptes — une personne, une adresse, un accès, un rôle — et s'est arrêté là, sur un interdit écrit
@@ -17,8 +17,20 @@ résultat est un produit où **l'accès s'ouvre sans que personne ne le sache** 
 `components/team/access-panel.tsx` le dit à l'écran — *« la personne se connectera quand elle se
 connectera »*.
 
-**C11 lui donne le chaînon manquant**, et rien de plus : un lien, un courriel, et l'accès qui ne se
-pose qu'au moment où quelqu'un s'en sert.
+**Le chantier a doublé de taille le 08/09/2026**, sur une spécification humaine qui décrit le
+parcours attendu **en entier** :
+
+> Super Admin crée un domaine → désigne son administrateur → l'administrateur reçoit une invitation
+> → connexion en SSO → accès à son domaine → gestion des administrateurs et membres du domaine.
+
+**Trois des six maillons existaient**, et ce n'est pas rien : le cloisonnement (règle 1 et
+`lib/db/scoped.ts` depuis C1, durci au point d'entrée par C9), le SSO **lié au domaine** —
+`resolveDomainId` lit le `hd` du jeton et jamais l'adresse —, et la gestion des utilisateurs d'un
+domaine. **Trois manquaient** : l'invitation, l'amorçage en un geste avec sa règle d'adresse, et
+*« gérer les informations de son domaine »*, que T9.4 avait explicitement écarté — *« aucun
+`updateDomain`, et ce n'est pas un oubli »*.
+
+**C11 pose les trois qui manquent, et rien d'autre.**
 
 **C10 reste aux macro-parcours**, non découpé. C11 prend le rang suivant plutôt que de s'insérer
 dans un chantier dont le contenu n'est pas tranché.
@@ -36,10 +48,19 @@ technique plutôt que masqué par une fiche antidatée.
 suit n'est pas une description de ce qui a été fait : c'est le contrat auquel T11.1 sera confronté
 comme les autres, et ses écarts éventuels se noteront.
 
-**Et C11 ne s'ouvre pas maintenant.** Décision humaine du 08/09/2026 : **C7 reprend d'abord**, à
-T7.7, et se referme — c'est le dernier chantier du POC et il attend depuis le 30/08. C11 suit.
-T11.1 reste une **avance prise**, commitée seule ; la session de découpage complète — celle qui
-balaie `ETAT.md` et replie C7 — se tiendra à l'ouverture réelle de C11.
+**C11 passe devant C7**, décision humaine du 08/09/2026 — **troisième écart à `docs/05` §6**,
+*« un chantier à la fois, fermé avant d'ouvrir le suivant »*, après ceux des découpages de C8 et de
+C9. Consigné au journal technique, et le travail continue (règle 6).
+
+**Deux raisons, et la première est écrite dans `tickets-C7.md`** : *« les deux balayages viennent
+après les écrans neufs, faute de quoi ils passeraient sur un produit qu'un ticket suivant
+changerait »*. T11.2 ajoute un écran neuf ; T7.7 est l'un de ces deux balayages. Dans l'ordre
+inverse, la page d'invitation n'aurait **jamais** été balayée. La seconde est comptable : deux
+chantiers sont ouverts à moitié, et refermer C11 en deux tickets n'en laisse plus qu'un.
+
+**Et le second balayage est déjà dépensé.** T7.6 — les petits écrans — est livré depuis le
+30/08/2026 et ne repassera pas. **La page d'invitation se fait donc responsive à la main**, dans
+T11.2, plutôt qu'en comptant sur un ticket qui ne reviendra pas : c'est écrit dans sa fiche.
 
 ---
 
@@ -62,9 +83,10 @@ réécrit plutôt que de compter sur la mémoire.
 
 ---
 
-## Sept arbitrages rendus le 08/09/2026, à ne pas rouvrir en cours de ticket
+## Onze arbitrages rendus le 08/09/2026, à ne pas rouvrir en cours de ticket
 
-Trois viennent de l'humain, quatre lui ont été délégués.
+Sept viennent de l'humain, quatre lui ont été délégués. **Les quatre derniers sont postérieurs à la
+spécification du parcours complet**, et l'un d'eux en amende un plus ancien.
 
 **(1) Le jeton n'authentifie jamais.** Il transporte une intention que le SSO vient valider. Le
 chemin d'authentification reste **unique** : un lien magique aurait fait d'une boîte mail la clé des
@@ -88,8 +110,10 @@ découle trois propriétés qu'aucun code n'a à porter : aucune personne ne na�
 (`docs/04` §7), aucun domaine non client ne s'ouvre (règle 5), personne d'archivé ne ressuscite.
 **`lib/auth/entry.ts` n'est pas modifié d'un caractère**, et c'est l'interdit qui le garantit.
 
-**(5) Une migration, et une seule** — `0017`. Une seconde serait un signal d'arrêt, pas une étape :
-elle voudrait dire que le ticket a débordé de son périmètre. C'est la règle de C7 et de C9, tenue.
+**(5) Deux migrations, et pas une troisième** — `0017` pour `invitations`, `0018` pour
+`domains.description`. **L'arbitrage disait « une seule » et il s'amende le 08/09/2026**, la
+spécification demandant une description de domaine qu'aucune colonne ne porte. La règle de fond ne
+bouge pas : **une migration hors de ces deux-là est un signal d'arrêt**, pas une étape.
 
 **(6) `grantPersonAccess` reste intact, et les deux gestes cohabitent.** Accorder un accès
 immédiatement et inviter sont **deux gestes voisins, pas un remplacement** : le premier sert quand
@@ -100,29 +124,63 @@ ticket.**
 **(7) Un lien vaut sept jours.** Assez pour une semaine de congés, trop court pour qu'un lien oublié
 dans une boîte reste une porte. La valeur est écrite **une fois**, dans `lib/auth/invitation.ts`.
 
+**(8) `full_name` reste un seul champ.** La spécification écrit *« son prénom ; son nom »* ; le séparer
+n'est pas un champ de plus mais une migration **et** la reprise de chaque écran, de chaque tri et de
+chaque phrase de journal qui lit un nom — l'équipe, le radar, les participants d'activité, la carte
+de la personne courante. Le libellé dit « Prénom et nom » et porte un exemple. **Écart à la
+spécification, assumé et écrit** ; s'il doit se refermer, ce sera par son propre chantier, jamais en
+sous-main d'un ticket de C11.
+
+**(9) L'accès du premier administrateur se pose à l'acceptation**, comme tous les autres. C'est
+l'arbitrage (1) tenu jusqu'au bout : un accès qui n'a jamais servi n'existe pas. **Contrepartie
+nommée** : entre la création et le premier clic, **le domaine n'a aucun administrateur** — état déjà
+lisible sur `/domaines`, qui affiche le fait *« aucun compte »* depuis T9.4, et qui dira désormais
+*« invitation en attente »*. Le geste se révoque et se refait.
+
+**(10) Les identités et le statut restent au super administrateur.** Un administrateur de domaine
+gère le **nom**, le **nom du centre de compétence** et la **description** — trois champs descriptifs.
+Il ne touche ni `domain_identities`, ni `status`, ni `archived_at`. **La raison n'est pas
+hiérarchique, elle est d'étanchéité** : une identité vérifiée dit *quelle entreprise Google ouvre ce
+domaine*. Qui pourrait en ajouter une rattacherait le `hd` d'une autre entreprise à son propre
+domaine — c'est la frontière elle-même, et elle ne se délègue pas. Le typage l'interdit, pas la
+vigilance.
+
+**(11) Une adresse hors du nom de domaine est refusée, strictement.** `user1@mycompany.com` pour
+`mycompany.com`, et rien d'autre ; comparaison en minuscules des deux côtés, comme les trois autres
+lectures d'identité. **Ce n'est pas un rattachement**, et la distinction est celle de l'arbitrage (2)
+de C9 : le rattachement se fait sur le `hd` **vérifié**, jamais sur la chaîne de l'adresse. Cette
+règle-ci est une **cohérence de saisie**, qui attrape la faute au formulaire plutôt qu'au premier
+échec de connexion. **Sa limite est écrite** : une entreprise dont le `hd` est `mycompany.com` et les
+adresses `@mycompany.fr` verra sa saisie refusée — le contournement est d'ajouter le second nom de
+domaine comme identité, ce que le super administrateur peut faire.
+
 ---
 
-## Interdits communs aux trois tickets
+## Interdits communs aux cinq tickets
 
 **Aucune relance, aucun rappel, aucun envoi récurrent.** `docs/03` §8 n'est pas amendé : une
 invitation part une fois. Réinviter est un geste **humain et explicite**, qui révoque le lien
 précédent — et le mot « relancer » n'apparaît nulle part à l'écran.
 
-**Aucune création de personne à la volée** (`docs/04` §7). On invite une ligne `persons` qui existe
-**déjà** ; la créer reste le geste séparé de `createPerson`.
+**Aucune personne ne naît d'un jeton** (`docs/04` §7). C'est le chemin de connexion que l'interdit
+vise, et il ne bouge pas : un jeton valide dont l'e-mail n'a pas de ligne `persons` est refusé.
+Une personne se crée **par un geste humain nommé** — `createPerson` depuis `/equipe`, la désignation
+depuis `/domaines` — et l'invitation ne fait que suivre.
 
 **Aucune modification de `lib/auth/entry.ts`.** Les six règles d'entrée et leurs sept causes ne se
 rouvrent pas — c'est l'arbitrage (4), rendu opposable.
 
 **Aucun troisième rôle**, aucune écriture d'`is_active`, aucun sélecteur de domaine à l'écran.
 
-**Aucune migration hors de `0017`** (arbitrage 5). **Aucune dépendance neuve** (arbitrage 3).
+**Aucune migration hors de `0017` et `0018`** (arbitrage 5). **Aucune dépendance neuve**
+(arbitrage 3). **Aucun `event_target_type` neuf**, et aucun sixième `event_verb`.
 
 **Aucune suppression de donnée métier** (règle 4). Une invitation se **révoque** — une date de plus
 sur la ligne —, elle ne s'efface pas.
 
 **Aucune valeur visuelle en dur** (règle 2), et **aucun neuvième jeton de design system inventé**,
-y compris sur la page publique d'invitation, qui est le seul écran neuf du chantier.
+y compris sur la page publique d'invitation, **seul écran neuf du chantier** — T11.5 n'ajoute qu'un
+bloc à un écran qui existe. **Elle se fait responsive à la main**, T7.6 étant passé.
 
 **Aucun indice calculé** (D39) : pas de décompte d'invitations en attente à l'accueil, pas de badge,
 pas de jauge, pas de « X personnes ne se sont jamais connectées ».
@@ -245,7 +303,8 @@ d'un contexte de droits. **Les garde-fous sont dans l'action**, un panneau absen
 jamais protégé le point d'entrée HTTP qui l'accompagne.
 
 **4. `app/invitation/[jeton]/page.tsx`**, hors du groupe `(app)` comme `app/domaines/` et
-`app/auth/` : pas de coquille, pas de navigation, aucune session. Elle nomme le domaine et n'offre
+`app/auth/` : pas de coquille, pas de navigation, aucune session. **Responsive et accessible dès
+l'écriture** — T7.6 est passé et ne repassera pas ; T7.7, lui, la prendra en balayage. Elle nomme le domaine et n'offre
 que les fournisseurs `isProviderConnected`. **Elle ne distingue pas ses causes** : jeton inconnu,
 expiré, révoqué et déjà accepté disent le même mot — *un refus qui distingue ses causes est un
 oracle offert à qui frappe*. Elle pose un cookie scellé de quinze minutes par le `seal`/`open` de
@@ -316,11 +375,124 @@ communs.
 
 ---
 
+## T11.4 — L'amorçage d'un domaine : un geste, une règle d'adresse, et une invitation
+
+**Objectif** — Que le premier maillon du parcours existe : le super administrateur crée une
+entreprise **et** désigne son administrateur en un seul geste, et cet administrateur **reçoit une
+invitation**.
+
+**Périmètre** — `lib/db/schema.ts` · `drizzle/0018_*.sql` · `lib/forms/domain.ts` (+ test) ·
+`lib/forms/domain-manager.ts` (+ test) · `app/domaines/actions.ts` (+ test) ·
+`components/admin/domain-panel.tsx` · `components/admin/domain-manager-panel.tsx` ·
+`app/domaines/page.tsx`.
+
+**Attendu** — Cinq gestes.
+
+**1. `domains.description`, facultative** — migration `0018`, la seconde et la dernière du chantier.
+Un texte, sans autre règle : c'est la seule colonne que la spécification demande et qu'aucune table
+ne porte.
+
+**2. Un seul formulaire, là où il y en avait deux.** Le nom de l'entreprise, le nom du centre de
+compétence, le fournisseur et le nom de domaine, la description, puis les prénom-et-nom et l'adresse
+de l'administrateur. **Le geste écrit quatre tables** — `domains`, `domain_identities`, `persons`,
+`invitations` — et **il n'est pas atomique** : `neon-http` n'a pas de transaction interactive (dette
+de T3.6). **Tout se confronte donc avant la première écriture**, comme la création d'un projet
+depuis C1, et l'ordre va du plus contraignant au moins : la règle d'adresse, puis l'unicité de
+l'identité, puis le reste.
+
+**3. L'adresse doit porter le nom de domaine saisi** — arbitrage (11), refus strict, `lower()` des
+deux côtés. **Elle se refuse au formulaire, pas à la connexion** : découvrir la faute au premier
+échec de SSO, c'est la découvrir sans que rien ne dise pourquoi, l'écran d'entrée ne distinguant pas
+ses causes.
+
+**4. L'administrateur naît sans accès, et reçoit une invitation `domain_manager`** — arbitrage (9).
+`ALREADY_STAFFED` s'étend : **un domaine dont l'invitation est en attente n'accepte pas une seconde
+désignation**, faute de quoi deux liens ouvriraient le même premier compte. Le super administrateur
+**révoque et redésigne** si la personne ne vient jamais — c'est le seul chemin, et il est explicite.
+
+**5. `/domaines` dit l'état neuf.** L'écran affiche déjà deux faits d'accessibilité — *aucune
+identité*, *aucun compte*. Un troisième s'y ajoute, **invitation en attente**, sans quoi un domaine
+correctement amorcé serait annoncé comme inaccessible. **Aucun décompte, aucun badge, aucune
+relance** : un fait, comme les deux autres.
+
+**Validation** — Quatre mesures, et la première est le parcours lui-même.
+
+1. **Le parcours entier, mesuré** : un domaine créé par l'écran, son administrateur invité, le lien
+   suivi, le SSO passé — et `has_access` **et** `domain_role = domain_manager` **en base**, avec
+   `accepted_at` daté. C'est la seule mesure qui prouve que le chantier sert.
+2. **L'adresse hors du nom de domaine est refusée**, et **rien n'est écrit** — ni domaine, ni
+   identité, ni personne, ni invitation. **Le décompte en base tranche** : un refus qui aurait déjà
+   créé le domaine serait le pire des deux.
+3. **Deux désignations d'affilée** : la seconde refusée tant que la première est en attente ;
+   acceptée après révocation.
+4. **Lu dans le HTML servi**, `<script>` retirés : `/domaines` porte le fait *invitation en attente*
+   sur le domaine qui vient d'être créé.
+
+**Mise en défaut** — La règle d'adresse neutralisée fait tomber **la mesure 2 et aucune autre** ;
+l'extension d'`ALREADY_STAFFED` neutralisée fait tomber **la seule** mesure 3.
+
+**Interdits** — **Aucun troisième rôle** : le premier compte est `domain_manager`, et le rôle n'est
+pas un champ, il est le geste (T9.4). **Aucune migration hors de `0018`.** **Aucun accès accordé à la
+désignation** — arbitrage (9). **Aucun `updateDomain`** : c'est T11.5.
+
+---
+
+## T11.5 — Le domaine vu par son administrateur
+
+**Objectif** — *« Gérer les informations de son domaine »*, et **exactement cela** : trois champs
+descriptifs, bornés par le typage.
+
+**Périmètre** — `lib/db/scoped.ts` (+ test) · `lib/forms/domain.ts` (+ test) ·
+`app/(app)/administration/…` (l'écran et son action) · `components/admin/…` (le panneau).
+
+**Attendu** — Trois gestes.
+
+**1. `updateOwnDomain` dans la couche scopée** — une **quatrième** forme d'écriture, et elle mérite
+son nom. `superAdmin` tourne sans autorité nommable ; `asSuperAdmin(grant)` écrit **au-dessus** des
+domaines ; `forDomain(scope)` écrit les tables métier. Ici, une autorité **à l'intérieur** d'un
+domaine écrit la ligne qui le nomme — `domains` étant la seule table sans `domain_id`, aucune des
+trois ne convient. La méthode vit sur `ScopedDb`, ne peut toucher **que** la ligne du domaine de son
+appelant, et **n'accepte que trois colonnes** : `name`, `competence_center_name`, `description`. Ni
+`status`, ni `archived_at`, ni rien d'autre — **refusés à la compilation**, pas par vigilance
+(arbitrage 10).
+
+**2. Un bloc « Ce domaine » en tête de l'écran Administration**, et son panneau. **Pas un sixième
+écran** : `docs/06` §2 pose *six écrans, dont deux formulaires et un panneau — c'est le plancher*, et
+l'arbitrage (f) de C7 a tenu l'administration à un seul écran pour neuf référentiels. Le domaine
+n'est pas un référentiel, mais il est l'objet dont cet écran parle. **Droit : `manageDomain`**, celui
+des référentiels et des membres.
+
+**3. Le geste n'est pas journalisé, et c'est un arbitrage, pas un oubli.** Aucun
+`event_target_type` ne dit « domaine ». L'élargir demanderait une migration d'énuméré pour un seul
+objet — ce que l'arbitrage (d) de C7 refuse et que l'interdit commun redit. Et le poser sur `person`
+mentirait sur l'objet, ce qui est pire qu'un silence. **Le geste rejoint donc la liste des familles
+qui écrivent sans trace**, ouverte depuis T8.3, avec un cinquième nom.
+
+**Validation** — Trois mesures.
+
+1. **Lu dans le HTML servi** : le nom et la description du domaine paraissent sur l'écran
+   Administration, et la correction s'y lit après le geste.
+2. **Le droit s'éprouve par l'action**, en `text/plain`, avec étape témoin : un `member` qui frappe
+   le point d'entrée n'écrit rien. **Le décompte en base tranche, jamais le code HTTP.**
+3. **Les colonnes interdites le sont à la compilation** : `status` et `archived_at` passés à
+   `updateOwnDomain` sont un refus de typage, relu dans le test des garde-fous — c'est l'idiome de
+   `LinkTable` et de `DeletableTable`, resservi.
+
+**Mise en défaut** — Le contrôle de `manageDomain` neutralisé fait tomber **la seule** mesure 2. La
+borne de trois colonnes retirée fait tomber la mesure 3, et **rien d'autre**.
+
+**Interdits** — **Aucune écriture de `domain_identities`, de `status` ni d'`archived_at`**
+(arbitrage 10). **Aucun sixième écran.** **Aucune migration.** **Aucun `event_target_type` neuf.**
+
+---
+
 ## Ce que C11 ne fait pas, et ce sont des décisions
 
-**Le super administrateur n'invite pas.** `designateDomainManager` crée le premier responsable avec
-son accès, en un geste, et n'ouvre qu'une fois — *« les suivants se désignent depuis l'intérieur »*.
-Lui donner la variante différée est un quatrième ticket, pas un « pendant que j'y suis ».
+**Les prénom et nom séparés** — arbitrage (8). Écart nommé à la spécification du 08/09/2026 : le
+séparer demande son propre chantier.
+
+**Le statut d'un domaine, et ses identités vérifiées** — arbitrage (10). Suspendre, archiver,
+rétablir, rattacher une entreprise : le super administrateur, et lui seul.
 
 **L'import d'annuaire.** Sorti de C9 pour ses autorisations longues à obtenir ; C11 ne le rouvre
 pas. `persons.identity_provider` reste donc sans écrivain.
@@ -342,6 +514,10 @@ sur tout couple neuf par la position · **le droit s'éprouve par l'action**, en
 Et la discipline propre à ce terrain, héritée de C9 : **qu'un jeton soit refusé se lit dans la
 réponse, mais qu'aucune session n'ait été posée se lit dans le cookie et dans la base.**
 
+**Et le parcours entier se rejoue en fin de chantier**, pas seulement les cinq critères : créer un
+domaine, désigner son administrateur, suivre le lien, passer le SSO, inviter un membre, le voir
+entrer. C'est la spécification du 08/09/2026, et c'est la seule mesure qui dit que C11 a servi.
+
 En fin de chantier : `npm run lint` (`--max-warnings=0`), `npm run test` et `tsc` au vert. **Le vert
-de référence est 1 824 tests sur 64 fichiers**, relevé le 08/09/2026 — chaque ticket y compare le
+de référence est 1 834 tests sur 64 fichiers**, relevé après T11.1 — chaque ticket y compare le
 sien, jamais à un souvenir.

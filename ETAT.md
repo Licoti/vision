@@ -2,15 +2,15 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 08/09/2026, **T11.1 terminé — une avance prise sur C11, hors de son
-rang.** La table `invitations` : aucune colonne `token`, seule l'empreinte est stockée ; pas
+**Dernière mise à jour :** 08/09/2026, **T11.1 terminé — et C11 ouvert, sa fiche écrite après son
+premier ticket** (manquement consigné). La table `invitations` : aucune colonne `token` ; pas
 d'`archived_at`, donc `archive` est un refus de typage ; **quatre horodatages et aucun statut**.
 `superAdmin` reçoit sa **sixième** clé — la première qui ne vient pas d'une règle d'entrée — et
 **son sceau nominatif l'a arrêtée**. L'unicité `(domain_id, lower(email))` referme un point ouvert
 et **en a ouvert deux** : un **500 mesuré** au formulaire de personne, réparé par une garde, et le
 décompte de jumelles de T9.6 devenu **inatteignable**. **Périmètre étendu à deux fichiers d'équipe,
 sur demande.** **Vert : 1 834 tests sur 64 fichiers** (1 824 avant), `lint` et `tsc` au vert.
-**Ticket suivant : T7.7** — C7 reprend, et C11 attend sa clôture.
+**Ticket suivant : T11.2 — C11 passe devant C7** (08/09) ; C7 ferme le POC ensuite.
 
 ---
 
@@ -27,11 +27,11 @@ sur demande.** **Vert : 1 834 tests sur 64 fichiers** (1 824 avant), `lint` et `
 | TD — Dette technique et couche de présentation | TD.1 → TD.6 | **terminé** |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
-| C7 — Finitions | T7.1 → T7.10 | **à reprendre** — T7.1 → T7.6 livrés, T7.7 → T7.10 en attente |
+| C7 — Finitions | T7.1 → T7.10 | **en dernier** — T7.1 → T7.6 livrés, T7.7 → T7.10 après C11 |
 | C8 — Dette | T8.1 → T8.5 | **terminé** |
 | C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **terminé** |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
-| C11 — L'invitation | T11.1 → T11.3 | **T11.1 livré en avance** — T11.2, T11.3 après C7 |
+| C11 — Le parcours d'entrée | T11.1 → T11.5 | **en cours** — T11.1 livré, T11.2 suit |
 
 ---
 
@@ -131,9 +131,9 @@ amorçage partiel** — `npm run db:seed` ne vise que la démonstration, quand l
 rend le geste rejouable sans rien doubler : il ne manque qu'un appelant. → **avec la dette de T3.6.**
 **Le RLS a quitté C9** : voir le groupe (c).
 
-**C7 reprend maintenant, ses huit points vivant dans `tickets-C7.md`** (T7.7 à T7.10), et **C11 le
-suit, sa fiche écrite.** Aucune des deux listes n'est recopiée ici : elle y a doublé une fiche quatre
-chantiers durant.
+**C11 reprend maintenant** (T11.2 → T11.5, `tickets-C11.md`), **et C7 ferme le POC après** — T7.7 à
+T7.10. **La fiche a doublé le 08/09** sur une spécification du parcours complet : deux tickets de
+plus, l'amorçage en un geste et le domaine vu par son administrateur.
 
 **Le journal reste incomplet** (T8.3, laissé intact — règle 3) : **quatre familles écrivent sans
 trace** — le produit, l'adoption, la compétence portée, et les huit référentiels autres que l'entité
