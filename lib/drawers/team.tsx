@@ -45,6 +45,7 @@
  */
 
 import { AccessPanel } from "@/components/team/access-panel";
+import { InvitationPanel } from "@/components/team/invitation-panel";
 import { PersonPanel } from "@/components/team/person-panel";
 import {
   PersonDetail,
@@ -55,6 +56,7 @@ import { ConfirmPanel } from "@/components/ui/confirm-panel";
 import type { Session } from "@/lib/auth/session";
 import {
   activityParticipants,
+  invitations,
   jobs,
   personSkills,
   persons,
@@ -64,6 +66,7 @@ import {
 } from "@/lib/db/schema";
 import type { DrawerContent, TeamDrawerRequest } from "@/lib/drawers/types";
 import { formatAccompaniments, formatActivities } from "@/lib/format";
+import { INVITATION_TTL_DAYS } from "@/lib/auth/invitation";
 import {
   toPersonAccessFormValues,
   toPersonFormValues,
@@ -75,6 +78,7 @@ import {
   PERSON_ACCESS_PARAM,
   PERSON_FORM_NEW,
   PERSON_FORM_PARAM,
+  PERSON_INVITE_PARAM,
   PERSON_PANEL_PARAM,
   ROUTES,
   SKILL_PANEL_PARAM,
@@ -88,7 +92,9 @@ import {
   createPersonSkill,
   deletePerson,
   grantPersonAccess,
+  invitePerson,
   removePersonSkill,
+  revokeInvitation,
   revokePersonAccess,
   updatePerson,
   updatePersonSkill,
@@ -159,6 +165,42 @@ async function isLastDomainManager(
   return others === 0;
 }
 
+/**
+ * L'invitation **vivante** d'une personne, s'il y en a une — T11.2.
+ *
+ * **La condition est celle de l'index partiel**, mot pour mot : ni acceptée, ni
+ * révoquée. Les deux écrire ici plutôt que d'inventer un `status` est le choix
+ * de T11.1 — *quatre horodatages, et aucun statut* —, et le prix est que la
+ * condition se relit à chaque lecture. Elle est écrite deux fois : ici, et dans
+ * `invitePerson`, qui refuse sur le même décompte.
+ *
+ * **Une invitation périmée reste vivante au sens de l'index** : le lien est
+ * mort, la ligne retient toujours la place. C'est ce que la fiche doit dire, et
+ * c'est le geste de révocation qui la libère.
+ *
+ * **Elle ne protège rien** : `invitePerson` refait le décompte, et
+ * `revokeInvitation` relit la ligne qu'elle reçoit. Le panneau prévient,
+ * l'action refuse — le partage d'`isLastDomainManager`.
+ */
+async function pendingInvitationOf(
+  session: Session,
+  personId: string,
+): Promise<{ id: string; expiresAt: Date; role: string } | null> {
+  const rows = await session.db.list(invitations, {
+    where: and(
+      eq(invitations.personId, personId),
+      isNull(invitations.acceptedAt),
+      isNull(invitations.revokedAt),
+    ),
+    limit: 1,
+  });
+
+  const row = rows[0];
+  return row
+    ? { id: row.id, expiresAt: row.expiresAt, role: row.role }
+    : null;
+}
+
 export async function resolveTeamDrawer(
   session: Session,
   request: TeamDrawerRequest,
@@ -195,6 +237,16 @@ export async function resolveTeamDrawer(
         : false;
       const canRevoke = canCarry && person.hasAccess && !lastManager;
 
+      /* **L'invitation, aux mêmes conditions que le compte** : elle n'a de sens
+         que pour un membre du centre, et elle n'est lue que lorsqu'elle peut
+         changer quelque chose. Elle se lit **même sans le droit d'écrire** pour
+         qui a `canCarry`, parce que le fait — *une invitation est en attente* —
+         appartient à la fiche autant que le rôle : sans lui, un domaine
+         correctement amorcé se lirait comme un domaine sans compte. */
+      const pendingInvitation = canCarry
+        ? await pendingInvitationOf(session, person.id)
+        : null;
+
       return {
         titleId: "panneau-personne-titre",
         title: person.fullName,
@@ -222,6 +274,22 @@ export async function resolveTeamDrawer(
               canRevoke ? revokePersonAccess.bind(null, person.id) : null
             }
             lastManager={lastManager}
+            /* **Inviter ne se propose pas à qui a déjà un accès** : il n'y a
+               rien à ouvrir, et l'action le refuse de son côté. Ni à qui porte
+               déjà une invitation vivante — c'est le sixième refus, dit avant
+               le clic plutôt qu'après. */
+            inviteHref={
+              canCarry && !person.hasAccess && !pendingInvitation
+                ? ROUTES.teamPersonInvite(person.id)
+                : null
+            }
+            pendingInvitation={pendingInvitation}
+            /* Lié côté serveur, comme les cinq autres gestes de cette fiche. */
+            revokeInvitation={
+              canCarry && pendingInvitation
+                ? revokeInvitation.bind(null, pendingInvitation.id)
+                : null
+            }
           />
         ),
       };
@@ -420,6 +488,42 @@ export async function resolveTeamDrawer(
     }
 
     /* ------------------------------------------------------------------ */
+    case "invite": {
+      /* **L'ordre d'`access`, à la lettre** : le droit d'abord, il ne dépend
+         d'aucun identifiant ; puis la forme de l'UUID **avant** la base, une
+         colonne `uuid` interrogée avec n'importe quoi rendant une erreur
+         PostgreSQL, donc un 500, là où l'on attend la page nue. */
+      if (!session.can.manageDomain || !isUuid(request.id)) return null;
+
+      const row = await session.db.find(persons, request.id);
+      const person = row && row.archivedAt === null ? row : null;
+
+      /* Un intervenant côté entité ne reçoit jamais d'accès (`docs/05` §4, D2),
+         donc jamais d'invitation : le panneau n'existe pas pour lui, et
+         `openPersonForAccess` le refuse de son côté. */
+      if (!person || person.kind !== "center") return null;
+
+      /* **Les deux refus qui rendent le geste sans objet ferment le panneau**,
+         plutôt que d'ouvrir un formulaire dont la soumission dirait non. Les
+         deux vivent **aussi** dans l'action, qui seule protège. */
+      if (person.hasAccess) return null;
+      if (await pendingInvitationOf(session, person.id)) return null;
+
+      return {
+        titleId: "panneau-invitation-titre",
+        title: "Inviter",
+        subtitles: [person.fullName],
+        body: (
+          <InvitationPanel
+            action={invitePerson.bind(null, person.id)}
+            email={person.email}
+            expiryDays={INVITATION_TTL_DAYS}
+          />
+        ),
+      };
+    }
+
+    /* ------------------------------------------------------------------ */
     case "archive": {
       /* On ne confirme pas l'archivage de ce qui est déjà rangé. Qui n'a pas le
          droit obtient la page nue — pas un 404 : la liste reste lisible par tout
@@ -568,6 +672,7 @@ export function teamRequestFromParams(asked: {
   profil?: string | undefined;
   maitrise?: string | undefined;
   acces?: string | undefined;
+  inviter?: string | undefined;
   archiver?: string | undefined;
   supprimer?: string | undefined;
 }): TeamDrawerRequest | null {
@@ -590,6 +695,13 @@ export function teamRequestFromParams(asked: {
      d'ouverture fixe à distinguer d'un identifiant. */
   if (asked.acces !== undefined) {
     return { kind: "access", id: asked.acces };
+  }
+
+  /* `inviter` désigne **toujours** une personne, comme `acces` : on invite
+     quelqu'un, jamais une invitation. La révocation n'a pas de clé — c'est un
+     formulaire nu sur la fiche, la forme du retrait d'accès. */
+  if (asked.inviter !== undefined) {
+    return { kind: "invite", id: asked.inviter };
   }
 
   if (asked.archiver !== undefined) {
@@ -620,6 +732,7 @@ export const TEAM_PANEL_PARAMS = [
   PERSON_FORM_PARAM,
   SKILL_PANEL_PARAM,
   PERSON_ACCESS_PARAM,
+  PERSON_INVITE_PARAM,
   ARCHIVE_PANEL_PARAM,
   DELETE_PANEL_PARAM,
 ] as const;

@@ -92,16 +92,28 @@ import { and, eq, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import type { ConfirmState } from "@/components/ui/confirm-panel";
+import {
+  invitationExpiry,
+  invitationLink,
+  InvitationLinkError,
+  newInvitationToken,
+} from "@/lib/auth/invitation";
 import { requireSession } from "@/lib/auth/provider";
 import type { Session } from "@/lib/auth/session";
 import {
   activityParticipants,
+  invitations,
   personSkills,
   persons,
   projectMembers,
 } from "@/lib/db/schema";
 import { DomainScopeError, IntegrityError, type Row } from "@/lib/db/scoped";
 import { accessPhrase, objectPhrase } from "@/lib/journal";
+import {
+  parseInvitationForm,
+  readInvitationForm,
+  type InvitationFormState,
+} from "@/lib/forms/invitation";
 import {
   parsePersonAccessForm,
   parsePersonForm,
@@ -1091,6 +1103,215 @@ export async function revokePersonAccess(personId: string): Promise<void> {
     targetId: personId,
     summary: accessPhrase("revoked", updated.fullName),
   });
+
+  revalidatePath(ROUTES.team);
+}
+
+/* ==========================================================================
+   L'invitation — T11.2
+   ========================================================================== */
+
+/** Le refus d'invitation, sur la forme d'`accessRefusal` : les valeurs relues. */
+function inviteRefusal(
+  formData: FormData,
+  message: string,
+): InvitationFormState {
+  return { values: readInvitationForm(formData), errors: {}, message };
+}
+
+/**
+ * Inviter quelqu'un à rejoindre le domaine — **et lui rendre le lien, une
+ * fois**.
+ *
+ * **Le geste voisin ne bouge pas** (arbitrage (6) de `tickets-C11.md`).
+ * `grantPersonAccess` ouvre un accès *maintenant*, celle-ci le promet à qui
+ * viendra le chercher : le premier sert quand la personne est là, le second
+ * quand elle ne l'est pas. Fondre les deux aurait réécrit un geste mesuré hors
+ * du périmètre du chantier (règle 3).
+ *
+ * **Elle n'écrit pas `has_access`, et c'est toute la différence.** L'accès se
+ * pose à l'**acceptation** (arbitrage (9)) — un accès qui n'a jamais servi
+ * n'existe pas. La contrepartie est nommée : entre l'invitation et le premier
+ * clic, la personne n'a aucun accès, et la fiche le dit.
+ *
+ * **Six refus, dans cet ordre, et les quatre premiers sont ceux du geste
+ * voisin, repris tels quels :**
+ *
+ * 1. le droit, l'existence, l'archivage et le genre — `openPersonForAccess` ;
+ * 2. **l'adresse**, sans laquelle il n'y a personne à qui écrire, et rien à
+ *    confronter à l'e-mail vérifié : `redeemInvitation` compare les deux ;
+ * 3. **le doublon d'adresse dans le domaine**, désormais tenu en base par
+ *    `persons_domain_email_unique` (T11.1) — le contrôle reste, comme chez son
+ *    jumeau, et pour la même raison ;
+ * 4. **le dernier responsable ne se rétrograde pas** : inviter quelqu'un comme
+ *    `member` alors qu'il est le dernier responsable serait la rétrogradation
+ *    du geste voisin, différée d'un clic ;
+ * 5. **la personne a déjà un accès** — il n'y a rien à ouvrir, et un lien qui
+ *    ne changerait rien est un lien de trop ;
+ * 6. **une invitation vit déjà.** `invitations_pending_unique` le tient en base,
+ *    et ce refus le dit **avant** la levée, avec le geste qui le débloque :
+ *    révoquer, puis réinviter. Réinviter est un geste **humain et explicite**
+ *    (arbitrage (b) du 08/09/2026) — deux écritures enchaînées auraient pu
+ *    laisser la personne sans aucun lien valide, `neon-http` n'ayant pas de
+ *    transaction (dette de T3.6).
+ *
+ * **Elle ne rend pas `ok`, et ce n'est pas un oubli.** `ok` referme le panneau
+ * (TD.2) et emporterait avec lui la seule occurrence en clair du jeton : Vision
+ * n'en garde que l'empreinte (T11.1), et rien ne saurait le reconstituer. Le
+ * panneau reste donc ouvert sur le lien qu'il vient de créer. Écart nommé au
+ * patron de TD.2, consigné au journal technique.
+ *
+ * **Aucune trace au journal** (arbitrage (c) du 08/09/2026) : l'acceptation se
+ * produit dans le rappel du fournisseur, sans session ni acteur au sens de
+ * `record()`, et journaliser l'invitation sans son acceptation raconterait une
+ * moitié d'histoire. Le geste rejoint les familles qui écrivent sans trace,
+ * ouvertes depuis T8.3.
+ */
+export async function invitePerson(
+  personId: string,
+  _previous: InvitationFormState,
+  formData: FormData,
+): Promise<InvitationFormState> {
+  const session = await requireSession();
+
+  const gate = await openPersonForAccess(session, personId);
+  if ("message" in gate) return inviteRefusal(formData, gate.message);
+
+  const { values, errors, input } = parseInvitationForm(formData);
+  if (!input) return { values, errors };
+
+  const { person } = gate;
+
+  if (!person.email) {
+    return inviteRefusal(
+      formData,
+      "Cette personne n'a pas d'adresse e-mail : renseignez-la dans son profil avant de l'inviter. C'est elle que le fournisseur d'identité vérifiera, et elle que l'acceptation confrontera au lien.",
+    );
+  }
+
+  if (await emailAlreadyTaken(session, person.email, personId)) {
+    return inviteRefusal(formData, EMAIL_TAKEN);
+  }
+
+  if (
+    person.domainRole === "domain_manager" &&
+    input.role !== "domain_manager"
+  ) {
+    const others = await otherDomainManagers(session, personId);
+    if (others === 0) {
+      return inviteRefusal(
+        formData,
+        "C'est le dernier responsable de ce domaine : l'inviter à un rôle moindre le rétrograderait le jour où il accepterait, et le domaine deviendrait inadministrable. Désignez un autre responsable d'abord.",
+      );
+    }
+  }
+
+  if (person.hasAccess) {
+    return inviteRefusal(
+      formData,
+      "Cette personne a déjà un accès à ce domaine : elle peut se connecter dès maintenant. Son rôle se change depuis « Modifier le rôle ».",
+    );
+  }
+
+  /* **Le décompte porte sur les vivantes**, c'est-à-dire sur l'expression même
+     de l'index partiel : une invitation acceptée ou révoquée est une trace, et
+     deux traces ne se gênent pas. **Une invitation périmée compte encore** — le
+     lien est mort, la ligne est vivante, et l'index la retiendrait. La révoquer
+     est donc le geste, et le message le dit. */
+  const pending = await session.db.count(invitations, {
+    where: and(
+      eq(invitations.personId, personId),
+      sql`${invitations.acceptedAt} is null and ${invitations.revokedAt} is null`,
+    ),
+  });
+  if (pending > 0) {
+    return inviteRefusal(
+      formData,
+      "Une invitation est déjà en attente pour cette personne. Révoquez-la depuis sa fiche avant d'en créer une autre : deux liens ouvriraient le même accès, et n'en révoquer qu'un laisserait l'autre valide.",
+    );
+  }
+
+  /* **Le clair ne descend jamais en base** : `newInvitationToken` rend les deux
+     formes, et seule l'empreinte est écrite. Le lien se construit avant
+     l'écriture pour qu'un `AUTH_URL` absent refuse le geste plutôt que de
+     laisser une invitation dont personne ne saurait dire l'adresse. */
+  const { token, tokenHash } = newInvitationToken();
+
+  let link: string;
+  try {
+    link = invitationLink(token);
+  } catch (error) {
+    if (error instanceof InvitationLinkError) {
+      return inviteRefusal(
+        formData,
+        "L'adresse publique de Vision n'est pas configurée sur cet environnement : le lien d'invitation n'aurait mené nulle part, et rien n'a été enregistré.",
+      );
+    }
+    throw error;
+  }
+
+  try {
+    await session.db.insert(invitations, {
+      personId,
+      /* **L'adresse est copiée, pas jointe** (T11.1) : corriger le profil
+         ensuite ne doit pas déplacer la cible d'un lien déjà parti. */
+      email: person.email,
+      role: input.role,
+      tokenHash,
+      expiresAt: invitationExpiry(),
+    });
+  } catch (error) {
+    if (error instanceof DomainScopeError) {
+      return inviteRefusal(
+        formData,
+        "Cette personne n'appartient pas au domaine : rien n'a été enregistré.",
+      );
+    }
+    throw error;
+  }
+
+  revalidatePath(ROUTES.team);
+
+  /* **Ni `ok`, ni valeurs à ressaisir** : le panneau bascule sur le lien, et le
+     formulaire n'a plus lieu d'être. Voir l'en-tête. */
+  return { values, errors: {}, link };
+}
+
+/**
+ * Révoquer une invitation — **une date de plus sur la ligne**, jamais un
+ * effacement.
+ *
+ * **Muet, comme tout ce qui se défait** : c'est le patron de
+ * `revokePersonAccess` et de `removeDomainIdentity`. Le point d'entrée n'est
+ * rendu qu'à qui peut écrire, sur une invitation vivante — et le décompte **se
+ * refait ici** : un bouton absent du rendu n'a jamais protégé le point d'entrée
+ * HTTP qui l'accompagne.
+ *
+ * **Ce n'est pas un `unlink`, et `invitations` en accepterait pourtant un** :
+ * la table n'a pas d'`archived_at`, ce qui la range dans `LinkTable`. La règle 4
+ * ne l'imposerait donc pas. Ce qui l'impose est l'usage : une invitation
+ * révoquée doit continuer d'exister pour que l'index partiel distingue *aucune
+ * invitation* de *une invitation refermée*, et pour que le lien déjà parti
+ * trouve la ligne qui le refuse — effacée, il rendrait `unknown`, ce qui est le
+ * même mot à l'écran mais une cause de moins à mettre en défaut.
+ *
+ * **Une invitation déjà acceptée ne se révoque pas** : le lien a servi, l'accès
+ * est ouvert, et le retirer est l'autre geste (`revokePersonAccess`). La
+ * révoquer laisserait croire que l'accès s'est refermé.
+ */
+export async function revokeInvitation(invitationId: string): Promise<void> {
+  const session = await requireSession();
+
+  if (!session.can.manageDomain) return;
+
+  const invitation = await session.db.find(invitations, invitationId);
+  if (!invitation) return;
+
+  /* Rien à révoquer : le geste est sans objet, et l'écrire quand même
+     réécrirait une date déjà posée — la règle de `revokePersonAccess`. */
+  if (invitation.acceptedAt || invitation.revokedAt) return;
+
+  await session.db.update(invitations, invitationId, { revokedAt: new Date() });
 
   revalidatePath(ROUTES.team);
 }

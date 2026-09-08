@@ -52,8 +52,27 @@ import { SkillRadar } from "@/components/team/skill-radar";
 import { ACTION_LINK } from "@/components/ui/action-link";
 import { DrawerLink } from "@/components/ui/drawer";
 import { BlockNote } from "@/components/ui/empty-state";
+import { formatEventDay } from "@/lib/format";
 import { PERSON_ROLE_LABEL } from "@/lib/forms/person";
 import type { PersonDetail, TeamSkill } from "@/lib/queries/team";
+
+/**
+ * L'invitation vivante d'une personne, telle que la fiche la dit — T11.2.
+ *
+ * **Trois champs, et pas un décompte.** L'écran énonce *un fait*, comme
+ * `/domaines` énonce *aucune identité* et *aucun compte* : une invitation est en
+ * attente, elle vaut jusqu'à telle date, pour tel rôle. **Aucun badge, aucune
+ * jauge, aucune relance** — l'interdit commun de C11, et D39 pour le reste.
+ *
+ * `role` est une chaîne et non `PersonRoleValue` : la ligne vient de la base, et
+ * ce composant ne la rétrécit pas — c'est `PERSON_ROLE_LABEL` qui décide s'il
+ * sait la dire.
+ */
+export type PendingInvitation = {
+  id: string;
+  expiresAt: Date;
+  role: string;
+};
 
 export function PersonCard({
   person,
@@ -66,6 +85,9 @@ export function PersonCard({
   accessHref,
   revokeAccess,
   lastManager,
+  inviteHref,
+  pendingInvitation,
+  revokeInvitation,
 }: {
   person: PersonDetail;
   /** `null` retire le geste — le composant ne connaît aucun droit. */
@@ -94,6 +116,21 @@ export function PersonCard({
   revokeAccess: (() => Promise<void>) | null;
   /** Dit pourquoi le retrait n'est pas proposé, plutôt que de laisser un vide. */
   lastManager: boolean;
+  /**
+   * Le panneau d'**invitation** (T11.2). Nul pour un intervenant côté entité,
+   * nul sans le droit d'écrire, **et nul quand le geste serait sans objet** —
+   * un accès déjà ouvert, une invitation déjà en attente. Les deux derniers
+   * sont **aussi** des refus de l'action : ce qui protège est elle.
+   */
+  inviteHref: string | null;
+  /** Le fait, quand il existe : *une invitation est en attente*. */
+  pendingInvitation: PendingInvitation | null;
+  /**
+   * La révocation, **déjà liée** à l'invitation côté serveur. Nulle sans
+   * invitation vivante, et son absence n'est pas la protection :
+   * `revokeInvitation` relit la ligne qu'elle reçoit.
+   */
+  revokeInvitation: (() => Promise<void>) | null;
 }) {
   return (
     <section className="flex flex-col gap-4 rounded-2xl border border-surface-neutral-lighter p-4">
@@ -161,11 +198,66 @@ export function PersonCard({
             </BlockNote>
           ) : null}
 
+          {/* **Le fait, et rien de plus** (T11.2) : une invitation est en
+              attente, elle vaut jusqu'à cette date, pour ce rôle. Ni badge, ni
+              décompte, ni relance — l'interdit commun de C11, et D39.
+
+              **Aucun jeton neuf, aucun couple neuf par la position** : la ligne
+              a la forme exacte de celle du rôle, juste au-dessus, sur le même
+              fond — `content-neutral-base` pour l'intitulé,
+              `content-neutral-darkest` pour la valeur. Il n'y a donc rien à
+              remesurer (règle 2, et la leçon de T5.4 : c'est la position qui
+              décide du jeton).
+
+              **Le lien n'y est pas, et ne peut pas y être** : Vision n'en garde
+              que l'empreinte (T11.1). Il s'affiche une fois, dans le panneau qui
+              le crée. */}
+          {pendingInvitation ? (
+            <p className="flex flex-wrap items-baseline gap-2 text-sm text-content-neutral-darkest">
+              <span className="text-content-neutral-base">Invitation :</span>
+              <span>
+                en attente pour le rôle
+                {" "}
+                {PERSON_ROLE_LABEL[
+                  pendingInvitation.role as keyof typeof PERSON_ROLE_LABEL
+                ] ?? pendingInvitation.role}
+                , jusqu&apos;au {formatEventDay(pendingInvitation.expiresAt)}
+              </span>
+            </p>
+          ) : null}
+
           {/* Un `div` et non un `p` : `<form>` est du contenu de flux, et un
               élément de phrasé ne l'accepte pas — le balisage servi serait
               réécrit par le navigateur. La règle de `readings-panel.tsx`. */}
-          {accessHref || revokeAccess ? (
+          {accessHref || revokeAccess || inviteHref || revokeInvitation ? (
             <div className="mt-1 flex flex-wrap items-center gap-4">
+              {inviteHref ? (
+                <DrawerLink
+                  href={inviteHref}
+                  request={{ kind: "invite", id: person.id }}
+                  aria-label={`Inviter ${person.fullName}`}
+                  className={ACTION_LINK}
+                >
+                  Inviter
+                </DrawerLink>
+              ) : null}
+              {revokeInvitation ? (
+                /* Un formulaire nu : ni confirmation ni motif — c'est le partage
+                   du retrait d'accès (arbitrage (c) de `tickets-C4bis.md`). Rien
+                   ne disparaît, la ligne reste en base avec sa date, et
+                   l'invitation **se refait**. Le mot est « Révoquer », jamais
+                   « Supprimer » : c'est ce que la règle 4 dit du geste, et ce
+                   que la base fait. */
+                <form action={revokeInvitation}>
+                  <button
+                    type="submit"
+                    aria-label={`Révoquer l'invitation de ${person.fullName}`}
+                    className={ACTION_LINK}
+                  >
+                    Révoquer l&apos;invitation
+                  </button>
+                </form>
+              ) : null}
               {accessHref ? (
                 <DrawerLink
                   href={accessHref}

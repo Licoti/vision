@@ -36,7 +36,10 @@
 
 import Link from "next/link";
 
-import { PersonCard } from "@/components/team/person-card";
+import {
+  PersonCard,
+  type PendingInvitation,
+} from "@/components/team/person-card";
 import { Avatar } from "@/components/ui/avatar";
 import { BlockNote } from "@/components/ui/empty-state";
 import { StatusPill } from "@/components/ui/status-pill";
@@ -88,6 +91,9 @@ export function PersonDetail({
   accessHref,
   revokeAccess,
   lastManager,
+  inviteHref,
+  pendingInvitation,
+  revokeInvitation,
 }: {
   person: PersonDetailRow;
   /**
@@ -111,6 +117,10 @@ export function PersonDetail({
   accessHref: string | null;
   revokeAccess: (() => Promise<void>) | null;
   lastManager: boolean;
+  /** Les trois de l'**invitation** (T11.2), et ils traversent de même. */
+  inviteHref: string | null;
+  pendingInvitation: PendingInvitation | null;
+  revokeInvitation: (() => Promise<void>) | null;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
@@ -125,6 +135,9 @@ export function PersonDetail({
         accessHref={accessHref}
         revokeAccess={revokeAccess}
         lastManager={lastManager}
+        inviteHref={inviteHref}
+        pendingInvitation={pendingInvitation}
+        revokeInvitation={revokeInvitation}
       />
 
       <section className="flex flex-col gap-2">

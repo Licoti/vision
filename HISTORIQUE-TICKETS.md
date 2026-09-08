@@ -8043,3 +8043,84 @@ découverte et l'échange du code restent hors de portée d'un test unitaire.
 
 **1 816 → 1 824 tests sur 64 fichiers**, `lint` et `tsc` au vert. `ACTIONS-HUMAINES-C9.md` corrigé
 au passage : il disait `super_admins` vide, la table porte une ligne vivante depuis le geste humain.
+
+---
+
+## T11.2 — Le geste, la page, et l'acceptation — 08/09/2026
+
+**La boucle que C9 avait laissée ouverte se referme, et sans courriel.** Un responsable invite depuis
+la fiche d'une personne, le lien s'affiche **une seule fois** dans le panneau et se transmet à la
+main, l'invité le suit, passe par son fournisseur d'identité, et l'accès se pose. T11.3 fera partir
+le lien tout seul ; ce ticket-ci fait qu'il existe.
+
+**Neuf fichiers annoncés par la fiche, quatorze écrits — et les cinq écarts ont été annoncés au
+plan.** C'est la leçon de T9.6 appliquée d'avance : *un périmètre de fiche décrit une intention,
+jamais l'arbre des dépendances*. `lib/auth/cookie.ts` parce que le `seal`/`open` que la fiche nomme
+est **privé au module** · `lib/navigation.ts` et `lib/drawers/types.ts` pour la clé du panneau, sans
+laquelle `loadTeamDrawer` rend `null` · `person-card.tsx` et `person-detail.tsx` parce que le geste
+et le fait vivent sur la fiche · `app/invitation/[jeton]/entrer/route.ts` parce qu'**une page rendue
+par le serveur ne peut pas poser de cookie**. Un dixième s'est ajouté en cours de ticket, et il n'est
+pas mécanique : `route.test.ts`, écrit parce qu'une mise en défaut n'avait rien fait tomber.
+
+**Trois arbitrages rendus avec l'humain avant la première ligne.** **(a) Le panneau ne se referme pas
+sur son succès** — `ok: true` (TD.2) emporterait la seule occurrence en clair du jeton, `invitations`
+n'ayant aucune colonne `token` : l'action rend `link` **à la place** d'`ok`, et le panneau bascule du
+formulaire vers le lien. **(b) Réinviter est deux gestes** — révoquer, puis inviter —, parce qu'un
+geste unique enchaînerait deux écritures que `neon-http` ne peut pas couvrir : un échec entre les
+deux laisserait la personne sans aucun lien valide. **(c) Aucun des trois gestes n'est journalisé**,
+et un test le fixe : l'acceptation se produit dans le rappel du fournisseur, **sans session ni
+acteur** au sens de `record()`, et journaliser l'invitation sans son acceptation raconterait une
+moitié d'histoire.
+
+**Ce que le ticket a écrit.** `lib/auth/invitation.ts` — trente-deux octets, leur SHA-256, sept
+jours écrits une fois, et `redeemInvitation`, **pure au sens d'`entry.ts`** : ses **sept refus** se
+mesurent sur claims forgés, sans réseau. `lib/forms/invitation.ts` — un champ, le patron des
+vingt-six autres, plus `link` dans l'état. Deux actions : `invitePerson`, derrière la porte
+existante `openPersonForAccess`, avec **les quatre refus de `grantPersonAccess` repris tels quels et
+deux de plus** — un accès déjà ouvert, une invitation déjà vivante — et **qui n'écrit pas
+`has_access`** ; `revokeInvitation`, muette, une date de plus sur la ligne. Un panneau jumeau
+d'`access-panel.tsx`. Une page publique hors du groupe `(app)`, et sa route de départ. Et
+l'acceptation dans le rappel, **après `resolvePrincipal` et seulement sur `no_access`**.
+
+**La mesure qui a le plus appris : une contre-épreuve qui n'a rien fait tomber.** La fiche prescrit
+de déplacer l'acceptation avant `resolvePrincipal` et de voir tomber les mesures de domaine et
+d'archivage. Faite : **1 884 tests, tous verts**. Le rappel n'avait **aucun test** — le seul point
+d'entrée du dépôt à n'être tenu que par la lecture du code —, et l'arbitrage central du chantier
+reposait dessus. `route.test.ts` a été écrit dans la foulée : huit mesures, réseau seul simulé, base
+réelle, cookies scellés du vrai HMAC. Ordre inversé, il fait tomber **un** test — et pas celui qu'on
+croyait. *Personne d'archivé ne ressuscite* ne tombe pas, `redeemInvitation` refusant l'archivée de
+son côté ; le seul témoin de l'ordre est **le domaine suspendu**, que l'acceptation ne juge pas.
+
+**Le contraire d'un doublon : une garde que le typage seul retient.** `if (!claims.enterprise)`
+neutralisé ne fait tomber aucun test — la garde suivante rattrape le cas. **Retirée, `tsc` refuse.**
+*Avant de conclure qu'une garde sans test est morte, retirer la ligne plutôt que la neutraliser.*
+
+**Sept mises en défaut, chacune faisant tomber ce qu'elle devait.** Le sixième refus d'`invitePerson`
+neutralisé : un seul test, et la contrainte prend le relais **sous son nom**,
+`invitations_pending_unique`, lu dans `error.cause.constraint` — autrement dit, sans ce refus, une
+seconde invitation rendrait **500** au lieu d'un message qui nomme le geste. Le droit de
+`revokeInvitation`, le refus « déjà un accès », la double révocation, `domain_mismatch`,
+`email_mismatch`, `person_unavailable` : chacun son test, et rien d'autre.
+
+**Quatre mesures dans le HTML servi, dont une au bit près.** La page **nomme le domaine** (« Rejoindre
+Groupe Meridian ») et ne propose que les fournisseurs raccordés. Les **quatre refus** — inconnu,
+révoqué, déjà accepté, périmé — rendent la **même empreinte MD5**, `<script>` retirés : aucune
+différence de rendu ne trahit la cause. La fiche porte *« Invitation : en attente pour le rôle
+Membre, jusqu'au 15 septembre 2026 »* et « Révoquer l'invitation », sans qu'« Inviter » y paraisse.
+Le panneau se rend **côté serveur**, avec ses deux rôles et leurs notes.
+
+**Le droit éprouvé par l'action, et sa contre-épreuve.** `revokeInvitation` frappée en `text/plain`
+par un `member` rend **200** — exactement comme la même frappe par le responsable. Seul le décompte
+en base sépare les deux : `revoked_at` nul dans un cas, posé dans l'autre. Sans la contre-épreuve, un
+200 sans écriture aurait pu venir d'un point d'entrée inatteignable plutôt que d'un refus.
+
+**Deux garde-fous ont mordu, et aucun n'a été désactivé.** `react-hooks/purity` a refusé `Date.now()`
+dans le corps de la page — le contrôle est sorti dans une fonction de module. Le `switch` exhaustif
+de `resolveTeamDrawer` a refusé de compiler dès la clé `invite` ajoutée au type, avant qu'une seule
+ligne de rendu soit écrite.
+
+**Une collision d'adresse dans la fixture**, dite par l'index posé la veille : deux cas éloignés de
+mille lignes employaient la même adresse. *Une contrainte de base fait aussi le ménage dans les
+fixtures qui la précèdent.*
+
+**1 834 → 1 893 tests sur 67 fichiers**, `lint` (`--max-warnings=0`) et `tsc` au vert.

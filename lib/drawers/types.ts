@@ -158,6 +158,13 @@ export type TeamDrawerRequest =
   | { kind: "person"; id?: string | undefined }
   | { kind: "skill"; id: string }
   | { kind: "access"; id: string }
+  /**
+   * L'invitation (T11.2) — **la septième clé de cette page**, et elle porte les
+   * deux mêmes conditions muettes qu'`access` : un membre du centre, une
+   * personne vivante. `resolveTeamDrawer` les vérifie, et `invitePerson` les
+   * revérifie sur ce qu'elle reçoit.
+   */
+  | { kind: "invite"; id: string }
   | { kind: "archive"; id: string }
   | { kind: "delete"; id: string };
 
@@ -316,6 +323,7 @@ const TEAM_KINDS = [
   "person",
   "skill",
   "access",
+  "invite",
   "archive",
   "delete",
 ] as const;

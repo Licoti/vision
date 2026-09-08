@@ -30,9 +30,21 @@
  * un panneau absent du rendu n'a jamais protégé le point d'entrée HTTP qui
  * l'accompagne.
  *
- * **Aucune invitation, aucun courriel, aucune relance** (interdit du ticket) :
- * Vision montre le fait, elle ne notifie personne. La personne se connectera
- * quand elle se connectera.
+ * **Ce panneau n'invite pas, et c'est désormais parce qu'un autre le fait**
+ * (T11.2). La phrase qui vivait ici — *« aucune invitation, aucun courriel,
+ * aucune relance ; la personne se connectera quand elle se connectera »* —
+ * énonçait un interdit de T9.6, levé par décision humaine du 08/09/2026 : la
+ * laisser aurait fait d'un commentaire une affirmation fausse, ce qui vaut une
+ * ligne de code fausse (leçon de T7.5).
+ *
+ * **Les deux gestes cohabitent, aucun ne remplace l'autre** (arbitrage (6) de
+ * `tickets-C11.md`) : celui-ci ouvre l'accès **maintenant**, et sert quand la
+ * personne est là ; `invitePerson` le promet à qui viendra le chercher, et sert
+ * quand elle ne l'est pas. Fondre les deux aurait réécrit un geste mesuré hors
+ * du périmètre du chantier (règle 3).
+ *
+ * **Aucune relance pour autant** : une invitation part une fois (`docs/03` §8),
+ * et rien ici ne notifie personne.
  */
 
 import { useActionState } from "react";

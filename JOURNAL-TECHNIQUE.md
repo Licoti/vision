@@ -11099,3 +11099,126 @@ ici une autorité **à l'intérieur** d'un domaine écrit la ligne qui le nomme,
 table sans `domain_id`. La borne n'est pas un commentaire : la méthode ne peut toucher que la ligne
 du domaine de son appelant, et **n'accepte que trois colonnes**, `status` et `archived_at` étant des
 refus de typage. C'est l'idiome de `LinkTable` et de `DeletableTable`, resservi à un cran plus haut.
+
+## T11.2 — Le geste, la page, et l'acceptation (08/09/2026)
+
+**T11.2 — une mise en défaut n'a rien fait tomber, et c'est elle qui a écrit le meilleur test du
+ticket.** La fiche prescrit, pour l'arbitrage (4), de *déplacer l'acceptation avant
+`resolvePrincipal` et de voir tomber les mesures de domaine et d'archivage*. La contre-épreuve a été
+faite : **1 884 tests, tous verts, l'ordre inversé**. La leçon de T9.6 s'applique mot pour mot —
+*une contre-épreuve qui ne fait tomber aucun test ne dit pas que la garde est inutile ; elle dit que
+le test mesurait autre chose*. Le rappel n'avait **aucun test** : `app/auth/callback/` était le seul
+point d'entrée du dépôt à n'être tenu que par la lecture du code, et l'arbitrage central du chantier
+reposait dessus. `route.test.ts` a donc été écrit — **huitième écart de périmètre, et le seul que la
+discipline exigeait plutôt que la mécanique**. Ordre inversé, il fait tomber **un** test, celui du
+domaine suspendu.
+
+**T11.2 — le seul témoin de l'ordre est le domaine suspendu, et les autres refus sont doublés.**
+La mesure l'a dit contre l'intuition : *personne d'archivé ne ressuscite* ne tombe **pas** quand
+l'ordre s'inverse, parce que `redeemInvitation` refuse l'archivée de son côté. Ce qui n'est doublé
+nulle part est `domain_closed` — le septième refus d'`entry.ts`, qu'un domaine suspendu déclenche et
+que l'acceptation ne juge pas. **C'est donc lui, et lui seul, qui mesure l'arbitrage (4)**, et le
+commentaire du test archivé a été corrigé après la mesure : il annonçait une chute qui n'a pas eu
+lieu. *Un commentaire de test qui prédit une mise en défaut se vérifie comme le reste.*
+
+**T11.2 — `redeemInvitation` ne juge pas l'état du domaine, et un test le fixe.** La tentation était
+d'y ajouter le contrôle « par sécurité ». C'eût été réécrire une règle mesurée **et** rendre
+l'arbitrage (4) immesurable : c'est précisément parce que ce module ne juge pas le domaine que
+l'inversion de l'ordre ouvre une porte visible. Le contrat est donc écrit sous forme de test — *un
+domaine suspendu passe `redeemInvitation`* —, qui tombera le jour où quelqu'un ajoutera le contrôle,
+et l'obligera à relire l'arbitrage avant de corriger. La seconde barrière reste posée par
+`loadSession`, qui refait les quatre refus à chaque requête.
+
+**T11.2 — une garde que rien ne peut mettre en défaut par un test, et c'est le typage qui la
+tient.** `if (!claims.enterprise)` neutralisé ne fait tomber **aucun** test : la garde suivante,
+`domainId !== invitation.domainId`, rattrape le cas au moment de l'exécution. Ce n'est pourtant pas
+du code mort — **retirée, `tsc` refuse** (`Type 'string | null' is not assignable to type
+'string'`), `resolveDomainId` exigeant une chaîne. C'est l'idiome du dépôt à l'échelle d'une ligne :
+*refusé à la compilation, pas par la vigilance*, comme `LinkTable` et `DeletableTable`. La leçon
+générale : **avant de conclure qu'une garde sans test est morte, retirer la ligne plutôt que la
+neutraliser** — un `if (false)` conserve le typage que la suppression fait tomber.
+
+**T11.2 — le succès ne peut pas refermer ce panneau, et c'est le premier du dépôt.** `ok: true`
+referme le tiroir depuis TD.2, et c'est le patron des seize panneaux. Ici il **emporterait la seule
+occurrence en clair du jeton** : `invitations` n'a aucune colonne `token` (T11.1), et rien ne saurait
+reconstituer un lien à partir de son SHA-256. `invitePerson` rend donc `link` **à la place** d'`ok`,
+et le panneau bascule du formulaire vers le lien sans se fermer. Écart nommé au patron de TD.2,
+arbitré avec l'humain le 08/09. La conséquence est assumée et dite à l'écran : *le lien ne sera plus
+affiché ; le perdre demande de révoquer et de réinviter.*
+
+**T11.2 — réinviter est deux gestes, et l'absence de transaction l'a tranché.** Le schéma de T11.1
+écrit *« réinviter révoque la précédente »*, ce qui se lisait comme un geste unique. Un geste unique
+aurait enchaîné deux écritures que `neon-http` ne peut pas couvrir (dette de T3.6) : un échec entre
+les deux laisserait la personne **sans aucun lien valide**, l'ancien révoqué et le neuf absent. Le
+refus vit donc dans l'action — *une invitation est déjà en attente, révoquez-la d'abord* —, et la
+fiche porte les deux gestes. Décision humaine du 08/09.
+
+**T11.2 — le sixième refus double l'index, et la mise en défaut le prouve utile.** Neutralisé, il
+fait tomber **un seul** test — et la contrainte prend le relais **sous son nom** :
+`invitations_pending_unique`, lu dans `error.cause.constraint`. Autrement dit, sans lui, une seconde
+invitation ne serait pas *permise* : elle rendrait **500** là où l'on attend un message qui nomme le
+geste à faire. C'est exactement la famille du 500 de T11.1 sur `persons_domain_email_unique`, et la
+règle qui s'en dégage tient une phrase : **une contrainte de base a besoin d'un refus applicatif
+partout où une écriture la touche — non pour la doubler, mais pour choisir le message.**
+
+**T11.2 — une page rendue par le serveur ne peut pas poser de cookie, et la parade était déjà
+écrite.** La fiche demande que la page d'invitation *pose un cookie scellé de quinze minutes* ;
+Next l'interdit hors d'une action ou d'une route. Un formulaire l'aurait pu, au prix d'un `POST` là
+où le geste est une navigation. `app/invitation/[jeton]/entrer/route.ts` est donc le calque exact
+d'`/auth/connexion` — un `GET` qui pose un cookie et redirige —, ce qui laisse la page tenir en
+`<a href>`, sans JavaScript, comme `/auth/acces`. **Neuvième fichier hors du périmètre de la fiche**,
+et le seul écran du chantier en portait deux.
+
+**T11.2 — `seal` et `open` étaient privés, et la fiche les nommait.** *« Le `seal`/`open` de
+`lib/auth/cookie.ts` »* : ils ne sont pas exportés, seules quatre enveloppes le sont.
+`sealInvitation`/`openInvitation` en font une cinquième et une sixième, sur le **même** HMAC, avec la
+**même** relecture par la forme — et deux tests neufs mesurent ce que cette relecture garantit :
+**un cookie d'invitation n'ouvre aucune session**, et un principal ne s'ouvre pas comme une
+invitation. Sans la relecture par la forme, une charge de quinze minutes portant les bons noms de
+champs passerait pour un principal : la signature dit qu'une charge n'a pas été récrite, jamais
+qu'elle est celle qu'on attend.
+
+**T11.2 — `react-hooks/purity` a mordu sur `Date.now()` dans un rendu, et le déplacement est la
+réponse.** La page d'invitation lisait l'horloge dans son corps pour juger la péremption. La règle
+est juste — un rendu doit être idempotent —, et la page est pourtant `force-dynamic`. Le contrôle a
+été sorti dans une fonction de module plutôt que la règle désactivée : *un garde-fou qu'on désactive
+au premier usage ne garde rien* (la raison même pour laquelle le tertiaire n'a pas de gardien
+ESLint, consignée en TD.6).
+
+**T11.2 — les quatre refus de la page sont indistincts, et c'est mesuré au bit près.** Jeton
+inconnu, révoqué, déjà accepté, périmé : les quatre réponses HTML, `<script>` retirés, rendent la
+**même empreinte MD5**. C'est plus fort que « le message est le même » — cela dit qu'aucune
+différence de rendu, fût-elle un attribut, ne trahit la cause. *Un refus qui distingue ses causes est
+un oracle offert à qui frappe*, et l'adresse est publique.
+
+**T11.2 — le 200 muet, une troisième fois, et l'étape témoin l'a rattrapé.** `revokeInvitation`
+frappée en `text/plain` par un `member` rend **200**, exactement comme la même frappe par le
+responsable. Seul le décompte en base sépare les deux : `revoked_at` reste nul dans un cas, se pose
+dans l'autre. La contre-épreuve compte autant que la mesure — sans la frappe du responsable, un 200
+sans écriture aurait pu venir d'un point d'entrée inatteignable plutôt que d'un refus.
+
+**T11.2 — une collision d'adresse dans la fixture, et c'est l'index de T11.1 qui l'a dite.** Le
+premier passage des tests d'équipe a échoué sur `persons_domain_email_unique` : deux cas éloignés de
+mille lignes employaient `role.forge.${suffix}@acme.com`. La contrainte posée la veille a transformé
+en échec franc ce qui, la semaine dernière, aurait été deux lignes homonymes et un rapprochement
+arbitraire. *Une contrainte de base fait aussi le ménage dans les fixtures qui la précèdent.*
+
+**T11.2 — le décompte de rôles se lit en clair, jamais sur `enumValues.length`.** Le test qui fixe
+*« deux rôles, et pas un troisième »* écrit `["domain_manager", "member"]` en toutes lettres : un
+test qui compterait la longueur de l'énuméré resterait cohérent si un troisième rôle s'ajoutait, donc
+muet, quand l'interdit commun de C11 est précisément *aucun troisième rôle*. C'est l'asymétrie
+mesurée en T9.5, resservie.
+
+**T11.2 — aucun des trois gestes n'est journalisé, et c'est un arbitrage.** Inviter, révoquer,
+accepter n'écrivent aucune ligne d'`events`, et un test le fixe. La raison n'est pas le périmètre :
+l'acceptation se produit **dans le rappel du fournisseur**, sans session ni acteur au sens de
+`record()`, et journaliser l'invitation sans son acceptation raconterait une moitié d'histoire —
+« untel a été invité », sans jamais « untel est entré ». La famille rejoint la liste ouverte par
+T8.3, avec un **cinquième** nom, et sa destination est la prochaine session de découpage.
+
+**T11.2 — l'état « lien affiché » du panneau n'est pas lisible dans le HTML servi, et c'est dit.**
+Le panneau bascule sur `state.link`, que seule une soumission React produit : le rendu serveur ne
+porte que le formulaire, et `curl` ne peut pas atteindre l'autre état. La chaîne est donc mesurée en
+deux morceaux qui se rejoignent — l'action rend un lien contenant `/invitation/` (test), et cette
+adresse servie nomme le domaine (HTML mesuré). **La jointure des deux, elle, n'est pas mesurée**, et
+c'est la seule discipline du ticket qui se rapporte plutôt qu'elle ne se lit.

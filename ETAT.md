@@ -2,15 +2,16 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 08/09/2026, **T11.1 terminé — et C11 ouvert, sa fiche écrite après son
-premier ticket** (manquement consigné). La table `invitations` : aucune colonne `token` ; pas
-d'`archived_at`, donc `archive` est un refus de typage ; **quatre horodatages et aucun statut**.
-`superAdmin` reçoit sa **sixième** clé — la première qui ne vient pas d'une règle d'entrée — et
-**son sceau nominatif l'a arrêtée**. L'unicité `(domain_id, lower(email))` referme un point ouvert
-et **en a ouvert deux** : un **500 mesuré** au formulaire de personne, réparé par une garde, et le
-décompte de jumelles de T9.6 devenu **inatteignable**. **Périmètre étendu à deux fichiers d'équipe,
-sur demande.** **Vert : 1 834 tests sur 64 fichiers** (1 824 avant), `lint` et `tsc` au vert.
-**Ticket suivant : T11.2 — C11 passe devant C7** (08/09) ; C7 ferme le POC ensuite.
+**Dernière mise à jour :** 08/09/2026, **T11.2 terminé — la boucle de l'invitation est fermée, sans
+courriel**. Un responsable invite, le lien s'affiche **une fois** et se transmet à la main, le SSO le
+valide, l'accès se pose. **Une mise en défaut n'a rien fait tomber** — l'acceptation déplacée avant
+`resolvePrincipal`, 1 884 tests verts : le rappel n'avait **aucun test**, et l'arbitrage central du
+chantier n'était tenu que par la lecture. `route.test.ts` le mesure désormais, et **un seul témoin
+isole l'ordre**, le domaine suspendu. **Le panneau ne se referme pas sur son succès** (écart nommé à
+TD.2) : `ok` emporterait la seule occurrence en clair du jeton. **Quatre refus indistincts, mesurés à
+l'empreinte MD5 près.** **Périmètre étendu à neuf fichiers, annoncés au plan.** **Vert : 1 893 tests
+sur 67 fichiers** (1 834 avant), `lint` et `tsc` au vert.
+**Ticket suivant : T11.3 — l'envoi** ; puis T11.4, T11.5, et C7 ferme le POC.
 
 ---
 
@@ -31,7 +32,7 @@ sur demande.** **Vert : 1 834 tests sur 64 fichiers** (1 824 avant), `lint` et `
 | C8 — Dette | T8.1 → T8.5 | **terminé** |
 | C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **terminé** |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
-| C11 — Le parcours d'entrée | T11.1 → T11.5 | **en cours** — T11.1 livré, T11.2 suit |
+| C11 — Le parcours d'entrée | T11.1 → T11.5 | **en cours** — T11.1 et T11.2 livrés, T11.3 suit |
 
 ---
 
@@ -66,10 +67,13 @@ sur demande.** **Vert : 1 834 tests sur 64 fichiers** (1 824 avant), `lint` et `
 - **C11 — L'invitation — T11.1, 08/09.** Écrit **avant sa fiche** (manquement consigné). La
   contrainte d'adresse a fait tomber deux tests de T9.6 et **révélé un 500** au formulaire — mesuré,
   puis réparé. 1 824 → **1 834 tests**.
+- **C11 — Le geste, la page, l'acceptation — T11.2, 08/09.** La boucle entière **sans courriel** :
+  deux actions, un panneau, la page publique et sa route de départ, l'acceptation dans le rappel.
+  **La mise en défaut de l'arbitrage central n'a rien fait tomber** — le rappel n'avait aucun test —,
+  et le combler a été le neuvième écart de périmètre. 1 834 → **1 893 tests**.
 - **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, détaillés dans
-  `HISTORIQUE-TICKETS.md`. **Cinq portent une migration, `0010` à `0014`.** Le reste est de la
-  reprise d'ergonomie, le bouton aligné sur le design system, et le **renommage de « Projets » en
-  « Accompagnements »** (02/09), qui **rouvre D35** sur demande humaine explicite.
+  `HISTORIQUE-TICKETS.md`. **Cinq portent une migration, `0010` à `0014`** ; le reste est de
+  l'ergonomie, plus le **renommage de « Projets » en « Accompagnements »**, qui **rouvre D35**.
 
 ---
 
@@ -80,20 +84,11 @@ refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le
 
 ### a. À trancher — sinon les tickets suivants héritent du problème · gestes détaillés : `ACTIONS-HUMAINES-C9.md`
 
-- **Les trois derniers commits ne portent aucun fichier neuf, et `HEAD` ne compile pas.**
-  **Dix-neuf fichiers non suivis** (mesuré le 08/09) — tout `app/domaines/`, les quatre panneaux de
-  domaine, `lib/db/bootstrap.ts`, `lib/db/reconcile.ts`, `lib/forms/domain*.ts`,
-  `components/team/access-panel.tsx`, `lib/auth/oidc.test.ts` —, quand `lib/drawers/team.tsx` et
-  `app/domaines/actions.ts` **les importent**. `.gitignore` ne les exclut pas : c'est
-  `git commit -am` qui ne prend que le suivi. **C9 est écrit, il n'est pas dans le dépôt.**
-  → **action humaine : `git add -A` avant le prochain commit**, ou un `git add` des dix-neuf puis un
-  commit de rattrapage.
-
 - **Microsoft est écrit et n'est pas branché** — Entra ID Free demande une carte bancaire, et
   `ENTRA_CLIENT_ID`/`_SECRET` manquent de `.env.local`. **Mesuré** : la découverte aboutit, l'adresse
-  d'autorisation est juste. **Pas mesuré** : l'échange du code, et la substitution d'émetteur du
-  gabarit `{tenantid}` — **« deux valeurs, jamais une reprise » reste une hypothèse.** Son bouton ne
-  rend plus 500 (08/09). → **action humaine.**
+  d'autorisation est juste. **Pas mesuré** : l'échange du code, et la substitution du gabarit
+  `{tenantid}`. Son bouton ne rend plus 500 (08/09), et la page d'invitation ne le propose pas
+  davantage (T11.2). → **action humaine.**
 - **Les secrets Neon n'ont jamais été tournés.** Deux chaînes ont transité en clair le 12/08, hors
   dépôt mais valides. **Reportés cinq fois, et C9 est passé** — la raison qui les reportait n'existe
   plus. → **action humaine, et c'est la plus vieille de la liste.**
@@ -103,7 +98,7 @@ refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le
   → **action humaine, avant tout déploiement.**
 - **`CLAUDE.md` porte trois énoncés périmés** : « Statut de projet » contre « Statuts
   d'accompagnement » · l'entrée « Projet » contre « Accompagnements » · *« Entra ID le remplacera en
-  C7 »*, quand **c'est Google, en C9** (même écart dans `docs/01` §141). → **action humaine.**
+  C7 »*, quand c'est Google, en C9 (même écart `docs/01` §141). → **action humaine.**
 - **Ce qu'un macro-parcours relie reste à trancher**, et avec lui **« macro-parcours » contre le
   « Réseau de liens entre produits » de `docs/02` §10**, même direction sous un autre nom. L'entrée
   de menu et l'écran vide restent tels quels — ni table, ni objet, ni droit ; le concept devra entrer
@@ -112,13 +107,12 @@ refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le
 ### b. Assignés à un ticket
 
 **C9 est clos ; six points lui survivent.** **Le jeu de démonstration n'a ni adresse ni identité
-vérifiée** — `scripts/seed.ts` n'en écrit pas. **Cela ne l'empêche pas d'être connectable, cela
-l'empêche d'être cohérent** : le `hd` vient de Google, jamais de nous, et **seul un vrai domaine
-Workspace ouvre le chemin d'un membre de domaine** — la limite que T9.2 avait écrite d'avance.
+vérifiée** — cela ne l'empêche pas d'être connectable, cela l'empêche d'être **cohérent** : le `hd`
+vient de Google, jamais de nous, et seul un vrai domaine Workspace ouvre le chemin d'un membre.
 → **le prochain ticket qui ouvre `scripts/seed.ts`, pour la fixture et non pour le SSO.**
 **Le décompte de jumelles de `grantPersonAccess` est inatteignable** depuis T11.1 : il lit
-`lower(email)`, l'expression même de l'index, qui ne peut plus valoir plus de un. Filet conservé sur
-décision du 08/09, **et aucun test ne peut plus l'exercer**. → **le jour où l'on ôte un filet.**
+`lower(email)`, l'expression même de l'index. Filet conservé le 08/09, **et aucun test ne peut plus
+l'exercer**. → **le jour où l'on ôte un filet.**
 **Le libellé des deux rôles est écrit à trois endroits**, plus deux mots que `lib/journal.ts` récrit
 exprès, étant pur. → **T7.9**, avec les quatre libellés hors de `lib/format.ts`.
 **`withoutAnySession()` reste importable depuis `app/`**, rien ne l'en empêchant mécaniquement : la
@@ -131,13 +125,22 @@ amorçage partiel** — `npm run db:seed` ne vise que la démonstration, quand l
 rend le geste rejouable sans rien doubler : il ne manque qu'un appelant. → **avec la dette de T3.6.**
 **Le RLS a quitté C9** : voir le groupe (c).
 
-**C11 reprend maintenant** (T11.2 → T11.5, `tickets-C11.md`), **et C7 ferme le POC après** — T7.7 à
-T7.10. **La fiche a doublé le 08/09** sur une spécification du parcours complet : deux tickets de
-plus, l'amorçage en un geste et le domaine vu par son administrateur.
+**C11 continue** (T11.3 → T11.5), **et C7 ferme le POC après**. **T11.3 hérite d'un état déjà
+atteint** : sans clé d'envoi, l'invitation existe et son lien s'affiche — donc **aucun second chemin
+de code à écrire**.
 
-**Le journal reste incomplet** (T8.3, laissé intact — règle 3) : **quatre familles écrivent sans
-trace** — le produit, l'adoption, la compétence portée, et les huit référentiels autres que l'entité
-(trente-deux gestes), chacune **fixée par un test qui tombera**. → **prochaine session de découpage.**
+**Deux points naissent de T11.2.** **L'état « lien affiché » du panneau ne se lit pas dans le HTML
+servi** — il naît d'une soumission React —, si bien que la chaîne est mesurée en deux morceaux dont
+la jointure ne l'est pas. → **T11.3, qui rouvre le panneau.** **`redeemInvitation` ne juge pas l'état
+du domaine, et c'est ce qui rend l'arbitrage (4) mesurable** : un test le fixe, et il tombera le jour
+où quelqu'un « sécurisera » le module — **un seul témoin isole l'ordre des six règles**, le domaine
+suspendu. → **à relire avant de corriger, jamais après.**
+
+**Le journal reste incomplet** (T8.3, laissé intact — règle 3) : **cinq familles écrivent sans
+trace** — le produit, l'adoption, la compétence portée, les huit référentiels autres que l'entité
+(trente-deux gestes), et **les trois gestes de l'invitation** (T11.2, arbitrage assumé : l'acceptation
+n'a ni session ni acteur). Chacune est **fixée par un test qui tombera**.
+→ **prochaine session de découpage.**
 
 **Au prochain ticket qui ouvre le fichier** — **destination qui a déjà échoué une fois**, T8.4 ayant
 dû recevoir un ticket pour ce seul motif. **`uiLayerSeal` garde une liste de six dossiers, pas une
@@ -170,11 +173,9 @@ sur quatre met « Annuler » au rang secondaire · les props d'icône de `Button
 - **Cinq dettes sans échéance.** Sans JavaScript, **les gestes d'une carte de roadmap ne sont plus
   atteignables** — seule exception arbitrée à D30 · **`disabled:opacity-40` est servi sur douze
   balises qui ne peuvent pas être désactivées**, à 2,35:1 composé · **rien en base ne retient un
-  outil**, ses quatre clés entrantes étant `set null`, son refus d'archivage vivant dans l'action
-  seule · **la fixture est incomplète sur les ressources et les résultats** — deux résultats sans
-  lien profond, six adresses sur `example.com` · **le réseau fait tomber la suite** : l'intermittent
-  de T8.1 est **`NeonDbError: fetch failed`**, une fois sur dix **sans écart d'assertion** — revu le
-  07/09, une fois sur deux passages complets. → **sans échéance.**
+  outil**, ses quatre clés entrantes étant `set null` · **la fixture est incomplète sur les
+  ressources et les résultats** · **le réseau fait tomber la suite** : l'intermittent de T8.1 est
+  **`NeonDbError: fetch failed`**, une fois sur dix **sans écart d'assertion**. → **sans échéance.**
 - **Un référentiel sur neuf reste ouvert au renommage, et c'est structurel.** T8.4 reconnaît une
   ligne par sa `position` — **huit refermés, mesurés** —, mais `tools` n'a pas d'ordinal : refermer
   demande une migration. L'orpheline « Audit d'accessibilité » reste en base de développement, et
@@ -193,26 +194,24 @@ sur quatre met « Annuler » au rang secondaire · les props d'icône de `Button
   tests, et C9 la durcit au **point d'entrée**. Écart à D38 consigné. → **le jour où le pilote
   exposera la transaction interactive ; les deux se referment ensemble.**
 - **Deux règles de période voisines vivent à deux endroits** — `lastActivityExpression` et
-  `projectPeriods` — **et divergent sur un point voulu** : la seconde compte les `planned`. L'une dit
-  l'étendue, l'autre la fraîcheur. → **à reposer si une troisième lecture apparaît.**
+  `projectPeriods` — **et divergent sur un point voulu** : la seconde compte les `planned`.
+  → **à reposer si une troisième lecture apparaît.**
 - **Trois dettes que seul l'usage tranchera** : les filtres ne survivent pas à un aller-retour par
-  la navigation principale (`docs/06` §9 les veut conservés) · le référentiel des personnes reste
-  servi **en entier** dans les deux formulaires · la liste transverse n'est pas plafonnée. → **si
-  l'usage le réclame.**
+  la navigation (`docs/06` §9 les veut conservés) · le référentiel des personnes est servi **en
+  entier** dans les deux formulaires · la liste transverse n'est pas plafonnée. → **si l'usage le
+  réclame.**
 
 ---
 
 ## Rappels de contexte
 
 - **Un argument lié à une action serveur n'est pas un secret.** `bind(null, project.id)` sort
-  l'identifiant de la saisie, mais Next le sérialise dans un champ `$ACTION_…`, **en clair en
-  développement**, et une soumission peut le réécrire. **Une action ne tire jamais une autorisation
-  de la valeur qu'on lui a liée** : elle interroge le droit sur la valeur **reçue**. **Le droit
-  s'éprouve par l'action, jamais par l'écran.**
+  l'identifiant de la saisie, mais Next le sérialise dans un champ `$ACTION_…` qu'une soumission peut
+  réécrire. **Une action interroge le droit sur la valeur reçue**, jamais sur celle qu'on lui a liée.
 - **Une fonction serveur se frappe en `text/plain`**, jamais en urlencodé — la charge est le tableau
-  d'arguments encodé en Flight. **Le code HTTP ne dit jamais ce qui a été écrit** : T6.1 a mesuré un
-  archivage refusé qui rend **200**, comme celui qui réussit. Trois « 200 muets » payés faute
-  d'étape témoin. **Seul le décompte en base tranche.**
+  d'arguments encodé en Flight. **Le code HTTP ne dit jamais ce qui a été écrit** : T6.1, puis T11.2,
+  ont mesuré des refus qui rendent **200** comme les succès. **Seul le décompte en base tranche**, et
+  la contre-épreuve — le même appel par qui a le droit — vaut autant que la mesure.
 - **Le panneau s'ouvre côté client depuis TD.2, son corps restant rendu sur le serveur** : une
   fonction `"use server"` renvoie un `ReactNode`, et les URL d'ouverture passent par la **même**
   résolution que le clic.
@@ -227,18 +226,18 @@ sur quatre met « Annuler » au rang secondaire · les props d'icône de `Button
   retenues par des clés `restrict` ; **`projects` n'est retenue par rien** — ses dix clés étrangères
   sont `cascade`, son panneau de confirmation est le seul garde-fou. Ajouter une quatrième table à
   `DeletableTable` est un arbitrage humain, jamais une décision de ticket.
-- **La période d'un accompagnement se déduit de ses activités** depuis le 31/08, **cinq lectures
-  joignant la même règle** en sous-requête groupée et non corrélée.
+- **La période d'un accompagnement se déduit de ses activités** (31/08), **cinq lectures joignant la
+  même règle** en sous-requête groupée et non corrélée.
 - **Le domaine vient du jeton, et de lui seul.** `resolveDomainId` prend une identité vérifiée —
   le `hd` de Google, le `tid` d'Entra — et interroge `domain_identities`. « Le premier domaine actif
   par nom » ne survit que dans `setCurrentPerson`, hors production, pour `/dev/session` seul.
-- **Le cookie authentifie, donc il se signe** (`lib/auth/cookie.ts`, HMAC-SHA256). Il porte une
-  **union** : une personne porte `{personId, domainId}`, un super administrateur son seul
-  identifiant — il n'a ni domaine ni ligne `persons`, et `getSession()` rend donc `null` pour lui.
-  **Le repli du stub est mort** : une identité absente ou inéligible est refusée, jamais remplacée,
-  et `requireSession` redirige vers `/auth/acces`. **`/dev/session` reste**, 404 en production :
-  une adresse personnelle ne porte ni `hd` ni `tid`, donc le chemin d'un membre de domaine ne se
-  parcourt pas au navigateur.
+- **Le cookie authentifie, donc il se signe** (`lib/auth/cookie.ts`, HMAC-SHA256). **Trois charges
+  depuis T11.2**, et chacune **se relit par sa forme** : un principal — union personne / super
+  administrateur, ce dernier sans domaine ni ligne `persons` —, un handshake de dix minutes, une
+  invitation de quinze. La signature dit qu'une charge n'a pas été récrite, jamais qu'elle est celle
+  qu'on attend : **un cookie d'invitation n'ouvre aucune session**, et c'est mesuré. **Le repli du
+  stub est mort** : une identité inéligible est refusée, jamais remplacée. **`/dev/session` reste**,
+  404 en production, et exige désormais une session déjà ouverte.
 - **Un accès et son rôle ne se séparent jamais** : `persons_role_requires_access` refuse chaque
   moitié écrite seule — mesuré. **Le dernier responsable ne se rétrograde ni ne se retire** : le
   décompte porte sur les *autres* responsables vivants, et comme qui exerce le geste en est un, il ne

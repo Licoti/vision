@@ -19,8 +19,10 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import {
   AuthSecretError,
   openHandshake,
+  openInvitation,
   openPrincipal,
   sealHandshake,
+  sealInvitation,
   sealPrincipal,
   type Principal,
 } from "./cookie";
@@ -69,6 +71,59 @@ describe("ce qui se relit", () => {
       codeVerifier: "v-1",
     };
     expect(openHandshake(sealHandshake(handshake))).toEqual(handshake);
+  });
+
+  test("une invitation fait l'aller-retour", () => {
+    expect(openInvitation(sealInvitation({ token: "t-1" }))).toEqual({
+      token: "t-1",
+    });
+  });
+});
+
+/* ==========================================================================
+   Les trois charges ne se confondent pas — T11.2
+
+   **Le sceau est le même, les formes ne le sont pas.** Une charge scellée par
+   nous reste une charge qui a fait l'aller-retour par le navigateur : la
+   signature dit qu'elle n'a pas été récrite, elle ne dit pas qu'elle a la forme
+   qu'on attend. C'est ce que la relecture par la forme tient, et ce bloc le
+   mesure sur le couple neuf.
+   ========================================================================== */
+
+describe("le cookie d'invitation ne se confond avec aucun autre", () => {
+  test("un principal ne s'ouvre pas comme une invitation", () => {
+    expect(openInvitation(sealPrincipal(person))).toBeNull();
+    expect(openInvitation(sealHandshake({
+      provider: "google",
+      state: "s",
+      nonce: "n",
+      codeVerifier: "v",
+    }))).toBeNull();
+  });
+
+  /* **Et l'inverse, qui est le sens dangereux** : un cookie d'invitation
+     n'ouvre aucune session. Sans la relecture par la forme, une charge scellée
+     de quinze minutes serait acceptée par `openPrincipal` dès qu'elle porterait
+     les bons noms de champs — c'est la raison pour laquelle la forme se relit,
+     et non seulement la signature. */
+  test("une invitation n'ouvre pas de session", () => {
+    expect(openPrincipal(sealInvitation({ token: "t-1" }))).toBeNull();
+    expect(openHandshake(sealInvitation({ token: "t-1" }))).toBeNull();
+  });
+
+  test("un jeton vide n'ouvre rien", () => {
+    expect(openInvitation(sealInvitation({ token: "" }))).toBeNull();
+  });
+
+  /* Le sceau vaut pour les trois : une signature d'un autre secret tombe. */
+  test("une invitation signée d'un autre secret tombe", () => {
+    const sealed = sealInvitation({ token: "t-1" });
+    process.env.AUTH_SECRET = OTHER_SECRET;
+    try {
+      expect(openInvitation(sealed)).toBeNull();
+    } finally {
+      process.env.AUTH_SECRET = SECRET;
+    }
   });
 });
 

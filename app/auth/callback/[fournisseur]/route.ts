@@ -14,17 +14,34 @@
  * **La cause du refus ne sort jamais d'ici.** Elle nomme le test qui l'éprouve ;
  * l'écran dit la même chose dans les sept cas. Un refus qui distingue ses causes
  * est un oracle offert à qui frappe.
+ *
+ * **Un quatrième temps depuis T11.2, et il ne se glisse pas avant les autres.**
+ * L'invitation s'accepte **après** `resolvePrincipal`, jamais avant (arbitrage
+ * (4) de `tickets-C11.md`), et **seulement sur `no_access`** : c'est le seul des
+ * sept refus qu'un lien peut réparer. Il en découle trois propriétés qu'aucune
+ * ligne d'ici n'a à porter — aucune personne ne naît à la volée (`docs/04` §7),
+ * aucun domaine non client ne s'ouvre (règle d'entrée 5), personne d'archivé ne
+ * ressuscite. **`lib/auth/entry.ts` n'est pas modifié d'un caractère**, et
+ * déplacer cet appel avant lui doit faire tomber les mesures de domaine et
+ * d'archivage : c'est ainsi que l'arbitrage se met en défaut.
+ *
+ * **Le cookie d'invitation s'efface dans tous les cas**, comme le handshake :
+ * accepté, refusé, ou simplement présent sur une connexion qui n'en avait pas
+ * besoin. Un jeton qui survivrait à son aller-retour se rejouerait au suivant.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
 
 import {
   HANDSHAKE_COOKIE,
+  INVITATION_COOKIE,
   SESSION_COOKIE,
   openHandshake,
+  openInvitation,
   sealPrincipal,
 } from "@/lib/auth/cookie";
 import { resolvePrincipal } from "@/lib/auth/entry";
+import { redeemInvitation } from "@/lib/auth/invitation";
 import { completeAuthorization, isProviderId } from "@/lib/auth/oidc";
 import { AUTH_ROUTES, sessionCookieOptions } from "@/lib/auth/provider";
 
@@ -41,6 +58,7 @@ export async function GET(
       new URL(AUTH_ROUTES.entry, request.nextUrl),
     );
     response.cookies.delete(HANDSHAKE_COOKIE);
+    response.cookies.delete(INVITATION_COOKIE);
     return response;
   };
 
@@ -63,13 +81,32 @@ export async function GET(
   }
 
   const outcome = await resolvePrincipal(claims);
-  if (!outcome.granted) return refuse();
+
+  /* **Les six règles ont statué ; l'invitation vient après, et pour un seul
+     refus.** Une personne référencée sans compte (D19) rend `no_access` : c'est
+     exactement l'état qu'un lien ouvre. Les six autres refus restent des refus,
+     et le lien ne les touche pas. */
+  let granted = outcome.granted;
+
+  if (!granted && outcome.refused === "no_access") {
+    const invitation = openInvitation(
+      request.cookies.get(INVITATION_COOKIE)?.value,
+    );
+
+    if (invitation) {
+      const redeemed = await redeemInvitation(invitation.token, claims);
+      granted = redeemed.granted;
+    }
+  }
+
+  if (!granted) return refuse();
 
   const response = NextResponse.redirect(new URL("/", request.nextUrl));
   response.cookies.delete(HANDSHAKE_COOKIE);
+  response.cookies.delete(INVITATION_COOKIE);
   response.cookies.set(
     SESSION_COOKIE,
-    sealPrincipal(outcome.granted),
+    sealPrincipal(granted),
     sessionCookieOptions,
   );
   return response;

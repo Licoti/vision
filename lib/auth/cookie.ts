@@ -55,6 +55,25 @@ export type Handshake = {
   codeVerifier: string;
 };
 
+/**
+ * Ce que `/invitation/[jeton]/entrer` confie au navigateur le temps d'un
+ * aller-retour SSO : le jeton d'invitation, et rien d'autre.
+ *
+ * **Il ne voyage pas dans l'URL d'autorisation**, où il traverserait le
+ * fournisseur, ses journaux et le `Referer` du navigateur. Il ne voyage pas non
+ * plus dans le `state` : celui-là est déjà porté par le handshake, et lui
+ * ajouter une charge mêlerait deux durées de vie — dix minutes pour l'un,
+ * quinze pour l'autre — sous un seul sceau.
+ *
+ * **Le jeton n'authentifie toujours pas** (arbitrage (1) de `tickets-C11.md`).
+ * Le sceau garantit qu'il n'a pas été récrit en chemin, jamais qu'il vaut
+ * quelque chose : `redeemInvitation` le confronte à la base et aux claims
+ * vérifiés, et c'est là que les sept refus vivent.
+ */
+export type Invitation = {
+  token: string;
+};
+
 /** Le cookie de session. Nom neuf : le format l'est aussi. */
 export const SESSION_COOKIE = "vision_session";
 
@@ -64,8 +83,25 @@ export const HANDSHAKE_COOKIE = "vision_oauth";
 /** Huit heures. Une journée de travail, pas un abonnement. */
 export const SESSION_TTL_SECONDS = 8 * 60 * 60;
 
+/**
+ * Le cookie qui porte une invitation en cours d'acceptation, effacé par le
+ * rappel — **dans tous les cas**, comme le handshake.
+ */
+export const INVITATION_COOKIE = "vision_invitation";
+
 /** Dix minutes : le temps d'un écran de consentement, jamais davantage. */
 export const HANDSHAKE_TTL_SECONDS = 10 * 60;
+
+/**
+ * Quinze minutes : le consentement du handshake, plus la création d'un compte
+ * chez le fournisseur.
+ *
+ * **Plus long que le handshake, et bien plus court que les sept jours du lien.**
+ * L'invitation, elle, vaut une semaine (`lib/auth/invitation.ts`) : ce cookie ne
+ * borne pas sa validité, il borne le seul aller-retour en cours. Expiré, il ne
+ * détruit rien — le lien se resuit, et une seconde tentative repart de la page.
+ */
+export const INVITATION_TTL_SECONDS = 15 * 60;
 
 /** Le seuil de `openssl rand -base64 32`, moins la marge de son padding. */
 const MIN_SECRET_LENGTH = 32;
@@ -166,7 +202,7 @@ function open(value: string | undefined | null): unknown {
 }
 
 /* ==========================================================================
-   Les deux charges
+   Les trois charges
 
    **Chacune se relit par sa forme, jamais sur parole.** Une charge scellée par
    nous reste une charge qui a fait l'aller-retour par le navigateur : la
@@ -212,6 +248,24 @@ export function openPrincipal(
 
 export function sealHandshake(handshake: Handshake): string {
   return seal(handshake, HANDSHAKE_TTL_SECONDS);
+}
+
+export function sealInvitation(invitation: Invitation): string {
+  return seal(invitation, INVITATION_TTL_SECONDS);
+}
+
+export function openInvitation(
+  value: string | undefined | null,
+): Invitation | null {
+  const payload = open(value) as Record<string, unknown> | null;
+  if (!payload) return null;
+
+  /* La forme se relit comme les deux autres. Un jeton vide passerait le typage
+     et n'ouvrirait rien — il rendrait `unknown` chez `redeemInvitation`, ce qui
+     est juste mais paie une lecture de base pour rien. */
+  if (typeof payload.token !== "string" || !payload.token) return null;
+
+  return { token: payload.token };
 }
 
 export function openHandshake(

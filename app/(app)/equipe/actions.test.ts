@@ -54,6 +54,7 @@ import {
   domains,
   entities,
   events,
+  invitations,
   jobs,
   personSkills,
   persons,
@@ -110,6 +111,8 @@ const {
   createPerson,
   deletePerson,
   grantPersonAccess,
+  invitePerson,
+  revokeInvitation,
   revokePersonAccess,
   updatePerson,
 } = await import("./actions");
@@ -254,6 +257,9 @@ afterAll(async () => {
     products,
     entities,
     jobs,
+    /* `invitations` retient `persons` par une clé `restrict` : elle part
+       avant. */
+    invitations,
     persons,
   ];
   for (const table of tables) {
@@ -1348,5 +1354,383 @@ describe("l'adresse en double se refuse au formulaire", () => {
     expect((await f.scope.find(persons, person.id))?.fullName).toBe(
       `Sienne corrigée ${suffix}`,
     );
+  });
+});
+
+/* ==========================================================================
+   L'invitation — T11.2
+
+   **Ce qui se mesure ici est le geste, jamais son acceptation** : celle-ci vit
+   dans `lib/auth/invitation.test.ts`, sur claims forgés et sans écran. La
+   frontière est celle du chantier — l'action promet un accès, le rappel du
+   fournisseur le pose.
+
+   **`invitePerson` n'écrit pas `has_access`**, et c'est la propriété que chaque
+   cas revérifie en base : c'est toute la différence avec `grantPersonAccess`,
+   qui ne bouge pas (arbitrage (6)).
+   ========================================================================== */
+
+const NO_INVITATION_STATE = { values: { role: "" }, errors: {} };
+
+/** Le formulaire d'invitation, tel qu'une soumission le porte. */
+function inviteForm(role: string): FormData {
+  const data = new FormData();
+  data.set("role", role);
+  return data;
+}
+
+/** Les invitations **vivantes** d'une personne — la condition de l'index. */
+async function pendingOf(personId: string) {
+  return f.scope.list(invitations, {
+    where: sql`${invitations.personId} = ${personId} and ${invitations.acceptedAt} is null and ${invitations.revokedAt} is null`,
+  });
+}
+
+/** Toutes ses lignes, vivantes ou refermées : une trace ne s'efface pas. */
+async function allInvitationsOf(personId: string) {
+  return f.scope.list(invitations, {
+    where: eq(invitations.personId, personId),
+  });
+}
+
+describe("invitePerson — ce que le geste écrit, et ce qu'il ne touche pas", () => {
+  test("une ligne, un lien rendu une fois, et aucun accès ouvert", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("À inviter", {
+      email: `a.inviter.${suffix}@acme.com`,
+    });
+
+    /* Étape témoin : sans elle, un état rendu ne prouve rien. */
+    expect(await accountOf(target.id)).toMatchObject({
+      hasAccess: false,
+      domainRole: null,
+    });
+    expect(await pendingOf(target.id)).toHaveLength(0);
+
+    const state = await invitePerson(
+      target.id,
+      NO_INVITATION_STATE,
+      inviteForm("member"),
+    );
+
+    expect(state.message).toBeUndefined();
+    expect(state.link).toContain("/invitation/");
+
+    /* **L'accès n'est pas ouvert**, et c'est l'arbitrage (9) : un accès qui n'a
+       jamais servi n'existe pas. Il se posera à l'acceptation. */
+    expect(await accountOf(target.id)).toMatchObject({
+      hasAccess: false,
+      domainRole: null,
+    });
+
+    const rows = await pendingOf(target.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ role: "member", sentAt: null });
+    /* **L'adresse est copiée**, pas jointe : c'est elle que l'acceptation
+       confrontera à l'e-mail vérifié. */
+    expect(rows[0]?.email).toBe(`a.inviter.${suffix}@acme.com`);
+  });
+
+  /* **Le clair ne descend jamais en base** (T11.1) : la colonne `token`
+     n'existe pas, et l'empreinte n'est pas le lien. */
+  test("la base ne porte que l'empreinte, jamais le lien", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Empreinte seule", {
+      email: `empreinte.${suffix}@acme.com`,
+    });
+
+    const state = await invitePerson(
+      target.id,
+      NO_INVITATION_STATE,
+      inviteForm("member"),
+    );
+
+    const token = state.link?.split("/invitation/")[1] ?? "";
+    expect(token).not.toBe("");
+
+    const row = (await pendingOf(target.id))[0];
+    expect(row?.tokenHash).not.toContain(token);
+    expect(row?.tokenHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(Object.keys(row ?? {})).not.toContain("token");
+  });
+
+  /* **Aucune trace au journal** — arbitrage (c) du 08/09/2026, et le geste
+     rejoint les familles ouvertes depuis T8.3. Le constat le fixe plutôt que de
+     le laisser se redécouvrir. */
+  test("le geste n'écrit aucune ligne de journal", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Sans trace", {
+      email: `sans.trace.inv.${suffix}@acme.com`,
+    });
+
+    const before = await journal();
+    await invitePerson(target.id, NO_INVITATION_STATE, inviteForm("member"));
+    const after = await journal();
+
+    expect(after.length).toBe(before.length);
+  });
+});
+
+describe("invitePerson — les six refus, éprouvés séparément", () => {
+  test("sans `manageDomain`, aucune invitation n'est créée", async () => {
+    const target = await freshPerson("Défendue à l'invitation", {
+      email: `defendue.inv.${suffix}@acme.com`,
+    });
+
+    currentPerson = f.memberId;
+    const state = await invitePerson(
+      target.id,
+      NO_INVITATION_STATE,
+      inviteForm("domain_manager"),
+    );
+
+    expect(state.message).toBeDefined();
+    expect(state.link).toBeUndefined();
+    expect(await pendingOf(target.id)).toHaveLength(0);
+  });
+
+  test("un intervenant côté entité ne s'invite pas", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Commanditaire", {
+      email: `commanditaire.${suffix}@acme.com`,
+      kind: "stakeholder",
+    });
+
+    const state = await invitePerson(
+      target.id,
+      NO_INVITATION_STATE,
+      inviteForm("member"),
+    );
+
+    expect(state.message).toBeDefined();
+    expect(await pendingOf(target.id)).toHaveLength(0);
+  });
+
+  test("sans adresse, il n'y a personne à qui écrire", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Sans adresse à inviter");
+
+    const state = await invitePerson(
+      target.id,
+      NO_INVITATION_STATE,
+      inviteForm("member"),
+    );
+
+    expect(state.message).toBeDefined();
+    expect(await pendingOf(target.id)).toHaveLength(0);
+  });
+
+  test("une personne qui a déjà un accès n'a rien à recevoir", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Déjà dotée", {
+      email: `deja.dotee.${suffix}@acme.com`,
+    });
+    await grantPersonAccess(target.id, NO_ACCESS_STATE, accessForm("member"));
+    expect(await accountOf(target.id)).toMatchObject({ hasAccess: true });
+
+    const state = await invitePerson(
+      target.id,
+      NO_INVITATION_STATE,
+      inviteForm("member"),
+    );
+
+    expect(state.message).toBeDefined();
+    expect(await pendingOf(target.id)).toHaveLength(0);
+  });
+
+  /* **Le sixième refus, et il double l'index partiel.** Sans lui, la base
+     lèverait `invitations_pending_unique` — un 500 là où l'on attend un message
+     qui dit le geste à faire : révoquer, puis réinviter. */
+  test("deux invitations vivantes pour une même personne, refusées", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Invitée deux fois", {
+      email: `deux.fois.${suffix}@acme.com`,
+    });
+
+    const first = await invitePerson(
+      target.id,
+      NO_INVITATION_STATE,
+      inviteForm("member"),
+    );
+    expect(first.link).toBeDefined();
+
+    const second = await invitePerson(
+      target.id,
+      NO_INVITATION_STATE,
+      inviteForm("member"),
+    );
+
+    expect(second.message).toBeDefined();
+    expect(second.link).toBeUndefined();
+    /* **Le décompte tranche** : une ligne refusée ne doit pas d'abord
+       s'écrire. */
+    expect(await pendingOf(target.id)).toHaveLength(1);
+  });
+
+  test("un rôle hors énuméré est une erreur de champ, jamais une levée", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Rôle forgé", {
+      email: `role.forge.invitation.${suffix}@acme.com`,
+    });
+
+    const state = await invitePerson(
+      target.id,
+      NO_INVITATION_STATE,
+      inviteForm("super_admin"),
+    );
+
+    expect(state.errors.role).toBeDefined();
+    expect(state.link).toBeUndefined();
+    expect(await pendingOf(target.id)).toHaveLength(0);
+  });
+
+  /* **Le dernier responsable ne se rétrograde pas, même en différé** :
+     l'inviter comme `member` le rétrograderait le jour où il accepterait. */
+  test("le dernier responsable ne s'invite pas à un rôle moindre", async () => {
+    currentPerson = f.managerId;
+
+    const state = await invitePerson(
+      f.managerId,
+      NO_INVITATION_STATE,
+      inviteForm("member"),
+    );
+
+    await restoreTheManager();
+
+    expect(state.message).toBeDefined();
+    expect(await pendingOf(f.managerId)).toHaveLength(0);
+  });
+
+  test("une personne archivée ne s'invite pas", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Rangée puis invitée", {
+      email: `rangee.inv.${suffix}@acme.com`,
+    });
+    await f.scope.archive(persons, target.id);
+
+    const state = await invitePerson(
+      target.id,
+      NO_INVITATION_STATE,
+      inviteForm("member"),
+    );
+
+    expect(state.message).toBeDefined();
+    expect(await pendingOf(target.id)).toHaveLength(0);
+  });
+});
+
+describe("revokeInvitation — muette, et mesurée en base", () => {
+  test("la ligne reste, avec sa date : une invitation se révoque", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("À révoquer", {
+      email: `a.revoquer.${suffix}@acme.com`,
+    });
+    await invitePerson(target.id, NO_INVITATION_STATE, inviteForm("member"));
+
+    const row = (await pendingOf(target.id))[0];
+    expect(row).toBeDefined();
+
+    await revokeInvitation(row!.id);
+
+    expect(await pendingOf(target.id)).toHaveLength(0);
+    /* **Rien n'est effacé** (règle 4, et l'index est partiel) : la trace
+       reste, et c'est elle qui refuse un lien déjà parti. */
+    const all = await allInvitationsOf(target.id);
+    expect(all).toHaveLength(1);
+    expect(all[0]?.revokedAt).toBeInstanceOf(Date);
+  });
+
+  test("révoquer rouvre le geste, et les deux lignes coexistent", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Réinvitée", {
+      email: `reinvitee.${suffix}@acme.com`,
+    });
+    await invitePerson(target.id, NO_INVITATION_STATE, inviteForm("member"));
+
+    const first = (await pendingOf(target.id))[0];
+    await revokeInvitation(first!.id);
+
+    const state = await invitePerson(
+      target.id,
+      NO_INVITATION_STATE,
+      inviteForm("domain_manager"),
+    );
+
+    expect(state.link).toBeDefined();
+    expect(state.link).not.toBe(first!.tokenHash);
+    expect(await pendingOf(target.id)).toHaveLength(1);
+    expect(await allInvitationsOf(target.id)).toHaveLength(2);
+  });
+
+  test("sans `manageDomain`, rien n'est révoqué", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Défendue à la révocation", {
+      email: `defendue.rev.${suffix}@acme.com`,
+    });
+    await invitePerson(target.id, NO_INVITATION_STATE, inviteForm("member"));
+    const row = (await pendingOf(target.id))[0];
+
+    currentPerson = f.memberId;
+    await revokeInvitation(row!.id);
+
+    /* Le geste est muet : **seul le décompte le juge**. */
+    expect(await pendingOf(target.id)).toHaveLength(1);
+    expect((await allInvitationsOf(target.id))[0]?.revokedAt).toBeNull();
+  });
+
+  test("une invitation déjà révoquée ne se re-date pas", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Révoquée deux fois", {
+      email: `revoquee.deux.${suffix}@acme.com`,
+    });
+    await invitePerson(target.id, NO_INVITATION_STATE, inviteForm("member"));
+    const row = (await pendingOf(target.id))[0];
+
+    await revokeInvitation(row!.id);
+    const first = (await allInvitationsOf(target.id))[0]?.revokedAt;
+
+    await revokeInvitation(row!.id);
+
+    expect((await allInvitationsOf(target.id))[0]?.revokedAt).toEqual(first);
+  });
+
+  test("un identifiant d'un autre domaine ne révoque rien", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Voisine à protéger", {
+      email: `voisine.rev.${suffix}@acme.com`,
+    });
+    await invitePerson(target.id, NO_INVITATION_STATE, inviteForm("member"));
+    const row = (await pendingOf(target.id))[0];
+
+    /* **Le geste porte l'identifiant reçu, jamais celui qu'on lui a lié** : la
+       même valeur, sous une session d'un autre domaine, ne doit rien atteindre.
+       C'est la règle 1, éprouvée par l'action. */
+    const other = await outsideAnySession.createDomain({
+      name: `__test__equipe__inv__voisin__${suffix}`,
+      competenceCenterName: "Voisin",
+    });
+    const otherScope = forDomain({ domainId: other.id });
+    const intruder = await otherScope.insert(persons, {
+      fullName: `Intruse ${suffix}`,
+      source: "manual",
+      kind: "center",
+      hasAccess: true,
+      domainRole: "domain_manager",
+      email: `intruse.${suffix}@voisin.com`,
+    });
+
+    const savedDomain = currentDomain;
+    currentPerson = intruder.id;
+    currentDomain = other.id;
+
+    await revokeInvitation(row!.id);
+
+    currentPerson = f.managerId;
+    currentDomain = savedDomain;
+
+    expect(await pendingOf(target.id)).toHaveLength(1);
+
+    await db.delete(persons).where(eq(persons.domainId, other.id));
+    await db.delete(domains).where(inArray(domains.id, [other.id]));
   });
 });

@@ -146,6 +146,7 @@ import {
   DELETE_PANEL_PARAM,
   PERSON_FORM_NEW,
   PERSON_ACCESS_PARAM,
+  PERSON_INVITE_PARAM,
   PERSON_FORM_PARAM,
   PERSON_PANEL_PARAM,
   ROUTES,
@@ -223,8 +224,8 @@ const PARAM = {
  * mentir le compilateur sur le cas qui est justement l'objet de T5bis.3.
  *
  * Les clés de panneau s'y ajoutent — `personne` en T5bis.4, puis `profil`,
- * `maitrise` et `archiver` en T5bis.6, `supprimer` le 28/08/2026, et `acces` en
- * T9.6. Ce ne sont pas des filtres, ce que le décompte d'exclusivité et
+ * `maitrise` et `archiver` en T5bis.6, `supprimer` le 28/08/2026, `acces` en
+ * T9.6 et `inviter` en T11.2. Ce ne sont pas des filtres, ce que le décompte d'exclusivité et
  * `TEAM_PANEL_PARAMS` tiennent séparément.
  */
 type PanelParam =
@@ -232,6 +233,7 @@ type PanelParam =
   | typeof PERSON_FORM_PARAM
   | typeof SKILL_PANEL_PARAM
   | typeof PERSON_ACCESS_PARAM
+  | typeof PERSON_INVITE_PARAM
   | typeof ARCHIVE_PANEL_PARAM
   | typeof DELETE_PANEL_PARAM;
 
@@ -417,6 +419,7 @@ export default async function TeamPage({
     [PERSON_FORM_PARAM]: one(params[PERSON_FORM_PARAM]),
     [SKILL_PANEL_PARAM]: one(params[SKILL_PANEL_PARAM]),
     [PERSON_ACCESS_PARAM]: one(params[PERSON_ACCESS_PARAM]),
+    [PERSON_INVITE_PARAM]: one(params[PERSON_INVITE_PARAM]),
     [ARCHIVE_PANEL_PARAM]: one(params[ARCHIVE_PANEL_PARAM]),
     [DELETE_PANEL_PARAM]: one(params[DELETE_PANEL_PARAM]),
   };

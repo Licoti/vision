@@ -475,6 +475,24 @@ export const SKILL_PANEL_PARAM = "maitrise";
 export const PERSON_ACCESS_PARAM = "acces";
 
 /**
+ * Le panneau d'**invitation** d'une personne, sur la page Équipe — T11.2.
+ *
+ * **Une septième clé, et non une seconde valeur sur `acces`.** Accorder un accès
+ * et inviter sont **deux gestes voisins, pas un remplacement** (arbitrage (6) de
+ * `tickets-C11.md`) : le premier sert quand la personne est là, le second quand
+ * elle ne l'est pas. Les confondre sous une clé aurait fait de la différence un
+ * champ, quand elle est le geste.
+ *
+ * **Sa valeur est un identifiant de personne**, comme `acces` : on invite
+ * quelqu'un, jamais une invitation. La révocation, elle, ne passe par aucune
+ * clé — c'est un formulaire nu sur la fiche, la forme du retrait d'accès.
+ *
+ * Ce n'est pas cette route qui protège, mais l'action, qui redérive le droit et
+ * ses six refus sur l'identifiant **reçu**.
+ */
+export const PERSON_INVITE_PARAM = "inviter";
+
+/**
  * Le détail d'une **piste de démarrage**, sur la page d'un accompagnement
  * (20/08/2026).
  *
@@ -1240,6 +1258,14 @@ export const ROUTES = {
   teamPersonAccess: (personId: string) =>
     `/equipe?${PERSON_ACCESS_PARAM}=${personId}`,
   /**
+   * L'écran, panneau d'**invitation** ouvert sur une personne — T11.2.
+   *
+   * La valeur porte l'identifiant, comme `teamPersonAccess` et pour la même
+   * raison : `/equipe` n'a pas d'objet de page.
+   */
+  teamPersonInvite: (personId: string) =>
+    `/equipe?${PERSON_INVITE_PARAM}=${personId}`,
+  /**
    * L'écran **Administration** — les référentiels du domaine (21/08/2026, porté
    * de un à cinq référentiels par T7.3).
    *
@@ -1345,6 +1371,26 @@ export const ROUTES = {
    */
   domainArchive: (domainId: string) =>
     `/domaines?${ARCHIVE_PANEL_PARAM}=${domainId}`,
+  /**
+   * La page publique d'une invitation — T11.2, **seule adresse de Vision qui
+   * s'ouvre sans session**, avec l'écran d'entrée.
+   *
+   * **Relative, et c'est l'action qui l'absolutise.** Le lien qu'on transmet
+   * doit porter un hôte, et l'hôte vit dans `AUTH_URL` — la même valeur que
+   * `callbackUrl` (`lib/auth/oidc.ts`), pour que deux constructions voisines ne
+   * soient pas deux occasions de diverger. Ce module, lui, ne lit aucun
+   * environnement : il est pur, et ses cent appelants ne veulent que le chemin.
+   */
+  invitation: (token: string) => `/invitation/${token}`,
+  /**
+   * Le départ vers un fournisseur, depuis la page d'invitation.
+   *
+   * **Une adresse et non un formulaire** : c'est un `GET` qui pose un cookie et
+   * redirige, exactement comme `/auth/connexion` le fait du handshake depuis
+   * T9.2 — et c'est ce qui laisse la page tenir sans JavaScript.
+   */
+  invitationEnter: (token: string, provider: string) =>
+    `/invitation/${token}/entrer?fournisseur=${provider}`,
 } as const;
 
 /**
