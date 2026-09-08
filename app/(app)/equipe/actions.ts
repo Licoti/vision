@@ -1,12 +1,19 @@
 "use server";
 
 /**
- * Les écritures de la page **Équipe** — T5bis.6.
+ * Les écritures de la page **Équipe** — T5bis.6, puis le **compte** en T9.6.
  *
  * Six gestes sur deux objets : créer une personne, corriger son profil,
  * l'archiver ; poser une compétence avec son niveau, corriger ce niveau, la
  * **retirer**. Sans eux, C5bis livrerait un référentiel qu'un script seul
  * alimente.
+ *
+ * **Deux de plus depuis T9.6, sur un troisième objet : le compte.** Accorder un
+ * accès avec son rôle, le retirer. Jusqu'à ce ticket, **aucun écran de Vision
+ * n'écrivait `has_access` ni `domain_role`** : la création forçait les deux à
+ * « pas de compte » sous un commentaire qui promettait le geste à C7, et C7 ne
+ * l'a jamais fait. Un domaine créé par T9.4 portait donc **exactement un
+ * compte, définitivement**.
  *
  * **Le droit est `session.can.manageDomain`, seul** (arbitrage (c) de C5bis).
  * `docs/02` §Rôle donne au responsable de domaine la gestion « des référentiels
@@ -81,7 +88,7 @@
  * posés par la couche, l'appelant n'y pense pas. Règle 1.
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import type { ConfirmState } from "@/components/ui/confirm-panel";
@@ -94,10 +101,13 @@ import {
   projectMembers,
 } from "@/lib/db/schema";
 import { DomainScopeError, IntegrityError, type Row } from "@/lib/db/scoped";
-import { objectPhrase } from "@/lib/journal";
+import { accessPhrase, objectPhrase } from "@/lib/journal";
 import {
+  parsePersonAccessForm,
   parsePersonForm,
+  readPersonAccessForm,
   readPersonForm,
+  type PersonAccessFormState,
   type PersonFormState,
 } from "@/lib/forms/person";
 import {
@@ -108,11 +118,21 @@ import {
 import { ROUTES } from "@/lib/navigation";
 
 /**
- * Le refus que les cinq points d'entrée d'écriture partagent, quand il ne vient
- * ni du droit ni d'une ligne disparue.
+ * Le refus que les points d'entrée d'écriture partagent, quand il ne vient ni du
+ * droit ni d'une ligne disparue.
+ *
+ * **Sans le compte**, et c'est le geste de T6.1 sur `scoped.ts` : la phrase
+ * disait « les cinq », ils sont sept. Un nombre dans un commentaire vieillit à
+ * chaque ticket ; ce qui se relit ici est la règle.
+ *
+ * **Le droit du compte est `manageDomain`, comme celui du profil** : `docs/02`
+ * §3 donne au responsable de domaine *« gérer les référentiels et les
+ * membres »*, et désigner les responsables suivants en fait partie. Aucun droit
+ * neuf n'entre dans `lib/auth/session.ts` — `SessionRights` garde ses quatre
+ * membres.
  */
 const RESERVED =
-  "La gestion des personnes et de leurs compétences est réservée au responsable de domaine.";
+  "La gestion des personnes, de leurs compétences et de leurs accès est réservée au responsable de domaine.";
 
 /**
  * Un refus qui n'appartient à aucun champ — un droit, une ligne disparue.
@@ -140,6 +160,19 @@ function skillRefusal(
     errors: {},
     message,
   };
+}
+
+/**
+ * Le même refus, sur la saisie d'un **accès** — second jumeau explicite.
+ *
+ * La saisie revient telle quelle, comme partout : un refus de droit ou de
+ * dernier responsable ne jette pas le rôle qui venait d'être choisi.
+ */
+function accessRefusal(
+  formData: FormData,
+  message: string,
+): PersonAccessFormState {
+  return { values: readPersonAccessForm(formData), errors: {}, message };
 }
 
 /**
@@ -214,18 +247,25 @@ async function openPerson(
 }
 
 /**
- * La porte de la **suppression** — la même, moins le refus de l'archivage
- * (28/08/2026).
+ * La porte des gestes qui **ne regardent pas l'archivage** — la même, moins ce
+ * refus (28/08/2026, élargie en T9.6).
  *
  * `openPerson` refuse une personne archivée parce qu'une ligne rangée ne reçoit
- * plus de saisie. Ici, ce refus serait faux : **ranger puis effacer est le
- * chemin naturel**, et l'interdire obligerait à rétablir avant de supprimer.
- * C'est la forme d'`openEntity` (`administration/actions.ts`), qui ne regarde
- * pas `archived_at` non plus.
+ * plus de saisie. Pour deux gestes, ce refus serait faux : **ranger puis
+ * effacer est le chemin naturel**, et l'interdire obligerait à rétablir avant de
+ * supprimer ; **ranger puis retirer l'accès l'est autant**, et une ligne
+ * archivée qui garde un accès est précisément la contradiction qu'on veut
+ * pouvoir corriger. C'est la forme d'`openEntity`
+ * (`administration/actions.ts`), qui ne regarde pas `archived_at` non plus.
+ *
+ * **Elle s'appelait `openPersonForDelete`** jusqu'à T9.6, et ce nom devenait
+ * faux au second appelant : ce qu'elle dit n'est pas *pour quel geste*, c'est
+ * *ce qu'elle ne vérifie pas*. Un nom qui énumère ses appelants vieillit à
+ * chaque ticket.
  *
  * Le droit reste `manageDomain`, énoncé avant toute lecture.
  */
-async function openPersonForDelete(
+async function openPersonIgnoringArchive(
   session: Session,
   personId: string,
 ): Promise<{ person: Row<typeof persons> } | { message: string }> {
@@ -297,6 +337,42 @@ async function openPersonSkill(
   return { person: gate.person, link };
 }
 
+/**
+ * La même porte, plus le refus de l'**intervenant côté entité** — garde-fou 1 de
+ * T9.6, et c'est le même que celui des compétences, pour une autre raison.
+ *
+ * `docs/05` §4 exclut *« l'accès des commanditaires côté entité »*, décidé en F1
+ * (D2) : *« la page projet est conçue lisible par eux, sans leur être ouverte »*.
+ * Le refus porte donc sur `kind === "stakeholder"`.
+ *
+ * **Et il est dans l'action**, jamais dans le rendu : la fiche d'un
+ * `stakeholder` n'affiche aucun point d'entrée d'accès, mais un point d'entrée
+ * absent du rendu n'a jamais protégé le point d'entrée HTTP qui l'accompagne.
+ *
+ * **Le refus de la personne archivée vient d'`openPerson`, réemployé et non
+ * récrit** — garde-fou 3 : `loadSession` refuse déjà une personne archivée, et
+ * lui accorder un accès qu'elle ne pourra pas exercer serait écrire une
+ * contradiction en base. La conséquence est nommée : le neutraliser fait tomber
+ * les tests de cette **même** règle sur les trois gestes qui la partagent, ce
+ * qui est une règle mise en défaut une fois, pas trois règles.
+ */
+async function openPersonForAccess(
+  session: Session,
+  personId: string,
+): Promise<{ person: Row<typeof persons> } | { message: string }> {
+  const gate = await openPerson(session, personId);
+  if ("message" in gate) return gate;
+
+  if (gate.person.kind !== "center") {
+    return {
+      message:
+        "Un intervenant côté entité ne reçoit jamais d'accès à Vision : la page d'un accompagnement est conçue pour être lisible par lui, sans lui être ouverte.",
+    };
+  }
+
+  return gate;
+}
+
 /* ==========================================================================
    La personne — créer, corriger, archiver
    ========================================================================== */
@@ -312,8 +388,17 @@ async function openPersonSkill(
  * `source: "manual"`, `hasAccess: false` et `domainRole: null` tiennent les deux
  * `CHECK` de `persons` : pas d'identifiant annuaire sans annuaire, pas de rôle
  * de domaine sans accès. Être référencé et pouvoir se connecter restent deux
- * choses distinctes (D19) — cette personne n'apparaîtra pas dans `/dev/session`,
- * et son compte est l'affaire de C7.
+ * choses distinctes (D19) — cette personne n'apparaîtra pas dans `/dev/session`
+ * tant qu'aucun accès ne lui a été accordé.
+ *
+ * **Aucun accès à la création, et c'est un interdit de T9.6** : le geste reste
+ * **explicite et séparé** (`grantPersonAccess`). Le commentaire qui vivait ici
+ * disait *« son compte est l'affaire de C7 »* — septième énoncé de la famille
+ * des promesses faites à C7, et c'est C9 qui l'a tenue.
+ *
+ * **L'e-mail est donc facultatif ici**, et le drapeau le dit : une personne qui
+ * naît sans compte n'a pas besoin d'adresse (D19). Elle en aura besoin le jour
+ * où on lui accordera un accès, et c'est `grantPersonAccess` qui l'exigera.
  *
  * `previous` est l'état que `useActionState` fait circuler, dont l'action n'a pas
  * besoin — la saisie repart du `FormData` à chaque soumission.
@@ -325,7 +410,9 @@ export async function createPerson(
   const session = await requireSession();
   if (!session.can.manageDomain) return refusal(formData, RESERVED);
 
-  const { values, errors, input } = parsePersonForm(formData);
+  const { values, errors, input } = parsePersonForm(formData, {
+    emailRequired: false,
+  });
   if (!input) return { values, errors };
 
   try {
@@ -381,8 +468,14 @@ export async function createPerson(
  *
  * **Cinq colonnes, et pas une de plus** : `source`, `has_access`, `domain_role`
  * et `is_active` ne sont pas des champs de ce formulaire et ne le deviennent
- * pas. Les écrire ici ferait de cet écran une console de comptes, ce qu'il n'est
- * pas — l'authentification est reprise par C7.
+ * pas. Le compte se donne **ailleurs et exprès** — `grantPersonAccess`, en bas
+ * de ce fichier —, et un champ caché sur ce formulaire n'atteint donc rien.
+ *
+ * **L'adresse cesse d'être facultative quand la personne a un accès** (T9.6), et
+ * le drapeau vient de la ligne **relue en base**, jamais du formulaire : la
+ * valeur qui décide de l'obligation ne peut pas venir de la saisie qu'elle
+ * contraint. Sans cela, il suffirait de vider le champ pour rendre un compte
+ * injoignable — la règle d'entrée 6 rapproche sur l'e-mail.
  */
 export async function updatePerson(
   personId: string,
@@ -394,7 +487,9 @@ export async function updatePerson(
   const gate = await openPerson(session, personId);
   if ("message" in gate) return refusal(formData, gate.message);
 
-  const { values, errors, input } = parsePersonForm(formData);
+  const { values, errors, input } = parsePersonForm(formData, {
+    emailRequired: gate.person.hasAccess,
+  });
   if (!input) return { values, errors };
 
   try {
@@ -543,7 +638,7 @@ export async function deletePerson(
 ): Promise<ConfirmState> {
   const session = await requireSession();
 
-  const gate = await openPersonForDelete(session, personId);
+  const gate = await openPersonIgnoringArchive(session, personId);
   if ("message" in gate) return { message: gate.message };
 
   const [members, participations] = await Promise.all([
@@ -707,6 +802,239 @@ export async function removePersonSkill(personSkillId: string): Promise<void> {
   if ("message" in gate) return;
 
   await session.db.unlink(personSkills, personSkillId);
+
+  revalidatePath(ROUTES.team);
+}
+
+/* ==========================================================================
+   Le compte — accorder l'accès, le retirer
+
+   **Le troisième objet de cet écran, et le dernier arrivé** (T9.6). Ce n'est ni
+   un profil ni une compétence : c'est le droit d'entrer. Il vit ici parce que
+   son droit est celui du profil — `manageDomain` — et parce que `docs/02` §3
+   donne au responsable de domaine « gérer les référentiels et les membres ».
+
+   **Le couple ne se sépare jamais.** `persons_role_requires_access` refuse
+   *accès sans rôle* et *rôle sans accès* : les deux colonnes s'écrivent dans la
+   même instruction, à l'accord comme au retrait. Ce n'est pas une précaution de
+   style, c'est la contrainte, et elle se constate en base.
+   ========================================================================== */
+
+/**
+ * Combien de **responsables vivants** ce domaine compte, en dehors d'une
+ * personne donnée.
+ *
+ * **C'est la mesure du garde-fou 2**, et elle est écrite une fois pour les deux
+ * gestes : le dernier responsable d'un domaine ne se rétrograde pas, et ne se
+ * retire pas non plus — sans quoi le domaine deviendrait inadministrable, et
+ * **rien dans Vision ne permettrait de le rouvrir** : le super administrateur
+ * crée des domaines, il n'entre pas dedans.
+ *
+ * **Les archivées ne comptent pas**, et c'est `count` qui l'obtient sans qu'on
+ * le demande : `loadSession` refuse une personne archivée, elle n'administre
+ * donc rien, et la compter parmi les gardiens ferait croire qu'un domaine reste
+ * ouvert quand il ne l'est plus.
+ *
+ * **Le décompte exclut la personne visée**, et c'est ce qui rend le refus juste :
+ * qui exerce ce geste porte `manageDomain`, donc **est** un responsable vivant.
+ * Le décompte ne peut donc valoir zéro que lorsque la cible est l'acteur
+ * lui-même et que personne d'autre ne gère — exactement le cas à refuser. Sur
+ * une autre personne, l'acteur suffit à le rendre non nul, et le geste passe.
+ */
+async function otherDomainManagers(
+  session: Session,
+  personId: string,
+): Promise<number> {
+  return session.db.count(persons, {
+    where: and(
+      eq(persons.hasAccess, true),
+      eq(persons.domainRole, "domain_manager"),
+      ne(persons.id, personId),
+    ),
+  });
+}
+
+/**
+ * Accorder un accès, avec son rôle — **et changer ce rôle**, par le même point
+ * d'entrée.
+ *
+ * **Un formulaire, deux gestes**, la propriété tenue depuis T3.4 : accorder et
+ * rétrograder écrivent la même chose — *cette personne a désormais ce rôle* —, et
+ * les distinguer aurait mis deux fois la même règle à deux endroits.
+ *
+ * **Quatre refus, dans cet ordre, et chacun a sa source :**
+ *
+ * 1. le droit, l'existence, l'archivage et le genre — `openPersonForAccess` ;
+ * 2. **l'adresse**, sans laquelle un accès ne sert à personne : la règle
+ *    d'entrée 6 de `tickets-C9.md` rapproche l'identité **sur l'e-mail au
+ *    premier passage** (`lib/auth/entry.ts`). L'obligation ne vient pas de la
+ *    base — la colonne est nullable —, elle vient du geste ;
+ * 3. **le doublon d'adresse dans le domaine** (arbitrage du 07/09/2026) :
+ *    `findPerson` rapproche en `limit 1` **sans ordre**, si bien que deux
+ *    personnes portant la même adresse rendraient un rapprochement arbitraire —
+ *    l'une des deux se connecterait sous l'identité de l'autre. Aucune
+ *    contrainte de base ne l'interdit ; ce refus est ce qui tient la promesse en
+ *    attendant qu'une unicité `(domain_id, lower(email))` s'autorise, donc une
+ *    migration, donc pas ce chantier ;
+ * 4. **le dernier responsable ne se rétrograde pas** — garde-fou 2, mesuré par
+ *    `otherDomainManagers`.
+ *
+ * **Le journal reçoit le geste** : `person` est déjà un `event_target_type`, et
+ * `state_changed` est le verbe des cinq qui nomme un état atteint. **Aucun
+ * sixième verbe**, c'est l'interdit commun de C9.
+ */
+export async function grantPersonAccess(
+  personId: string,
+  _previous: PersonAccessFormState,
+  formData: FormData,
+): Promise<PersonAccessFormState> {
+  const session = await requireSession();
+
+  const gate = await openPersonForAccess(session, personId);
+  if ("message" in gate) return accessRefusal(formData, gate.message);
+
+  const { values, errors, input } = parsePersonAccessForm(formData);
+  if (!input) return { values, errors };
+
+  const { person } = gate;
+
+  if (!person.email) {
+    return accessRefusal(
+      formData,
+      "Cette personne n'a pas d'adresse e-mail : renseignez-la dans son profil avant de lui accorder un accès. C'est elle qui rapproche son compte de son identité au premier passage.",
+    );
+  }
+
+  /* **Les archivées sont comptées ici**, à rebours du décompte des responsables
+     — et c'est le rapprochement qui l'impose : `findPerson` lit
+     `includeArchived: true`, si bien qu'une ligne rangée portant la même adresse
+     serait trouvée, une fois sur deux, à la place de celle-ci. Un refus qui
+     n'écarterait que les vivantes laisserait passer exactement le cas qu'il
+     prétend fermer. */
+  const twins = await session.db.count(persons, {
+    where: and(
+      sql`lower(${persons.email}) = lower(${person.email})`,
+      ne(persons.id, personId),
+    ),
+    includeArchived: true,
+  });
+  if (twins > 0) {
+    return accessRefusal(
+      formData,
+      "Une autre personne de ce domaine porte déjà cette adresse e-mail : le rapprochement au premier passage ne saurait pas laquelle désigner. Corrigez l'une des deux adresses avant d'accorder l'accès.",
+    );
+  }
+
+  if (
+    person.domainRole === "domain_manager" &&
+    input.role !== "domain_manager"
+  ) {
+    const others = await otherDomainManagers(session, personId);
+    if (others === 0) {
+      return accessRefusal(
+        formData,
+        "C'est le dernier responsable de ce domaine : le rétrograder le rendrait inadministrable, et rien dans Vision ne permettrait de le rouvrir. Désignez un autre responsable d'abord.",
+      );
+    }
+  }
+
+  try {
+    /* **Le couple, dans la même écriture** : `persons_role_requires_access`
+       refuse *accès sans rôle* et *rôle sans accès*. Les poser en deux
+       instructions serait, entre les deux, une ligne que la base refuse — et
+       `neon-http` n'a pas de transaction pour la couvrir (dette de T3.6). */
+    const updated = await session.db.update(persons, personId, {
+      hasAccess: true,
+      domainRole: input.role,
+    });
+    if (!updated) {
+      return accessRefusal(
+        formData,
+        "Cette personne n'existe plus dans ce domaine.",
+      );
+    }
+
+    /* Le nom **d'après** le geste, et le rôle **d'après** lui aussi : c'est ce
+       que la ligne dit du moment où l'accès a été donné (D22). Ni `project_id`
+       ni `product_id` — un événement de niveau **domaine**, comme les trois
+       autres de la personne. */
+    await session.db.record({
+      verb: "state_changed",
+      targetType: "person",
+      targetId: personId,
+      summary: accessPhrase("granted", updated.fullName, input.role),
+    });
+  } catch (error) {
+    /* Le second filet, sur la forme du refus de saisie d'accès : ce formulaire
+       ne porte aucune référence à confronter au domaine, mais la couche peut
+       lever pour une raison qu'on n'a pas prévue, et un 500 sur un geste de
+       droit se lirait mal. */
+    if (error instanceof DomainScopeError) {
+      return accessRefusal(
+        formData,
+        "Cette personne n'appartient pas au domaine : rien n'a été enregistré.",
+      );
+    }
+    throw error;
+  }
+
+  revalidatePath(ROUTES.team);
+
+  return { values, errors: {}, ok: true };
+}
+
+/**
+ * Retirer l'accès — `has_access` à faux **et** `domain_role` à nul, dans la même
+ * écriture.
+ *
+ * **Muet, comme tout ce qui se défait** : c'est le précédent exact de
+ * `removeDomainIdentity` (T9.4). Le point d'entrée n'est rendu qu'à qui peut
+ * écrire, sur une personne qui a un accès, et **la fiche dit avant le clic** que
+ * le dernier responsable ne se retire pas. Le décompte **se refait ici** : un
+ * bouton absent du rendu n'a jamais protégé le point d'entrée HTTP qui
+ * l'accompagne.
+ *
+ * **Aucune confirmation**, et c'est l'arbitrage (c) de `tickets-C4bis.md` : elle
+ * se justifie là où le geste retire tout un ensemble de la lecture. Ici rien ne
+ * disparaît — la personne reste, ses compétences restent, ses accompagnements
+ * restent —, et l'accès **se réaccorde**. C'est la règle du retrait d'une
+ * compétence, et le verbe à l'écran est « Retirer », jamais « Archiver ».
+ *
+ * **Sa porte ne regarde pas l'archivage** : une ligne rangée qui garde un accès
+ * est précisément la contradiction qu'on veut pouvoir corriger.
+ */
+export async function revokePersonAccess(personId: string): Promise<void> {
+  const session = await requireSession();
+
+  const gate = await openPersonIgnoringArchive(session, personId);
+  if ("message" in gate) return;
+
+  const { person } = gate;
+
+  /* Rien à retirer : le geste est sans objet, et l'écrire quand même laisserait
+     une ligne de journal qui raconte un fait qui n'a pas eu lieu. */
+  if (!person.hasAccess) return;
+
+  if (person.domainRole === "domain_manager") {
+    const others = await otherDomainManagers(session, personId);
+    if (others === 0) return;
+  }
+
+  const updated = await session.db.update(persons, personId, {
+    hasAccess: false,
+    domainRole: null,
+  });
+  if (!updated) return;
+
+  /* **Sans le rôle** : au retrait, la ligne n'en porte plus, et le dire serait
+     raconter ce qui n'est plus là. La dissymétrie est celle de `statePhrase`,
+     dont le motif ne vient qu'avec l'annulation. */
+  await session.db.record({
+    verb: "state_changed",
+    targetType: "person",
+    targetId: personId,
+    summary: accessPhrase("revoked", updated.fullName),
+  });
 
   revalidatePath(ROUTES.team);
 }

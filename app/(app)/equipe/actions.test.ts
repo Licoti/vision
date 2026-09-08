@@ -105,8 +105,14 @@ vi.mock("next/headers", () => ({
 
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
-const { archivePerson, createPerson, deletePerson, updatePerson } =
-  await import("./actions");
+const {
+  archivePerson,
+  createPerson,
+  deletePerson,
+  grantPersonAccess,
+  revokePersonAccess,
+  updatePerson,
+} = await import("./actions");
 
 const suffix = Math.random().toString(36).slice(2, 10);
 
@@ -141,12 +147,27 @@ beforeAll(async () => {
   currentDomain = domain.id;
   const scope = forDomain({ domainId: domain.id });
 
+  /**
+   * **Les deux comptes portent une adresse depuis T9.6**, et ce n'est pas du
+   * décor : un compte sans e-mail n'est joignable par aucun fournisseur (règle
+   * d'entrée 6), et `grantPersonAccess` le refuse **avant** de regarder le rôle.
+   * Sans elles, le test de la rétrogradation du dernier responsable passait pour
+   * la mauvaise raison — mesuré par sa mise en défaut, qui ne le faisait pas
+   * tomber. Les personnes sans accès n'en portent pas : c'est D19, et c'est ce
+   * que le refus « sans adresse » éprouve.
+   */
   const person = (fullName: string, role: "domain_manager" | "member" | null) =>
     scope.insert(persons, {
       fullName,
       source: "manual",
       kind: "center",
-      ...(role ? { hasAccess: true, domainRole: role } : { hasAccess: false }),
+      ...(role
+        ? {
+            hasAccess: true,
+            domainRole: role,
+            email: `${role}.${suffix}@acme.com`,
+          }
+        : { hasAccess: false }),
     });
 
   const manager = await person(`Responsable ${suffix}`, "domain_manager");
@@ -259,12 +280,23 @@ async function skillsOf(personId: string): Promise<number> {
   return rows.length;
 }
 
-/** Une personne neuve, que le test peut effacer sans troubler ses voisins. */
-async function freshPerson(label: string) {
+/**
+ * Une personne neuve, que le test peut effacer sans troubler ses voisins.
+ *
+ * **Deux options depuis T9.6**, et chacune sert un refus : l'adresse, sans
+ * laquelle aucun accès ne s'accorde, et le genre, `stakeholder` n'en recevant
+ * jamais. Elles sont posées **par la fixture et non par le geste** — ce sont les
+ * conditions du test, pas ce qu'il mesure.
+ */
+async function freshPerson(
+  label: string,
+  extra: { email?: string; kind?: "center" | "stakeholder" } = {},
+) {
   return f.scope.insert(persons, {
     fullName: `${label} ${suffix}`,
     source: "manual",
-    kind: "center",
+    kind: extra.kind ?? "center",
+    ...(extra.email === undefined ? {} : { email: extra.email }),
   });
 }
 
@@ -484,6 +516,7 @@ function personForm(overrides: Record<string, string> = {}): FormData {
   const data = new FormData();
   const values: Record<string, string> = {
     fullName: `Camille Roux ${suffix}`,
+    email: "",
     jobId: "",
     kind: "center",
     bio: "",
@@ -494,7 +527,7 @@ function personForm(overrides: Record<string, string> = {}): FormData {
 }
 
 const NO_PERSON_STATE = {
-  values: { fullName: "", jobId: "", kind: "", bio: "" },
+  values: { fullName: "", email: "", jobId: "", kind: "", bio: "" },
   errors: {},
 };
 
@@ -646,6 +679,555 @@ describe("le journal de la personne", () => {
         levelId: level!.id,
       });
     });
+
+    expect(written).toHaveLength(0);
+  });
+});
+
+/* ==========================================================================
+   Le compte — T9.6
+
+   **Le décompte en base tranche, jamais le code de retour.** `grantPersonAccess`
+   rend un état de formulaire : un refus et une réussite se ressemblent, et seule
+   la ligne relue dit ce qui a eu lieu. Chaque test la relit — c'est l'étape
+   témoin, et elle n'est pas optionnelle (leçon de T6.1 : un archivage refusé rend
+   200, exactement comme celui qui réussit).
+
+   **Le retrait est muet**, et c'est le partage de `removeDomainIdentity` (T9.4) :
+   il ne rend rien du tout. Il n'y a donc **que** l'étape témoin pour le juger, ce
+   qui est la situation la plus honnête de tout le fichier.
+   ========================================================================== */
+
+const NO_ACCESS_STATE = { values: { role: "" }, errors: {} };
+
+/** Le formulaire d'accès, tel qu'une soumission le porte. */
+function accessForm(role: string): FormData {
+  const data = new FormData();
+  data.set("role", role);
+  return data;
+}
+
+/**
+ * Le responsable de la fixture, **rendu à son état** — quoi qu'il vienne de se
+ * passer.
+ *
+ * **C'est une exigence de la mise en défaut, pas une politesse.** Les deux tests
+ * du dernier responsable visent l'acteur lui-même : c'est le seul cas où le
+ * décompte peut valoir zéro. Garde neutralisée, le geste **réussit** — l'acteur
+ * perd `manageDomain`, et les tests suivants tombent en cascade pour une raison
+ * qui n'est pas la leur. Le rétablissement précède donc l'assertion : la garde
+ * mise en défaut fait tomber **son** test, et rien d'autre.
+ */
+async function restoreTheManager(): Promise<void> {
+  const account = await accountOf(f.managerId);
+  if (account?.hasAccess && account.domainRole === "domain_manager") return;
+
+  await db
+    .update(persons)
+    .set({ hasAccess: true, domainRole: "domain_manager" })
+    .where(eq(persons.id, f.managerId));
+}
+
+/** Le compte d'une personne, **relu en base** — le seul verdict qui compte. */
+async function accountOf(personId: string): Promise<{
+  hasAccess: boolean;
+  domainRole: string | null;
+  email: string | null;
+} | null> {
+  const rows = await db
+    .select({
+      hasAccess: persons.hasAccess,
+      domainRole: persons.domainRole,
+      email: persons.email,
+    })
+    .from(persons)
+    .where(eq(persons.id, personId));
+  return rows[0] ?? null;
+}
+
+describe("grantPersonAccess — le couple se pose ensemble", () => {
+  test("l'accès et le rôle s'écrivent dans la même ligne", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("À doter", {
+      email: `a.doter.${suffix}@acme.com`,
+    });
+
+    /* L'étape témoin **avant** : sans elle, un accès qui existait déjà se
+       confondrait avec un accès accordé. */
+    expect(await accountOf(target.id)).toMatchObject({
+      hasAccess: false,
+      domainRole: null,
+    });
+
+    const state = await grantPersonAccess(
+      target.id,
+      NO_ACCESS_STATE,
+      accessForm("member"),
+    );
+
+    expect(state.ok).toBe(true);
+    expect(state.message).toBeUndefined();
+    expect(await accountOf(target.id)).toMatchObject({
+      hasAccess: true,
+      domainRole: "member",
+    });
+  });
+
+  test("le rôle se change par le même point d'entrée", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("À promouvoir", {
+      email: `a.promouvoir.${suffix}@acme.com`,
+    });
+
+    await grantPersonAccess(target.id, NO_ACCESS_STATE, accessForm("member"));
+    const promoted = await grantPersonAccess(
+      target.id,
+      NO_ACCESS_STATE,
+      accessForm("domain_manager"),
+    );
+
+    expect(promoted.ok).toBe(true);
+    expect(await accountOf(target.id)).toMatchObject({
+      hasAccess: true,
+      domainRole: "domain_manager",
+    });
+
+    /* **La fixture est rendue à son état**, et ce n'est pas de la politesse :
+       les deux tests du dernier responsable, plus bas, mesurent un domaine où
+       `f.managerId` est le **seul** à gérer. Un second responsable laissé
+       derrière les ferait passer pour de mauvaises raisons. */
+    await grantPersonAccess(target.id, NO_ACCESS_STATE, accessForm("member"));
+    await revokePersonAccess(target.id);
+    expect(await accountOf(target.id)).toMatchObject({ hasAccess: false });
+  });
+
+  /**
+   * **La contrainte est réelle, et ce test est ce qui le dit.** Le couple ne tient
+   * pas par la discipline de l'action : `persons_role_requires_access` refuse en
+   * base *accès sans rôle* et *rôle sans accès*. Sans cette mesure, « les deux
+   * s'écrivent ensemble » ne serait qu'une convention de l'appelant.
+   */
+  test("la base refuse une moitié du couple, écrite hors du geste", async () => {
+    const target = await freshPerson("Moitié de couple");
+
+    await expect(
+      f.scope.update(persons, target.id, { hasAccess: true }),
+    ).rejects.toThrow();
+    await expect(
+      f.scope.update(persons, target.id, { domainRole: "member" }),
+    ).rejects.toThrow();
+
+    expect(await accountOf(target.id)).toMatchObject({
+      hasAccess: false,
+      domainRole: null,
+    });
+  });
+
+  test("sans `manageDomain`, aucun accès n'est accordé", async () => {
+    const target = await freshPerson("Défendue au compte", {
+      email: `defendue.${suffix}@acme.com`,
+    });
+
+    currentPerson = f.memberId;
+    const state = await grantPersonAccess(
+      target.id,
+      NO_ACCESS_STATE,
+      accessForm("domain_manager"),
+    );
+
+    expect(state.message).toBeDefined();
+    expect(state.ok).toBeUndefined();
+    expect(await accountOf(target.id)).toMatchObject({ hasAccess: false });
+  });
+
+  test("un rôle hors énuméré n'écrit rien, et rend une erreur de champ", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Rôle forgé", {
+      email: `role.forge.${suffix}@acme.com`,
+    });
+
+    /* Une soumission forgée porte ce qu'elle veut. `super_admin` n'est pas un
+       rôle de domaine et ne peut pas en être un (arbitrage (4)) : ce qui doit
+       revenir est un message **sous le champ**, jamais un 500. */
+    const state = await grantPersonAccess(
+      target.id,
+      NO_ACCESS_STATE,
+      accessForm("super_admin"),
+    );
+
+    expect(state.errors.role).toBeDefined();
+    expect(state.ok).toBeUndefined();
+    expect(await accountOf(target.id)).toMatchObject({ hasAccess: false });
+  });
+});
+
+describe("grantPersonAccess — les quatre refus, éprouvés séparément", () => {
+  /**
+   * **Garde-fou 1** — `docs/05` §4 exclut *« l'accès des commanditaires côté
+   * entité »*, décidé en F1 (D2). Le refus est dans l'action : la fiche d'un
+   * `stakeholder` n'affiche aucun point d'entrée d'accès, et un point d'entrée
+   * absent du rendu n'a jamais protégé le point d'entrée HTTP qui l'accompagne.
+   */
+  test("un intervenant côté entité ne reçoit jamais d'accès", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Côté entité", {
+      kind: "stakeholder",
+      email: `cote.entite.${suffix}@acme.com`,
+    });
+
+    const state = await grantPersonAccess(
+      target.id,
+      NO_ACCESS_STATE,
+      accessForm("member"),
+    );
+
+    expect(state.message).toBeDefined();
+    expect(await accountOf(target.id)).toMatchObject({
+      hasAccess: false,
+      domainRole: null,
+    });
+  });
+
+  /**
+   * **Garde-fou 3** — `loadSession` refuse déjà une personne archivée ; lui
+   * accorder un accès qu'elle ne pourra pas exercer serait écrire une
+   * contradiction en base.
+   *
+   * **Ce refus vient d'`openPerson`, partagé avec la correction de profil et les
+   * compétences** : le neutraliser fait tomber les tests de cette **même** règle
+   * sur les trois gestes, ce qui est une règle mise en défaut une fois, pas trois
+   * règles. Le fait est écrit plutôt que découvert.
+   */
+  test("une personne archivée ne reçoit pas d'accès", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Rangée puis dotée", {
+      email: `rangee.${suffix}@acme.com`,
+    });
+    await f.scope.archive(persons, target.id);
+
+    const state = await grantPersonAccess(
+      target.id,
+      NO_ACCESS_STATE,
+      accessForm("member"),
+    );
+
+    expect(state.message).toBeDefined();
+    expect(await accountOf(target.id)).toMatchObject({ hasAccess: false });
+  });
+
+  /**
+   * **Le geste 1 tenu par le geste 2** : la règle d'entrée 6 rapproche l'identité
+   * sur l'e-mail au premier passage (`lib/auth/entry.ts`). Un accès accordé à qui
+   * n'a pas d'adresse ne servirait à personne — et **c'est cette mesure que
+   * l'e-mail retiré du formulaire fait tomber**, aucune autre.
+   */
+  test("sans adresse e-mail, l'accès est refusé", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Sans adresse");
+
+    const state = await grantPersonAccess(
+      target.id,
+      NO_ACCESS_STATE,
+      accessForm("member"),
+    );
+
+    expect(state.message).toBeDefined();
+    expect(await accountOf(target.id)).toMatchObject({
+      hasAccess: false,
+      email: null,
+    });
+  });
+
+  /**
+   * **Le quatrième refus** (arbitrage du 07/09/2026) : `findPerson` rapproche
+   * l'e-mail en `limit 1` **sans ordre**, si bien que deux personnes portant la
+   * même adresse rendraient un rapprochement arbitraire — l'une se connecterait
+   * sous l'identité de l'autre. Aucune contrainte de base ne l'interdit ; ce refus
+   * est ce qui tient la promesse en attendant qu'une unicité s'autorise.
+   */
+  test("une adresse déjà portée dans le domaine est refusée", async () => {
+    currentPerson = f.managerId;
+    const shared = `jumelle.${suffix}@acme.com`;
+
+    const first = await freshPerson("Première jumelle", { email: shared });
+    const second = await freshPerson("Seconde jumelle", { email: shared });
+
+    const state = await grantPersonAccess(
+      second.id,
+      NO_ACCESS_STATE,
+      accessForm("member"),
+    );
+
+    expect(state.message).toBeDefined();
+    expect(await accountOf(second.id)).toMatchObject({ hasAccess: false });
+    expect(await accountOf(first.id)).toMatchObject({ hasAccess: false });
+  });
+
+  /**
+   * **Et la jumelle archivée compte aussi**, parce que le rapprochement la lit :
+   * `findPerson` passe `includeArchived: true`. Un refus qui n'écarterait que les
+   * vivantes laisserait passer exactement le cas qu'il prétend fermer.
+   */
+  test("même archivée, la jumelle interdit l'accès", async () => {
+    currentPerson = f.managerId;
+    const shared = `jumelle.rangee.${suffix}@acme.com`;
+
+    const archived = await freshPerson("Jumelle rangée", { email: shared });
+    await f.scope.archive(persons, archived.id);
+    const alive = await freshPerson("Jumelle vivante", { email: shared });
+
+    const state = await grantPersonAccess(
+      alive.id,
+      NO_ACCESS_STATE,
+      accessForm("member"),
+    );
+
+    expect(state.message).toBeDefined();
+    expect(await accountOf(alive.id)).toMatchObject({ hasAccess: false });
+  });
+
+  /**
+   * **Garde-fou 2** — sans responsable, le domaine deviendrait inadministrable, et
+   * **rien dans Vision ne permettrait de le rouvrir** : le super administrateur
+   * crée des domaines, il n'entre pas dedans.
+   *
+   * Le décompte porte sur **les autres**, et qui exerce ce geste est
+   * nécessairement un responsable vivant : il ne peut donc valoir zéro que
+   * lorsque la cible est l'acteur lui-même — exactement le cas mesuré ici.
+   */
+  test("le dernier responsable ne se rétrograde pas", async () => {
+    currentPerson = f.managerId;
+
+    const state = await grantPersonAccess(
+      f.managerId,
+      NO_ACCESS_STATE,
+      accessForm("member"),
+    );
+    const after = await accountOf(f.managerId);
+    await restoreTheManager();
+
+    expect(state.message).toBeDefined();
+    expect(state.ok).toBeUndefined();
+    expect(after).toMatchObject({
+      hasAccess: true,
+      domainRole: "domain_manager",
+    });
+  });
+});
+
+describe("revokePersonAccess — muet, et mesuré en base", () => {
+  test("l'accès et le rôle tombent dans la même ligne", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("À retirer", {
+      email: `a.retirer.${suffix}@acme.com`,
+    });
+    await grantPersonAccess(target.id, NO_ACCESS_STATE, accessForm("member"));
+    expect(await accountOf(target.id)).toMatchObject({ hasAccess: true });
+
+    await revokePersonAccess(target.id);
+
+    expect(await accountOf(target.id)).toMatchObject({
+      hasAccess: false,
+      domainRole: null,
+    });
+  });
+
+  test("sans `manageDomain`, rien n'est retiré", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Retrait défendu", {
+      email: `retrait.defendu.${suffix}@acme.com`,
+    });
+    await grantPersonAccess(target.id, NO_ACCESS_STATE, accessForm("member"));
+
+    currentPerson = f.memberId;
+    await revokePersonAccess(target.id);
+
+    /* Le geste est muet : il n'y a **que** l'étape témoin pour le juger. */
+    expect(await accountOf(target.id)).toMatchObject({
+      hasAccess: true,
+      domainRole: "member",
+    });
+
+    currentPerson = f.managerId;
+    await revokePersonAccess(target.id);
+  });
+
+  test("le dernier responsable ne se retire pas", async () => {
+    currentPerson = f.managerId;
+
+    await revokePersonAccess(f.managerId);
+    const after = await accountOf(f.managerId);
+    await restoreTheManager();
+
+    expect(after).toMatchObject({
+      hasAccess: true,
+      domainRole: "domain_manager",
+    });
+  });
+
+  /**
+   * **Une ligne rangée qui garde un accès est la contradiction qu'on veut pouvoir
+   * corriger** : la porte du retrait ne regarde donc pas l'archivage, à rebours de
+   * celle de l'accord. C'est l'argument d'`openPersonIgnoringArchive`, déjà écrit
+   * pour la suppression.
+   */
+  test("une personne archivée peut perdre son accès", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Rangée avec accès", {
+      email: `rangee.avec.acces.${suffix}@acme.com`,
+    });
+    await grantPersonAccess(target.id, NO_ACCESS_STATE, accessForm("member"));
+    await f.scope.archive(persons, target.id);
+
+    await revokePersonAccess(target.id);
+
+    expect(await accountOf(target.id)).toMatchObject({
+      hasAccess: false,
+      domainRole: null,
+    });
+  });
+});
+
+/**
+ * **La boucle entière, et c'est le critère qui compte** (mesure 4 de la fiche) :
+ * les autres mesures prouvent que le ticket ne casse rien, celle-ci prouve qu'il
+ * sert à quelque chose.
+ *
+ * `listAccounts` est ce que `/dev/session` propose et ce que `resolveAccount`
+ * interroge : une personne qui y paraît **pourrait se connecter**. Avant T9.6,
+ * aucune personne créée par l'écran n'y entrait jamais — `createPerson` forçait
+ * `hasAccess: false`, définitivement.
+ */
+describe("la boucle du compte", () => {
+  test("créée par l'écran avec une adresse, elle entre dans `listAccounts`", async () => {
+    currentPerson = f.managerId;
+    const fullName = `Nouvelle recrue ${suffix}`;
+    const email = `nouvelle.recrue.${suffix}@acme.com`;
+
+    const created = await createPerson(
+      NO_PERSON_STATE,
+      personForm({ fullName, email }),
+    );
+    expect(created.ok).toBe(true);
+
+    const row = await personNamed(fullName);
+    expect(row).not.toBeNull();
+
+    /* **Le point de départ, mesuré** : créée, elle n'est pas un compte. D19
+       sépare *être référencé* de *pouvoir se connecter*, et la création ne
+       l'enfreint pas. */
+    const { listAccounts } = await import("@/lib/auth/session");
+    expect(
+      (await listAccounts(domainId as string)).map((one) => one.id),
+    ).not.toContain(row!.id);
+
+    const granted = await grantPersonAccess(
+      row!.id,
+      NO_ACCESS_STATE,
+      accessForm("member"),
+    );
+    expect(granted.ok).toBe(true);
+
+    const accounts = await listAccounts(domainId as string);
+    expect(accounts.map((one) => one.id)).toContain(row!.id);
+    expect(accounts.find((one) => one.id === row!.id)).toMatchObject({
+      fullName,
+      email,
+      role: "member",
+    });
+
+    /* Et le geste se défait : elle sort de la liste comme elle y est entrée. */
+    await revokePersonAccess(row!.id);
+    expect(
+      (await listAccounts(domainId as string)).map((one) => one.id),
+    ).not.toContain(row!.id);
+  });
+});
+
+describe("le journal du compte", () => {
+  test("accorder écrit `state_changed`, avec le rôle dans la phrase", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Tracée à l'accord", {
+      email: `tracee.accord.${suffix}@acme.com`,
+    });
+
+    const written = await traced(() =>
+      grantPersonAccess(target.id, NO_ACCESS_STATE, accessForm("member")),
+    );
+
+    expect(written).toHaveLength(1);
+    /* **Aucun sixième verbe** : `state_changed` est celui des cinq qui nomme un
+       état atteint, et l'ajouter à l'énuméré serait une migration — signal
+       d'arrêt des interdits communs de C9. */
+    expect(written[0]?.verb).toBe("state_changed");
+    expect(written[0]?.targetType).toBe("person");
+    expect(written[0]?.targetId).toBe(target.id);
+    expect(written[0]?.actorId).toBe(f.managerId);
+    expect(written[0]?.summary).toBe(
+      `Accès accordé${NBSP}: Tracée à l'accord ${suffix}${NBSP}— membre`,
+    );
+    /* Un événement de niveau **domaine**, comme les trois autres de la personne. */
+    expect(written[0]?.projectId).toBeNull();
+    expect(written[0]?.productId).toBeNull();
+  });
+
+  test("retirer écrit `state_changed`, sans nommer de rôle", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Tracée au retrait", {
+      email: `tracee.retrait.${suffix}@acme.com`,
+    });
+    await grantPersonAccess(target.id, NO_ACCESS_STATE, accessForm("member"));
+
+    const written = await traced(() => revokePersonAccess(target.id));
+
+    expect(written).toHaveLength(1);
+    expect(written[0]?.verb).toBe("state_changed");
+    expect(written[0]?.summary).toBe(
+      `Accès retiré${NBSP}: Tracée au retrait ${suffix}`,
+    );
+    expect(written[0]?.summary).not.toContain("membre");
+  });
+
+  /**
+   * **Un refus n'écrit pas de trace**, et c'est la même discipline que sur la
+   * création : une ligne de journal qui raconterait un fait qui n'a pas eu lieu
+   * serait pire qu'aucune ligne.
+   *
+   * **Le refus éprouvé ici est celui du droit, et ce choix est délibéré** : les
+   * trois garde-fous ont chacun **un** test, et un seul, pour que leur mise en
+   * défaut n'en fasse tomber qu'un. Rejouer l'un d'eux ici lui aurait donné un
+   * second témoin, et « exactement son test, et rien d'autre » aurait cessé
+   * d'être vrai.
+   */
+  test("un refus n'écrit aucune ligne", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Refusée sans trace", {
+      email: `refusee.${suffix}@acme.com`,
+    });
+
+    currentPerson = f.memberId;
+    const written = await traced(async () => {
+      const state = await grantPersonAccess(
+        target.id,
+        NO_ACCESS_STATE,
+        accessForm("member"),
+      );
+      expect(state.message).toBeDefined();
+    });
+
+    expect(written).toHaveLength(0);
+    expect(await accountOf(target.id)).toMatchObject({ hasAccess: false });
+  });
+
+  /**
+   * **Le geste sans objet n'écrit rien non plus** : retirer un accès qui n'existe
+   * pas n'est pas un fait, et `revokePersonAccess` s'arrête avant d'écrire.
+   */
+  test("retirer un accès inexistant n'écrit aucune ligne", async () => {
+    currentPerson = f.managerId;
+    const target = await freshPerson("Sans accès à retirer");
+
+    const written = await traced(() => revokePersonAccess(target.id));
 
     expect(written).toHaveLength(0);
   });

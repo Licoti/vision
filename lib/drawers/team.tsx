@@ -19,6 +19,12 @@
  * elle-même : une personne d'un autre domaine n'existe pas, elle ne « manque »
  * pas.
  *
+ * **Le compte est arrivé en T9.6** — `access`, sixième clé de cette page. Il
+ * s'ouvre aux **mêmes** conditions que la compétence : `manageDomain`, une
+ * personne vivante, et le **centre** — `docs/05` §4 exclut *« l'accès des
+ * commanditaires côté entité »* (D2). Les trois conditions sont refaites par
+ * l'action, qui seule protège.
+ *
  * **Une lecture, le reste en écriture.** `personDetail` ne passe par aucun droit
  * (D9) : la fiche se lit par tout le domaine, comme la liste qui la porte, et ce
  * sont ses gestes qui tombent avec `manageDomain`, chacun à `null`. Les autres
@@ -38,6 +44,7 @@
  * filtre n'édite rien, il n'a aucune valeur à conserver.
  */
 
+import { AccessPanel } from "@/components/team/access-panel";
 import { PersonPanel } from "@/components/team/person-panel";
 import {
   PersonDetail,
@@ -57,11 +64,15 @@ import {
 } from "@/lib/db/schema";
 import type { DrawerContent, TeamDrawerRequest } from "@/lib/drawers/types";
 import { formatAccompaniments, formatActivities } from "@/lib/format";
-import { toPersonFormValues } from "@/lib/forms/person";
+import {
+  toPersonAccessFormValues,
+  toPersonFormValues,
+} from "@/lib/forms/person";
 import { toPersonSkillFormValues } from "@/lib/forms/person-skill";
 import {
   ARCHIVE_PANEL_PARAM,
   DELETE_PANEL_PARAM,
+  PERSON_ACCESS_PARAM,
   PERSON_FORM_NEW,
   PERSON_FORM_PARAM,
   PERSON_PANEL_PARAM,
@@ -76,12 +87,14 @@ import {
   createPerson,
   createPersonSkill,
   deletePerson,
+  grantPersonAccess,
   removePersonSkill,
+  revokePersonAccess,
   updatePerson,
   updatePersonSkill,
 } from "@/app/(app)/equipe/actions";
 
-import { asc, eq, isNull, or } from "drizzle-orm";
+import { and, asc, eq, isNull, ne, or } from "drizzle-orm";
 
 /**
  * Ce qui s'oppose à la suppression d'une personne, dit avant le geste — ou
@@ -116,6 +129,36 @@ function opposingTrace(
   return `${parts.join(" et ")} : le geste sera refusé.`;
 }
 
+/**
+ * Cette personne est-elle le **dernier responsable** du domaine ? — T9.6.
+ *
+ * **La question de l'écran, jamais celle du droit.** Elle décide de ce qui se
+ * rend — le bouton de retrait, la phrase qui dit pourquoi il n'est pas là — et
+ * elle ne protège rien : `grantPersonAccess` et `revokePersonAccess` refont le
+ * décompte sur l'identifiant qu'elles reçoivent. C'est le partage exact de
+ * `removeDomainIdentity` (T9.4), et de `opposingTrace` juste au-dessus : le
+ * panneau prévient, l'action refuse.
+ *
+ * **Le décompte porte sur les autres**, et les archivées n'y sont pas : c'est
+ * l'écriture jumelle d'`otherDomainManagers` (`app/(app)/equipe/actions.ts`), à
+ * qui appartient le raisonnement.
+ */
+async function isLastDomainManager(
+  session: Session,
+  person: { id: string; hasAccess: boolean; domainRole: string | null },
+): Promise<boolean> {
+  if (!person.hasAccess || person.domainRole !== "domain_manager") return false;
+
+  const others = await session.db.count(persons, {
+    where: and(
+      eq(persons.hasAccess, true),
+      eq(persons.domainRole, "domain_manager"),
+      ne(persons.id, person.id),
+    ),
+  });
+  return others === 0;
+}
+
 export async function resolveTeamDrawer(
   session: Session,
   request: TeamDrawerRequest,
@@ -140,6 +183,18 @@ export async function resolveTeamDrawer(
       const canWrite = session.can.manageDomain;
       const canCarry = canWrite && person.kind === "center";
 
+      /* **Le compte, aux mêmes conditions que la compétence** : les deux sont des
+         propriétés du centre — l'une par l'arbitrage (d) de C5bis, l'autre par
+         `docs/05` §4 et D2 —, et les deux refus vivent **aussi** dans l'action.
+
+         Le retrait ne se propose ni sans accès à retirer, ni sur le dernier
+         responsable : le décompte est payé **seulement** quand il peut changer
+         quelque chose, c'est-à-dire quand le geste serait rendu. */
+      const lastManager = canCarry
+        ? await isLastDomainManager(session, person)
+        : false;
+      const canRevoke = canCarry && person.hasAccess && !lastManager;
+
       return {
         titleId: "panneau-personne-titre",
         title: person.fullName,
@@ -158,6 +213,15 @@ export async function resolveTeamDrawer(
             addSkillHref={canCarry ? ROUTES.teamSkillNew(person.id) : null}
             editSkillHref={canCarry ? ROUTES.teamSkillEdit : null}
             removeSkill={canCarry ? removePersonSkill : null}
+            accessHref={canCarry ? ROUTES.teamPersonAccess(person.id) : null}
+            /* **Lié côté serveur**, comme les quatre confirmations de cette
+               page : l'identifiant sort de la saisie. Ce n'est pas un verrou —
+               Next sérialise les arguments liés dans un champ `$ACTION_…`,
+               réécrivable. Le verrou est dans l'action. */
+            revokeAccess={
+              canRevoke ? revokePersonAccess.bind(null, person.id) : null
+            }
+            lastManager={lastManager}
           />
         ),
       };
@@ -205,6 +269,12 @@ export async function resolveTeamDrawer(
               person ? updatePerson.bind(null, person.id) : createPerson
             }
             jobs={jobRows.map((job) => ({ id: job.id, label: job.label }))}
+            /* **La bascule vient de la ligne relue, jamais du formulaire**
+               (T9.6) : une personne qui a un accès ne peut pas perdre son
+               adresse, sans quoi son compte deviendrait injoignable — la règle
+               d'entrée 6 rapproche sur l'e-mail. À la création, personne n'a
+               d'accès : `false` par défaut. */
+            {...(person?.hasAccess ? { emailRequired: true } : {})}
             {...(person
               ? {
                   submitLabel: "Enregistrer les modifications",
@@ -301,6 +371,47 @@ export async function resolveTeamDrawer(
                   skillLabel: heldSkill.label,
                   submitLabel: "Enregistrer les modifications",
                   initial: toPersonSkillFormValues(held),
+                }
+              : {})}
+          />
+        ),
+      };
+    }
+
+    /* ------------------------------------------------------------------ */
+    case "access": {
+      /* Le droit d'abord — il ne dépend d'aucun identifiant —, puis la forme de
+         l'UUID **avant** la base : une colonne `uuid` interrogée avec n'importe
+         quoi rend une erreur PostgreSQL, donc un 500, là où l'on attend la page
+         nue. */
+      if (!session.can.manageDomain || !isUuid(request.id)) return null;
+
+      /* La personne est confrontée au domaine et à son archivage : une ligne
+         rangée ne reçoit pas d'accès (garde-fou 3), et c'est **aussi** le refus
+         d'`openPerson` dans l'action — le seul contrôle qui protège. */
+      const row = await session.db.find(persons, request.id);
+      const person = row && row.archivedAt === null ? row : null;
+
+      /* Un intervenant côté entité ne reçoit jamais d'accès (`docs/05` §4, D2) :
+         le panneau n'existe pas pour lui, et `openPersonForAccess` le refuse de
+         son côté. */
+      if (!person || person.kind !== "center") return null;
+
+      const lastManager = await isLastDomainManager(session, person);
+
+      return {
+        titleId: "panneau-acces-titre",
+        title: person.hasAccess ? "Modifier le rôle" : "Accorder l'accès",
+        subtitles: [person.fullName],
+        body: (
+          <AccessPanel
+            action={grantPersonAccess.bind(null, person.id)}
+            email={person.email}
+            lastManager={lastManager}
+            {...(person.hasAccess
+              ? {
+                  submitLabel: "Enregistrer le rôle",
+                  initial: toPersonAccessFormValues(person),
                 }
               : {})}
           />
@@ -456,6 +567,7 @@ export function teamRequestFromParams(asked: {
   personne?: string | undefined;
   profil?: string | undefined;
   maitrise?: string | undefined;
+  acces?: string | undefined;
   archiver?: string | undefined;
   supprimer?: string | undefined;
 }): TeamDrawerRequest | null {
@@ -471,6 +583,13 @@ export function teamRequestFromParams(asked: {
 
   if (asked.maitrise !== undefined) {
     return { kind: "skill", id: asked.maitrise };
+  }
+
+  /* `acces` désigne **toujours** une personne : accorder l'accès et changer le
+     rôle sont le même geste sur la même cible, et il n'y a donc pas de valeur
+     d'ouverture fixe à distinguer d'un identifiant. */
+  if (asked.acces !== undefined) {
+    return { kind: "access", id: asked.acces };
   }
 
   if (asked.archiver !== undefined) {
@@ -500,6 +619,7 @@ export const TEAM_PANEL_PARAMS = [
   PERSON_PANEL_PARAM,
   PERSON_FORM_PARAM,
   SKILL_PANEL_PARAM,
+  PERSON_ACCESS_PARAM,
   ARCHIVE_PANEL_PARAM,
   DELETE_PANEL_PARAM,
 ] as const;

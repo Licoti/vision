@@ -111,12 +111,17 @@ export type ProjectDrawerRequest =
   | { kind: "budget" };
 
 /**
- * Les quatre panneaux de la page **Équipe** — T5bis.4, puis T5bis.6.
+ * Les panneaux de la page **Équipe** — T5bis.4, T5bis.6, puis le compte en T9.6.
  *
- * **Une lecture et trois écritures**, et la séparation est celle que la page
+ * **Sans le compte**, et c'est le geste de T6.1 sur `scoped.ts` : la phrase
+ * disait « les quatre », puis « les cinq », et T9.6 en ajoute un sixième. Un
+ * nombre dans un commentaire vieillit à chaque ticket ; ce qui se relit ici est
+ * la règle.
+ *
+ * **Une lecture, le reste en écriture**, et la séparation est celle que la page
  * produit tient déjà deux fois : `personDetail` se lit par tout le domaine
- * (D9), comme `personaDetail` et `useCaseDetail` ; `person`, `skill` et
- * `archive` demandent `manageDomain` (arbitrage (c) de C5bis).
+ * (D9), comme `personaDetail` et `useCaseDetail` ; `person`, `skill`, `access`,
+ * `archive` et `delete` demandent `manageDomain` (arbitrage (c) de C5bis).
  *
  * `id` est facultatif là où la valeur porte le cas dans l'URL — `nouveau`
  * contre un identifiant : son absence dit « créer ». Il est requis partout
@@ -137,11 +142,22 @@ export type ProjectDrawerRequest =
  * `archive` : `/equipe` n'a pas d'objet de page. Il n'en est pas une variante —
  * ranger et effacer ne sont pas deux formes du même geste, et c'est la
  * distinction que la page Administration tient déjà en deux clés.
+ *
+ * **`access` est le sixième** (T9.6) — le **compte**, et non le profil. Son
+ * identifiant est toujours celui d'une personne : un seul panneau accorde l'accès
+ * et change le rôle, la propriété de T3.4.
+ *
+ * **Il porte deux conditions que le type ne dit pas** — il n'ouvre que sur un
+ * membre du centre, et que sur une personne vivante —, et c'est délibéré : une
+ * condition qui dépend de la base ne se prouve pas dans un type.
+ * `resolveTeamDrawer` les vérifie, et l'action les revérifie sur ce qu'elle
+ * reçoit. C'est la forme de `manager` sur l'écran au-dessus des domaines.
  */
 export type TeamDrawerRequest =
   | { kind: "personDetail"; id: string }
   | { kind: "person"; id?: string | undefined }
   | { kind: "skill"; id: string }
+  | { kind: "access"; id: string }
   | { kind: "archive"; id: string }
   | { kind: "delete"; id: string };
 
@@ -299,6 +315,7 @@ const TEAM_KINDS = [
   "personDetail",
   "person",
   "skill",
+  "access",
   "archive",
   "delete",
 ] as const;

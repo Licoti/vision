@@ -8,12 +8,18 @@
  * **Une fonction par forme de phrase, jamais une par point d'appel.** C'est ce
  * qui empêche deux gestes voisins de dire la même chose de deux manières :
  * `createProject` et `archiveProject` traversent la même fonction, et le seul
- * moyen qu'ils divergent serait de changer la table des participes. **Cinq
- * formes depuis T8.3** : les gestes qui disent « ceci a été créé, corrigé,
+ * moyen qu'ils divergent serait de changer la table des participes. **Six
+ * formes depuis T9.6** : les gestes qui disent « ceci a été créé, corrigé,
  * archivé ou rétabli » passent tous par `objectPhrase`, ceux qui font *atteindre
  * un état* par `statePhrase`, ceux qui touchent la composition d'une équipe par
- * `teamPhrase`, ceux qui relient deux accompagnements par `linkPhrase`, et la
- * désignation de la North Star par `northStarPhrase`.
+ * `teamPhrase`, ceux qui relient deux accompagnements par `linkPhrase`, la
+ * désignation de la North Star par `northStarPhrase`, et l'accès d'une personne
+ * au domaine par `accessPhrase`.
+ *
+ * **La sixième non plus n'est pas venue d'un objet, mais d'un geste** : `person`
+ * était déjà l'un des seize noms, et `objectPhrase` savait dire « Personne
+ * modifiée ». Ce qu'elle ne savait pas dire, c'est qu'un compte vient de
+ * s'ouvrir.
  *
  * **T8.3 n'a ajouté aucune forme pour les dix objets neufs**, et c'est la
  * mesure de ce que `objectPhrase` porte : dix noms de plus dans `NOUNS`, zéro
@@ -35,6 +41,7 @@
  */
 
 import type { ActivityState } from "@/lib/forms/activity";
+import type { PersonRoleValue } from "@/lib/forms/person";
 
 /**
  * L'espace insécable, U+00A0. Devant « : » et « ; », la typographie l'exige.
@@ -312,6 +319,77 @@ export function northStarPhrase(
   label: string,
 ): string {
   return `North Star ${NORTH_STAR_DEEDS[deed]}${NBSP}: ${label}`;
+}
+
+/**
+ * Ce qu'un geste a fait du **compte** d'une personne — T9.6.
+ *
+ * **Deux, et pas quatre** : un accès s'accorde ou se retire, et le changement de
+ * rôle est le premier — `grantPersonAccess` sert les deux, et ce qu'elle écrit
+ * est toujours « cette personne a désormais ce rôle ». Rien ne l'archive ni ne
+ * le rétablit : `has_access` et `domain_role` sont deux colonnes d'une ligne qui
+ * reste.
+ */
+export type JournalAccessDeed = "granted" | "revoked";
+
+/**
+ * Les deux participes, accordés au masculin d'« Accès ».
+ *
+ * **Ils ne passent pas par `DEEDS`**, et pour la raison qui écarte déjà les
+ * trois états de `STATES` et les deux de `NORTH_STAR_DEEDS` : « accordé » n'est
+ * pas dans la table des quatre, et « retiré » y dirait autre chose —
+ * `LINK_DEEDS.removed` parle d'un lien déclaré. Les écrire ici évite d'inventer
+ * une seconde règle d'accord pour deux valeurs.
+ */
+const ACCESS_DEEDS: Record<JournalAccessDeed, string> = {
+  granted: "accordé",
+  revoked: "retiré",
+};
+
+/**
+ * Les deux rôles, **en minuscules de phrase**.
+ *
+ * C'est le partage que `STATES` tient déjà avec la roadmap : le journal reprend
+ * les mots de l'écran, à la casse près, parce qu'une phrase ne porte pas une
+ * étiquette. `PERSON_ROLE_LABEL` (`lib/forms/person.ts`) reste l'autorité de ce
+ * que le formulaire propose ; ici on écrit la même chose dans une phrase. Le
+ * type, lui, est **le même** : ce module est pur — il n'importe pas le schéma —,
+ * et il tient donc son union du dossier des formulaires, exactement comme
+ * `ActivityState`.
+ */
+const ACCESS_ROLES: Record<PersonRoleValue, string> = {
+  domain_manager: "responsable de domaine",
+  member: "membre",
+};
+
+/**
+ * La sixième forme : l'accès qu'une personne vient de recevoir, ou de perdre.
+ *
+ * « Accès accordé : Camille Roux — responsable de domaine » · « Accès retiré :
+ * Camille Roux ».
+ *
+ * **C'est le gabarit d'`objectPhrase`, le nom de l'objet en moins**, et c'est le
+ * choix de `northStarPhrase` pour la même raison : « Personne modifiée : Camille
+ * Roux » ne dirait pas *ce qui* a changé, quand accorder un accès est un fait
+ * plus lourd qu'un changement de nom. Le `target_type` reste `person`, qui est
+ * l'objet touché ; la phrase dit le geste. Le verbe de la colonne est
+ * `state_changed`, le seul des cinq qui nomme un état atteint — **aucun sixième
+ * verbe**, ce qu'interdisent les interdits communs de C9.
+ *
+ * **Le rôle n'accompagne que l'accord.** Au retrait, il n'y a plus de rôle : le
+ * dire serait raconter ce que la ligne ne porte plus. C'est la dissymétrie de
+ * `statePhrase`, dont le motif ne vient qu'avec l'annulation.
+ *
+ * **Le nom est figé** (D22), comme partout : c'est la désignation de qui a reçu
+ * l'accès au moment où il l'a reçu.
+ */
+export function accessPhrase(
+  deed: JournalAccessDeed,
+  label: string,
+  role?: PersonRoleValue,
+): string {
+  const clause = `Accès ${ACCESS_DEEDS[deed]}${NBSP}: ${label}`;
+  return role ? `${clause}${NBSP}— ${ACCESS_ROLES[role]}` : clause;
 }
 
 /** Les trois mouvements qu'une composition d'équipe peut avoir subis. */

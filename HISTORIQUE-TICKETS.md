@@ -7968,3 +7968,52 @@ le code.
 
 **Vert** : 1 750 → **1 771 tests sur 63 fichiers** (+21, +2 fichiers), `lint` (`--max-warnings=0`) et
 `tsc` au vert.
+
+## T9.6 — Les comptes d'un domaine : ce qu'aucun écran n'écrivait — 07/09/2026
+
+**Le trou, et il était total.** **Aucun écran de Vision n'écrivait `has_access` ni `domain_role`.**
+Le seul lieu de création d'une personne forçait `hasAccess: false` et `domainRole: null` sous un
+commentaire qui promettait le geste à C7 — et C7 ne l'a jamais fait. Toutes les personnes
+connectables venaient de `scripts/seed.ts` ou de `designateDomainManager` (T9.4), **qui n'ouvre
+qu'une fois par domaine**. Un domaine créé par l'écran portait donc exactement un compte,
+définitivement. Le second manque était indissociable : **`email` n'était écrit par aucun
+formulaire**, et la règle d'entrée 6 rapproche l'identité *sur l'e-mail au premier passage*.
+
+**Trois gestes, et un quatrième refus qui n'était pas dans la fiche.** L'e-mail entre dans le
+formulaire de personne — facultatif sans accès (D19), obligatoire dès qu'un accès existe, la bascule
+venant de la **ligne relue** et jamais du formulaire. L'accès s'accorde avec son rôle, par un panneau
+et une clé d'URL à lui (`?acces=`) : le profil se corrige, le compte **se donne**, et les confondre
+aurait mis `has_access` à portée d'un champ caché. Il se retire en formulaire nu et muet — le
+précédent de `removeDomainIdentity`. **Le quatrième refus est venu d'une mesure** : `findPerson`
+rapproche l'e-mail en `limit 1` **sans ordre**, si bien que deux personnes d'un domaine portant la
+même adresse rendraient un rapprochement arbitraire — l'une se connectant sous l'identité de l'autre.
+Le refus vit dans l'action, compte **aussi les archivées** (le rapprochement les lit), et la
+contrainte de base qui le remplacerait est une migration, donc un signal d'arrêt.
+
+**Ce que la mise en défaut a trouvé, et c'est l'essentiel du ticket.** Huit neutralisations, chacune
+isolée à un test — mais deux d'entre elles ont d'abord dit autre chose. « Le dernier responsable ne se
+rétrograde pas » **passait garde retirée** : la fixture n'avait pas d'e-mail, et le refus qui tombait
+était celui de l'adresse. Et les deux mesures du dernier responsable, qui visent l'acteur lui-même,
+**faisaient tomber six tests en cascade** garde retirée — l'acteur perdant `manageDomain`. La fixture
+donne maintenant une adresse à ses comptes, et le rétablissement précède l'assertion. Troisième
+trouvaille : le refus de la personne archivée d'`openPerson` **n'avait aucun test depuis T5bis.6** ;
+T9.6 lui en donne le premier.
+
+**Le journal ne gagne aucun verbe** — `state_changed` et `person` existaient — mais une **sixième
+forme de phrase**, `accessPhrase`, pour la raison exacte de `northStarPhrase` : « Personne modifiée »
+aurait rendu l'ouverture d'un compte indiscernable d'un changement de nom.
+
+**Et un point ouvert refermé au passage**, celui qu'`ETAT.md` adressait à ce ticket :
+`superAdmin.findDomainIdentity` confronte le `hd` reçu **en `lower()` des deux côtés**. La garantie
+tenait à un usage — *« on l'a rangée en minuscules à la saisie »* — et non à une règle ; les trois
+lectures d'identité du dépôt disent maintenant la même chose.
+
+**Mesuré** — le rôle, l'adresse et les deux gestes **lus dans le HTML servi**, `<script>` retirés, sur
+cinq adresses : la fiche d'un responsable, celle d'un intervenant côté entité (**aucun bloc de
+compte**, et la fiche reste entière), le panneau d'accès avec le rôle porté présélectionné, celui
+d'une personne sans accès, et `?acces=` sur un `stakeholder`, qui **n'ouvre rien**. Le couple
+`has_access` / `domain_role` se pose et se retire dans la même écriture, **et la base refuse chaque
+moitié écrite seule** — la contrainte n'est pas une discipline de l'appelant. La boucle entière :
+créée par l'écran avec une adresse, dotée de `member`, elle **entre dans `listAccounts`**, donc dans
+`/dev/session` ; l'accès retiré, elle en sort. **1 771 → 1 816 tests sur 63 fichiers**, `lint` et
+`tsc` au vert. **Aucune migration, aucune dépendance, aucun troisième rôle.**

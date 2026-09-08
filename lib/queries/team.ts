@@ -35,6 +35,7 @@ import {
 } from "@/lib/availability";
 import type { ScopedDb } from "@/lib/db/scoped";
 import {
+  domainRole,
   jobs,
   personKind,
   personSkills,
@@ -50,6 +51,17 @@ import type { ProjectStatusNature } from "@/lib/queries/projects";
 
 /** Le côté d'où vient la personne — centre de compétence ou entité (docs/04 §2). */
 export type PersonKind = (typeof personKind.enumValues)[number];
+
+/**
+ * `domain_manager` · `member` — le rôle que porte un **compte** (T9.6).
+ *
+ * Dérivé du schéma, comme `PersonKind` juste au-dessus, et jumeau assumé de
+ * `DomainRole` (`lib/auth/session.ts`) et de `PersonRoleValue`
+ * (`lib/forms/person.ts`) : les trois dérivent du **même** énuméré, elles ne
+ * peuvent pas diverger. Ce module ne dépend pas de `lib/auth`, qui traîne un
+ * contexte de session dont une lecture n'a que faire.
+ */
+export type PersonDomainRole = (typeof domainRole.enumValues)[number];
 
 /**
  * **Réexporté**, et c'est le seul de ce module.
@@ -494,6 +506,25 @@ export type PersonDetail = {
   bio: string | null;
   /** Toujours nulle pour un intervenant côté entité (arbitrage (d) de C5bis). */
   availability: PersonAvailability | null;
+  /**
+   * L'adresse que le fournisseur d'identité vérifiera, ou `null` (T9.6).
+   *
+   * **Elle est lue parce que le compte en dépend** : la règle d'entrée 6 de
+   * `tickets-C9.md` rapproche l'identité sur l'e-mail au premier passage, et une
+   * personne sans adresse ne peut pas recevoir d'accès. La fiche le dit **avant**
+   * le clic, plutôt que de laisser l'action le refuser après.
+   */
+  email: string | null;
+  /** Cette personne peut-elle se connecter ? D19 : être référencé ne suffit pas. */
+  hasAccess: boolean;
+  /**
+   * Son rôle, ou `null` quand elle n'a pas d'accès.
+   *
+   * **Le couple est garanti par `persons_role_requires_access`** : jamais un
+   * accès sans rôle, jamais un rôle sans accès. Les deux champs voyagent
+   * ensemble parce que la base les tient ensemble.
+   */
+  domainRole: PersonDomainRole | null;
   skills: TeamSkill[];
   projects: PersonProject[];
   /**
@@ -538,6 +569,11 @@ export type PersonDetail = {
  * divergence avec `listProjects` — qui écarte les projets d'un produit archivé
  * parce qu'elle répond à « où en sont nos accompagnements » — est assumée.
  *
+ * **Le compte est lu depuis T9.6**, dans la **même** requête : trois colonnes de
+ * plus sur la ligne qu'on lisait déjà, et aucune lecture neuve. Ce n'est pas une
+ * mesure de la personne (D39), c'est un fait sur son accès — et c'est le seul
+ * endroit du produit où il se lit hors de `/dev/session`.
+ *
  * **Aucun décompte n'est rendu** : ni nombre d'accompagnements, ni nombre de
  * compétences, ni moyenne de niveau. La liste se lit, elle ne se totalise pas
  * (garde-fou 2). Le décompte des accompagnements est bien **calculé** depuis le
@@ -558,6 +594,12 @@ export function findPersonDetail(
         jobLabel: jobs.label,
         kind: persons.kind,
         bio: persons.bio,
+        /* Les trois colonnes du **compte** (T9.6). Elles ne servent pas à
+           qualifier la personne — ce serait l'indice que D39 interdit — mais à
+           dire un **fait** : qui peut entrer, et avec quel rôle. */
+        email: persons.email,
+        hasAccess: persons.hasAccess,
+        domainRole: persons.domainRole,
       })
       .from(persons)
       .leftJoin(jobs, and(eq(jobs.id, persons.jobId), filter(jobs)))

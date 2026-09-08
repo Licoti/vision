@@ -10907,3 +10907,68 @@ domaine était déjà à jour »* — vingt-huit tables à zéro créé, zéro m
 les huit référentiels déplacés et les sept outils avec leurs adresses intactes. Aucun test n'aurait
 pu dire cela : il aurait fallu une base semée par l'ancien code, et c'est exactement ce qu'était la
 base de développement. *Une extraction se prouve contre l'état que le code d'avant a laissé.*
+
+**T9.6 — Le périmètre de la fiche était incomplet de huit fichiers, et faux d'un neuvième.** La
+fiche annonçait `lib/forms/person.ts`, `app/(app)/equipe/actions.ts`, `app/(app)/equipe/drawers.tsx`
+et « les composants de saisie de l'équipe ». **`drawers.tsx` n'a pas bougé d'un caractère** —
+`loadTeamDrawer` ne fait que rétrécir la demande par `asTeamRequest`, et la résolution vit dans
+`lib/drawers/team.tsx`, que la fiche ne nomme pas. Rendre un panneau neuf en a demandé huit de plus :
+`lib/journal.ts` (la phrase), `lib/queries/team.ts` (trois colonnes de plus sur une lecture
+existante), `lib/drawers/team.tsx`, `lib/drawers/types.ts`, `lib/navigation.ts`,
+`app/(app)/equipe/page.tsx`, `components/team/person-card.tsx` et `person-detail.tsx`, plus
+`components/team/access-panel.tsx`. **Troisième énoncé de fiche mis en défaut dans C9** —
+neuf référentiels qui étaient huit (T9.5), la condition de matériel descendue du chantier au ticket
+(T9.2), et ce périmètre. *Un périmètre de fiche décrit une intention, jamais l'arbre des
+dépendances ; l'écart s'annonce au plan plutôt qu'il ne se découvre au troisième fichier.*
+
+**T9.6 — Un quatrième garde-fou, décidé sur une mesure et non sur la fiche.** `findPerson`
+(`lib/auth/entry.ts`) rapproche l'e-mail en `limit 1` **sans `order by`** : deux personnes d'un même
+domaine portant la même adresse rendent un rapprochement **arbitraire**, et l'une se connecterait
+sous l'identité de l'autre. Aucune contrainte de base ne l'interdit — `persons` n'a pas d'unicité sur
+`(domain_id, lower(email))`, et en poser une serait une migration, signal d'arrêt des interdits
+communs de C9. Le refus vit donc dans l'action, par un `count`, et **il compte les archivées** :
+`findPerson` lit `includeArchived: true`, si bien qu'un refus qui n'écarterait que les vivantes
+laisserait passer exactement le cas qu'il prétend fermer. Les deux facettes se mettent en défaut
+séparément — le refus entier fait tomber deux tests, le seul `includeArchived` un.
+→ point ouvert dans `ETAT.md` pour la contrainte.
+
+**T9.6 — Un test qui passait pour la mauvaise raison, et c'est la mise en défaut qui l'a dit.**
+« Le dernier responsable ne se rétrograde pas » passait **garde neutralisée** : la personne de la
+fixture n'avait pas d'e-mail, et le refus qui tombait était celui de l'adresse, trois lignes plus
+haut. La fixture donne désormais une adresse à ses deux comptes — ce qu'elle aurait toujours dû
+faire, un compte sans adresse n'étant joignable par aucun fournisseur. *Une contre-épreuve qui ne
+fait tomber aucun test ne dit pas que la garde est inutile : elle dit que le test mesurait autre
+chose.*
+
+**T9.6 — Deux tests contaminaient les vingt suivants, garde neutralisée.** Les deux mesures du
+dernier responsable visent **l'acteur lui-même** — c'est le seul cas où le décompte des *autres*
+responsables peut valoir zéro. Garde retirée, le geste réussit : l'acteur perd `manageDomain`, et
+six tests tombaient en cascade pour une raison qui n'était pas la leur. Le rétablissement de la
+fixture (`restoreTheManager`) précède donc l'assertion. *Un test qui vise le droit de qui l'exerce
+rend la fixture avant de juger, sinon la mise en défaut ne peut plus dire « son test, et rien
+d'autre ».*
+
+**T9.6 — Le refus de la personne archivée n'avait aucun test, et T9.6 lui en donne le premier.**
+`openPerson` refuse une ligne rangée depuis T5bis.6 ; le neutraliser ne faisait tomber **rien** avant
+ce ticket — `updatePerson` et les compétences n'éprouvaient pas ce refus. Le plan prévoyait d'annoncer
+une garantie *partagée par trois gestes* : la mesure a dit l'inverse, un seul témoin, et c'est celui
+que T9.6 vient d'écrire. *Une règle réemployée n'est pas une règle testée ; on ne le sait qu'en la
+neutralisant.*
+
+**T9.6 — Le verbe du journal ne bouge pas, la phrase change.** Accorder ou retirer un accès passe par
+`state_changed` et `person`, deux valeurs existantes, et par une **sixième forme de phrase**
+(`accessPhrase`) — la forme de `northStarPhrase`, arrivée pour la même raison : `objectPhrase("person",
+"updated", …)` aurait rendu l'ouverture d'un compte indiscernable d'un changement de nom. Les deux
+mots de rôle sont **récrits en minuscules de phrase** dans `lib/journal.ts`, qui est pur et n'importe
+pas le schéma : c'est le partage que `STATES` tient déjà avec le vocabulaire de la roadmap. Le
+libellé de rôle existe donc à **trois** endroits (`components/shell/current-person.tsx`,
+`app/dev/session/page.tsx`, `lib/forms/person.ts`) plus ces deux mots-là. → point ouvert vers T7.9,
+qui porte déjà quatre libellés hors de `lib/format.ts`.
+
+**T9.6 — Le décompte du dernier responsable ne se déclenche que sur soi-même, et c'est une
+propriété, pas une chance.** `otherDomainManagers` exclut la personne visée. Or qui exerce le geste porte
+`manageDomain`, donc **est** un responsable vivant : le décompte ne peut valoir zéro que lorsque la
+cible est l'acteur. Sur n'importe qui d'autre, l'acteur suffit à le rendre non nul — et le retrait
+d'un accès laissé sur une **ligne archivée** reste donc possible, ce qui est précisément la
+contradiction qu'on veut pouvoir corriger. La porte du retrait ne regarde pas l'archivage
+(`openPersonIgnoringArchive`), celle de l'accord si.

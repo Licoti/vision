@@ -1139,6 +1139,34 @@ describe("superAdmin", () => {
     ).toBeUndefined();
   });
 
+  /**
+   * **La casse du jeton ne décide de rien** (T9.6) — point ouvert refermé.
+   *
+   * `lib/forms/domain.ts` **abaisse** l'identité à la saisie, si bien qu'une
+   * valeur en base est toujours en minuscules. Mais le `hd` que rend le
+   * fournisseur, lui, n'était confronté qu'en `eq` : la garantie tenait à un
+   * **usage**, pas à une règle. Le jour où un fournisseur rendrait `ACME.COM`,
+   * l'entreprise cliente cesserait d'être reconnue — et le refus ne dirait pas
+   * pourquoi (T9.2 refuse sans distinguer ses causes, délibérément).
+   *
+   * C'est la forme de `findSuperAdminByEmail` juste en dessous, et celle du
+   * rapprochement de `lib/auth/entry.ts` : les trois lectures d'identité disent
+   * maintenant la même chose.
+   */
+  test("l'entreprise vérifiée se trouve quelle que soit la casse du jeton", async () => {
+    const value = `casse-du-jeton-${suffix}.example`;
+    await a.scope.insert(domainIdentities, { provider: "google", value });
+
+    for (const received of [
+      value.toUpperCase(),
+      `${value.slice(0, 1).toUpperCase()}${value.slice(1)}`,
+    ]) {
+      expect(
+        (await superAdmin.findDomainIdentity("google", received))?.domainId,
+      ).toBe(a.domainId);
+    }
+  });
+
   test("un super administrateur se trouve quelle que soit la casse", async () => {
     const email = `Camille.MAJUSCULE.${suffix}@exemple.test`;
     await db

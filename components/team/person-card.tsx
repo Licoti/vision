@@ -16,6 +16,13 @@
  * laisse la frontière du bundle du bon côté — c'est ce qui a permis à T5bis.5 d'y
  * poser un radar sans embarquer une ligne de JavaScript.
  *
+ * **Le compte se lit ici depuis T9.6**, et c'est le seul endroit du produit hors
+ * de `/dev/session` : *qui peut se connecter, et avec quel rôle*. **C'est un
+ * fait, pas une mesure** — un rôle est ce qu'on a donné à quelqu'un, jamais ce
+ * que Vision aurait calculé de lui (D39). Le bloc n'existe pas pour un
+ * intervenant côté entité : `docs/05` §4 exclut *« l'accès des commanditaires
+ * côté entité »* (D2), et **l'action le refuse aussi** — c'est elle qui protège.
+ *
  * **Il ne connaît aucun droit** (T5bis.6) : il reçoit ses points d'entrée, et
  * `null` retire le geste. C'est `lib/drawers/team.tsx` qui les dérive de
  * `manageDomain` et du genre de la personne, et ce sont les **actions** qui
@@ -45,6 +52,7 @@ import { SkillRadar } from "@/components/team/skill-radar";
 import { ACTION_LINK } from "@/components/ui/action-link";
 import { DrawerLink } from "@/components/ui/drawer";
 import { BlockNote } from "@/components/ui/empty-state";
+import { PERSON_ROLE_LABEL } from "@/lib/forms/person";
 import type { PersonDetail, TeamSkill } from "@/lib/queries/team";
 
 export function PersonCard({
@@ -55,6 +63,9 @@ export function PersonCard({
   addSkillHref,
   editSkillHref,
   removeSkill,
+  accessHref,
+  revokeAccess,
+  lastManager,
 }: {
   person: PersonDetail;
   /** `null` retire le geste — le composant ne connaît aucun droit. */
@@ -65,6 +76,24 @@ export function PersonCard({
   addSkillHref: string | null;
   editSkillHref: ((personSkillId: string) => string) | null;
   removeSkill: ((personSkillId: string) => Promise<void>) | null;
+  /**
+   * Le panneau du compte (T9.6) — accorder l'accès, ou changer le rôle. Nul pour
+   * un intervenant côté entité, et nul sans le droit d'écrire.
+   */
+  accessHref: string | null;
+  /**
+   * Le retrait de l'accès, **déjà lié** à la personne côté serveur. Nul quand la
+   * personne n'a pas d'accès, et nul quand elle est le **dernier responsable** du
+   * domaine.
+   *
+   * **Son absence n'est pas la protection** : `revokePersonAccess` refait le
+   * décompte sur l'identifiant qu'elle reçoit — un bouton absent du rendu n'a
+   * jamais protégé le point d'entrée HTTP qui l'accompagne. C'est le partage de
+   * `removeDomainIdentity` (T9.4), à la lettre.
+   */
+  revokeAccess: (() => Promise<void>) | null;
+  /** Dit pourquoi le retrait n'est pas proposé, plutôt que de laisser un vide. */
+  lastManager: boolean;
 }) {
   return (
     <section className="flex flex-col gap-4 rounded-2xl border border-surface-neutral-lighter p-4">
@@ -84,6 +113,93 @@ export function PersonCard({
           <span className="text-content-neutral-base">Disponibilité :</span>
           <AvailabilityDot availability={person.availability} />
         </p>
+      ) : null}
+
+      {/* **Le compte, et il ne paraît que pour le centre** : un intervenant côté
+          entité ne reçoit jamais d'accès (`docs/05` §4, D2), et une ligne
+          « aucun accès » sur sa fiche laisserait croire qu'il pourrait en
+          recevoir un.
+
+          **Aucun jeton neuf, aucun couple neuf par la position** : la ligne du
+          rôle a la forme exacte de celle de la disponibilité, juste au-dessus —
+          `content-neutral-base` pour l'intitulé, `content-neutral-darkest` pour
+          la valeur, sur le même fond. Il n'y a donc rien à remesurer (règle 2, et
+          la leçon de T5.4 : c'est la position qui décide du jeton). */}
+      {person.kind === "center" ? (
+        <div className="flex flex-col gap-2">
+          <h3 className="text-2xs font-semibold text-content-neutral-dark uppercase">
+            Accès à Vision
+          </h3>
+
+          <p className="flex flex-wrap items-baseline gap-2 text-sm text-content-neutral-darkest">
+            <span className="text-content-neutral-base">Rôle :</span>
+            <span>
+              {person.hasAccess && person.domainRole
+                ? PERSON_ROLE_LABEL[person.domainRole]
+                : "Aucun accès — cette personne ne peut pas se connecter"}
+            </span>
+          </p>
+
+          {/* L'adresse **est** le compte : c'est elle que le fournisseur
+              d'identité vérifie, et elle qui rapproche la connexion de cette
+              ligne au premier passage. Son absence se dit ici, avant qu'un geste
+              soit tenté. */}
+          {person.email ? (
+            <p className="text-sm text-content-neutral-dark">{person.email}</p>
+          ) : (
+            <BlockNote>
+              Aucune adresse e-mail : un accès ne peut pas être accordé tant
+              qu&apos;elle manque.
+            </BlockNote>
+          )}
+
+          {person.hasAccess && lastManager ? (
+            <BlockNote>
+              Dernier responsable de ce domaine : son accès ne peut pas être
+              retiré, ni son rôle abaissé — sans responsable, le domaine
+              deviendrait inadministrable.
+            </BlockNote>
+          ) : null}
+
+          {/* Un `div` et non un `p` : `<form>` est du contenu de flux, et un
+              élément de phrasé ne l'accepte pas — le balisage servi serait
+              réécrit par le navigateur. La règle de `readings-panel.tsx`. */}
+          {accessHref || revokeAccess ? (
+            <div className="mt-1 flex flex-wrap items-center gap-4">
+              {accessHref ? (
+                <DrawerLink
+                  href={accessHref}
+                  request={{ kind: "access", id: person.id }}
+                  aria-label={
+                    person.hasAccess
+                      ? `Modifier le rôle de ${person.fullName}`
+                      : `Accorder un accès à ${person.fullName}`
+                  }
+                  className={ACTION_LINK}
+                >
+                  {person.hasAccess
+                    ? "Modifier le rôle"
+                    : "Accorder l'accès"}
+                </DrawerLink>
+              ) : null}
+              {revokeAccess ? (
+                /* Un formulaire nu : ni confirmation ni motif — c'est le partage
+                   du retrait d'une compétence (arbitrage (c) de
+                   `tickets-C4bis.md`). Rien ne disparaît, et l'accès se
+                   réaccorde ; « Retirer » est le mot, jamais « Archiver ». */
+                <form action={revokeAccess}>
+                  <button
+                    type="submit"
+                    aria-label={`Retirer l'accès de ${person.fullName}`}
+                    className={ACTION_LINK}
+                  >
+                    Retirer l&apos;accès
+                  </button>
+                </form>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="flex flex-col gap-2">

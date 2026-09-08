@@ -1089,6 +1089,18 @@ export const superAdmin = {
    * suspendu ouvre-t-il une session ?* n'est aucune des six règles d'entrée
    * écrites dans `tickets-C9.md`. T9.1 ne tranche pas à la place de T9.2 ; le
    * point est porté dans `ETAT.md` plutôt que décidé ici en silence.
+   *
+   * **La comparaison est en `lower()` des deux côtés depuis T9.6**, et c'est un
+   * point ouvert refermé : `lib/forms/domain.ts` **abaisse** l'identité à la
+   * saisie, si bien qu'une valeur en base est toujours en minuscules — mais le
+   * `hd` que rend le fournisseur, lui, n'était confronté qu'en `eq`. La garantie
+   * tenait donc à un **usage** — « on l'a rangée en minuscules » — et non à une
+   * règle : le jour où une identité entrerait autrement, ou où un fournisseur
+   * rendrait `ACME.COM`, l'entreprise cliente cesserait d'être reconnue et la
+   * session serait refusée sans que rien ne dise pourquoi. C'est la forme de
+   * `findSuperAdminByEmail` et celle du rapprochement de `lib/auth/entry.ts`,
+   * pour la même raison, et les trois lectures d'identité disent maintenant la
+   * même chose.
    */
   async findDomainIdentity(
     provider: (typeof identityProvider.enumValues)[number],
@@ -1100,7 +1112,7 @@ export const superAdmin = {
       .where(
         and(
           eq(domainIdentities.provider, provider),
-          eq(domainIdentities.value, value),
+          sql`lower(${domainIdentities.value}) = lower(${value})`,
         ),
       )
       .limit(1);

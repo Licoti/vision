@@ -29,6 +29,7 @@ import { describe, expect, test } from "vitest";
 
 import {
   linkPhrase,
+  accessPhrase,
   northStarPhrase,
   objectPhrase,
   statePhrase,
@@ -532,5 +533,77 @@ describe("linkPhrase — ce qu'un geste a fait d'un lien déclaré", () => {
    */
   test("le retrait ne porte que la désignation", () => {
     expect(linkPhrase("removed", "Refonte du panier")).not.toContain("—");
+  });
+});
+
+describe("accessPhrase — le compte d'une personne", () => {
+  test("les deux participes, accordés au masculin d'« Accès »", () => {
+    expect(accessPhrase("granted", "Camille Roux", "domain_manager")).toBe(
+      `Accès accordé${NBSP}: Camille Roux${NBSP}— responsable de domaine`,
+    );
+    expect(accessPhrase("granted", "Camille Roux", "member")).toBe(
+      `Accès accordé${NBSP}: Camille Roux${NBSP}— membre`,
+    );
+    expect(accessPhrase("revoked", "Camille Roux")).toBe(
+      `Accès retiré${NBSP}: Camille Roux`,
+    );
+  });
+
+  test("les deux espaces sont insécables, devant les deux-points comme devant le tiret", () => {
+    const phrase = accessPhrase("granted", "Camille Roux", "member");
+    expect(phrase).toContain(`${NBSP}: Camille Roux`);
+    expect(phrase).toContain(`${NBSP}— membre`);
+    expect(phrase).not.toContain(" : ");
+    expect(phrase).not.toContain(" — ");
+  });
+
+  /**
+   * **Le rôle n'accompagne que l'accord.** Au retrait, la ligne n'en porte plus :
+   * le dire serait raconter ce qui n'est plus là. C'est la dissymétrie de
+   * `statePhrase`, dont le motif ne vient qu'avec l'annulation.
+   */
+  test("le retrait ne nomme aucun rôle, même si on lui en passe un", () => {
+    expect(accessPhrase("revoked", "Camille Roux")).not.toContain("responsable");
+    expect(accessPhrase("revoked", "Camille Roux")).not.toContain("membre");
+  });
+
+  test("accorder et retirer ne disent pas la même chose", () => {
+    /* La colonne porte le **même** verbe `state_changed` et le **même**
+       `target_type` `person` dans les deux cas : la phrase est tout ce que la
+       frise a pour les distinguer. */
+    expect(accessPhrase("granted", "X", "member")).not.toBe(
+      accessPhrase("revoked", "X"),
+    );
+  });
+
+  /**
+   * **La sixième forme ne double aucune des cinq.** « Accès accordé » n'est pas
+   * « Personne modifiée » : c'est la raison même de son existence —
+   * `objectPhrase("person", "updated", …)` aurait rendu l'ouverture d'un compte
+   * indiscernable d'un changement de nom, et accorder un accès est un fait plus
+   * lourd.
+   */
+  test("elle ne se confond avec aucun geste de profil", () => {
+    const phrases = new Set([
+      accessPhrase("granted", "Camille Roux", "domain_manager"),
+      accessPhrase("granted", "Camille Roux", "member"),
+      accessPhrase("revoked", "Camille Roux"),
+      objectPhrase("person", "created", "Camille Roux"),
+      objectPhrase("person", "updated", "Camille Roux"),
+      objectPhrase("person", "archived", "Camille Roux"),
+    ]);
+    expect(phrases.size).toBe(6);
+  });
+
+  /**
+   * **Le nom ne s'accorde sur aucun genre**, et c'est déjà la règle de
+   * `teamPhrase` et d'`objectPhrase` : `persons` n'en porte pas, et il n'en
+   * portera pas. « Accordé » s'accorde avec « Accès », le mot, jamais avec qui
+   * le reçoit.
+   */
+  test("aucun accord sur la personne", () => {
+    expect(accessPhrase("granted", "Sofia Marchand", "member")).toBe(
+      `Accès accordé${NBSP}: Sofia Marchand${NBSP}— membre`,
+    );
   });
 });

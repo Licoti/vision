@@ -30,11 +30,19 @@
  * action qui ne connaît pas l'identifiant de la personne. **C'est le serveur qui
  * décide ce que ce formulaire écrit, jamais un champ caché.**
  *
- * **Quatre champs, et pas un de plus** : ni compte, ni rôle de domaine, ni accès.
- * Être référencé et pouvoir se connecter restent deux choses distinctes (D19), et
- * l'authentification est reprise par C7. Ni score, ni date de validation, ni
- * historique de progression : Vision ne mesure pas une personne (garde-fous 1
- * et 2).
+ * **Cinq champs depuis T9.6, et pas un de plus** : ni compte, ni rôle de domaine,
+ * ni accès. Être référencé et pouvoir se connecter restent deux choses distinctes
+ * (D19), et **le compte se donne ailleurs** — `access-panel.tsx`, par un geste
+ * explicite et séparé. Ni score, ni date de validation, ni historique de
+ * progression : Vision ne mesure pas une personne (garde-fous 1 et 2).
+ *
+ * **L'e-mail est le cinquième**, et il est entré avec le geste qui le rend
+ * nécessaire : la règle d'entrée 6 de `tickets-C9.md` rapproche une identité **sur
+ * l'e-mail au premier passage**. Il est **facultatif tant qu'aucun accès n'est
+ * accordé** — une personne référencée n'a pas besoin d'adresse (D19) — et
+ * **obligatoire dès qu'un accès l'est** : `emailRequired` porte cette bascule, et
+ * elle vient du serveur, qui a relu la ligne. Un champ du formulaire ne peut pas
+ * décider de sa propre obligation.
  *
  * **Le `select` de disponibilité est parti le 28/08/2026**, avec la colonne qui
  * le recevait : la valeur se déduit désormais du nombre d'accompagnements
@@ -66,6 +74,7 @@ export type PersonJobOption = { id: string; label: string };
 export function PersonPanel({
   action,
   jobs,
+  emailRequired = false,
   submitLabel = "Ajouter la personne",
   initial = EMPTY_PERSON_VALUES,
 }: {
@@ -83,6 +92,14 @@ export function PersonPanel({
    * n'est proposé à personne d'autre.
    */
   jobs: readonly PersonJobOption[];
+  /**
+   * La personne porte déjà un accès : son adresse cesse d'être facultative.
+   *
+   * **Il ne protège rien** — il pose l'astérisque et la note. C'est
+   * `validatePersonForm`, appelée par l'action avec le même drapeau tiré de la
+   * ligne **relue**, qui refuse la saisie vide.
+   */
+  emailRequired?: boolean;
   submitLabel?: string;
   /**
    * Les valeurs du profil corrigé. C'est l'**état initial** de
@@ -125,6 +142,41 @@ export function PersonPanel({
           aria-invalid={errors.fullName ? true : undefined}
           aria-describedby={errors.fullName ? "personne-nom-erreur" : undefined}
           className={`${CONTROL} ${borderOf(errors.fullName)}`}
+        />
+      </FormField>
+
+      {/* **L'adresse juste après le nom**, comme dans le panneau du premier
+          responsable d'un domaine (T9.4) : c'est l'autre moitié de l'identité
+          d'une personne. `type="email"` et `inputMode` sont là pour le clavier du
+          téléphone, jamais pour valider — la seule autorité sur la validité d'une
+          adresse est le fournisseur d'identité, et `isEmailAddress` n'écarte que
+          ce qu'aucun ne rendra jamais. */}
+      <FormField
+        label="Adresse e-mail"
+        htmlFor="personne-email"
+        note={
+          emailRequired
+            ? "Cette personne a un accès à Vision : son adresse est obligatoire, c'est elle qui rapproche son compte de son identité."
+            : "Facultative tant qu'aucun accès n'est accordé. Elle devient obligatoire le jour où cette personne reçoit un accès : c'est elle que le fournisseur d'identité vérifiera."
+        }
+        error={errors.email}
+        errorId="personne-email-erreur"
+        {...(emailRequired ? { required: true } : {})}
+      >
+        <input
+          id="personne-email"
+          name="email"
+          type="email"
+          inputMode="email"
+          placeholder="prenom.nom@acme.com"
+          defaultValue={values.email}
+          autoComplete="off"
+          spellCheck={false}
+          aria-invalid={errors.email ? true : undefined}
+          aria-describedby={
+            errors.email ? "personne-email-erreur" : undefined
+          }
+          className={`${CONTROL_TEXT} ${borderOf(errors.email)}`}
         />
       </FormField>
 

@@ -451,6 +451,30 @@ export const PERSON_FORM_NEW = "nouveau";
 export const SKILL_PANEL_PARAM = "maitrise";
 
 /**
+ * Le panneau du **compte** d'une personne (T9.6) — lui accorder un accès avec son
+ * rôle, ou changer ce rôle.
+ *
+ * **`acces` sans accent**, comme `releve` et `maitrise` : un paramètre d'URL
+ * accentué s'encode en pourcentages dès qu'il est copié, et l'adresse cesse
+ * d'être lisible. Le mot vient du domaine — `persons.has_access`.
+ *
+ * **Une clé à elle, et non une seconde valeur sur `profil`.** Ce ne sont pas deux
+ * gestes de même rang : le profil se corrige, le compte **se donne**. Les
+ * confondre aurait mis `has_access` et `domain_role` à portée d'un champ caché du
+ * formulaire de profil, ce que `readPersonForm` refuse en n'en lisant que cinq.
+ * C'est la séparation que cette page tient déjà entre `personne` et `profil`.
+ *
+ * **Sa valeur est toujours un identifiant de personne**, jamais polymorphe :
+ * accorder et changer le rôle sont le même geste, sur la même cible, par le même
+ * formulaire (la propriété de T3.4). Rien ne se crée ici, il n'y a donc pas de
+ * `nouveau` à porter.
+ *
+ * Ce n'est pas cette route qui protège, mais l'action, qui redérive le droit et
+ * les trois garde-fous sur l'identifiant **reçu**.
+ */
+export const PERSON_ACCESS_PARAM = "acces";
+
+/**
  * Le détail d'une **piste de démarrage**, sur la page d'un accompagnement
  * (20/08/2026).
  *
@@ -1204,6 +1228,17 @@ export const ROUTES = {
    */
   teamSkillEdit: (personSkillId: string) =>
     `/equipe?${SKILL_PANEL_PARAM}=${personSkillId}`,
+  /**
+   * La page Équipe, panneau du **compte** ouvert sur une personne (T9.6) : lui
+   * accorder un accès avec son rôle, ou changer ce rôle. La fermeture reste
+   * `team`.
+   *
+   * **La valeur porte l'identifiant**, comme `teamPersonArchive` et pour la même
+   * raison : `/equipe` n'a pas d'objet de page. Une seule entrée pour les deux
+   * gestes — un formulaire, deux points d'entrée, la forme de `teamSkillEdit`.
+   */
+  teamPersonAccess: (personId: string) =>
+    `/equipe?${PERSON_ACCESS_PARAM}=${personId}`,
   /**
    * L'écran **Administration** — les référentiels du domaine (21/08/2026, porté
    * de un à cinq référentiels par T7.3).

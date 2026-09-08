@@ -2,18 +2,17 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 07/09/2026, **T9.5 terminé** — l'amorçage d'un domaine neuf. Une
-**extraction**, pas une écriture : les référentiels partent dans `lib/db/bootstrap.ts`, le
-rapprochement de T8.4 dans `lib/db/reconcile.ts`, et l'action de T9.4 les appelle. **Huit
-référentiels, pas neuf** — le décompte de la fiche est mis en défaut : les entités sont les
-divisions de l'entreprise, et les adresses d'outil appartiennent au client ; les deux restent au
-script. **68 lignes**, et **`ensureAll` a enfin des tests**, le déplacement vers `lib/` le rendant
-atteignable. **Cinq neutralisations, chacune isolée**, et `npm run db:seed` rend *« Rien à
-faire »* sur une base semée avant l'extraction. **Chantier en cours :** **C9** (`tickets-C9.md`) ;
-**C7 garde ses quatre tickets** T7.7 → T7.10 et passe après — second écart à `docs/05` §6. **Vert de
-référence : 1 771 tests sur 63 fichiers, `lint` et `tsc` au vert** (1 750 avant T9.5) — chaque
-ticket y compare le sien, jamais à un souvenir. **Ticket suivant : T9.6 — les comptes d'un
-domaine**, sans lequel un domaine créé par T9.4 porterait un seul compte, définitivement.
+**Dernière mise à jour :** 07/09/2026, **T9.6 terminé — et C9 est clos.** Les comptes d'un domaine :
+**aucun écran n'écrivait `has_access` ni `domain_role`**, et un domaine créé par T9.4 portait un seul
+compte, définitivement. L'e-mail entre au formulaire — facultatif sans accès, obligatoire dès qu'un
+accès existe, **la bascule venant de la ligne relue** —, l'accès s'accorde avec son rôle par une clé
+d'URL à lui, et se retire muet. **Un quatrième refus est venu d'une mesure** : le rapprochement lit
+l'e-mail en `limit 1` **sans ordre**, donc un doublon d'adresse est refusé, archivées comprises.
+**Huit neutralisations isolées, dont deux ont d'abord dit autre chose** — un test qui passait garde
+retirée, six qui tombaient en cascade —, et le refus de la personne archivée d'`openPerson` **reçoit
+son premier témoin depuis T5bis.6**. **Vert de référence : 1 816 tests sur 63 fichiers, `lint` et
+`tsc` au vert** (1 771 avant T9.6). **Chantier suivant : C7 reprend** — **ticket suivant : T7.7,
+accessibilité et navigation au clavier**, et le POC est complet le jour où C7 se referme.
 
 ---
 
@@ -30,9 +29,9 @@ domaine**, sans lequel un domaine créé par T9.4 porterait un seul compte, déf
 | TD — Dette technique et couche de présentation | TD.1 → TD.6 | **terminé** |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
-| C7 — Finitions | T7.1 → T7.10 | **en pause** — T7.1 → T7.6 livrés, T7.7 → T7.10 après C9 |
+| C7 — Finitions | T7.1 → T7.10 | **à reprendre** — T7.1 → T7.6 livrés, T7.7 → T7.10 en attente |
 | C8 — Dette | T8.1 → T8.5 | **terminé** |
-| C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **en cours** — T9.1 → T9.5 livrés ; reste T9.6 |
+| C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **terminé** |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
 
 ---
@@ -59,14 +58,12 @@ domaine**, sans lequel un domaine créé par T9.4 porterait un seul compte, déf
 - **C8 — Dette — T8.1 → T8.5, 04-05/09.** Le premier chantier que `docs/05` §5 n'a pas écrit, tiré
   des seuls points ouverts — et **quatre énoncés de fiche sur cinq y ont été mis en défaut**, du
   domaine de tests résiduel à la redirection redondante. 1 582 → 1 646 tests.
-- **C9 — T9.1 → T9.5, 06-07/09.** Deux tables hors du produit, une clé **laissée intacte plutôt
-  qu'élargie**. Puis le SSO : le domaine cesse d'être *trouvé* pour être *désigné*, **aucun écran du
-  produit ne bouge**. Puis le droit : **la preuve se passe en argument**, et le compilateur désigne
-  les trente-six appels. Puis l'écran, **premier appelant de la garde**, qui renomme le critère de
-  `superAdmin` et trouve par sonde que **Drizzle rend une colonne sans son qualificatif** dans un
-  gabarit `sql`. Puis l'amorçage, **une extraction** : `scripts/seed.ts` perd 600 lignes, l'action
-  de création gagne un appel, et **le second énoncé de fiche du chantier tombe** — huit référentiels,
-  pas neuf. 1 646 → 1 689 → 1 697 → 1 750 → **1 771 tests sur 63 fichiers**.
+- **C9 — SSO et administration multi-domaine — T9.1 → T9.6, 06-07/09.** Deux tables hors du produit,
+  puis le SSO — le domaine cesse d'être *trouvé* pour être *désigné*, **aucun écran du produit ne
+  bouge** —, puis le droit dont **la preuve se passe en argument**, l'écran au-dessus des domaines,
+  l'amorçage extrait du script, et les comptes. **Trois énoncés de fiche mis en défaut** : neuf
+  référentiels qui étaient huit, une condition de matériel qui portait sur un ticket et non sur le
+  chantier, un périmètre incomplet de huit fichiers. 1 646 → **1 816 tests sur 63 fichiers**.
 - **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, détaillés dans
   `HISTORIQUE-TICKETS.md`. **Cinq portent une migration, `0010` à `0014`.** Le reste est de la
   reprise d'ergonomie, le bouton aligné sur le design system, et le **renommage de « Projets » en
@@ -101,31 +98,28 @@ refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le
 
 ### b. Assignés à un ticket
 
-**C9 — T9.1 à T9.5 sont faits ; T9.6 garde sa fiche entière** (`tickets-C9.md`) : les comptes d'un
-domaine, dont **`email`, sans lequel aucune personne saisie dans Vision ne peut se connecter** — le
-jeu de démonstration a `email = null`, donc **aucun de ses comptes n'est joignable par le SSO**
-(T9.2). **T9.6 réemploiera `isEmailAddress`** (`lib/forms/domain-manager.ts`), exportée par T9.4.
+**C9 est clos ; six points lui survivent.** **Le jeu de démonstration n'a aucune adresse** —
+`scripts/seed.ts` n'en écrit pas —, donc **aucun de ses comptes n'est joignable par le SSO** (T9.2) ;
+l'écran Équipe sait désormais l'écrire. → **le prochain ticket qui ouvre `scripts/seed.ts`.**
+**Rien n'interdit en base deux adresses identiques dans un domaine** : le refus de T9.6 vit dans
+l'action, et l'unicité `(domain_id, lower(email))` — archivées comprises, le rapprochement les lisant
+— serait une migration. → **le jour où une contrainte s'autorise.**
+**Le libellé des deux rôles est écrit à trois endroits**, plus deux mots que `lib/journal.ts` récrit
+exprès, étant pur. → **T7.9**, avec les quatre libellés hors de `lib/format.ts`.
 **`withoutAnySession()` reste importable depuis `app/`**, rien ne l'en empêchant mécaniquement : la
-refermer demande une clause dans `eslint.config.mjs`, ce qui réveille la dette d'`uiLayerSeal` —
-deux sujets pour un seul geste. → **le prochain ticket qui ouvre `eslint.config.mjs`**, avec la
-clause auto-portante d'`uiLayerSeal`.
-**Une identité vérifiée est rangée en minuscules à la saisie, et lue en `eq`** : `resolveDomainId`
-ne rabaisse pas la casse du `hd` reçu. Le cas n'est pas atteignable aujourd'hui, mais **la garantie
-tient à un usage, pas à une règle**. → **T9.6**, ou le premier ticket qui ouvre `lib/auth/session.ts`.
+refermer demande une clause dans `eslint.config.mjs`, ce qui réveille la dette d'`uiLayerSeal` — deux
+sujets pour un geste. → **le prochain ticket qui ouvre `eslint.config.mjs`.**
 **`persons.identity_provider` n'a aucun écrivain**, et l'inscrire sur une ligne trouvée par e-mail
 buterait sur `persons_external_id_requires_directory`. → **le jour où l'import d'annuaire arrive.**
 **L'amorçage d'un domaine créé par l'écran n'est pas atomique**, et **aucun geste ne répare un
-amorçage partiel** — `npm run db:seed` ne vise que le domaine de démonstration. Le rapprochement de
-T8.4 rend pourtant le geste rejouable sans rien doubler : il ne manque qu'un appelant. → **avec la
-dette de T3.6, ou un geste de réparation si le cas se produit.**
+amorçage partiel** — `npm run db:seed` ne vise que la démonstration, quand le rapprochement de T8.4
+rend le geste rejouable sans rien doubler : il ne manque qu'un appelant. → **avec la dette de T3.6.**
 **Le RLS a quitté C9** : voir le groupe (c).
 
-**C7 passe après C9 : ses huit points gardent leur ticket, et `tickets-C7.md` les décrit en
-entier** — la liste n'est plus recopiée ici, elle y a doublé une fiche quatre chantiers durant.
-**T7.7** accessibilité et navigation au clavier, quatre points · **T7.8** quatre états vides jamais
-vus rendus, et le contenu d'`/a-propos` (D36) · **T7.9** quatre colonnes sans lecteur, et **quatre
-libellés hors de `lib/format.ts`**, dont un vocabulaire à trancher · **T7.10** quatre reprises
-d'ergonomie, dont la piste qui ne mène pas à son activité.
+**C7 reprend maintenant, et ses huit points vivent dans `tickets-C7.md`** — T7.7 l'accessibilité,
+T7.8 les états vides et `/a-propos`, T7.9 les colonnes sans lecteur et les libellés, T7.10
+l'ergonomie. **La liste cesse d'être recopiée ici** : elle y a doublé une fiche quatre chantiers
+durant.
 
 **Le journal reste incomplet** (T8.3, laissé intact — règle 3) : **quatre familles écrivent sans
 trace** — le produit, l'adoption, la compétence portée, et les huit référentiels autres que l'entité
@@ -243,6 +237,12 @@ secondaire · les props d'icône de `Button` n'ont aucun appelant.
   et `requireSession` redirige vers `/auth/acces`. **`/dev/session` reste**, 404 en production :
   une adresse personnelle ne porte ni `hd` ni `tid`, donc le chemin d'un membre de domaine ne se
   parcourt pas au navigateur.
+- **Un accès et son rôle ne se séparent jamais.** `persons_role_requires_access` refuse *accès sans
+  rôle* et *rôle sans accès* : les deux colonnes s'écrivent dans la même instruction, et la base
+  refuse chaque moitié écrite seule — mesuré, pas supposé. **Le dernier responsable d'un domaine ne
+  se rétrograde ni ne se retire** : le décompte porte sur les *autres* responsables vivants, et comme
+  qui exerce le geste en est un, il ne vaut zéro que sur soi-même. **Un intervenant côté entité n'en
+  reçoit jamais** (`docs/05` §4, D2).
 - **Une écriture au-dessus des domaines se prouve.** `superAdmin` ne porte que des lectures ; les
   deux écrivains vivent derrière `asSuperAdmin(grant)`, et la couche **relit la ligne** — un grant
   forgé ne vaut rien. `requireSuperAdmin()` depuis une session, `withoutAnySession(motif)` hors.

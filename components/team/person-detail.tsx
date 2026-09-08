@@ -85,6 +85,9 @@ export function PersonDetail({
   addSkillHref,
   editSkillHref,
   removeSkill,
+  accessHref,
+  revokeAccess,
+  lastManager,
 }: {
   person: PersonDetailRow;
   /**
@@ -93,8 +96,10 @@ export function PersonDetail({
    * cette fiche sans qu'elle les lise : c'est la carte qui les porte, et ce sont
    * les actions qui protègent.
    *
-   * **Sans le compte** : la phrase disait « les six », ils sont sept. Un nombre
-   * dans un commentaire vieillit à chaque ticket.
+   * **Sans le compte**, deux fois : la phrase disait « les six », puis « les
+   * sept », et T9.6 en ajoute deux — l'accès accordé, l'accès retiré. Un nombre
+   * dans un commentaire vieillit à chaque ticket ; ce qui se relit ici est la
+   * règle.
    */
   editHref: string | null;
   archiveHref: string | null;
@@ -102,6 +107,10 @@ export function PersonDetail({
   addSkillHref: string | null;
   editSkillHref: ((personSkillId: string) => string) | null;
   removeSkill: ((personSkillId: string) => Promise<void>) | null;
+  /** Les deux points d'entrée du **compte** (T9.6), et ce qui les explique. */
+  accessHref: string | null;
+  revokeAccess: (() => Promise<void>) | null;
+  lastManager: boolean;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
@@ -113,6 +122,9 @@ export function PersonDetail({
         addSkillHref={addSkillHref}
         editSkillHref={editSkillHref}
         removeSkill={removeSkill}
+        accessHref={accessHref}
+        revokeAccess={revokeAccess}
+        lastManager={lastManager}
       />
 
       <section className="flex flex-col gap-2">
