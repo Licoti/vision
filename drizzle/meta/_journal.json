@@ -127,6 +127,13 @@
       "when": 1788850332259,
       "tag": "0017_harsh_chamber",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788893462581,
+      "tag": "0018_oval_mandroid",
+      "breakpoints": true
     }
   ]
 }

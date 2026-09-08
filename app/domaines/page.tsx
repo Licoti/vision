@@ -79,7 +79,7 @@ import {
   ROUTES,
 } from "@/lib/navigation";
 
-import { restoreDomain, resumeDomain } from "./actions";
+import { restoreDomain, resumeDomain, revokeDomainInvitation } from "./actions";
 import { loadDomainDrawer } from "./drawers";
 
 /* L'autorité se relit à chaque requête : rien à mettre en cache. */
@@ -210,10 +210,19 @@ export default async function DomainsPage({
                       {/* **Une absence se dit, elle ne se compte pas.** Sans
                           compte, l'entreprise est close : c'est la règle
                           d'entrée 6, et c'est ce qui commande le geste du
-                          premier responsable. */}
+                          premier responsable.
+
+                          **Le troisième fait vient de T11.4**, et sans lui un
+                          domaine correctement amorcé serait annoncé comme
+                          inaccessible : l'administrateur est désigné, son lien
+                          est parti, et son compte s'ouvrira à l'acceptation
+                          (arbitrage (9)). **Un fait, jamais un décompte ni un
+                          badge** — ni combien, ni depuis quand. */}
                       {!domain.hasAccount && !archived ? (
                         <span className="mt-1 block text-xs text-content-neutral-base">
-                          Aucun compte — personne ne peut se connecter
+                          {domain.hasPendingInvitation
+                            ? "Invitation en attente — le compte s'ouvrira à l'acceptation"
+                            : "Aucun compte — personne ne peut se connecter"}
                         </span>
                       ) : null}
                     </span>
@@ -283,8 +292,10 @@ export default async function DomainsPage({
 
                             {/* **Il n'ouvre qu'une fois** : une fois un compte
                                 posé, la suite se passe à l'intérieur du domaine,
-                                par son responsable. */}
-                            {!domain.hasAccount ? (
+                                par son responsable. Et pas davantage tant qu'une
+                                invitation attend — deux liens ouvriraient le
+                                même premier compte (T11.4). */}
+                            {!domain.hasAccount && !domain.hasPendingInvitation ? (
                               <DrawerLink
                                 href={ROUTES.domainManager(domain.id)}
                                 request={{ kind: "manager", id: domain.id }}
@@ -293,6 +304,31 @@ export default async function DomainsPage({
                               >
                                 Désigner le premier responsable
                               </DrawerLink>
+                            ) : null}
+
+                            {/* **Le seul chemin de rattrapage** : sans lui, une
+                                entreprise dont l'administrateur ne vient jamais
+                                resterait close — la révocation du produit vit
+                                dans `/equipe`, et demande une session que
+                                personne ne peut ouvrir ici. Un formulaire nu :
+                                révoquer **défait**, et `docs/06` §9 proscrit la
+                                confirmation là où elle ne protège rien — le
+                                geste se refait d'un clic. */}
+                            {!domain.hasAccount && domain.hasPendingInvitation ? (
+                              <form
+                                action={revokeDomainInvitation.bind(
+                                  null,
+                                  domain.id,
+                                )}
+                              >
+                                <button
+                                  type="submit"
+                                  role="menuitem"
+                                  className={MENU_ITEM}
+                                >
+                                  Révoquer l&apos;invitation
+                                </button>
+                              </form>
                             ) : null}
 
                             {domain.status === "active" ? (

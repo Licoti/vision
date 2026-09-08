@@ -1441,6 +1441,9 @@ describe("l'autorité d'une écriture au-dessus des domaines", () => {
     (await db.select().from(domains).where(eq(domains.id, id)))[0];
 
   async function dropDomain(id: string): Promise<void> {
+    /* **Les invitations d'abord** : `invitations.person_id` est `restrict`, et
+       une personne invitée ne se supprime pas sans que le geste le dise. */
+    await db.delete(invitations).where(eq(invitations.domainId, id));
     await db.delete(persons).where(eq(persons.domainId, id));
     await db.delete(domainIdentities).where(eq(domainIdentities.domainId, id));
     await db.delete(domains).where(eq(domains.id, id));
@@ -1613,6 +1616,120 @@ describe("l'autorité d'une écriture au-dessus des domaines", () => {
       expect(referenced.domainId).toBe(id);
     } finally {
       await dropDomain(id);
+    }
+  });
+
+  /**
+   * **Le troisième fait d'accessibilité** — T11.4.
+   *
+   * Sans lui, un domaine correctement amorcé se lirait comme un domaine que
+   * personne ne peut ouvrir : l'administrateur est désigné, son lien est parti,
+   * et son compte s'ouvrira à l'acceptation (arbitrage (9)). La lecture doit
+   * dire *une invitation attend*, jamais combien ni depuis quand.
+   */
+  test("la liste dit qu'une invitation attend, et cesse quand elle se referme", async () => {
+    const { grant } = await grantOf("invitation-en-attente");
+    const { id } = await throwawayDomain("invitation-en-attente");
+    const scope = forDomain({ domainId: id });
+
+    const rowOf = async () =>
+      (await asSuperAdmin(grant).listDomainsForAdmin()).find(
+        (domain) => domain.id === id,
+      );
+
+    try {
+      expect((await rowOf())?.hasPendingInvitation).toBe(false);
+
+      const invited = await scope.insert(persons, {
+        fullName: `Invité ${suffix}`,
+        source: "manual",
+        kind: "center",
+        email: `invite.attente.${suffix}@exemple.test`,
+      });
+
+      const row = await scope.insert(invitations, {
+        personId: invited.id,
+        email: `invite.attente.${suffix}@exemple.test`,
+        role: "domain_manager",
+        tokenHash: `hash-attente-${suffix}`,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
+      expect(await rowOf()).toMatchObject({
+        hasAccount: false,
+        hasPendingInvitation: true,
+      });
+
+      /* **Une invitation périmée compte encore** : le lien est mort, la ligne
+         est vivante, et l'index partiel la retiendrait. C'est l'expression de
+         `invitations_pending_unique`, mot pour mot — deux lectures qui
+         divergeraient ici diraient deux choses de la même ligne. */
+      await scope.update(invitations, row.id, {
+        expiresAt: new Date(Date.now() - 1_000),
+      });
+      expect((await rowOf())?.hasPendingInvitation).toBe(true);
+
+      /* Révoquée, elle n'est plus qu'une trace. */
+      await scope.update(invitations, row.id, { revokedAt: new Date() });
+      expect((await rowOf())?.hasPendingInvitation).toBe(false);
+
+      /* Acceptée, elle n'en est pas une autre — et le compte, lui, paraît. */
+      await scope.update(invitations, row.id, {
+        revokedAt: null,
+        acceptedAt: new Date(),
+      });
+      await scope.update(persons, invited.id, {
+        hasAccess: true,
+        domainRole: "domain_manager",
+      });
+      expect(await rowOf()).toMatchObject({
+        hasAccount: true,
+        hasPendingInvitation: false,
+      });
+    } finally {
+      await dropDomain(id);
+    }
+  });
+
+  /**
+   * **L'alias, et le piège qu'il ferme** — mesuré par sonde le 06/09/2026 sur
+   * les deux sous-requêtes voisines, et reposé ici pour la troisième.
+   *
+   * Sans alias, `pending.domain_id = domains.id` se résoudrait **dans** la
+   * sous-requête et rendrait `false` en silence : un résultat plausible, qu'un
+   * test de forme n'aurait pas attrapé. Le témoin est le domaine voisin — celui
+   * qui n'a pas d'invitation ne doit pas hériter de celle de l'autre.
+   */
+  test("l'invitation d'une entreprise n'est jamais lue sur une autre", async () => {
+    const { grant } = await grantOf("invitation-voisine");
+    const { id } = await throwawayDomain("invitation-voisine");
+    const { id: other } = await throwawayDomain("invitation-voisine-temoin");
+    const scope = forDomain({ domainId: id });
+
+    try {
+      const invited = await scope.insert(persons, {
+        fullName: `Invité voisin ${suffix}`,
+        source: "manual",
+        kind: "center",
+        email: `invite.voisin.${suffix}@exemple.test`,
+      });
+      await scope.insert(invitations, {
+        personId: invited.id,
+        email: `invite.voisin.${suffix}@exemple.test`,
+        role: "domain_manager",
+        tokenHash: `hash-voisin-${suffix}`,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
+
+      const rows = await asSuperAdmin(grant).listDomainsForAdmin();
+      expect(rows.find((domain) => domain.id === id)?.hasPendingInvitation).toBe(
+        true,
+      );
+      expect(
+        rows.find((domain) => domain.id === other)?.hasPendingInvitation,
+      ).toBe(false);
+    } finally {
+      await dropDomain(id);
+      await dropDomain(other);
     }
   });
 

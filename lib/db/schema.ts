@@ -323,6 +323,14 @@ export const domains = pgTable("domains", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   competenceCenterName: text("competence_center_name").notNull(),
+  /**
+   * Ce que fait cette entreprise, en une phrase — **facultative** (T11.4).
+   *
+   * La seule colonne que la spécification du 08/09/2026 demande et qu'aucune
+   * table ne portait. Sans autre règle : ni longueur, ni forme — en inventer
+   * une ici serait une règle produit que ni `docs/02` ni `docs/04` ne portent.
+   */
+  description: text("description"),
   status: domainStatus("status").notNull().default("active"),
   archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })

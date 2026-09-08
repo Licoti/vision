@@ -25,6 +25,7 @@ import { DomainIdentityPanel } from "@/components/admin/domain-identity-panel";
 import { DomainManagerPanel } from "@/components/admin/domain-manager-panel";
 import { DomainPanel } from "@/components/admin/domain-panel";
 import { ConfirmPanel } from "@/components/ui/confirm-panel";
+import { INVITATION_TTL_DAYS } from "@/lib/auth/invitation";
 import { asSuperAdmin, type SuperAdminGrant } from "@/lib/db/scoped";
 import { formatDomainStatus } from "@/lib/format";
 import {
@@ -60,7 +61,9 @@ export async function resolveDomainDrawer(
         titleId: "panneau-domaine-titre",
         title: "Ajouter une entreprise cliente",
         subtitles: ["Au-dessus des domaines"],
-        body: <DomainPanel action={createDomain} />,
+        body: (
+          <DomainPanel action={createDomain} expiryDays={INVITATION_TTL_DAYS} />
+        ),
       };
 
     case "identities":
@@ -145,15 +148,22 @@ async function manager(
      redite : l'écran évite un cul-de-sac, l'action tient la règle. Une fois un
      compte posé, la suite se passe à l'intérieur du domaine — c'est le
      responsable désigné qui désigne les suivants, jamais le super
-     administrateur, qui n'entre pas dans les entreprises. */
-  if (domain.hasAccount) return null;
+     administrateur, qui n'entre pas dans les entreprises.
+
+     **La seconde moitié vient de T11.4** : un domaine dont l'invitation est en
+     attente n'accepte pas une seconde désignation, faute de quoi deux liens
+     ouvriraient le même premier compte. Le geste se révoque et se refait. */
+  if (domain.hasAccount || domain.hasPendingInvitation) return null;
 
   return {
     titleId: "panneau-responsable-titre",
     title: "Désigner le premier responsable",
     subtitles: [domain.name],
     body: (
-      <DomainManagerPanel action={designateDomainManager.bind(null, domain.id)} />
+      <DomainManagerPanel
+        action={designateDomainManager.bind(null, domain.id)}
+        expiryDays={INVITATION_TTL_DAYS}
+      />
     ),
   };
 }

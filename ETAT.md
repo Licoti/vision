@@ -2,14 +2,16 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 08/09/2026, **T11.3 terminé — le lien part tout seul, et son absence ne
-casse rien**. Sans clé, **aucune requête n'est tentée** : l'état reste celui de T11.2, **sans second
-chemin de code**. **Quatre mises en défaut, et l'une contredit la fiche** — la clé retirée fait
-tomber **8** tests, non « la mesure 2 et aucune autre » (4ᵉ énoncé de fiche mis en défaut du
-chantier). **La jointure du lien, mesurée, est en défaut** : sans JavaScript, le panneau se referme
-sur l'invitation qu'il vient de créer, et le lien est perdu. **Aucune requête réelle vers un tiers**,
-la clé Resend n'existant pas. **Périmètre étendu à huit fichiers, annoncés au plan.** **Vert :
-1 910 tests sur 68 fichiers** (1 893 avant). **Suivant : T11.4 — l'amorçage d'un domaine.**
+**Dernière mise à jour :** 08/09/2026, **T11.4 terminé — le premier maillon du parcours existe**.
+Une entreprise et son administrateur naissent **d'un seul geste**, qui écrit **quatre tables** et
+**invite** au lieu d'ouvrir. **Six gestes pour cinq attendus** : la révocation depuis `/domaines` n'y
+était pas nommée, et sans elle la mesure 3 était inatteignable — une entreprise dont l'administrateur
+ne vient jamais restait close. **La règle d'adresse ne vaut que sous Google**, le `tid` d'Entra
+n'étant pas un nom de domaine (décision humaine). **Deux mises en défaut, l'une contredit la fiche**
+— la règle retirée fait tomber **5** tests, non « la mesure 2 et aucune autre » (5ᵉ énoncé de fiche
+mis en défaut du chantier) —, **et l'autre a montré que rien en base ne double l'extension
+d'`ALREADY_STAFFED`**. **Périmètre étendu à quatre fichiers, annoncés au plan.** **Vert : 1 940 tests
+sur 68 fichiers** (1 910 avant). **Suivant : T11.5 — le domaine vu par son administrateur.**
 
 ---
 
@@ -30,7 +32,7 @@ la clé Resend n'existant pas. **Périmètre étendu à huit fichiers, annoncés
 | C8 — Dette | T8.1 → T8.5 | **terminé** |
 | C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **terminé** |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
-| C11 — Le parcours d'entrée | T11.1 → T11.5 | **en cours** — T11.1 → T11.3 livrés, T11.4 suit |
+| C11 — Le parcours d'entrée | T11.1 → T11.5 | **en cours** — T11.1 → T11.4 livrés, T11.5 suit |
 
 ---
 
@@ -72,6 +74,9 @@ la clé Resend n'existant pas. **Périmètre étendu à huit fichiers, annoncés
 - **C11 — L'envoi — T11.3, 08/09.** Un `fetch`, deux variables, **zéro dépendance** ; l'invitation
   ne dépend jamais de lui. **Une mise en défaut contredit la fiche** (8 tests, pas 1), et **la
   jointure du lien est mesurée en défaut**. 1 893 → **1 910**.
+- **C11 — L'amorçage d'un domaine — T11.4, 08/09.** Un geste, quatre tables, et l'administrateur qui
+  **naît sans accès**. **La fiche demandait cinq gestes et son critère en exigeait un sixième** : la
+  révocation, sans laquelle une entreprise close le restait. 1 910 → **1 940 tests**.
 - **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, détaillés dans
   `HISTORIQUE-TICKETS.md`. **Cinq portent une migration, `0010` à `0014`** ; le reste est de
   l'ergonomie, plus le **renommage de « Projets » en « Accompagnements »**, qui **rouvre D35**.
@@ -124,9 +129,10 @@ refermer demande une clause dans `eslint.config.mjs`, ce qui réveille la dette 
 sujets pour un geste. → **le prochain ticket qui ouvre `eslint.config.mjs`.**
 **`persons.identity_provider` n'a aucun écrivain**, et l'inscrire sur une ligne trouvée par e-mail
 buterait sur `persons_external_id_requires_directory`. → **le jour où l'import d'annuaire arrive.**
-**L'amorçage d'un domaine créé par l'écran n'est pas atomique**, et **aucun geste ne répare un
-amorçage partiel** — `npm run db:seed` ne vise que la démonstration, quand le rapprochement de T8.4
-rend le geste rejouable sans rien doubler : il ne manque qu'un appelant. → **avec la dette de T3.6.**
+**L'amorçage d'un domaine n'est pas atomique, et il écrit désormais quatre tables** (T11.4) — une
+panne laisse une entreprise sans identité, sans compte ou sans invitation, et **aucun geste ne répare
+un amorçage partiel** : le rapprochement de T8.4 le rendrait rejouable sans rien doubler, il ne manque
+qu'un appelant. → **avec la dette de T3.6.**
 **Le RLS a quitté C9** : voir le groupe (c).
 
 **C11 continue** (T11.4 et T11.5), **et C7 ferme le POC après**.
@@ -136,6 +142,16 @@ perdu** — mesuré en T11.3, harnais éprouvé par étape témoin : `resolveTea
 dès qu'une invitation vivante existe, donc sur celle qu'il vient de créer, et le clair n'existe nulle
 part ailleurs. L'invitation, elle, est écrite. **Seconde exception à D30**, non arbitrée.
 → **arbitrage humain, puis le ticket qui rouvre `lib/drawers/team.tsx`.**
+
+**Deux points de T11.4.** **Sans JavaScript, aucun geste de la ligne d'entreprise n'est atteignable**
+— mesuré : `ActionMenu` n'est pas dans le HTML servi, ce qui vaut depuis T9.4 pour les deux
+rétablissements ; **la révocation d'amorçage en aggrave la portée**, étant le seul chemin qui rouvre
+une entreprise close. **Troisième exception à D30**, non arbitrée. → **arbitrage humain, puis le
+ticket qui rouvre `lib/drawers/domains.tsx`.**
+**Rien en base ne double le refus « une invitation attend déjà »** — `invitations_pending_unique`
+porte sur `(domain_id, person_id)`, et une seconde désignation vise une autre personne : le contrôle
+applicatif est le seul gardien, là où celui d'`invitePerson` en a deux. → **à relire avant de
+« simplifier » `designateDomainManager`, jamais après.**
 **`redeemInvitation` ne juge pas l'état du domaine, et c'est ce qui rend l'arbitrage (4) mesurable** :
 un test le fixe, et il tombera le jour où quelqu'un « sécurisera » le module — **un seul témoin isole
 l'ordre des six règles**, le domaine suspendu. → **à relire avant de corriger, jamais après.**

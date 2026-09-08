@@ -8189,3 +8189,64 @@ déjà servis dans ce panneau, sur le même fond. Aucun couple de couleurs neuf 
 « Mesure T11.3 », l'a invitée, a révoqué l'invitation, puis **archivé** la personne (règle 4).
 
 **1 893 → 1 910 tests sur 68 fichiers**, `lint` (`--max-warnings=0`) et `tsc` au vert.
+
+---
+
+## T11.4 — L'amorçage d'un domaine — 08/09/2026
+
+**Le premier maillon du parcours existe.** Le super administrateur crée une entreprise **et** désigne
+son administrateur **en un seul geste**, et cet administrateur **reçoit une invitation** au lieu d'un
+accès posé d'office. Le geste écrit **quatre tables** — `domains`, `domain_identities`, `persons`,
+`invitations` — et **tout se confronte avant la première écriture**, `neon-http` n'ayant pas de
+transaction (dette de T3.6) : la règle d'adresse, l'hôte du lien, puis l'unicité de l'identité.
+
+**Cinq gestes attendus, six livrés — et le sixième était la condition du critère.** La migration
+`0018` pose `domains.description`, facultative. Le formulaire de création passe de quatre champs à
+sept. L'adresse **doit relever du nom de domaine saisi**, au formulaire et non à la connexion.
+L'administrateur naît **sans accès** (arbitrage (9)), et `ALREADY_STAFFED` s'étend à *une invitation
+en attente*. `/domaines` porte un **troisième fait d'accessibilité**. Et **`revokeDomainInvitation`**,
+que l'attendu ne nommait pas : sans elle, la mesure 3 était inatteignable et une entreprise dont
+l'administrateur ne vient jamais restait close pour de bon — `revokeInvitation` vit dans `/equipe` et
+exige une session que personne ne peut ouvrir dans un domaine sans compte. Décision humaine du
+08/09/2026, prise au plan.
+
+**Périmètre étendu à quatre fichiers, annoncés au plan.** `lib/db/scoped.ts` porte le troisième fait
+(`hasPendingInvitation`) et la description à la création — **aucune clé neuve**, le sceau nominatif de
+T9.3 ne bouge pas ; `lib/db/scoped.test.ts` le mesure ; `lib/drawers/domains.tsx` referme la porte du
+panneau aux mêmes conditions que l'action ; `components/admin/invitation-link.tsx` écrit **une fois**
+le bloc du lien pour les deux panneaux d'amorçage.
+
+**La règle d'adresse ne vaut que là où l'identité est un nom de domaine.** Le `hd` de Google en est
+un, le `tid` d'Entra n'en est pas un — aucune adresse ne porte un identifiant de locataire, et le
+confronter aurait refusé toute saisie légitime. `addressDomainsOf` ne retient que les identités
+Google, et une liste vide ne refuse rien. Décision humaine du 08/09/2026 ; la limite de l'arbitrage
+(11) et son contournement — ajouter le second nom de domaine comme identité — tiennent inchangés.
+
+**Quatre mesures, et la première est le parcours lui-même.** Un domaine créé par l'action sous un
+cookie **réellement scellé** : quatre tables écrites, `has_access` **faux**, invitation vivante, et
+**l'empreinte en base est celle du jeton du lien rendu**. Puis `redeemInvitation` sur des claims
+forgés — adresse vérifiée, `hd` de l'entreprise — pose `has_access` **et** `domain_role =
+domain_manager`, date `accepted_at`, et la liste cesse de dire qu'on attend quelqu'un. **L'adresse
+hors du nom de domaine** est refusée et **rien n'est écrit** — les quatre tables comptées avant et
+après, étape témoin comprise. **Deux désignations d'affilée** : la seconde refusée tant que la
+première attend, acceptée après `revokeDomainInvitation` — le geste du produit, pas une écriture de
+fixture —, et **la ligne révoquée reste** (règle 4). **Lu dans le HTML servi**, `<script>` retirés :
+*« Invitation en attente — le compte s'ouvrira à l'acceptation »*, qui s'échange contre *« Aucun
+compte »* dès la révocation.
+
+**Deux mises en défaut, et l'une contredit la fiche.** La règle d'adresse retirée fait tomber **cinq**
+tests — les deux de l'action, les trois du module pur —, non *« la mesure 2 et aucune autre »* :
+**cinquième énoncé de fiche mis en défaut du chantier**, et c'est le nombre qui est faux, jamais la
+propriété. L'extension d'`ALREADY_STAFFED` neutralisée fait tomber **un seul** test, au mot de la
+fiche — et elle a montré autre chose : **rien en base ne la double**, `invitations_pending_unique`
+portant sur `(domain_id, person_id)`, deux invitations vivantes pour deux personnes ont coexisté sans
+qu'aucune contrainte proteste. Le contrôle applicatif est le **seul** gardien, là où son voisin
+d'`invitePerson` en a deux.
+
+**Sans JavaScript, la révocation n'est pas atteignable**, et c'est mesuré : le contenu d'`ActionMenu`
+n'est pas dans le HTML servi — aucun des trois gestes de la ligne n'y paraît, ce qui vaut depuis T9.4.
+Le geste neuf hérite du défaut sans l'aggraver en nature, mais il l'aggrave en portée : il est le seul
+chemin qui rouvre une entreprise close. **Troisième exception à D30**, non arbitrée, partie dans
+`ETAT.md` avec sa destination.
+
+**1 910 → 1 940 tests sur 68 fichiers**, `lint` (`--max-warnings=0`) et `tsc` au vert.

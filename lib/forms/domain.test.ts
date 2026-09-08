@@ -13,6 +13,7 @@
 import { describe, expect, test } from "vitest";
 
 import {
+  addressDomainsOf,
   EMPTY_DOMAIN_VALUES,
   IDENTITY_PROVIDERS,
   isIdentityProvider,
@@ -35,6 +36,9 @@ const COMPLETE = {
   competenceCenterName: "Studio Design",
   provider: "google",
   identityValue: "acme.com",
+  description: "L'entreprise qui fournit tout au coyote.",
+  managerFullName: "Camille Roux",
+  managerEmail: "camille@acme.com",
 };
 
 describe("normalizeIdentityValue", () => {
@@ -69,7 +73,7 @@ describe("isIdentityProvider", () => {
 });
 
 describe("readDomainForm", () => {
-  test("lit les quatre champs, et normalise l'identité au passage", () => {
+  test("lit les sept champs, et normalise l'identité au passage", () => {
     expect(
       readDomainForm(form({ ...COMPLETE, identityValue: "  ACME.com " })),
     ).toEqual({ ...COMPLETE, identityValue: "acme.com" });
@@ -81,7 +85,20 @@ describe("readDomainForm", () => {
       competenceCenterName: "",
       provider: "",
       identityValue: "",
+      description: "",
+      managerFullName: "",
+      managerEmail: "",
     });
+  });
+
+  /* Du même côté que le rapprochement de la règle d'entrée 6 et que la règle
+     d'adresse : une saisie en capitales ne doit rendre un compte ni
+     injoignable, ni refusé à tort. */
+  test("abaisse la casse de l'adresse de l'administrateur", () => {
+    expect(
+      readDomainForm(form({ ...COMPLETE, managerEmail: "Camille@ACME.com" }))
+        .managerEmail,
+    ).toBe("camille@acme.com");
   });
 
   /* Un champ caché ajouté par n'importe qui deviendrait une colonne écrite —
@@ -92,7 +109,10 @@ describe("readDomainForm", () => {
     );
     expect(Object.keys(values).sort()).toEqual([
       "competenceCenterName",
+      "description",
       "identityValue",
+      "managerEmail",
+      "managerFullName",
       "name",
       "provider",
     ]);
@@ -138,13 +158,75 @@ describe("validateDomainForm", () => {
     ).toContain("n'existe pas");
   });
 
-  test("l'état vide porte les deux erreurs de nom et celle de l'identité", () => {
+  test("l'état vide porte cinq erreurs, et la description n'en est pas", () => {
     const errors = validateDomainForm(EMPTY_DOMAIN_VALUES);
     expect(Object.keys(errors).sort()).toEqual([
       "competenceCenterName",
       "identityValue",
+      "managerEmail",
+      "managerFullName",
       "name",
     ]);
+  });
+
+  /* ------------------------------------------------------------------------
+     L'administrateur, saisi dans le même formulaire — T11.4
+     ------------------------------------------------------------------------ */
+
+  test("la description est facultative, et elle seule", () => {
+    expect(validateDomainForm({ ...COMPLETE, description: "" })).toEqual({});
+  });
+
+  test("le nom de l'administrateur est obligatoire", () => {
+    expect(
+      validateDomainForm({ ...COMPLETE, managerFullName: "" }).managerFullName,
+    ).toContain("obligatoire");
+  });
+
+  test("son adresse est obligatoire", () => {
+    expect(
+      validateDomainForm({ ...COMPLETE, managerEmail: "" }).managerEmail,
+    ).toContain("obligatoire");
+  });
+
+  /* **La règle d'adresse, confrontée à l'identité du même formulaire** — c'est
+     l'arbitrage (11), et c'est la mesure 2 de la fiche, en amont de l'action. */
+  test("une adresse hors du nom de domaine saisi est refusée", () => {
+    expect(
+      validateDomainForm({ ...COMPLETE, managerEmail: "camille@gmail.com" })
+        .managerEmail,
+    ).toContain("@acme.com");
+  });
+
+  test("elle suit l'identité saisie, jamais une valeur figée", () => {
+    expect(
+      validateDomainForm({
+        ...COMPLETE,
+        identityValue: "autre.example",
+        managerEmail: "camille@autre.example",
+      }),
+    ).toEqual({});
+  });
+
+  /* **Le `tid` d'Entra n'est pas un nom de domaine** : il n'y a rien à
+     confronter, et la règle ne s'applique pas (décision du 08/09/2026). */
+  test("sous Microsoft, l'adresse n'est pas confrontée au locataire", () => {
+    expect(
+      validateDomainForm({
+        ...COMPLETE,
+        provider: "microsoft",
+        identityValue: "9188040d-6c67-4c5b-b112-36a304b66dad",
+        managerEmail: "camille@acme.com",
+      }),
+    ).toEqual({});
+  });
+
+  /* Une identité fautive ne dit qu'une faute : refuser l'adresse en plus
+     commanderait une correction que la première rend inutile. */
+  test("une identité vide ne fait pas refuser l'adresse par surcroît", () => {
+    const errors = validateDomainForm({ ...COMPLETE, identityValue: "" });
+    expect(errors.identityValue).toBeDefined();
+    expect(errors.managerEmail).toBeUndefined();
   });
 });
 
@@ -155,8 +237,10 @@ describe("parseDomainForm", () => {
     expect(input).toEqual({
       name: "Acme",
       competenceCenterName: "Studio Design",
+      description: "L'entreprise qui fournit tout au coyote.",
       provider: "google",
       identityValue: "acme.com",
+      manager: { fullName: "Camille Roux", email: "camille@acme.com" },
     });
   });
 
@@ -175,6 +259,47 @@ describe("parseDomainForm", () => {
   test("la saisie revient telle quelle avec l'erreur", () => {
     const { values } = parseDomainForm(form({ ...COMPLETE, name: "" }));
     expect(values.competenceCenterName).toBe("Studio Design");
+  });
+
+  /* **Nulle plutôt que vide** : une description non saisie n'est pas une phrase
+     vide, et la colonne est `null`able. */
+  test("une description non saisie descend nulle en base", () => {
+    const { input } = parseDomainForm(form({ ...COMPLETE, description: "" }));
+    expect(input?.description).toBeNull();
+  });
+});
+
+/* ==========================================================================
+   Les noms de domaine dont une adresse peut relever — T11.4
+   ========================================================================== */
+
+describe("addressDomainsOf", () => {
+  /* **Un `hd` est un nom de domaine ; un `tid` ne l'est pas.** Ce test est le
+     seul endroit qui dit pourquoi la règle d'adresse ne s'applique pas sous
+     Entra ID : aucune adresse réelle ne porte un identifiant de locataire. */
+  test("ne retient que les identités Google", () => {
+    expect(
+      addressDomainsOf([
+        { provider: "google", value: "acme.com" },
+        { provider: "microsoft", value: "9188040d-6c67-4c5b-b112-36a304b66dad" },
+      ]),
+    ).toEqual(["acme.com"]);
+  });
+
+  test("une entreprise à deux identités Google rend les deux", () => {
+    expect(
+      addressDomainsOf([
+        { provider: "google", value: "acme.com" },
+        { provider: "google", value: "acme.fr" },
+      ]),
+    ).toEqual(["acme.com", "acme.fr"]);
+  });
+
+  test("sans identité Google, il n'y a rien à confronter", () => {
+    expect(addressDomainsOf([])).toEqual([]);
+    expect(
+      addressDomainsOf([{ provider: "microsoft", value: "un-tid" }]),
+    ).toEqual([]);
   });
 });
 

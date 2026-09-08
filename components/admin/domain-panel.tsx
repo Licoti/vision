@@ -22,10 +22,12 @@
 
 import { useActionState } from "react";
 
+import { InvitationLink } from "@/components/admin/invitation-link";
 import { borderOf, CONTROL, CONTROL_TEXT, FormField } from "@/components/ui/form-field";
 import { Panel } from "@/components/ui/panel";
 import { formatIdentityProvider } from "@/lib/format";
 import {
+  addressDomainsOf,
   EMPTY_DOMAIN_VALUES,
   IDENTITY_CLAIM,
   IDENTITY_PROVIDERS,
@@ -35,11 +37,14 @@ import {
 
 export function DomainPanel({
   action,
+  expiryDays,
 }: {
   action: (
     state: DomainFormState,
     formData: FormData,
   ) => Promise<DomainFormState>;
+  /** Ce que vaut un lien d'invitation, dit à qui le crée. Valeur du serveur. */
+  expiryDays: number;
 }) {
   const [state, submit, pending] = useActionState(action, {
     values: EMPTY_DOMAIN_VALUES,
@@ -57,6 +62,15 @@ export function DomainPanel({
     ? IDENTITY_CLAIM[values.provider]
     : IDENTITY_CLAIM.google;
 
+  /* **Le `hd` est un nom de domaine ; le `tid` ne l'est pas** — la note de
+     l'adresse ne promet donc une correspondance que là où la règle s'applique.
+     Le rendu part de la valeur revenue de l'action, jamais d'un état client :
+     sans JavaScript, la note reste juste. */
+  const identityIsAddressDomain =
+    addressDomainsOf([
+      { provider: values.provider, value: values.identityValue },
+    ]).length > 0;
+
   return (
     <Panel
       action={submit}
@@ -64,8 +78,16 @@ export function DomainPanel({
       submitLabel="Créer l'entreprise"
       message={state.message}
       errors={errors}
-      ok={state.ok}
     >
+      {state.link ? (
+        <InvitationLink
+          link={state.link}
+          sent={state.sent ?? false}
+          email={values.managerEmail}
+          expiryDays={expiryDays}
+        />
+      ) : (
+        <>
       <FormField
         label="Nom de l'entreprise"
         htmlFor="domaine-nom"
@@ -157,6 +179,90 @@ export function DomainPanel({
           className={`${CONTROL_TEXT} ${borderOf(errors.identityValue)}`}
         />
       </FormField>
+
+      <FormField
+        label="Description"
+        htmlFor="domaine-description"
+        note="Ce que fait cette entreprise, en une phrase. Facultative — elle se corrige ensuite depuis l'intérieur du domaine."
+        error={errors.description}
+        errorId="domaine-description-erreur"
+      >
+        <textarea
+          id="domaine-description"
+          name="description"
+          rows={3}
+          defaultValue={values.description}
+          aria-invalid={errors.description ? true : undefined}
+          aria-describedby={
+            errors.description ? "domaine-description-erreur" : undefined
+          }
+          className={`${CONTROL} resize-y`}
+        />
+      </FormField>
+
+      {/* **Le premier administrateur se saisit ici, et pas dans un second
+          geste** : une entreprise sans compte n'ouvre aucune session (règle
+          d'entrée 6), et la créer sans lui, c'était créer une ligne que
+          personne ne pouvait ouvrir. Il naît **sans accès** : c'est le lien
+          qu'il reçoit, et sa connexion, qui l'ouvriront. */}
+      <FormField
+        label="Prénom et nom de l'administrateur"
+        htmlFor="domaine-responsable"
+        note="La personne qui administrera cette entreprise dans Vision : elle crée les produits et les accompagnements, gère les référentiels, et invite les comptes suivants. Par exemple « Camille Roux »."
+        error={errors.managerFullName}
+        errorId="domaine-responsable-erreur"
+        required
+      >
+        <input
+          id="domaine-responsable"
+          name="managerFullName"
+          type="text"
+          defaultValue={values.managerFullName}
+          autoComplete="off"
+          aria-invalid={errors.managerFullName ? true : undefined}
+          aria-describedby={
+            errors.managerFullName ? "domaine-responsable-erreur" : undefined
+          }
+          className={`${CONTROL} ${borderOf(errors.managerFullName)}`}
+        />
+      </FormField>
+
+      <FormField
+        label="Adresse e-mail de l'administrateur"
+        htmlFor="domaine-responsable-email"
+        note={`Elle doit relever du nom de domaine de l'entreprise${identityIsAddressDomain ? ` — « @${values.identityValue || "acme.com"} »` : ""} : une adresse d'un autre nom de domaine ne serait rapprochée par aucun jeton. C'est à elle que part l'invitation.`}
+        error={errors.managerEmail}
+        errorId="domaine-responsable-email-erreur"
+        required
+      >
+        <input
+          id="domaine-responsable-email"
+          name="managerEmail"
+          type="email"
+          inputMode="email"
+          placeholder="prenom.nom@acme.com"
+          defaultValue={values.managerEmail}
+          autoComplete="off"
+          spellCheck={false}
+          aria-invalid={errors.managerEmail ? true : undefined}
+          aria-describedby={
+            errors.managerEmail
+              ? "domaine-responsable-email-erreur"
+              : undefined
+          }
+          className={`${CONTROL_TEXT} ${borderOf(errors.managerEmail)}`}
+        />
+      </FormField>
+
+      {/* **Aucun accès n'est accordé par ce geste** (arbitrage (9)), et la
+          phrase le dit avant le clic plutôt qu'après. */}
+      <p className="text-xs text-content-neutral-dark">
+        L&apos;administrateur ne reçoit aucun accès maintenant : le lien
+        s&apos;affichera ici une seule fois, et vous pourrez le transmettre
+        vous-même ; s&apos;il part aussi par courriel, le panneau le dira.
+      </p>
+        </>
+      )}
     </Panel>
   );
 }

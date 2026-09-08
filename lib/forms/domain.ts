@@ -5,8 +5,8 @@
  * qui rend la règle énonçable et vérifiable seule, sans branche Neon.
  *
  * **Deux formulaires dans un module, et une règle d'identité écrite une fois.**
- * La création saisit une entreprise *et* sa première identité ; le panneau des
- * identités n'en saisit qu'une. Les séparer en deux fichiers aurait fait vivre
+ * La création saisit une entreprise, sa première identité *et son premier
+ * administrateur* (T11.4) ; le panneau des identités n'en saisit qu'une. Les séparer en deux fichiers aurait fait vivre
  * la même règle de normalisation à deux endroits — *« deux copies divergent un
  * jour, et c'est celle qu'on a oublié de corriger qui laisse passer »*. Ce qui
  * les réunit n'est pas la commodité, c'est que la seconde est un morceau de la
@@ -30,6 +30,10 @@
  */
 
 import { identityProvider } from "@/lib/db/schema";
+import {
+  validateDomainManagerForm,
+  type DomainManagerFormValues,
+} from "@/lib/forms/domain-manager";
 import { referentialField } from "@/lib/forms/referential";
 
 /** `google` · `microsoft`. Dérivé du schéma. */
@@ -68,6 +72,30 @@ export function isIdentityProvider(
  */
 export function normalizeIdentityValue(value: string): string {
   return value.trim().toLowerCase();
+}
+
+/**
+ * Les noms de domaine dont une adresse de cette entreprise peut relever —
+ * T11.4, et **c'est le seul endroit qui en décide**.
+ *
+ * **Un `hd` est un nom de domaine ; un `tid` ne l'est pas.** Google rend le nom
+ * de domaine de l'entreprise, qu'une adresse porte après son arobase ; Entra ID
+ * rend un identifiant de locataire, qu'aucune adresse ne contient. Confronter
+ * une adresse à un `tid` refuserait toute saisie légitime : Microsoft ne rend
+ * donc **aucun** nom de domaine à confronter, et la règle ne s'applique pas —
+ * décision humaine du 08/09/2026, consignée au journal technique.
+ *
+ * **Sa limite est celle de l'arbitrage (11)** : une entreprise dont le `hd` est
+ * `mycompany.com` et les adresses `@mycompany.fr` verra sa saisie refusée. Le
+ * contournement est d'ajouter le second nom de domaine comme identité vérifiée,
+ * ce que le super administrateur peut faire — et cette liste le suit.
+ */
+export function addressDomainsOf(
+  identities: readonly { provider: string; value: string }[],
+): string[] {
+  return identities
+    .filter((identity) => identity.provider === "google")
+    .map((identity) => identity.value);
 }
 
 /** La règle de forme d'une identité, partagée par les deux formulaires. */
@@ -110,6 +138,12 @@ export type DomainFormValues = {
   provider: string;
   /** Le `hd` de Google ou le `tid` d'Entra, tel que le fournisseur le rend. */
   identityValue: string;
+  /** Ce que fait l'entreprise, en une phrase. **Facultative** — T11.4. */
+  description: string;
+  /** « Camille Roux ». Le premier administrateur, invité par ce même geste. */
+  managerFullName: string;
+  /** L'adresse que le fournisseur vérifiera, et qui reçoit l'invitation. */
+  managerEmail: string;
 };
 
 export type DomainFormErrors = Partial<Record<keyof DomainFormValues, string>>;
@@ -124,8 +158,18 @@ export type DomainFormState = {
   errors: DomainFormErrors;
   /** Un empêchement qui n'appartient à aucun champ : un droit, une ligne rangée. */
   message?: string;
-  /** L'écriture a eu lieu : le panneau se referme (TD.2). */
-  ok?: boolean;
+  /**
+   * Le lien d'invitation du premier administrateur, **rendu une seule fois** —
+   * T11.4.
+   *
+   * **Il tient lieu d'`ok`** : `ok` referme le panneau (TD.2) et emporterait
+   * avec lui la seule occurrence en clair du jeton, dont Vision ne garde que
+   * l'empreinte (T11.1). Le panneau reste ouvert sur ce qu'il vient de créer —
+   * c'est l'écart nommé de T11.2, resservi ici.
+   */
+  link?: string;
+  /** Le courriel est-il **parti** ? — un fait, jamais un réglage (T11.3). */
+  sent?: boolean;
 };
 
 export const EMPTY_DOMAIN_VALUES: DomainFormValues = {
@@ -133,15 +177,23 @@ export const EMPTY_DOMAIN_VALUES: DomainFormValues = {
   competenceCenterName: "",
   provider: "google",
   identityValue: "",
+  description: "",
+  managerFullName: "",
+  managerEmail: "",
 };
 
 /**
- * Les quatre champs de ce formulaire, et pas un de plus.
+ * Les sept champs de ce formulaire, et pas un de plus.
  *
  * L'action ne construit jamais sa ligne par étalement d'un `FormData` : un champ
  * caché ajouté par n'importe qui deviendrait une colonne écrite — et `status`
  * est précisément la colonne qu'un tel champ atteindrait, celle qui décide qui
- * peut ouvrir une session.
+ * peut ouvrir une session. Le **rôle** est le second nom qu'un tel champ
+ * viserait : il ne se saisit pas, ce geste ne connaît que `domain_manager`.
+ *
+ * **L'adresse est abaissée**, du même côté que le rapprochement de la règle
+ * d'entrée 6 et que la règle d'adresse : une saisie en capitales ne doit rendre
+ * un compte ni injoignable, ni refusé à tort.
  */
 export function readDomainForm(formData: FormData): DomainFormValues {
   return {
@@ -151,9 +203,23 @@ export function readDomainForm(formData: FormData): DomainFormValues {
     identityValue: normalizeIdentityValue(
       referentialField(formData, "identityValue"),
     ),
+    description: referentialField(formData, "description"),
+    managerFullName: referentialField(formData, "managerFullName"),
+    managerEmail: referentialField(formData, "managerEmail").toLowerCase(),
   };
 }
 
+/**
+ * **Un seul formulaire, là où il y en avait deux** (T11.4).
+ *
+ * Les deux champs du responsable ne sont pas revalidés ici : ils passent par
+ * `validateDomainManagerForm`, qui porte déjà la règle d'adresse et l'exigence
+ * d'e-mail. Les récrire poserait une seconde autorité, qui divergerait un jour
+ * de la première.
+ *
+ * **La règle d'adresse se confronte à l'identité saisie dans ce même
+ * formulaire** : c'est la seule que l'entreprise portera à sa naissance.
+ */
 export function validateDomainForm(values: DomainFormValues): DomainFormErrors {
   const errors: DomainFormErrors = {};
 
@@ -170,24 +236,53 @@ export function validateDomainForm(values: DomainFormValues): DomainFormErrors {
   if (identity.provider) errors.provider = identity.provider;
   if (identity.value) errors.identityValue = identity.value;
 
-  /* Aucune longueur maximale : les deux colonnes sont des `text` sans
+  /* **Les noms de domaine ne se dérivent que d'une identité valide** : sur une
+     saisie fautive, il n'y a rien à confronter, et refuser l'adresse en plus
+     dirait une seconde faute là où il n'y en a qu'une. */
+  const addressDomains =
+    identity.value || identity.provider
+      ? []
+      : addressDomainsOf([
+          { provider: values.provider, value: values.identityValue },
+        ]);
+
+  const manager = validateDomainManagerForm(
+    {
+      fullName: values.managerFullName,
+      email: values.managerEmail,
+    } satisfies DomainManagerFormValues,
+    addressDomains,
+  );
+  if (manager.fullName) errors.managerFullName = manager.fullName;
+  if (manager.email) errors.managerEmail = manager.email;
+
+  /* Aucune longueur maximale : les trois colonnes sont des `text` sans
      contrainte, et en inventer une ici serait une règle produit que ni `docs/02`
-     ni `docs/04` ne portent — la règle de `lib/forms/vision.ts`. */
+     ni `docs/04` ne portent — la règle de `lib/forms/vision.ts`. La description
+     n'a pas non plus d'obligation : c'est la seule colonne facultative du
+     formulaire. */
 
   return errors;
 }
 
 /**
- * Les colonnes que ce formulaire écrit, **dans deux tables**.
+ * Les colonnes que ce formulaire écrit, **dans quatre tables** (T11.4).
  *
- * `status` et `archived_at` n'y figurent pas : la première garde sa valeur par
- * défaut, la seconde n'appartient qu'à `archiveDomain` et `restoreDomain`.
+ * `domains` et `domain_identities` depuis T9.4 ; `persons` et `invitations`
+ * depuis T11.4, où le premier administrateur naît **sans accès** et reçoit un
+ * lien. `status` et `archived_at` n'y figurent pas : la première garde sa
+ * valeur par défaut, la seconde n'appartient qu'à `archiveDomain` et
+ * `restoreDomain`. `has_access` et `domain_role` non plus : ils attendent
+ * l'acceptation (arbitrage (9)).
  */
 export type DomainRowInput = {
   name: string;
   competenceCenterName: string;
+  /** Nulle plutôt que vide : une description non saisie n'est pas une phrase vide. */
+  description: string | null;
   provider: IdentityProviderValue;
   identityValue: string;
+  manager: { fullName: string; email: string };
 };
 
 /**
@@ -216,8 +311,13 @@ export function parseDomainForm(formData: FormData): {
     input: {
       name: values.name,
       competenceCenterName: values.competenceCenterName,
+      description: values.description || null,
       provider: values.provider,
       identityValue: values.identityValue,
+      manager: {
+        fullName: values.managerFullName,
+        email: values.managerEmail,
+      },
     },
   };
 }

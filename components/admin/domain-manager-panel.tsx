@@ -22,6 +22,7 @@
 
 import { useActionState } from "react";
 
+import { InvitationLink } from "@/components/admin/invitation-link";
 import { borderOf, CONTROL, CONTROL_TEXT, FormField } from "@/components/ui/form-field";
 import { Panel } from "@/components/ui/panel";
 import {
@@ -31,12 +32,15 @@ import {
 
 export function DomainManagerPanel({
   action,
+  expiryDays,
 }: {
   /** L'action serveur, **déjà liée** au domaine. Le panneau ne sait pas lequel. */
   action: (
     state: DomainManagerFormState,
     formData: FormData,
   ) => Promise<DomainManagerFormState>;
+  /** Ce que vaut un lien, dit à qui le crée. La valeur vient du serveur. */
+  expiryDays: number;
 }) {
   const [state, submit, pending] = useActionState(action, {
     values: EMPTY_DOMAIN_MANAGER_VALUES,
@@ -46,6 +50,10 @@ export function DomainManagerPanel({
   const values = state.values;
   const errors = state.errors;
 
+  /* **Deux états, un seul composant** — le patron d'`invitation-panel.tsx`.
+     Tant que `state.link` est absent, c'est un formulaire ; dès qu'il paraît,
+     c'est le lien, et le panneau **ne se referme pas** : `ok` emporterait la
+     seule occurrence en clair du jeton. */
   return (
     <Panel
       action={submit}
@@ -53,8 +61,16 @@ export function DomainManagerPanel({
       submitLabel="Désigner le responsable"
       message={state.message}
       errors={errors}
-      ok={state.ok}
     >
+      {state.link ? (
+        <InvitationLink
+          link={state.link}
+          sent={state.sent ?? false}
+          email={values.email}
+          expiryDays={expiryDays}
+        />
+      ) : (
+        <>
       <FormField
         label="Nom complet"
         htmlFor="responsable-nom"
@@ -101,6 +117,18 @@ export function DomainManagerPanel({
           className={`${CONTROL_TEXT} ${borderOf(errors.email)}`}
         />
       </FormField>
+
+      {/* **Ce que la phrase promet, l'action le tient dans les deux cas** :
+          elle ne dit pas *un courriel partira*, l'envoi n'étant pas raccordé
+          partout, et une promesse fausse vaudrait le silence qu'elle
+          remplace. */}
+      <p className="text-xs text-content-neutral-dark">
+        Cette personne ne reçoit aucun accès maintenant : elle reçoit un lien
+        d&apos;invitation, et c&apos;est sa connexion par le fournisseur
+        d&apos;identité qui ouvrira son compte.
+      </p>
+        </>
+      )}
     </Panel>
   );
 }

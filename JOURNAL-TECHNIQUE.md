@@ -11317,3 +11317,81 @@ révoquée, l'événement de journal. La base de développement a déjà dériv�
 dans une. Il en fait **253** après deux passes de compression. **Un ticket ne peut pas balayer** :
 `CLAUDE.md` réserve ce geste à la session de découpage, et le précédent de T5bis.2 est le même. Le
 seuil est donc franchi sciemment, et il le restera jusqu'au découpage suivant.
+
+---
+
+## T11.4 — L'amorçage d'un domaine : un geste, une règle d'adresse, et une invitation (08/09/2026)
+
+**Un geste que la fiche n'a pas nommé, et sans lequel son propre critère était inatteignable.**
+L'attendu de T11.4 liste cinq gestes, et aucun n'est la révocation. Or sa mesure 3 demande *« acceptée
+après révocation »*, son point 4 écrit *« le super administrateur révoque et redésigne — c'est le seul
+chemin »*, et **ce chemin n'existait pas** : `revokeInvitation` vit dans `/equipe` et exige une session
+**dans** le domaine, que personne ne peut ouvrir tant qu'aucun compte n'y existe. Sans un geste sur
+`/domaines`, une entreprise dont l'administrateur ne vient jamais restait close pour de bon.
+`revokeDomainInvitation` est donc née d'une **décision humaine du 08/09/2026**, prise au plan, et
+l'écart entre l'attendu et le mesuré est ici : *un attendu qui ne nomme pas un geste n'a pas prouvé
+qu'il n'en fallait pas — c'est son critère qui le dit.*
+
+**La règle d'adresse ne s'applique pas sous Entra ID, et ce n'est pas un oubli.** L'arbitrage (11)
+écrit *« une adresse hors du nom de domaine saisi est refusée »* et suppose que l'identité vérifiée
+**soit** un nom de domaine : c'est le `hd` de Google, ce n'est pas le `tid` d'Entra, qui est un
+identifiant de locataire. Confronter une adresse à un GUID aurait refusé **toute** saisie légitime et
+rendu Microsoft inutilisable par l'écran. `addressDomainsOf` ne retient donc que les identités Google,
+et **une liste vide ne refuse rien** — la règle se tait plutôt que d'inventer. Décision humaine du
+08/09/2026 ; la limite de l'arbitrage tient inchangée pour Google, et son contournement aussi : une
+entreprise à deux noms de domaine ajoute le second comme identité vérifiée.
+
+**Le refus strict est strict, et deux pièges d'implémentation ont été fermés par le test.** Un
+`endsWith` aurait accepté `user1@mail.mycompany.com`, un `includes` aurait accepté
+`user1@notmycompany.com` : ni l'un ni l'autre n'est l'adresse d'une entreprise, et les deux sont
+mesurés comme refus. La comparaison porte sur le segment qui suit le **dernier** arobase, en
+minuscules des deux côtés.
+
+**Rien en base ne tient l'extension d'`ALREADY_STAFFED`, et la mise en défaut l'a montré.** Le sixième
+refus d'`invitePerson` (T11.2) a un filet : `invitations_pending_unique` porte sur
+`(domain_id, person_id)`, et le neutraliser fait remonter la contrainte **sous son nom**. Ici, la
+seconde désignation vise une **autre personne** : l'index ne la voit pas, et le refus neutralisé,
+**deux invitations vivantes ont coexisté dans le même domaine** — la seconde a rendu son lien sans que
+rien ne proteste. Le contrôle applicatif est donc **le seul gardien** de *un seul premier compte à la
+fois*, là où son voisin en a deux. Le fait est dit plutôt que supposé, et il vaut pour qui voudra un
+jour « simplifier » cette ligne.
+
+**La mise en défaut de la règle d'adresse contredit la fiche, comme quatre fois avant elle.** La fiche
+annonce *« la mesure 2 et aucune autre »* ; la règle retirée fait tomber **cinq** tests — les deux de
+l'action (création et redésignation) et les trois du module pur. Aucun ne dit autre chose que la règle
+d'adresse : ce qui est faux est le **nombre**, jamais la propriété. **Cinquième énoncé de fiche mis en
+défaut du chantier.** L'autre mise en défaut, elle, tient au mot près : l'extension neutralisée fait
+tomber **un seul** test, et c'est la mesure 3.
+
+**Le panneau ne se referme plus sur le succès, et c'est la troisième fois.** `createDomain` et
+`designateDomainManager` ne rendent plus `ok` mais `link` : `ok` referme le panneau (TD.2) et
+emporterait **la seule occurrence en clair du jeton**, dont Vision ne garde que l'empreinte (T11.1).
+C'est l'écart nommé de T11.2, resservi ici pour la même raison, et il est désormais porté par trois
+gestes. Le bloc du lien est **écrit une fois** (`components/admin/invitation-link.tsx`) pour les deux
+panneaux d'amorçage — **un quatrième fichier hors du périmètre annoncé**, demandé au plan : le recopier
+aurait ajouté une forme à celles qu'`ETAT.md` compte déjà en double.
+
+**Sans JavaScript, la révocation n'est pas atteignable — et elle porte le seul chemin de
+rattrapage.** Mesuré : le contenu d'`ActionMenu` **n'est pas dans le HTML servi**, aucun des trois
+gestes de la ligne d'entreprise n'y paraît, et cela vaut depuis T9.4 pour « Rétablir l'accès » et
+« Rétablir cette entreprise ». Le geste neuf hérite du défaut sans l'aggraver *en nature*, mais il
+l'aggrave *en portée* : les deux gestes existants se défont autrement, celui-ci est le seul chemin
+qui rouvre une entreprise close. **Troisième exception à D30**, non arbitrée. Le refermer demande une
+adresse d'ouverture, donc un panneau, donc `lib/drawers/domains.tsx` et un paramètre d'URL — hors
+périmètre (règle 3). Le point part dans `ETAT.md` avec sa destination.
+
+**Ce qui est lu dans le HTML servi, et ce qui ne peut pas l'être.** Sous un cookie de super
+administrateur **réellement scellé**, `<script>` retirés : la ligne d'une entreprise en attente porte
+*« Invitation en attente — le compte s'ouvrira à l'acceptation »* et **ne porte pas** *« Aucun
+compte »* ; l'invitation révoquée, les deux phrases s'échangent. Les entrées de menu, elles, ne se
+lisent pas — voir ci-dessus —, et ce ticket ne prétend donc pas les avoir mesurées.
+
+**Une trace laissée puis ôtée dans la base de développement.** La sonde de mesure a créé une
+entreprise « Sonde T11.4 », son identité, une personne sans accès et son invitation, puis les a
+**supprimées** en fin de mesure — la règle 4 protège la donnée métier, pas une fixture locale posée
+pour la durée d'un `curl`. Il reste une ligne `super_admins` « Sonde T11.4 », qui sert d'autorité à la
+mesure et qu'archiver aurait suffi à neutraliser.
+
+**`ETAT.md` reste au-dessus du seuil**, à 253 lignes avant ce ticket. Une ligne de ticket et deux
+points ouverts neufs y entrent, deux points existants se récrivent. **Un ticket ne balaie pas** —
+`CLAUDE.md` réserve le geste à la session de découpage —, et le dépassement reste su.

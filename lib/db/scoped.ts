@@ -1198,6 +1198,16 @@ export type AdminDomainRow = {
   hasIdentity: boolean;
   /** Au moins une personne vivante à `has_access` : sans elle, personne n'entre. */
   hasAccount: boolean;
+  /**
+   * Au moins une invitation **vivante** — T11.4.
+   *
+   * **C'est le troisième fait d'accessibilité**, et il dit ce que les deux
+   * autres ne peuvent pas dire : sans lui, un domaine correctement amorcé se
+   * lirait comme un domaine que personne ne peut ouvrir, alors qu'il attend un
+   * clic. **Un fait, jamais un décompte** (D39) : la liste dit *une invitation
+   * attend*, elle ne dit pas combien ni depuis quand.
+   */
+  hasPendingInvitation: boolean;
 };
 
 export function asSuperAdmin(grant: SuperAdminGrant) {
@@ -1295,6 +1305,19 @@ export function asSuperAdmin(grant: SuperAdminGrant) {
               and account.has_access
               and account.archived_at is null
           )`,
+          /* **L'expression est celle de l'index partiel**, mot pour mot
+             (`invitations_pending_unique`) : une invitation acceptée ou révoquée
+             est une trace, et **une invitation périmée compte encore** — le lien
+             est mort, la ligne est vivante, et l'index la retiendrait. Deux
+             lectures qui divergeraient ici diraient deux choses de la même
+             ligne. L'alias est celui des deux voisines, pour la même raison
+             mesurée le 06/09/2026. */
+          hasPendingInvitation: sql<boolean>`exists (
+            select 1 from ${invitations} as pending
+            where pending.domain_id = ${domains}.id
+              and pending.accepted_at is null
+              and pending.revoked_at is null
+          )`,
         })
         .from(domains)
         .orderBy(domains.name);
@@ -1325,6 +1348,8 @@ export function asSuperAdmin(grant: SuperAdminGrant) {
     async createDomain(values: {
       name: string;
       competenceCenterName: string;
+      /** Facultative — T11.4. `null` plutôt qu'une phrase vide. */
+      description?: string | null;
     }): Promise<InferSelectModel<typeof domains>> {
       await assertAuthority();
 
