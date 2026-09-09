@@ -2,8 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 08/09/2026, **T11.5 terminé — C11 est clos, le parcours tient de bout en
-bout**. Un administrateur corrige les **trois champs descriptifs** de son domaine, et pas un de plus :
+**Dernière mise à jour :** 09/09/2026. **T11.5 terminé le 08/09 — le parcours tient de bout en
+bout**, et **C11, refermé ce jour-là, rouvre le 09/09 pour son contrôle de sécurité** (voir plus
+bas). Un administrateur corrige les **trois champs descriptifs** de son domaine, et pas un de plus :
 `updateOwnDomain` est une **quatrième forme d'écriture** — une autorité *à l'intérieur* d'un domaine
 sur la seule table sans `domain_id` —, **sa cible n'est jamais un argument**, et `status` comme
 `archived_at` sont des refus **de compilation**. **Périmètre étendu à trois fichiers**, ceux du
@@ -11,8 +12,16 @@ mécanisme des panneaux, demandés au plan et validés. **La boucle est mesurée
 ligne de JavaScript** ; **le 404 du membre ne prouve rien**, c'est la route qui refuse, et c'est le
 test d'action qui établit le droit. **Deux mises en défaut au mot de la fiche**, dont la mesure 3 qui
 vit dans `tsc` et non dans `vitest`. **6ᵉ énoncé de fiche mis en défaut du chantier**, un décompte
-encore. **Vert : 1 956 tests sur 68 fichiers** (1 940 avant). **Suivant : C7 — T7.7 → T7.10, qui
-ferme le POC.**
+encore. **Vert : 1 956 tests sur 68 fichiers** (1 940 avant).
+
+**09/09/2026 — C11 rouvre pour un sixième ticket, et c'est un contrôle.** `tickets-C11.md` porte
+désormais **T11.6 — le contrôle de sécurité de C9 et C11** : la connexion, le SSO, les domaines,
+l'étanchéité et les droits, **éprouvés ensemble** comme une surface d'attaque et non ticket par
+ticket. **Il mesure et consigne, il ne corrige pas** — sauf une faille critique, exception nommée à
+sa fiche. **Deux constats sont déjà en main** et y sont écrits : le dépôt ne sert **aucun en-tête de
+sécurité** et n'a **aucun `middleware.ts`** · `npm audit` rend **deux avis critiques sur
+`next@16.3.0`** et un avis haut sur `sharp`. **Suivant : T11.6**, puis C7 — T7.7 → T7.10, qui ferme
+le POC.
 
 ---
 
@@ -29,11 +38,11 @@ ferme le POC.**
 | TD — Dette technique et couche de présentation | TD.1 → TD.6 | **terminé** |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
-| C7 — Finitions | T7.1 → T7.10 | **le suivant** — T7.1 → T7.6 livrés, T7.7 → T7.10 ferment le POC |
+| C7 — Finitions | T7.1 → T7.10 | **après T11.6** — T7.1 → T7.6 livrés, T7.7 → T7.10 ferment le POC |
 | C8 — Dette | T8.1 → T8.5 | **terminé** |
 | C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **terminé** |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
-| C11 — Le parcours d'entrée | T11.1 → T11.5 | **terminé** |
+| C11 — Le parcours d'entrée | T11.1 → T11.6 | **rouvert le 09/09** — T11.1 → T11.5 livrés, T11.6 suit |
 
 ---
 
@@ -82,7 +91,12 @@ ferme le POC.**
   d'écriture** dont la cible n'est jamais un argument, et deux colonnes refusées **à la compilation**.
   **La boucle mesurée en HTTP réel, sans JavaScript** ; le 404 du membre ne prouve rien — la route
   refuse, l'action est éprouvée à part. **Le parcours entier rejoué en six étapes**, mesure temporaire
-  retirée après coup. 1 940 → **1 956 tests**. **C11 est clos.**
+  retirée après coup. 1 940 → **1 956 tests**. **Chantier refermé — puis rouvert le 09/09 pour
+  T11.6.**
+- **C11 — Le contrôle de sécurité — T11.6, à faire.** La fiche est écrite (09/09) : sept familles,
+  **58 points d'entrée × 4 identités**, l'étanchéité par identifiant d'un autre domaine, et deux
+  constats déjà en main — **aucun en-tête de sécurité, aucun `middleware.ts`** · **`next@16.3.0`
+  porte deux avis critiques**. Il mesure, il ne corrige pas.
 - **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, détaillés dans
   `HISTORIQUE-TICKETS.md`. **Cinq portent une migration, `0010` à `0014`** ; le reste est de
   l'ergonomie, plus le **renommage de « Projets » en « Accompagnements »**, qui **rouvre D35**.
@@ -141,7 +155,8 @@ un amorçage partiel** : le rapprochement de T8.4 le rendrait rejouable sans rie
 qu'un appelant. → **avec la dette de T3.6.**
 **Le RLS a quitté C9** : voir le groupe (c).
 
-**C11 est clos ; C7 ferme le POC** — T7.7 → T7.10.
+**C11 rouvre pour T11.6** — le contrôle de sécurité de C9 et C11 —, **puis C7 ferme le POC**
+(T7.7 → T7.10).
 
 **Deux points de T11.2, dont un récrit par sa mesure.** **Sans JavaScript, le lien d'invitation est
 perdu** — mesuré en T11.3, harnais éprouvé par étape témoin : `resolveTeamDrawer` ferme le panneau

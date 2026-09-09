@@ -11471,3 +11471,49 @@ chemin — le geste du produit, pas une écriture de fixture.
 y entre, quatre points se récrivent, aucun point neuf n'est ouvert. **Un ticket ne balaie
 pas** — `CLAUDE.md` réserve le geste à la session de découpage —, et le dépassement reste su. **C11
 étant clos, la prochaine session de découpage est celle qui devra le faire.**
+
+## C11 rouvre pour un contrôle de sécurité — la fiche de T11.6 (09/09/2026)
+
+**Un chantier clos rouvre, et ce n'est pas un découpage.** T11.5 avait refermé C11 le 08/09/2026 :
+les trois manques posés, le parcours entier rejoué. Le 09/09, une demande humaine y ajoute un
+**sixième ticket** — un contrôle de sécurité portant sur C9 **et** C11. La fiche est écrite dans
+`tickets-C11.md`, avec un **amendement daté en tête du chantier** plutôt qu'un numéro qui dépasserait
+sans explication.
+
+**Pourquoi pas un chantier à part.** Un chantier ne s'ouvre pas sans session de découpage, et un
+découpage se fait **sur un contenu qu'on connaît** : ici, ce que le contrôle trouvera est exactement
+ce qu'on ne sait pas encore. Un chantier d'un seul ticket aurait donc demandé la cérémonie complète
+pour une liste que le ticket lui-même doit produire. Le contrôle porte par ailleurs sur deux
+chantiers dont celui-ci, et **rien n'est en ligne** : c'est le moment où il coûte le moins.
+
+**Trois arbitrages, rendus au plan.** Le ticket **mesure et consigne, il ne corrige pas** — une
+faille confirmée devient un point ouvert daté, sa correction est un ticket à elle (règle 3) —, avec
+**une exception étroite et nommée** : une faille critique se corrige dans le ticket même, laisser une
+porte ouverte le temps d'un commit ne se défendant pas. Ce qui reste après lui, ce sont **des tests,
+là où une garde n'en a pas** — jamais un double des 1 956 existants. Et le résultat s'écrit dans un
+**document de travail**, `SECURITE-C9-C11.md`, qui dira lui-même qu'il n'est pas une fondation.
+
+**Le critère du ticket retourne la deuxième discipline contre la revue elle-même.** *« Les tests se
+mettent en défaut avant d'être crus »* devient : **une sonde qui ne peut pas échouer ne prouve
+rien** — neutraliser la garde qu'elle vise doit la faire passer au rouge, et le rapport dit ce qui a
+été neutralisé et ce qui est tombé. Sans cela, un contrôle de sécurité rend un document rassurant
+dont personne ne sait s'il mesure quoi que ce soit.
+
+**Deux constats sont tombés pendant l'écriture de la fiche, et ils y sont écrits plutôt que laissés
+à découvrir.** Le dépôt ne sert **aucun en-tête de sécurité** — ni `Content-Security-Policy`, ni
+`Strict-Transport-Security`, ni `X-Frame-Options`, ni `Referrer-Policy`, ni
+`X-Content-Type-Options` — et n'a **aucun `middleware.ts`** : la page publique d'invitation est donc
+cadrable, et `/dev/session` ne tient qu'à un `notFound()` posé dans le composant, son action inline
+`switchPerson` ne portant **aucun `requireSession`** (sa fermeture en production vit en profondeur,
+dans `setCurrentPerson`). Et `npm audit --omit=dev` rend **deux avis critiques sur `next@16.3.0`** —
+exécution de code à distance non authentifiée, serveurs Windows d'une part, API d'optimisation
+d'images sur fichiers AVIF d'autre part, corrigées en 16.3.4 — plus un avis haut sur `sharp`.
+`next/image` est employé sur trois composants ; l'hébergement visé est Linux. **La montée de version
+est interdite au ticket** : elle change le produit et demande sa propre mesure.
+
+**Deux énoncés de la fiche du chantier ont cessé d'être vrais et ont été récrits, pas complétés.**
+*« Interdits communs aux cinq tickets »* devient *« aux tickets du chantier »*, avec la phrase qui
+manquait — ils valent pour les six, T11.6 compris, *« un contrôle qui s'autoriserait ce qu'un ticket
+s'interdit ne contrôlerait plus rien »*. Et la vérification de fin de chantier disait *« le vert de
+référence est 1 834 tests sur 64 fichiers »*, relevé après T11.1 : elle porte désormais les deux
+nombres, et dit lequel vaut pour T11.6.

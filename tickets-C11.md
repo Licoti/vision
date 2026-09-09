@@ -32,6 +32,20 @@ domaine. **Trois manquaient** : l'invitation, l'amorçage en un geste avec sa r�
 
 **C11 pose les trois qui manquent, et rien d'autre.**
 
+**Amendement du 09/09/2026 — le chantier rouvre pour un quatrième objet, et il n'est pas du même
+ordre que les trois autres.** T11.5 avait clos C11 la veille : les trois manques étaient posés, le
+parcours entier rejoué. **Décision humaine du 09/09/2026 : un T11.6 s'y ajoute, et c'est un
+contrôle, pas une fonctionnalité.** *« Rien d'autre »* reste donc vrai au sens où il a été écrit —
+C11 n'ajoute aucun quatrième maillon au parcours ; ce que T11.6 apporte est une **épreuve** de ce
+que C9 et C11 ont déjà écrit.
+
+**Pourquoi ici plutôt que dans un chantier à lui.** Le contrôle porte sur deux chantiers, dont
+celui-ci, et **rien n'est encore en ligne** : c'est le dernier moment où il coûte peu. Ouvrir un
+chantier pour un seul ticket aurait demandé une session de découpage — et un découpage se fait sur
+un contenu qu'on ne connaît pas encore, puisque c'est précisément ce que le contrôle doit
+découvrir. **Le chantier repasse « en cours » dans `ETAT.md`, et se referme une seconde fois avec
+T11.6.**
+
 **C10 reste aux macro-parcours**, non découpé. C11 prend le rang suivant plutôt que de s'insérer
 dans un chantier dont le contenu n'est pas tranché.
 
@@ -156,7 +170,10 @@ domaine comme identité, ce que le super administrateur peut faire.
 
 ---
 
-## Interdits communs aux cinq tickets
+## Interdits communs aux tickets du chantier
+
+**Ils valent pour les six**, T11.6 compris — un contrôle qui s'autoriserait ce qu'un ticket
+s'interdit ne contrôlerait plus rien. T11.6 ajoute les siens, il n'en retire aucun.
 
 **Aucune relance, aucun rappel, aucun envoi récurrent.** `docs/03` §8 n'est pas amendé : une
 invitation part une fois. Réinviter est un geste **humain et explicite**, qui révoque le lien
@@ -484,6 +501,184 @@ borne de trois colonnes retirée fait tomber la mesure 3, et **rien d'autre**.
 **Interdits** — **Aucune écriture de `domain_identities`, de `status` ni d'`archived_at`**
 (arbitrage 10). **Aucun sixième écran.** **Aucune migration.** **Aucun `event_target_type` neuf.**
 
+
+---
+
+## T11.6 — Le contrôle de sécurité de C9 et C11
+
+**Objectif** — Éprouver **ensemble**, comme une surface d'attaque, ce que C9 et C11 ont écrit ticket
+par ticket : la connexion, le SSO, la gestion des domaines, l'étanchéité et les droits. **Le ticket
+mesure, il ne répare pas** — sauf une exception nommée plus bas.
+
+**Ce n'est pas une relecture de code.** Un contrôle qui se contente de lire conclut ce qu'il croyait
+déjà. Ici chaque énoncé se frappe : une requête, une réponse, **et un décompte en base**.
+
+---
+
+### Trois arbitrages, rendus au plan du 09/09/2026
+
+**(1) Mesurer et consigner, jamais corriger — sauf le critique.** Chaque faille confirmée devient un
+point ouvert daté, avec sa destination, et sa correction est un ticket à elle : c'est la règle 3, et
+c'est aussi ce qui permet d'**annoncer** un périmètre à un ticket qui touche l'authentification.
+**L'exception, et elle est étroite** : une faille **critique** — une donnée d'un domaine lisible ou
+écrivable depuis un autre, un contournement d'authentification — se corrige **dans** le ticket, et
+l'écart de périmètre se consigne comme les neuf précédents. Laisser une porte ouverte le temps d'un
+commit ne se défend pas.
+
+**(2) Ce qui reste après le ticket, ce sont des tests.** Une sonde qui **trouve un trou**, ou qui
+éprouve une garde qu'**aucun test ne couvre**, devient un test permanent. Celle qui ne ferait que
+rejouer une garde déjà mesurée ne s'ajoute pas : la suite en compte 1 956, et un contrôle qui les
+double n'ajoute que du temps d'exécution. **L'inventaire de ce qui est déjà couvert est fait** — il
+est dans la section « Ce qui tient déjà » ci-dessous, et il se vérifie avant d'écrire quoi que ce
+soit.
+
+**(3) Le résultat s'écrit dans `SECURITE-C9-C11.md`**, créé par ce ticket. **Document de travail, pas
+fondation** : il le dit dans son propre en-tête, comme `ACTIONS-HUMAINES-C11.md`, et il ne figure pas
+au tableau « Où écrire quoi » de `CLAUDE.md`. Les failles confirmées repartent ensuite dans `ETAT.md`
+avec leur destination ; les pièges dans `JOURNAL-TECHNIQUE.md`.
+
+---
+
+### Périmètre
+
+**Ce qui se lit** — `lib/auth/` en entier (`cookie.ts`, `oidc.ts`, `entry.ts`, `invitation.ts`,
+`super-admin.ts`, `provider.ts`, `session.ts`) · les sept routes et pages publiques de `app/auth/`,
+`app/invitation/` et `app/dev/` · les **cinquante-huit actions serveur** de C9 et C11
+(`app/domaines/actions.ts` 9, `app/(app)/equipe/actions.ts` 11, `app/(app)/administration/actions.ts`
+38) et les cinq fonctions `load*Drawer` · `lib/db/scoped.ts` · `eslint.config.mjs` ·
+`next.config.ts` et `netlify.toml`.
+
+**Ce qui s'écrit** — `SECURITE-C9-C11.md` (créé) · des tests, **là où l'arbitrage (2) le demande et
+nulle part ailleurs** · `ETAT.md` et `JOURNAL-TECHNIQUE.md` en fin de ticket.
+
+**La couche d'accès est de C1, et elle entre quand même.** `docs/04` §6 : *« le filtrage par domaine
+ne doit pas être facultatif — c'est la seule faille qui, en multi-domaine, causerait une fuite de
+données entre entreprises »*. Contrôler l'étanchéité sans elle n'aurait pas de sens.
+
+---
+
+### Ce qui tient déjà — à vérifier, jamais à réécrire
+
+**Sept fichiers de tests portent déjà la sécurité de ces deux chantiers**, et le contrôle commence
+par les relire plutôt que par les refaire :
+
+| Fichier | Ce qu'il tient déjà |
+|---|---|
+| `lib/auth/cookie.test.ts` | La signature, l'altération, la troncature, le mauvais secret, l'expiration, la forme inconnue, et **trois cas de confusion de charge** |
+| `lib/auth/entry.test.ts` | La règle 2 avant les autres, et **les huit refus** des règles 4, 5 et 6 |
+| `lib/auth/invitation.test.ts` | **Les sept refus**, l'entropie, l'empreinte, les sept jours, le lien qui ne vaut qu'une fois |
+| `lib/auth/session.test.ts` | Les droits, les identités refusées, le domaine désigné par le couple vérifié |
+| `lib/auth/super-admin.test.ts` | Sans cookie, en responsable de domaine, en super administrateur archivé |
+| `app/auth/callback/[fournisseur]/route.test.ts` | **Aucun cookie posé sur un refus**, et l'ordre `resolvePrincipal` → `redeemInvitation` |
+| `lib/db/scoped.test.ts` | La frontière de domaine en lecture, en écriture, en jointure ; l'autorité forgée ; l'unicité des identités |
+
+**Une ligne du rapport qui ne ferait que citer l'un d'eux n'est pas un contrôle** : elle dit ce qui
+est couvert, et le contrôle porte alors sur ce qui l'entoure.
+
+---
+
+### Attendu — sept familles, et chacune se frappe
+
+**A. Le cookie et la session.** La **matrice de confusion des trois charges** — session, handshake,
+invitation : un seul HMAC les scelle, et la distinction est **structurelle**, pas étiquetée. Les neuf
+croisements se mesurent, dont trois le sont déjà. S'y ajoutent les drapeaux du cookie servi, et la
+**seconde barrière** : accès retiré, personne archivée, personne désactivée, domaine suspendu — **un
+cookie déjà posé n'y survit pas**, et cela se mesure en frappant une action avec un cookie devenu
+caduc, jamais en lisant `loadSession`.
+
+**B. Le SSO.** Rejeu du `code`, rejeu du `state`, `state` d'un autre aller-retour, handshake d'un
+autre fournisseur, absence de handshake, `nonce` absent ou faux. **Le cookie de handshake s'efface
+dans tous les cas** — accepté comme refusé. `?fournisseur=` inconnu et non raccordé : le 500 corrigé
+le 08/09/2026 se re-mesure. Et **aucune cause de refus ne se distingue** dans ce que le visiteur
+reçoit — un refus qui nomme sa cause est un oracle. **Le chemin Microsoft reste non mesurable**
+(aucun locataire raccordé) : il se **déclare** tel dans le rapport, il ne se suppose pas correct.
+
+**C. L'invitation.** Les sept refus, isolés. **La page publique comme oracle** : jeton inconnu,
+révoqué, périmé, déjà accepté doivent rendre **le même écran** — et le rapport dit si le temps de
+réponse les distingue. Le cookie d'invitation n'ouvre aucune session. Le rejeu d'un lien accepté.
+L'ordre `resolvePrincipal` → `redeemInvitation`, qui est l'arbitrage (4) du chantier.
+
+**D. Les droits, éprouvés par l'action.** La matrice **cinquante-huit points d'entrée × quatre
+identités** — aucune, membre, responsable de domaine, super administrateur. **Le décompte en base
+tranche, jamais le code de retour**, et **l'étape témoin n'est pas optionnelle** : la même charge,
+sous l'identité qui a le droit, doit écrire. **Les cinq `load*Drawer` en sont** : ce sont des points
+d'entrée HTTP, pas des détails de rendu.
+
+**E. L'étanchéité.** Chaque action qui reçoit un identifiant, frappée avec **un identifiant d'un
+autre domaine** — deux domaines de fixture, et le décompte lu sur les deux. **Les arguments liés par
+`.bind(null, id)` en font partie** : Next les sérialise dans un champ `$ACTION_…` qu'une soumission
+réécrit, et le rappel de contexte d'`ETAT.md` le dit depuis C6. C'est la famille que `docs/04` §6
+nomme *« la seule faille »* : une confirmée y est **critique** au sens de l'arbitrage (1).
+
+**F. Le transport et l'exposition.** **Deux constats sont déjà en main au 09/09/2026, et ils sont
+écrits ici plutôt que laissés à découvrir** : le dépôt ne sert **aucun en-tête de sécurité** — ni
+`Content-Security-Policy`, ni `Strict-Transport-Security`, ni `X-Frame-Options`, ni
+`Referrer-Policy`, ni `X-Content-Type-Options` — et **il n'a aucun `middleware.ts`**. Il s'ensuit que
+la page publique d'invitation est **cadrable dans une iframe**, et que `/dev/session` ne tient qu'à
+un `notFound()` posé dans le composant, avec une action inline `switchPerson` qui ne porte **aucun
+`requireSession`** — sa fermeture en production vit en profondeur, dans `setCurrentPerson`. Les trois
+se mesurent : un `curl -I` pour les en-têtes, une page cadrée pour l'iframe, et l'action frappée sous
+`NODE_ENV=production`. S'y ajoutent les journaux de serveur — deux `console.error` dans
+`lib/mail/send.ts`, déjà propres au 09/09, à re-mesurer — et les messages d'erreur servis.
+
+**G. Les dépendances.** `npm audit --omit=dev`, et **le résultat du 09/09/2026 est déjà connu** :
+`next@16.3.0` porte **deux avis critiques** — exécution de code à distance non authentifiée sur les
+serveurs hébergés sous Windows, et la même dans l'API d'optimisation d'images sur des fichiers AVIF,
+corrigées en **16.3.4** — et `sharp` un avis **haut**. `next/image` est employé sur trois composants,
+donc l'API concernée est servie ; l'hébergement visé est Netlify, donc Linux. **Le rapport dit
+l'exposition réelle, pas la sévérité annoncée.** **La montée de version n'est pas un geste de
+revue** : elle change le produit, elle demande sa propre mesure, et elle est **interdite ici**.
+
+---
+
+### Validation — quatre mesures, et la deuxième est la plus importante
+
+1. **`SECURITE-C9-C11.md` existe, et chaque ligne porte sa mesure** : la requête, la réponse, le
+   décompte en base, le verdict. **Une ligne qui porte une appréciation sans mesure est un défaut du
+   ticket**, pas un résultat — c'est *« le critère se lit, jamais il ne s'affirme »* appliqué à un
+   rapport.
+2. **Chaque sonde se met en défaut avant d'être crue.** Neutraliser la garde qu'elle vise doit la
+   faire passer au rouge, et **une sonde qui ne peut pas échouer ne prouve rien** — c'est la
+   deuxième discipline du protocole, retournée contre le contrôle lui-même. Le rapport dit, pour
+   chaque sonde, **ce qui a été neutralisé et ce qui est tombé**.
+3. **Toute faille confirmée est rejouable** : sa reproduction tient en une commande ou en un test
+   nommé, écrite dans le rapport — sans quoi le ticket suivant repart de zéro.
+4. `npm run lint` (`--max-warnings=0`), `npm run test` et `tsc` au vert. **Le vert de référence est
+   1 956 tests sur 68 fichiers** (T11.5), et il ne bouge que des tests neufs de l'arbitrage (2).
+
+**Mise en défaut** — la discipline vaut pour les tests **ajoutés** : chacun doit tomber quand on
+neutralise la règle qu'il vise, et **rien d'autre ne doit tomber avec lui**.
+
+---
+
+### Interdits
+
+**Aucune correction hors de l'exception critique** de l'arbitrage (1) — et une correction faite à ce
+titre se nomme, s'argumente et se mesure comme n'importe quel geste.
+
+**Aucune montée de version, aucune dépendance neuve, aucune migration.** La famille G consigne ; elle
+ne répare pas.
+
+**Aucun RLS** — D38 tient, et sa destination n'a pas bougé : *le jour où le pilote de base expose la
+transaction interactive*, avec la dette de T3.6.
+
+**Aucun secret dans le rapport** — ni jeton en clair, ni clé, ni chaîne de connexion, ni charge de
+cookie scellée. Les sondes n'écrivent que des **empreintes** et des **décomptes**. C'est l'interdit
+commun de C9, resservi : *« aucun secret dans le dépôt, aucun secret dans un message »*.
+
+**Aucune mesure contre une base autre que celle de développement ou de test.** Rien ne se frappe en
+ligne — il n'y a d'ailleurs rien en ligne.
+
+**Aucun script d'attaque conservé.** Une sonde qui reste devient un **test** ; une sonde qui ne reste
+pas se retire, comme le parcours de clôture de T11.5. Le dépôt ne range pas d'exploit.
+
+**Aucune décision de `docs/07` rouverte**, ni les six arbitrages de C9, ni les onze de C11. Un
+désaccord se consigne dans `JOURNAL-TECHNIQUE.md`, et le travail continue (règle 6).
+
+**Aucun écran, aucun geste, aucune fonctionnalité.** Ce ticket ne rend rien : **il déroge au premier
+point du protocole et le dit**, comme T9.1, T9.3 et T11.1 — son critère est un rapport mesuré et des
+décomptes en base.
+
 ---
 
 ## Ce que C11 ne fait pas, et ce sont des décisions
@@ -514,10 +709,13 @@ sur tout couple neuf par la position · **le droit s'éprouve par l'action**, en
 Et la discipline propre à ce terrain, héritée de C9 : **qu'un jeton soit refusé se lit dans la
 réponse, mais qu'aucune session n'ait été posée se lit dans le cookie et dans la base.**
 
-**Et le parcours entier se rejoue en fin de chantier**, pas seulement les cinq critères : créer un
-domaine, désigner son administrateur, suivre le lien, passer le SSO, inviter un membre, le voir
-entrer. C'est la spécification du 08/09/2026, et c'est la seule mesure qui dit que C11 a servi.
+**Et le parcours entier se rejoue en fin de chantier**, pas seulement les critères de chaque ticket :
+créer un domaine, désigner son administrateur, suivre le lien, passer le SSO, inviter un membre, le
+voir entrer. C'est la spécification du 08/09/2026, et c'est la seule mesure qui dit que C11 a servi.
+**Il a été rejoué le 08/09/2026 avec T11.5**, en six étapes, et **T11.6 ne le rejoue pas** : un
+contrôle n'est pas un parcours, et ce qu'il referme est la question *« est-ce sûr ? »*, pas la
+question *« est-ce que ça marche ? »*.
 
 En fin de chantier : `npm run lint` (`--max-warnings=0`), `npm run test` et `tsc` au vert. **Le vert
-de référence est 1 834 tests sur 64 fichiers**, relevé après T11.1 — chaque ticket y compare le
-sien, jamais à un souvenir.
+de référence était 1 834 tests sur 64 fichiers** après T11.1 ; il est de **1 956 sur 68** après
+T11.5, et c'est à celui-là que T11.6 compare le sien — jamais à un souvenir.
