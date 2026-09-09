@@ -207,6 +207,41 @@ describe("un refus ne pose aucun cookie de session", () => {
 
     expect(response.cookies.get(SESSION_COOKIE)?.value).toBeUndefined();
   });
+
+  /* **Un rappel frappé sans handshake — un attaquant qui court-circuite
+     `/auth/connexion`.** Trouvé sans test par T11.6 : `route.test.ts` posait
+     toujours le cookie de handshake, si bien que la garde `if (!handshake)
+     return refuse()` (`route.ts`) n'était jamais éprouvée. Ici la requête porte
+     un cookie d'invitation vivant et des claims qui *ouvriraient* une session si
+     le handshake n'était pas exigé — c'est ce qui met la garde en défaut :
+     l'ôter fait passer le rappel à `completeAuthorization`, qui grante, et le
+     test tombe sur ses trois assertions. Le cookie d'invitation s'efface **quand
+     même**, comme sur tout refus. */
+  test("un rappel sans handshake n'ouvre rien, même avec un lien et des claims valides", async () => {
+    const target = await invited("sans-handshake");
+    nextClaims = claims({ email: target.email });
+
+    const request = new NextRequest(
+      "http://localhost:3000/auth/callback/google?code=c&state=s-1",
+      {
+        headers: {
+          cookie: `${INVITATION_COOKIE}=${sealInvitation({ token: target.token })}`,
+        },
+      },
+    );
+    const response = await GET(request, {
+      params: Promise.resolve({ fournisseur: "google" }),
+    });
+
+    expect(response.headers.get("location")).toContain("/auth/acces");
+    expect(response.cookies.get(SESSION_COOKIE)?.value).toBeUndefined();
+    expect(response.cookies.get(INVITATION_COOKIE)?.value).toBe("");
+    /* **Le décompte en base tranche** : le lien n'a rien accepté. */
+    expect(await accountOf(target.person.id)).toMatchObject({
+      hasAccess: false,
+      domainRole: null,
+    });
+  });
 });
 
 /* ==========================================================================

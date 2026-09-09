@@ -117,12 +117,15 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 const {
   archivePerson,
   createPerson,
+  createPersonSkill,
   deletePerson,
   grantPersonAccess,
   invitePerson,
+  removePersonSkill,
   revokeInvitation,
   revokePersonAccess,
   updatePerson,
+  updatePersonSkill,
 } = await import("./actions");
 
 const suffix = Math.random().toString(36).slice(2, 10);
@@ -1974,5 +1977,140 @@ describe("revokeInvitation — muette, et mesurée en base", () => {
 
     await db.delete(persons).where(eq(persons.domainId, other.id));
     await db.delete(domains).where(inArray(domains.id, [other.id]));
+  });
+});
+
+/* ==========================================================================
+   Les trois gestes de la compétence portée — le trou trouvé par T11.6.
+
+   **`createPersonSkill`, `updatePersonSkill` et `removePersonSkill` n'étaient
+   frappées par aucun test.** `lib/forms/person-skill.test.ts` éprouve le
+   *parsing* du formulaire — pur, sans base —, jamais les trois points d'entrée
+   HTTP. Le contrôle de sécurité de T11.6 l'a relevé : trois des cinquante-huit
+   actions de C9/C11 sans la moindre mesure d'autorisation.
+
+   **Le droit est `manageDomain`**, énoncé en première ligne des trois portes
+   (`openPersonForSkill`, `openPersonSkill`) avant toute lecture. Ces tests le
+   frappent sous un membre — refusé — puis sous le responsable — le témoin qui
+   écrit —, sur le patron des « seize actions » d'administration. **La mise en
+   défaut** : retirer l'un des deux `if (!session.can.manageDomain)` fait tomber
+   le refus qui le vise, et lui seul.
+
+   **L'étanchéité inter-domaine ne se remesure pas ici** : les trois gestes ne
+   touchent la base que par `session.db.find`/`insert`/`unlink`, dont la frontière
+   est éprouvée ligne à ligne par `lib/db/scoped.test.ts` (« la frontière de
+   domaine », « l'archivage », « les compétences portées »). La doubler
+   n'ajouterait que du temps d'exécution (arbitrage (2) de T11.6).
+   ========================================================================== */
+
+describe("les trois gestes de la compétence — le droit, éprouvé par l'action", () => {
+  const EMPTY_SKILL_STATE = { values: { skillId: "", levelId: "" }, errors: {} };
+
+  /** Un porteur dédié : ne pas troubler `skilledId`, que d'autres tests comptent. */
+  let holderId: string;
+  /** Une seconde compétence, non encore portée : ce que `createPersonSkill` pose. */
+  let otherSkillId: string;
+  let firstLevelId: string;
+  let secondLevelId: string;
+  /** Une liaison vivante, pour les deux gestes qui reçoivent son identifiant. */
+  let linkId: string;
+
+  beforeAll(async () => {
+    const holder = await f.scope.insert(persons, {
+      fullName: `Porteur compétence T11.6 ${suffix}`,
+      source: "manual",
+      kind: "center",
+      hasAccess: false,
+    });
+    holderId = holder.id;
+
+    const skill = await f.scope.insert(skills, { label: `Sécurité ${suffix}` });
+    const other = await f.scope.insert(skills, { label: `Étanchéité ${suffix}` });
+    otherSkillId = other.id;
+    const first = await f.scope.insert(skillLevels, {
+      label: `Notion ${suffix}`,
+      rank: 1,
+    });
+    firstLevelId = first.id;
+    const second = await f.scope.insert(skillLevels, {
+      label: `Maîtrise ${suffix}`,
+      rank: 4,
+    });
+    secondLevelId = second.id;
+
+    const link = await f.scope.insert(personSkills, {
+      personId: holder.id,
+      skillId: skill.id,
+      levelId: first.id,
+    });
+    linkId = link.id;
+  }, 60_000);
+
+  const skillForm = (fields: Record<string, string>): FormData => {
+    const data = new FormData();
+    for (const [key, value] of Object.entries(fields)) data.set(key, value);
+    return data;
+  };
+
+  /** Le niveau d'une liaison, lu en base — le seul verdict qui compte. */
+  const levelOf = async (id: string): Promise<string | null> => {
+    const rows = await db
+      .select({ levelId: personSkills.levelId })
+      .from(personSkills)
+      .where(eq(personSkills.id, id));
+    return rows[0]?.levelId ?? null;
+  };
+
+  test("createPersonSkill : un membre ne pose rien, le responsable pose", async () => {
+    const form = skillForm({ skillId: otherSkillId, levelId: secondLevelId });
+
+    /* Le porteur ne détient qu'une compétence — celle de la fixture. Poser une
+       *seconde* compétence est le geste éprouvé. */
+    currentPerson = f.memberId;
+    const before = await skillsOf(holderId);
+    const refused = await createPersonSkill(holderId, EMPTY_SKILL_STATE, form);
+
+    expect(refused.ok).toBeUndefined();
+    expect(refused.message).toContain("responsable de domaine");
+    expect(await skillsOf(holderId)).toBe(before);
+
+    /* L'étape témoin : la même charge, sous le responsable, écrit. */
+    currentPerson = f.managerId;
+    const written = await createPersonSkill(holderId, EMPTY_SKILL_STATE, form);
+
+    expect(written.ok).toBe(true);
+    expect(await skillsOf(holderId)).toBe(before + 1);
+  });
+
+  test("updatePersonSkill : un membre ne corrige rien, le responsable corrige", async () => {
+    const form = skillForm({ levelId: secondLevelId });
+
+    currentPerson = f.memberId;
+    expect(await levelOf(linkId)).toBe(firstLevelId);
+    const refused = await updatePersonSkill(linkId, EMPTY_SKILL_STATE, form);
+
+    expect(refused.ok).toBeUndefined();
+    expect(refused.message).toContain("responsable de domaine");
+    expect(await levelOf(linkId)).toBe(firstLevelId);
+
+    currentPerson = f.managerId;
+    const written = await updatePersonSkill(linkId, EMPTY_SKILL_STATE, form);
+
+    expect(written.ok).toBe(true);
+    expect(await levelOf(linkId)).toBe(secondLevelId);
+  });
+
+  test("removePersonSkill : un membre ne retire rien, le responsable retire", async () => {
+    /* Le geste est **muet** (retour `void`) : seule la base tranche. */
+    currentPerson = f.memberId;
+    const before = await levelOf(linkId);
+    expect(before).not.toBeNull();
+
+    await removePersonSkill(linkId);
+    expect(await levelOf(linkId)).toBe(before);
+
+    currentPerson = f.managerId;
+    await removePersonSkill(linkId);
+    expect(await levelOf(linkId)).toBeNull();
   });
 });

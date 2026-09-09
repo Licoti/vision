@@ -2,26 +2,22 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 09/09/2026. **T11.5 terminé le 08/09 — le parcours tient de bout en
-bout**, et **C11, refermé ce jour-là, rouvre le 09/09 pour son contrôle de sécurité** (voir plus
-bas). Un administrateur corrige les **trois champs descriptifs** de son domaine, et pas un de plus :
-`updateOwnDomain` est une **quatrième forme d'écriture** — une autorité *à l'intérieur* d'un domaine
-sur la seule table sans `domain_id` —, **sa cible n'est jamais un argument**, et `status` comme
-`archived_at` sont des refus **de compilation**. **Périmètre étendu à trois fichiers**, ceux du
-mécanisme des panneaux, demandés au plan et validés. **La boucle est mesurée en HTTP réel, sans une
-ligne de JavaScript** ; **le 404 du membre ne prouve rien**, c'est la route qui refuse, et c'est le
-test d'action qui établit le droit. **Deux mises en défaut au mot de la fiche**, dont la mesure 3 qui
-vit dans `tsc` et non dans `vitest`. **6ᵉ énoncé de fiche mis en défaut du chantier**, un décompte
-encore. **Vert : 1 956 tests sur 68 fichiers** (1 940 avant).
+**Dernière mise à jour :** 09/09/2026. **T11.6 terminé — le contrôle de sécurité de C9 et C11 n'a
+trouvé aucune faille**, trois trous de *couverture* (jamais de faille) comblés par des tests
+permanents, cinq constats de durcissement consignés. Le rapport est `SECURITE-C9-C11.md` (document
+de travail). **Frappe hybride** : la matrice des droits et l'étanchéité par le harnais du dépôt
+(cookie réellement scellé, décompte en base, étape témoin), plus des frappes HTTP réelles au `curl`.
+**Un énoncé de fiche corrigé** : `next/image` n'est employé **nulle part** — trois commentaires, pas
+trois usages —, et l'API AVIF, servie, ne peut optimiser aucun fichier (URL distant refusé, pas de
+`public/`). **Deux croisements de charge ne s'ajoutent pas** : sûrs, mais incapables d'échouer à la
+mise en défaut. **Aucune correction, aucun écart de périmètre** — l'exception critique ne s'est pas
+présentée. **Vert : 1 962 tests sur 69 fichiers** (1 956 sur 68 avant). **C11 refermé une seconde
+fois. Suivant : C7 — T7.7 → T7.10, qui ferme le POC.**
 
-**09/09/2026 — C11 rouvre pour un sixième ticket, et c'est un contrôle.** `tickets-C11.md` porte
-désormais **T11.6 — le contrôle de sécurité de C9 et C11** : la connexion, le SSO, les domaines,
-l'étanchéité et les droits, **éprouvés ensemble** comme une surface d'attaque et non ticket par
-ticket. **Il mesure et consigne, il ne corrige pas** — sauf une faille critique, exception nommée à
-sa fiche. **Deux constats sont déjà en main** et y sont écrits : le dépôt ne sert **aucun en-tête de
-sécurité** et n'a **aucun `middleware.ts`** · `npm audit` rend **deux avis critiques sur
-`next@16.3.0`** et un avis haut sur `sharp`. **Suivant : T11.6**, puis C7 — T7.7 → T7.10, qui ferme
-le POC.
+**09/09/2026 — C11 a rouvert pour T11.6, le contrôle, puis s'est refermé.** Le ticket a éprouvé
+**ensemble**, comme une surface d'attaque, ce que C9 et C11 avaient écrit ticket par ticket. Sept
+familles frappées, chacune mise en défaut avant d'être crue. Le socle d'étanchéité
+(`lib/db/scoped.ts`) et le chemin d'authentification (`lib/auth/`) tiennent leurs promesses, mesurés.
 
 ---
 
@@ -38,11 +34,11 @@ le POC.
 | TD — Dette technique et couche de présentation | TD.1 → TD.6 | **terminé** |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
-| C7 — Finitions | T7.1 → T7.10 | **après T11.6** — T7.1 → T7.6 livrés, T7.7 → T7.10 ferment le POC |
+| C7 — Finitions | T7.1 → T7.10 | **suivant** — T7.1 → T7.6 livrés, T7.7 → T7.10 ferment le POC |
 | C8 — Dette | T8.1 → T8.5 | **terminé** |
 | C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **terminé** |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
-| C11 — Le parcours d'entrée | T11.1 → T11.6 | **rouvert le 09/09** — T11.1 → T11.5 livrés, T11.6 suit |
+| C11 — Le parcours d'entrée | T11.1 → T11.6 | **terminé** (rouvert puis refermé le 09/09) |
 
 ---
 
@@ -74,29 +70,13 @@ le POC.
   extrait du script, et les comptes. **Trois énoncés de fiche mis en défaut.** 1 646 → **1 816**.
 - **Hors ticket, 08/09 — le fournisseur non raccordé.** Trouvé par une question : `?fournisseur=`
   `microsoft` rendait **500**, l'aller n'attrapant pas la levée que le retour attrape. **→ 1 824.**
-- **C11 — L'invitation — T11.1, 08/09.** Écrit **avant sa fiche** (manquement consigné). La
-  contrainte d'adresse a fait tomber deux tests de T9.6 et **révélé un 500** au formulaire — mesuré,
-  puis réparé. 1 824 → **1 834 tests**.
-- **C11 — Le geste, la page, l'acceptation — T11.2, 08/09.** La boucle entière **sans courriel** :
-  deux actions, un panneau, la page publique et sa route de départ, l'acceptation dans le rappel.
-  **La mise en défaut de l'arbitrage central n'a rien fait tomber** — le rappel n'avait aucun test —,
-  et le combler a été le neuvième écart de périmètre. 1 834 → **1 893 tests**.
-- **C11 — L'envoi — T11.3, 08/09.** Un `fetch`, deux variables, **zéro dépendance** ; l'invitation
-  ne dépend jamais de lui. **Une mise en défaut contredit la fiche** (8 tests, pas 1), et **la
-  jointure du lien est mesurée en défaut**. 1 893 → **1 910**.
-- **C11 — L'amorçage d'un domaine — T11.4, 08/09.** Un geste, quatre tables, et l'administrateur qui
-  **naît sans accès**. **La fiche demandait cinq gestes et son critère en exigeait un sixième** : la
-  révocation, sans laquelle une entreprise close le restait. 1 910 → **1 940 tests**.
-- **C11 — Le domaine vu par son administrateur — T11.5, 08/09.** Trois champs, une **quatrième forme
-  d'écriture** dont la cible n'est jamais un argument, et deux colonnes refusées **à la compilation**.
-  **La boucle mesurée en HTTP réel, sans JavaScript** ; le 404 du membre ne prouve rien — la route
-  refuse, l'action est éprouvée à part. **Le parcours entier rejoué en six étapes**, mesure temporaire
-  retirée après coup. 1 940 → **1 956 tests**. **Chantier refermé — puis rouvert le 09/09 pour
-  T11.6.**
-- **C11 — Le contrôle de sécurité — T11.6, à faire.** La fiche est écrite (09/09) : sept familles,
-  **58 points d'entrée × 4 identités**, l'étanchéité par identifiant d'un autre domaine, et deux
-  constats déjà en main — **aucun en-tête de sécurité, aucun `middleware.ts`** · **`next@16.3.0`
-  porte deux avis critiques**. Il mesure, il ne corrige pas.
+- **C11 — Le parcours d'entrée — T11.1 → T11.6, 08-09/09.** Les trois maillons qui manquaient au
+  geste de C9 — l'invitation (sans courriel puis avec, en `fetch` sans dépendance), l'amorçage d'un
+  domaine en un geste (quatre tables, l'administrateur qui naît sans accès), la correction des
+  informations de son domaine (`updateOwnDomain`, cible jamais un argument) — puis, C11 rouvert le
+  09/09, **le contrôle de sécurité T11.6** : sept familles éprouvées ensemble, **aucune faille**,
+  trois trous de couverture comblés, un énoncé de fiche corrigé. Détail : `HISTORIQUE-TICKETS.md` ;
+  contrôle : `SECURITE-C9-C11.md`. 1 816 → **1 962 tests, 69 fichiers**.
 - **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, détaillés dans
   `HISTORIQUE-TICKETS.md`. **Cinq portent une migration, `0010` à `0014`** ; le reste est de
   l'ergonomie, plus le **renommage de « Projets » en « Accompagnements »**, qui **rouvre D35**.
@@ -155,8 +135,7 @@ un amorçage partiel** : le rapprochement de T8.4 le rendrait rejouable sans rie
 qu'un appelant. → **avec la dette de T3.6.**
 **Le RLS a quitté C9** : voir le groupe (c).
 
-**C11 rouvre pour T11.6** — le contrôle de sécurité de C9 et C11 —, **puis C7 ferme le POC**
-(T7.7 → T7.10).
+**C11 est refermé (T11.6 livré le 09/09) ; C7 ferme le POC** (T7.7 → T7.10).
 
 **Deux points de T11.2, dont un récrit par sa mesure.** **Sans JavaScript, le lien d'invitation est
 perdu** — mesuré en T11.3, harnais éprouvé par étape témoin : `resolveTeamDrawer` ferme le panneau
@@ -198,6 +177,13 @@ sur quatre met « Annuler » au rang secondaire · les props d'icône de `Button
 
 ### c. Dettes assumées — le fait et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`
 
+- **Cinq constats de durcissement du contrôle T11.6 (09/09), aucun critique — le détail dans
+  `SECURITE-C9-C11.md`.** Le dépôt ne sert **aucun en-tête de sécurité** (ni CSP, ni HSTS, ni
+  `X-Frame-Options` — la page publique d'invitation est cadrable en iframe) et n'a **aucun
+  `middleware.ts`** ; `X-Powered-By: Next.js` fuit la pile → **durcissement du transport.**
+  `next@16.3.0` porte **deux avis critiques** (RCE Windows — hébergement Linux, sans objet ; RCE
+  AVIF — API servie mais **inexploitable**, aucun `remotePatterns`, pas de `public/`) et `sharp` un
+  avis haut, corrigés en 16.3.4 → **une montée de version, hors revue, avec sa propre mesure.**
 - **Le design system a neuf manques, et aucun n'a été inventé.** **Une carte ne se détache d'aucun
   fond** — **cinq** positions de 1,04:1 à 1,27:1 depuis le bloc « Ce domaine » (T11.5), quand le seuil
   d'un composant est 3:1 ; tous les couples de **texte** passent 4,5:1. S'y ajoutent trois élévations, deux gradients, aucun jeton de

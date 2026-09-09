@@ -11517,3 +11517,64 @@ manquait — ils valent pour les six, T11.6 compris, *« un contrôle qui s'auto
 s'interdit ne contrôlerait plus rien »*. Et la vérification de fin de chantier disait *« le vert de
 référence est 1 834 tests sur 64 fichiers »*, relevé après T11.1 : elle porte désormais les deux
 nombres, et dit lequel vaut pour T11.6.
+
+---
+
+**T11.6 — le contrôle n'a trouvé aucune faille, trois trous de couverture, et deux énoncés de la
+fiche en défaut.** Le rapport est `SECURITE-C9-C11.md` (document de travail, pas fondation). Ce qui
+suit est ce qui mérite d'être retenu, pas le rapport en double.
+
+**La fiche disait « `next/image` est employé sur trois composants » — c'est faux, et l'exposition
+en dépend.** `next/image` n'est employé **nulle part** : les trois occurrences (`personas.tsx`,
+`persona-detail.tsx`, `use-case-detail.tsx`) sont des **commentaires** qui expliquent pourquoi une
+balise `<img>` nue lui est préférée — Vision n'héberge aucun fichier. L'API `/_next/image` reste
+servie par le framework (elle porte l'avis critique AVIF de `next@16.3.0`), mais elle ne peut
+optimiser **aucun** fichier : URL distant refusé faute de `remotePatterns`, et aucun fichier local
+(pas de dossier `public/`). Mesuré au `curl` : `400 "url parameter is not allowed"` et
+`400 "not a valid image"`. Exposition résiduelle — mais l'énoncé de la fiche surestimait le risque,
+et un rapport qui l'aurait recopié aurait menti par emprunt.
+
+**La deuxième discipline, retournée contre le contrôle — et un cas où elle a d'abord échoué.** Une
+sonde qui ne peut pas passer au rouge ne prouve rien. La mise en défaut des trois gestes de
+compétence l'a montré : neutraliser le seul `manageDomain` d'`openPersonSkill` ne fait **rien**
+tomber, parce qu'`openPersonForSkill`→`openPerson`, appelée en second, rattrape. La garde est
+**redondante** (défense en profondeur), et la sonde ne prouve son propos qu'en neutralisant **les
+deux** contrôles. Le rapport dit, pour chaque test ajouté, ce qui a été neutralisé et ce qui est
+tombé.
+
+**Deux croisements de la matrice de confusion des charges ne s'ajoutent pas, faute de pouvoir
+échouer.** `openPrincipal(sealHandshake)` et `openHandshake(sealPrincipal)` rendent `null` — mais
+**même la garde `kind`/forme retirée**, ils rendraient `null` : un handshake n'a ni `personId` ni
+`domainId`, un principal n'a ni `state` ni `codeVerifier`. Une sonde qui reste verte quand on
+neutralise ce qu'elle vise est un ornement ; l'arbitrage (2) l'exclut. 7 des 9 croisements sont
+donc couverts, et les 2 restants sont **sûrs et non testables utilement**, ce qui n'est pas la même
+chose que « non couverts ».
+
+**Un trou de couverture n'est pas une faille, et le rapport le dit à chaque fois.** Les trois
+gestes de la compétence portée n'avaient aucun test d'action (seul le *parsing* du formulaire était
+couvert), le rappel SSO sans handshake n'était jamais frappé, et la garde de production de
+`setCurrentPerson` n'était éprouvée nulle part. **Le code était correct dans les trois cas** ; ce
+qui manquait était le filet. Trois tests permanents comblent, tous mis en défaut. 1 956 → 1 962,
+68 → 69 fichiers.
+
+**Constat de framework, positif et à connaître.** La protection CSRF intégrée des Server Actions de
+Next **avorte** l'action quand l'en-tête `Origin` ne correspond pas à `Host` — mesuré :
+`POST /dev/session` avec `Origin: https://evil.example.com` rend 500 de framework (application-code
+9 ms), **aucun cookie posé**. Cette barrière ne vit dans aucun code du dépôt ; **une montée de
+version de Next qui la relâcherait passerait inaperçue** — à surveiller le jour où `next` monte.
+
+**Aucune correction, donc aucun écart de périmètre.** L'exception critique de l'arbitrage (1) ne
+s'est pas présentée : rien à réparer dans le ticket. Le seul code de production touché l'a été
+**temporairement**, pour les mises en défaut, puis restauré — le diff final ne porte que des tests
+et le rapport.
+
+**T11.6 — `ETAT.md` reste à 278 lignes après le repli de C11, au-dessus du seuil de 250, et c'est
+une tension entre deux règles du `CLAUDE.md`.** L'étape 5 du protocole de ticket dit *« au-delà, le
+balayer avant de continuer »* ; la session de découpage dit qu'elle *« est le seul moment où
+`ETAT.md` se balaie »*. J'ai fait le geste légitime de clôture — replier les six lignes de ticket de
+C11 en une ligne de chantier clos, leur récit parti dans `HISTORIQUE-TICKETS.md` (296 → 278) —, mais
+le balayage profond (sortir les points refermés des groupes a/b/c) relève du découpage, et **C7 est
+déjà découpé** : aucune session n'est prévue avant T7.7. Je n'ai pas supprimé de points ouverts
+suivis de ma propre initiative — perdre un point suivi coûte plus qu'un dépassement de seuil. **À
+trancher par l'humain, ou au prochain découpage** : soit T7.7 balaie en ouvrant, soit le seuil se
+révise. Excédent préexistant à T11.6 (le fichier était à 292 avant).

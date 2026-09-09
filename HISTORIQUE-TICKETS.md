@@ -8335,3 +8335,65 @@ invitations et super administrateur retirés.
 
 **1 940 → 1 956 tests sur 68 fichiers**, `lint` (`--max-warnings=0`) et `tsc` au vert. **C11 est
 clos** : le parcours du 08/09/2026 tient de bout en bout, et C7 ferme le POC.
+
+## T11.6 — Le contrôle de sécurité de C9 et C11 — 09/09/2026
+
+**C11 avait été refermé la veille par T11.5 ; il rouvre pour un sixième ticket qui n'est pas une
+fonctionnalité mais un contrôle.** Décision humaine du 09/09/2026 : éprouver **ensemble**, comme une
+surface d'attaque, ce que C9 et C11 avaient écrit ticket par ticket — la connexion, le SSO, les
+domaines, l'étanchéité, les droits. Le ticket **mesure et consigne, il ne corrige pas**, sauf une
+faille critique (aucune trouvée). Il déroge au premier point du protocole — il ne rend aucun écran —
+et le dit, comme T9.1, T9.3 et T11.1. Le livrable est `SECURITE-C9-C11.md` (document de travail),
+plus les seuls tests que l'arbitrage (2) rend permanents.
+
+**La méthode a été tranchée au plan : frappe hybride.** La matrice des droits et l'étanchéité par le
+harnais du dépôt — la fonction serveur appelée sous un cookie **réellement scellé** par
+`sealPrincipal`, décompte en base, étape témoin —, le paradigme déjà mesuré et jugé plus fort qu'une
+requête simulée ; plus des frappes **HTTP réelles** au `curl` contre `next dev`, sur ce que
+l'in-process ne peut pas voir. Les sept familles ont été prises dans l'ordre G, F, A, B, C, D, E —
+les courtes d'abord, les deux matrices en dernier —, le rapport écrit au fil de l'eau.
+
+**Aucune faille. Trois trous de couverture, jamais de faille.** Le code était correct dans les trois
+cas ; ce qui manquait était le filet.
+- **Les trois gestes de la compétence portée** — `createPersonSkill`, `updatePersonSkill`,
+  `removePersonSkill` — n'avaient **aucun test d'action** : seul le parsing du formulaire était
+  couvert (`lib/forms/person-skill.test.ts`). Trois des 58 points d'entrée sans mesure
+  d'autorisation. Comblés dans `app/(app)/equipe/actions.test.ts` (+3). **Mise en défaut révélatrice**
+  : la garde est **redondante** — neutraliser le seul `manageDomain` d'`openPersonSkill` ne fait rien
+  tomber, `openPerson` (appelée en second) rattrape ; il faut neutraliser **les deux** pour que les
+  trois tombent, et eux seuls. Défense en profondeur confirmée.
+- **Le rappel SSO frappé sans handshake** — un attaquant qui court-circuite `/auth/connexion` —
+  n'était jamais éprouvé : `route.test.ts` posait toujours le cookie de handshake. Comblé (+1) :
+  requête avec invitation vivante et claims accordants, **sans** handshake → 307, invitation effacée,
+  aucune session, rien en base. Mise en défaut : ôter `if (!handshake) return refuse()` fait tomber
+  le seul test.
+- **La garde de production de `setCurrentPerson`** — la fermeture réelle de `switchPerson`, qui ne
+  porte aucun `requireSession` — n'était éprouvée nulle part. Fichier neuf `lib/auth/provider.test.ts`
+  (+2, avec témoin hors production). Mise en défaut : ôter le `throw` fait poser le cookie.
+
+**Un énoncé de la fiche corrigé, et l'exposition en dépendait.** La fiche disait *« `next/image` est
+employé sur trois composants, donc l'API concernée est servie »*. `next/image` n'est employé **nulle
+part** : les trois occurrences sont des **commentaires** expliquant pourquoi une balise `<img>` nue
+lui est préférée. L'API `/_next/image` reste servie (elle porte l'avis critique AVIF de
+`next@16.3.0`), mais elle ne peut optimiser **aucun** fichier — URL distant refusé faute de
+`remotePatterns`, aucun fichier local faute de `public/` ; mesuré : `400` dans les deux cas.
+L'exposition est résiduelle, et un rapport qui aurait recopié la fiche aurait menti par emprunt.
+
+**Deux croisements de charge exclus, faute de pouvoir échouer.** La matrice de confusion des trois
+charges compte 9 croisements ; 7 sont couverts. Les deux restants — `openPrincipal(sealHandshake)`,
+`openHandshake(sealPrincipal)` — sont sûrs, mais **même la garde retirée** ils rendraient `null` (un
+handshake n'a ni `personId` ni `codeVerifier`). Une sonde inapte à passer au rouge ne prouve rien
+(arbitrage 2) ; elles ne s'ajoutent pas.
+
+**Cinq constats de durcissement, aucun critique, tous consignés en points ouverts datés.** Aucun
+en-tête de sécurité servi (page d'invitation cadrable en iframe), aucun `middleware.ts`,
+`X-Powered-By` qui fuit la pile ; `next@16.3.0` porte deux avis critiques (RCE Windows sans objet sur
+Linux ; RCE AVIF sur une API inexploitable ici) et `sharp` un avis haut, corrigés en 16.3.4 — montée
+de version interdite au ticket. **Constat positif de framework** : la protection CSRF intégrée des
+Server Actions de Next avorte l'action quand `Origin` ≠ `Host`, sans code de notre part.
+
+**Aucune correction, donc aucun écart de périmètre.** L'exception critique de l'arbitrage (1) ne
+s'est pas présentée. Le seul code de production touché l'a été **temporairement**, pour les mises en
+défaut, puis restauré : le diff final ne porte que deux fichiers de tests, un fichier de tests neuf
+et le rapport. **1 956 → 1 962 tests, 68 → 69 fichiers**, `lint` (`--max-warnings=0`) et `tsc` au
+vert. **C11 est refermé une seconde fois ; C7 ferme le POC.**
