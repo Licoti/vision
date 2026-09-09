@@ -12,7 +12,14 @@ trois usages —, et l'API AVIF, servie, ne peut optimiser aucun fichier (URL di
 `public/`). **Deux croisements de charge ne s'ajoutent pas** : sûrs, mais incapables d'échouer à la
 mise en défaut. **Aucune correction, aucun écart de périmètre** — l'exception critique ne s'est pas
 présentée. **Vert : 1 962 tests sur 69 fichiers** (1 956 sur 68 avant). **C11 refermé une seconde
-fois. Suivant : C7 — T7.7 → T7.10, qui ferme le POC.**
+fois.**
+
+**09/09/2026 — C7 rouvert pour reprendre les quatre finitions mises en pause** (T7.1 → T7.6 livrés
+les 28-30/08). **Suivant : T7.7 — Accessibilité : clavier, focus, contraste, titres**, puis T7.8
+(états vides et note « À propos »), T7.9 (colonnes saisies qu'aucun écran ne lit), T7.10 (gestes qui
+n'atteignent pas leur cible) — et **T7.10 ferme le POC**. Rappel de sa fiche : les deux balayages
+(T7.7, puis T7.10) viennent **après** les écrans neufs, faute de quoi ils passeraient sur un produit
+qu'un ticket suivant changerait ; C11 a livré son écran neuf, la voie est libre.
 
 **09/09/2026 — C11 a rouvert pour T11.6, le contrôle, puis s'est refermé.** Le ticket a éprouvé
 **ensemble**, comme une surface d'attaque, ce que C9 et C11 avaient écrit ticket par ticket. Sept
@@ -34,7 +41,7 @@ familles frappées, chacune mise en défaut avant d'être crue. Le socle d'étan
 | TD — Dette technique et couche de présentation | TD.1 → TD.6 | **terminé** |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
-| C7 — Finitions | T7.1 → T7.10 | **suivant** — T7.1 → T7.6 livrés, T7.7 → T7.10 ferment le POC |
+| C7 — Finitions | T7.1 → T7.10 | **en cours** (rouvert le 09/09) — T7.1 → T7.6 livrés, T7.7 → T7.10 suivent et ferment le POC |
 | C8 — Dette | T8.1 → T8.5 | **terminé** |
 | C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **terminé** |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
