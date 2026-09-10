@@ -35,6 +35,12 @@
  * texte sont ceux qu'`/auth/acces` porte sur le même fond de page —
  * `-darkest`, `-dark`, `-base`, mesurés par TD.1 —, `EmptyState` porte les
  * siens, et les liens sont le bouton du design system.
+ *
+ * **Le mot « Vision » est le `h1` de l'écran** (T7.7), pour la raison qu'il
+ * l'est sur `/auth/acces` et mesurée de la même façon : sans lui, le HTML servi
+ * s'ouvrait sur le `h2` d'`EmptyState`. Le titre de l'écran reste « Rejoindre
+ * … » au rang 2 — il nomme ce que l'invité vient faire, jamais le produit qui
+ * l'accueille.
  */
 
 import Link from "next/link";
@@ -134,13 +140,13 @@ export default async function InvitationPage({
   return (
     <main className="mx-auto flex min-h-screen max-w-160 flex-col justify-center gap-8 px-5 py-12 md:px-10 md:py-18">
       <header className="flex flex-col gap-2">
-        <p className="flex items-center gap-2 text-xl font-bold text-content-neutral-darkest">
+        <h1 className="flex items-center gap-2 text-xl font-bold text-content-neutral-darkest">
           <span
             aria-hidden="true"
             className="size-2 rounded-full bg-surface-secondary-base"
           />
           Vision
-        </p>
+        </h1>
         <p className="text-sm leading-200 text-content-neutral-dark">
           Comment un centre de compétence design accompagne les produits
           d&apos;une entreprise, dans le temps.

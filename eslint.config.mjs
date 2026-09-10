@@ -131,10 +131,56 @@ const SPACING_CLAUSES = [
  * trois clauses de TD.5 disparaîtraient de tout le dépôt sauf du socle, en
  * silence.
  */
+/* ==========================================================================
+   T7.7 — l'ARIA qui ment ne revient pas
+
+   Le ticket a retiré `role="menu"`, `aria-haspopup="menu"` et **trente-huit**
+   `role="menuitem"` : le motif ARIA du menu promet une navigation aux flèches
+   et un focus tournant que `ActionMenu` n'a jamais eus, et `menuitem` efface au
+   passage la nature de lien des `<Link>` qu'il recouvre.
+
+   **Ce garde-fou existe parce que rien d'autre ne pouvait tenir ce correctif.**
+   Les enfants d'`ActionMenu` ne sont rendus qu'une fois le menu ouvert :
+   `role="menuitem"` n'a jamais paru dans le HTML servi, et le `curl` du
+   protocole ne peut donc ni le trouver ni constater qu'il est parti. Le dépôt
+   n'a par ailleurs aucun harnais de rendu — `vitest` tourne en environnement
+   `node`, sans jsdom. Restait l'idiome du dépôt : un cliquet de source, qui se
+   met en défaut en réécrivant l'attribut.
+
+   **Il vise trois attributs nommés, jamais « l'ARIA » en général.** Un
+   garde-fou trop large est celui qu'on désactive au premier faux positif —
+   c'est l'argument qui a fait renoncer à la clause du bouton tertiaire
+   ci-dessus. `aria-expanded`, `aria-controls`, `aria-label`, `aria-live`,
+   `role="group"`, `role="dialog"` et `role="option"` restent hors de portée :
+   ils décrivent ce que le HTML ne dit pas, et ils ne mentent sur rien.
+   ========================================================================== */
+
+const ariaRole = (value) =>
+  `JSXAttribute[name.name="role"] > Literal[value="${value}"]`;
+
+const MENU_PATTERN_CLAUSES = [
+  {
+    selector: ariaRole("menu"),
+    message:
+      "Motif ARIA `menu` : il promet flèches, `Home`/`Fin` et focus tournant, qu'`ActionMenu` ne tient pas. Un déclencheur qui dit `aria-expanded` et une liste de liens suffisent (T7.7).",
+  },
+  {
+    selector: ariaRole("menuitem"),
+    message:
+      "`role=\"menuitem\"` efface la nature native d'un `<a>` ou d'un `<button>` et promet une navigation aux flèches qui n'existe pas. Laisser le rôle natif (T7.7).",
+  },
+  {
+    selector:
+      'JSXAttribute[name.name="aria-haspopup"] > Literal[value="menu"]',
+    message:
+      "`aria-haspopup=\"menu\"` annonce un widget menu ; `aria-expanded` dit déjà ce qu'il faut d'un déclencheur de liste (T7.7).",
+  },
+];
+
 const spacingScaleLock = {
   files: ["components/ui/**/*.tsx"],
   rules: {
-    "no-restricted-syntax": ["error", ...SPACING_CLAUSES],
+    "no-restricted-syntax": ["error", ...SPACING_CLAUSES, ...MENU_PATTERN_CLAUSES],
   },
 };
 
@@ -228,7 +274,12 @@ const socleLock = {
   files: ["**/*.tsx"],
   ignores: ["components/ui/**"],
   rules: {
-    "no-restricted-syntax": ["error", ...SPACING_CLAUSES, ...SOCLE_CLAUSES],
+    "no-restricted-syntax": [
+      "error",
+      ...SPACING_CLAUSES,
+      ...SOCLE_CLAUSES,
+      ...MENU_PATTERN_CLAUSES,
+    ],
   },
 };
 

@@ -586,7 +586,6 @@ function RoadmapEntry({
             <DrawerLink
               href={editHref}
               request={{ kind: "activity", id: activity.id }}
-              role="menuitem"
               className={MENU_ITEM}
             >
               Modifier
@@ -599,7 +598,6 @@ function RoadmapEntry({
             <DrawerLink
               href={resultHref}
               request={{ kind: "result", id: activity.id }}
-              role="menuitem"
               className={MENU_ITEM}
             >
               {activity.result ? "Corriger le résultat" : "Saisir un résultat"}
@@ -611,7 +609,7 @@ function RoadmapEntry({
             <form
               action={archiveResult.bind(null, activity.id, activity.result.id)}
             >
-              <button type="submit" role="menuitem" className={MENU_ITEM}>
+              <button type="submit" className={MENU_ITEM}>
                 Archiver le résultat
               </button>
             </form>
@@ -620,14 +618,14 @@ function RoadmapEntry({
             <form
               action={transitionActivity.bind(null, activity.id, "in_progress")}
             >
-              <button type="submit" role="menuitem" className={MENU_ITEM}>
+              <button type="submit" className={MENU_ITEM}>
                 Marquer en cours
               </button>
             </form>
           ) : null}
           {canMarkDone ? (
             <form action={transitionActivity.bind(null, activity.id, "done")}>
-              <button type="submit" role="menuitem" className={MENU_ITEM}>
+              <button type="submit" className={MENU_ITEM}>
                 Marquer terminée
               </button>
             </form>
@@ -639,7 +637,6 @@ function RoadmapEntry({
             <form action={archiveActivity.bind(null, activity.id)}>
               <button
                 type="submit"
-                role="menuitem"
                 className={MENU_ITEM_DANGER}
               >
                 Archiver la saisie
@@ -652,7 +649,6 @@ function RoadmapEntry({
             <DrawerLink
               href={cancelHref}
               request={{ kind: "cancel", id: activity.id }}
-              role="menuitem"
               className={MENU_ITEM_DANGER}
             >
               Annuler l&apos;activité

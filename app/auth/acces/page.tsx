@@ -42,6 +42,13 @@
  * texte sont ceux que TD.1 a mesurés sur le fond de page — `-darkest`,
  * `-dark`, `-base` à 4,73:1 —, `EmptyState` porte les siens, et les liens sont
  * le bouton du design system, sans une valeur en dur (règle 2).
+ *
+ * **Le mot « Vision » est le `h1` de l'écran** (T7.7). Il l'était déjà par la
+ * position et par le poids ; il ne l'était pas par la balise, et le HTML servi
+ * s'ouvrait donc sur le `h2` d'`EmptyState` — mesuré : *0 h1*. Un écran sans
+ * `h1` n'a pas de titre pour qui le parcourt par ses titres, et le rang 2 qui
+ * le suit devenait un rang sauté. La balise change, les classes ne changent
+ * pas : ce ticket pose des attributs, il ne redessine rien.
  */
 
 import Link from "next/link";
@@ -87,13 +94,13 @@ export default async function AccessPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-160 flex-col justify-center gap-8 px-10 py-18">
       <header className="flex flex-col gap-2">
-        <p className="flex items-center gap-2 text-xl font-bold text-content-neutral-darkest">
+        <h1 className="flex items-center gap-2 text-xl font-bold text-content-neutral-darkest">
           <span
             aria-hidden="true"
             className="size-2 rounded-full bg-surface-secondary-base"
           />
           Vision
-        </p>
+        </h1>
         <p className="text-sm leading-200 text-content-neutral-dark">
           Comment un centre de compétence design accompagne les produits
           d&apos;une entreprise, dans le temps.

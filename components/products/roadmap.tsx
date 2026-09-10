@@ -254,11 +254,21 @@ function Timeline({
           720 px = les 264 de la colonne d'identité, plus 432 de tracé. La ligne
           de rattrapage reste dehors : elle se lit sans l'axe.
 
-          Sans `tabindex` ni `role` : un conteneur défilant devrait être
-          atteignable au clavier, et c'est un attribut d'accessibilité — donc
-          T7.7, qui pose les attributs, et non ce ticket, qui pose la mise en
-          page. Le point est consigné pour elle. */}
-      <div className="overflow-x-auto">
+          **Elle s'atteint au clavier** (T7.7). Un conteneur qui défile et
+          qu'aucun enfant focalisable ne traverse est un contenu que seule la
+          souris atteint — WCAG 2.1.1. `tabIndex={0}` en fait un arrêt de
+          tabulation, d'où les flèches font défiler l'axe ; `role="group"` et
+          son nom disent alors ce qu'on vient d'atteindre, sans quoi le lecteur
+          d'écran annoncerait un groupe muet. **`group` et non `region`** : une
+          `region` est un repère de page, et cette frise est une partie d'un
+          bloc qui a déjà son titre, pas une destination de navigation — c'est
+          l'arbitrage qu'a déjà rendu `roadmap-scale.tsx`. */}
+      <div
+        tabIndex={0}
+        role="group"
+        aria-label="Frise des accompagnements — défilement horizontal"
+        className="overflow-x-auto"
+      >
         <div className="relative min-w-180">
           {/* Les filets verticaux, alignés sur les graduations — posés sur la
             seule zone de tracé, jamais sous la colonne des libellés. Ils sont

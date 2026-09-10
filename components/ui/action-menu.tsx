@@ -45,6 +45,24 @@
  * donnés : `Échap` referme, un clic hors du menu referme, et le focus revient au
  * bouton — sans quoi la tabulation repartirait du début du document.
  *
+ * **Ce n'est pas un `menu` ARIA, et T7.7 lui a retiré ce mot.** Il portait
+ * `role="menu"`, `aria-haspopup="menu"` et **trente-huit** `role="menuitem"`
+ * sur sept fichiers, sans la navigation aux flèches ni le `tabindex` mobile que
+ * le motif exige : l'ARIA promettait un widget que le clavier ne tenait pas, et
+ * la promesse coûtait deux fois — `menuitem` **efface** la nature de lien des
+ * `<Link>` qu'il recouvrait, donc la liste des liens de la page, et le lecteur
+ * d'écran annonçait un menu dont les flèches ne faisaient rien.
+ *
+ * Deux issues, et l'une ajoute quand l'autre retire. Écrire le motif — focus
+ * tournant, flèches, `Home`/`Fin` — aurait posé un mécanisme d'interaction neuf
+ * pour ne rien changer à ce que l'on peut faire. **Retirer les trois attributs
+ * rend au HTML ce qu'il est déjà** : un bouton qui dit `aria-expanded`, et une
+ * liste de liens et de boutons que la tabulation traverse — ce qu'elle faisait
+ * de toute façon. C'est l'interdit du ticket, pris à la lettre : *aucun `aria-*`
+ * posé sur un élément dont le rôle natif suffit ; c'est du bruit qui finira par
+ * mentir*. `aria-expanded` et `aria-controls` restent, eux : ils ne décrivent
+ * rien de faux, et ils disent la seule chose que le HTML ne dit pas.
+ *
  * **Il ne prend aucun `className`, et c'est délibéré** (correctif du
  * 17/08/2026) : sa racine porte `relative`, dont son menu déroulant a besoin
  * pour s'ancrer. Un positionnement passé de l'extérieur entrait en conflit avec
@@ -134,7 +152,6 @@ export function ActionMenu({
         ref={trigger}
         type="button"
         aria-label={label}
-        aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen((was) => !was)}
@@ -161,7 +178,6 @@ export function ActionMenu({
       {open ? (
         <div
           id={menuId}
-          role="menu"
           className="absolute right-0 top-full z-20 mt-2 flex w-60 flex-col gap-0.5 rounded-xl border border-surface-neutral-lighter bg-surface-neutral-pale p-1.5"
         >
           {children}

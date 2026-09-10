@@ -445,7 +445,6 @@ export default async function ProductPage({
                     <ActionMenu label={`Options du produit ${product.name}`}>
                       <Link
                         href={ROUTES.productEdit(product.id)}
-                        role="menuitem"
                         className={MENU_ITEM}
                       >
                         Modifier ce produit
@@ -453,7 +452,6 @@ export default async function ProductPage({
                       <DrawerLink
                         href={ROUTES.productArchive(product.id)}
                         request={{ kind: "archive" }}
-                        role="menuitem"
                         className={MENU_ITEM_DANGER}
                       >
                         Archiver ce produit

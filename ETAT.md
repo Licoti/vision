@@ -2,24 +2,20 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 09/09/2026. **T11.6 terminé — le contrôle de sécurité de C9 et C11 n'a
-trouvé aucune faille**, trois trous de *couverture* (jamais de faille) comblés par des tests
-permanents, cinq constats de durcissement consignés. Le rapport est `SECURITE-C9-C11.md` (document
-de travail). **Frappe hybride** : la matrice des droits et l'étanchéité par le harnais du dépôt
-(cookie réellement scellé, décompte en base, étape témoin), plus des frappes HTTP réelles au `curl`.
-**Un énoncé de fiche corrigé** : `next/image` n'est employé **nulle part** — trois commentaires, pas
-trois usages —, et l'API AVIF, servie, ne peut optimiser aucun fichier (URL distant refusé, pas de
-`public/`). **Deux croisements de charge ne s'ajoutent pas** : sûrs, mais incapables d'échouer à la
-mise en défaut. **Aucune correction, aucun écart de périmètre** — l'exception critique ne s'est pas
-présentée. **Vert : 1 962 tests sur 69 fichiers** (1 956 sur 68 avant). **C11 refermé une seconde
-fois.**
+**Dernière mise à jour :** 10/09/2026. **T7.7 terminé — le premier des deux balayages de C7**, tout
+en attribut, rien en dessin. **Deux écrans publics n'avaient aucun `h1`** (`/auth/acces`,
+`/invitation/[jeton]` — mesuré *0*, corrigé à *1*), **la frise du produit s'atteint au clavier**, et
+le **motif ARIA du menu est retiré plutôt que complété** : `role="menu"`, `aria-haspopup` et
+**trente-huit `role="menuitem"`** promettaient des flèches qu'`ActionMenu` n'a jamais eues.
+**Quatre relevés sur treize rendus** : un `h1` partout, aucun rang sauté, **zéro contrôle sans nom**,
+l'anneau de focus au-dessus de 3:1 sauf sur la barre latérale déjà dérogée. **Deux mesures manquent
+et se disent** (voir points ouverts). **Trois énoncés de fiche en défaut.** **1 962 tests, 69
+fichiers**, inchangés.
 
 **09/09/2026 — C7 rouvert pour reprendre les quatre finitions mises en pause** (T7.1 → T7.6 livrés
-les 28-30/08). **Suivant : T7.7 — Accessibilité : clavier, focus, contraste, titres**, puis T7.8
-(états vides et note « À propos »), T7.9 (colonnes saisies qu'aucun écran ne lit), T7.10 (gestes qui
-n'atteignent pas leur cible) — et **T7.10 ferme le POC**. Rappel de sa fiche : les deux balayages
-(T7.7, puis T7.10) viennent **après** les écrans neufs, faute de quoi ils passeraient sur un produit
-qu'un ticket suivant changerait ; C11 a livré son écran neuf, la voie est libre.
+les 28-30/08). **Ticket suivant : T7.8 — les états vides et la note « À propos »**, puis T7.9
+(colonnes saisies qu'aucun écran ne lit) et T7.10 (gestes qui n'atteignent pas leur cible) — et
+**T7.10 ferme le POC**. Le premier des deux balayages est passé (T7.7) ; le second est T7.10.
 
 **09/09/2026 — C11 a rouvert pour T11.6, le contrôle, puis s'est refermé.** Le ticket a éprouvé
 **ensemble**, comme une surface d'attaque, ce que C9 et C11 avaient écrit ticket par ticket. Sept
@@ -41,7 +37,7 @@ familles frappées, chacune mise en défaut avant d'être crue. Le socle d'étan
 | TD — Dette technique et couche de présentation | TD.1 → TD.6 | **terminé** |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
-| C7 — Finitions | T7.1 → T7.10 | **en cours** (rouvert le 09/09) — T7.1 → T7.6 livrés, T7.7 → T7.10 suivent et ferment le POC |
+| C7 — Finitions | T7.1 → T7.10 | **en cours** (rouvert le 09/09) — T7.1 → T7.7 livrés, T7.8 → T7.10 ferment le POC |
 | C8 — Dette | T8.1 → T8.5 | **terminé** |
 | C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **terminé** |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
@@ -84,6 +80,12 @@ familles frappées, chacune mise en défaut avant d'être crue. Le socle d'étan
   09/09, **le contrôle de sécurité T11.6** : sept familles éprouvées ensemble, **aucune faille**,
   trois trous de couverture comblés, un énoncé de fiche corrigé. Détail : `HISTORIQUE-TICKETS.md` ;
   contrôle : `SECURITE-C9-C11.md`. 1 816 → **1 962 tests, 69 fichiers**.
+- **C7 — T7.7, Accessibilité — 10/09.** Deux écrans publics sans `h1`, la frise atteignable au
+  clavier, **trente-huit `role="menuitem"` retirés** avec `role="menu"` et `aria-haspopup` — l'ARIA
+  promettait un menu que le clavier ne tenait pas. Quatre relevés sur treize rendus, **zéro contrôle
+  sans nom**. Le HTML servi ne pouvant pas tenir le correctif de menu, un **cliquet de lint** le
+  tient. **Trois énoncés de fiche en défaut.** 1 962 tests, inchangés.
+
 - **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, détaillés dans
   `HISTORIQUE-TICKETS.md`. **Cinq portent une migration, `0010` à `0014`** ; le reste est de
   l'ergonomie, plus le **renommage de « Projets » en « Accompagnements »**, qui **rouvre D35**.
@@ -133,7 +135,11 @@ l'exercer**. → **le jour où l'on ôte un filet.**
 exprès, étant pur. → **T7.9**, avec les quatre libellés hors de `lib/format.ts`.
 **`withoutAnySession()` reste importable depuis `app/`**, rien ne l'en empêchant mécaniquement : la
 refermer demande une clause dans `eslint.config.mjs`, ce qui réveille la dette d'`uiLayerSeal` — deux
-sujets pour un geste. → **le prochain ticket qui ouvre `eslint.config.mjs`.**
+sujets pour un geste. **T7.7 a ouvert ce fichier et ne les a pas faits** : ils ne sont pas de
+l'accessibilité, et la règle 3 refuse le geste « pendant que j'y suis ». **Seconde fois qu'une
+destination « le prochain ticket qui ouvre le fichier » échoue**, après T8.4 — les deux formulations
+se contredisent, et c'est la destination qu'il faut changer, pas la règle. → **un ticket à soi, ou
+un arbitrage humain.**
 **`persons.identity_provider` n'a aucun écrivain**, et l'inscrire sur une ligne trouvée par e-mail
 buterait sur `persons_external_id_requires_directory`. → **le jour où l'import d'annuaire arrive.**
 **L'amorçage d'un domaine n'est pas atomique, et il écrit désormais quatre tables** (T11.4) — une
@@ -142,7 +148,7 @@ un amorçage partiel** : le rapprochement de T8.4 le rendrait rejouable sans rie
 qu'un appelant. → **avec la dette de T3.6.**
 **Le RLS a quitté C9** : voir le groupe (c).
 
-**C11 est refermé (T11.6 livré le 09/09) ; C7 ferme le POC** (T7.7 → T7.10).
+**C11 est refermé ; C7 ferme le POC** — T7.7 livré, restent T7.8 → T7.10.
 
 **Deux points de T11.2, dont un récrit par sa mesure.** **Sans JavaScript, le lien d'invitation est
 perdu** — mesuré en T11.3, harnais éprouvé par étape témoin : `resolveTeamDrawer` ferme le panneau
@@ -162,6 +168,15 @@ applicatif est le seul gardien, là où celui d'`invitePerson` en a deux. → **
 **`redeemInvitation` ne juge pas l'état du domaine, et c'est ce qui rend l'arbitrage (4) mesurable** :
 un test le fixe, et il tombera le jour où quelqu'un « sécurisera » le module — **un seul témoin isole
 l'ordre des six règles**, le domaine suspendu. → **à relire avant de corriger, jamais après.**
+
+**Le parcours clavier n'a jamais été fait au navigateur** (T7.7) : ni Playwright ni Puppeteer, et
+l'interdit (b) de C7 refuse une dépendance neuve. Est mesuré l'ordre de tabulation **dérivé du HTML
+servi** ; ne sont **pas** mesurés `Échap`, le clic extérieur, le retour du focus au déclencheur et le
+défilement de la frise aux flèches. → **arbitrage humain : une dépendance de développement, ou le
+manque assumé.**
+**Lire un écran authentifié au `curl` demande un harnais qui n'existe pas** (T7.7) : `/dev/session`
+exige une session **déjà ouverte** depuis T11.6, et son formulaire ne se rend donc pas au premier
+passage. Le geste est à refaire à chaque ticket. → **outillage, si un troisième le redemande.**
 
 **Le journal reste incomplet** (T8.3, laissé intact — règle 3) : **six familles écrivent sans
 trace** — le produit, l'adoption, la compétence portée, les huit référentiels autres que l'entité
@@ -192,11 +207,15 @@ sur quatre met « Annuler » au rang secondaire · les props d'icône de `Button
   AVIF — API servie mais **inexploitable**, aucun `remotePatterns`, pas de `public/`) et `sharp` un
   avis haut, corrigés en 16.3.4 → **une montée de version, hors revue, avec sa propre mesure.**
 - **Le design system a neuf manques, et aucun n'a été inventé.** **Une carte ne se détache d'aucun
-  fond** — **cinq** positions de 1,04:1 à 1,27:1 depuis le bloc « Ce domaine » (T11.5), quand le seuil
-  d'un composant est 3:1 ; tous les couples de **texte** passent 4,5:1. S'y ajoutent trois élévations, deux gradients, aucun jeton de
-  bordure de contrôle, d'erreur, d'interlettrage, de voile, de séparateur, de mouvement, et
-  **`--number-*` s'arrête à 100 px**. Six substituts mesurés ; les points d'arrêt restent posés à la
-  main, hors de `spacingScaleLock` (T1.6). → **design system.**
+  fond**, **remesuré par T7.7 et non refermé** : **cinq** positions de **1,01:1 à 1,26:1** quand le
+  seuil d'un composant est 3:1 — l'étendue annoncée par T11.5 se corrige de deux arrondis. Le plus
+  franc jeton de surface neutre employable en filet plafonne à **2,22:1** ; le seul qui passerait,
+  `surface-neutral-base` (**4,73:1**), est un jeton de **texte**, et le poser en filet serait un
+  redessin. Tous les couples de **texte** passent 4,5:1, et l'anneau de focus passe 3:1 partout sauf
+  sur la barre latérale, où la dérogation existe (13,65:1). S'y ajoutent trois élévations, deux
+  gradients, aucun jeton de bordure de contrôle, d'erreur, d'interlettrage, de voile, de séparateur,
+  de mouvement, et **`--number-*` s'arrête à 100 px**. Six substituts mesurés ; les points d'arrêt
+  restent posés à la main, hors de `spacingScaleLock` (T1.6). → **design system.**
 - **Six points attendent une main humaine, et aucun ne se referme par un ticket.** Le **filtre de la
   roadmap** ne se partage plus par son adresse (21/08) · la **page produit porte deux langages
   d'en-tête** · **`docs/06` §3 porte deux écarts** du 29/08, et *si le document suit ou si l'écart

@@ -273,7 +273,6 @@ export default async function DomainsPage({
                           <form action={restoreDomain.bind(null, domain.id)}>
                             <button
                               type="submit"
-                              role="menuitem"
                               className={MENU_ITEM}
                             >
                               Rétablir cette entreprise
@@ -284,7 +283,6 @@ export default async function DomainsPage({
                             <DrawerLink
                               href={ROUTES.domainIdentities(domain.id)}
                               request={{ kind: "identities", id: domain.id }}
-                              role="menuitem"
                               className={MENU_ITEM}
                             >
                               Gérer les identités vérifiées
@@ -299,7 +297,6 @@ export default async function DomainsPage({
                               <DrawerLink
                                 href={ROUTES.domainManager(domain.id)}
                                 request={{ kind: "manager", id: domain.id }}
-                                role="menuitem"
                                 className={MENU_ITEM}
                               >
                                 Désigner le premier responsable
@@ -323,7 +320,6 @@ export default async function DomainsPage({
                               >
                                 <button
                                   type="submit"
-                                  role="menuitem"
                                   className={MENU_ITEM}
                                 >
                                   Révoquer l&apos;invitation
@@ -335,7 +331,6 @@ export default async function DomainsPage({
                               <DrawerLink
                                 href={ROUTES.domainSuspend(domain.id)}
                                 request={{ kind: "suspend", id: domain.id }}
-                                role="menuitem"
                                 className={MENU_ITEM}
                               >
                                 Suspendre cette entreprise
@@ -344,7 +339,6 @@ export default async function DomainsPage({
                               <form action={resumeDomain.bind(null, domain.id)}>
                                 <button
                                   type="submit"
-                                  role="menuitem"
                                   className={MENU_ITEM}
                                 >
                                   Rétablir l&apos;accès
@@ -355,7 +349,6 @@ export default async function DomainsPage({
                             <DrawerLink
                               href={ROUTES.domainArchive(domain.id)}
                               request={{ kind: "archive", id: domain.id }}
-                              role="menuitem"
                               className={MENU_ITEM_DANGER}
                             >
                               Archiver cette entreprise

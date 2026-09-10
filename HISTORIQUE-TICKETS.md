@@ -8397,3 +8397,111 @@ s'est pas présentée. Le seul code de production touché l'a été **temporaire
 défaut, puis restauré : le diff final ne porte que deux fichiers de tests, un fichier de tests neuf
 et le rapport. **1 956 → 1 962 tests, 68 → 69 fichiers**, `lint` (`--max-warnings=0`) et `tsc` au
 vert. **C11 est refermé une seconde fois ; C7 ferme le POC.**
+
+---
+
+## T7.7 — Accessibilité : clavier, focus, contraste, titres — 10/09/2026
+
+**Le premier des deux balayages de C7, et il vient après les écrans neufs** — C11 ayant livré le
+sien, la voie était libre. Le ticket pose des attributs, des libellés et des jetons existants ; il ne
+redessine rien. **Quatre corrections, quatre relevés, et deux mesures que ce poste n'a pas pu
+rendre.**
+
+### Ce qui a changé
+
+**Deux écrans publics n'avaient aucun `h1`**, et c'est le HTML servi qui l'a dit — jamais une lecture
+de code. `/auth/acces` et `/invitation/[jeton]` ouvraient sur le `h2` d'`EmptyState` : *0 h1*, et un
+rang 2 sans rang 1 au-dessus. Le mot « Vision » y était déjà le titre par la position et par le
+poids ; il ne l'était pas par la balise. `<p>` devient `<h1>`, **à classes inchangées** — aucun
+redessin. Relevé après : *1 h1* sur les deux, et le rang 2 retrouve son parent. `/domaines` porte le
+même `<p>` et le garde : lui a déjà son `h1` par `PageHeader`, et deux `h1` vaudraient zéro.
+
+**La frise de la page produit s'atteint au clavier.** `components/products/roadmap.tsx` était le seul
+conteneur à défilement horizontal du dépôt, et son propre commentaire renvoyait le manque à ce
+ticket depuis T7.6 : *« Sans `tabindex` ni `role` : un conteneur défilant devrait être atteignable au
+clavier »*. Il reçoit `tabIndex={0}`, `role="group"` et son nom — WCAG 2.1.1. **`group` et non
+`region`** : une `region` est un repère de page, et cette frise est une partie d'un bloc qui a déjà
+son titre, pas une destination de navigation ; c'est l'arbitrage qu'avait déjà rendu
+`roadmap-scale.tsx`. Servi, relu : `<div tabindex="0" role="group" aria-label="Frise des
+accompagnements — défilement horizontal">`.
+
+**Le motif ARIA du menu est retiré, pas complété.** `ActionMenu` déclarait `role="menu"`,
+`aria-haspopup="menu"` et **trente-huit `role="menuitem"` sur sept fichiers**, sans la navigation aux
+flèches ni le focus tournant que le motif exige. Le mensonge coûtait deux fois : `menuitem` **efface**
+la nature de lien des `<Link>` qu'il recouvrait — donc la liste des liens de la page —, et le lecteur
+d'écran annonçait un menu dont les flèches ne faisaient rien. Écrire le motif complet aurait posé un
+mécanisme d'interaction neuf **pour ne rien changer à ce qu'on peut faire** ; le retirer rend au HTML
+ce qu'il est déjà, un déclencheur qui dit `aria-expanded` et une liste que la tabulation traverse.
+C'est l'interdit du ticket à la lettre : *aucun `aria-*` posé sur un élément dont le rôle natif
+suffit*. `aria-expanded` et `aria-controls` restent : ils ne décrivent rien de faux.
+
+**Un cliquet, parce que rien d'autre ne pouvait tenir ce correctif.** Les enfants d'`ActionMenu` ne
+sont rendus qu'ouvert : `role="menuitem"` **n'a jamais paru dans le HTML servi**, et le `curl` du
+protocole ne peut ni le trouver ni constater son départ ; le dépôt n'a par ailleurs aucun harnais de
+rendu. Trois clauses `no-restricted-syntax` dans `eslint.config.mjs` visent les trois attributs
+**nommés**, jamais « l'ARIA » en général — un garde-fou trop large est celui qu'on désactive au
+premier faux positif. Reprises dans `spacingScaleLock` **et** dans `socleLock` : le format plat
+d'ESLint écrase la valeur d'une règle au lieu de la fusionner, piège consigné depuis TD.5.
+
+### Les quatre relevés
+
+**Les titres, sur treize rendus.** Neuf écrans du groupe `(app)` (dont les deux pages de détail),
+trois panneaux ouverts par leur URL, deux écrans publics : **un `h1` partout après correction, aucun
+rang sauté**. `PageHeader` → `h1`, `SectionHeader` et `BlockHeader` → `h2`, `BlockDivider` → `h3`,
+`EmptyState` → `h2` ou `h3` selon `level`. Le `<summary>` du journal **porte** un `h2` — voir les
+énoncés de fiche mis en défaut. Un panneau ouvert par l'URL pose son `h2` de dialogue **avant** le
+`h1` de la page dans l'ordre du document : ce n'est pas un rang sauté (on redescend, on ne saute
+pas), le `role="dialog"` et son `aria-labelledby` faisant du panneau son propre contexte. Laissé tel
+quel — le corriger serait restructurer.
+
+**Les libellés, sur treize rendus : zéro contrôle sans nom accessible.** Les cinq `<nav>` du dépôt
+sont tous nommés. `Button` impose `label` sur toute icône seule par son type ; `ExternalLink` porte
+son `sr-only` *(lien externe, nouvel onglet)* et il est le **seul** `target="_blank"` du produit ;
+`Picker` est un combobox complet (`role="combobox"`, `aria-expanded`, `aria-controls`,
+`aria-activedescendant`, `aria-live`) ; les champs de formulaire apparient `aria-invalid` et
+`aria-describedby` par `FormField`.
+
+**Le focus, mesuré.** `--border-focus` (`#196de3`) : **4,52:1** sur le fond de page, **4,76:1** sur
+une carte, **4,58:1** sur `surface-primary-lightest`, 3,82:1 sur `-lighter`, 3,58:1 sur
+`surface-primary-lighter`, 3,76:1 sur `surface-neutral-darkest` — tous au-dessus du seuil de 3:1 d'un
+composant. **Seule la barre latérale est en défaut à 2,87:1**, et la dérogation existait déjà :
+`content-neutral-pale`, **13,65:1**. Le seul couple neuf par la position est celui de la frise, dont
+l'anneau tombe sur le fond de son `Block` — **4,76:1** en tonalité neutre, **4,58:1** en bleue. Rien
+n'a été inventé : `outline-offset` porte l'anneau **à l'extérieur** de l'élément, donc sur le fond du
+parent et jamais sur un bouton sombre.
+
+**Le clavier — et c'est le relevé incomplet.** L'ordre de tabulation a été **dérivé du HTML servi**,
+ordre du document, filtré par le sélecteur même de `FocusTrap` : 43 arrêts sur l'accueil, 36 sur
+`/equipe`, 37 sur la page produit, 59 sur la page accompagnement panneau ouvert — **tous nommés**. Le
+lien d'évitement est le premier arrêt de chaque écran du groupe `(app)`. Sur `/equipe`, le chemin que
+la fiche disait jamais parcouru : le panneau **s'ouvre par son URL** (`?profil=nouveau` →
+`role="dialog"` + `aria-labelledby` pointant un `h2` de même `id`), la croix porte `autofocus` et
+`aria-label="Fermer le panneau"`, le voile est `aria-hidden` et `tabindex="-1"`, et le `closeHref`
+**reconduit les filtres actifs** — `?dispo=available&profil=nouveau` referme sur
+`/equipe?dispo=available`. C'est la seule des cinq propriétés de `DrawerHost` qui distingue `/equipe`
+des deux hôtes éprouvés par TD.2, et elle est mesurée.
+
+### Ce qui n'a pas été fait, et pourquoi
+
+**Le parcours clavier au navigateur n'a pas eu lieu.** Ni Playwright ni Puppeteer au dépôt, et
+l'interdit (b) du chantier refuse une dépendance neuve. `Échap`, le clic extérieur, le retour du
+focus au déclencheur et le défilement de la frise aux flèches restent **lus dans le code, jamais
+éprouvés**. Rapporté comme un manque, jamais comme une mesure.
+
+**Le point « une carte ne se détache d'aucun fond » ne se referme pas**, et la fiche l'annonçait.
+Cinq positions mesurées, de **1,01:1 à 1,26:1** quand le seuil est 3:1. Le plus franc jeton de
+surface neutre employable en filet plafonne à **2,22:1** ; le seul qui passerait, `surface-neutral-base`
+(**4,73:1**), est un jeton de **texte**, et le poser en filet serait un redessin. **Aucun neuvième
+jeton n'a été inventé.** Le point garde sa destination : design system.
+
+**Deux points ouverts d'`eslint.config.mjs` n'ont pas été refermés** alors que le ticket a ouvert ce
+fichier : ils ne sont pas de l'accessibilité, et la règle 3 refuse le geste « pendant que j'y suis ».
+**Seconde fois qu'une destination « le prochain ticket qui ouvre le fichier » échoue** — la première
+avait valu un ticket entier à T8.4.
+
+### Chiffres
+
+`npm run lint` (`--max-warnings=0`) au vert · `tsc --noEmit` au vert · **1 962 tests sur 69
+fichiers**, inchangés — aucun test ne couvrait ces attributs, et le filet du correctif de menu est un
+cliquet de lint, mis en défaut : trois clauses réécrites font tomber exactement trois erreurs, dans
+les deux portées, et rien d'autre.

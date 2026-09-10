@@ -418,7 +418,6 @@ export function Indicators({
                 <DrawerLink
                   href={visionHref}
                   request={{ kind: "vision" }}
-                  role="menuitem"
                   className={MENU_ITEM}
                 >
                   {vision
@@ -434,7 +433,6 @@ export function Indicators({
                     >
                       <button
                         type="submit"
-                        role="menuitem"
                         disabled={indicator.isNorthStar}
                         className={`${MENU_ITEM} disabled:text-content-neutral-light`}
                       >
@@ -453,7 +451,6 @@ export function Indicators({
               <DrawerLink
                 href={markersHref}
                 request={{ kind: "markers" }}
-                role="menuitem"
                 className={MENU_ITEM}
               >
                 Voir les repères
@@ -462,7 +459,6 @@ export function Indicators({
                 <DrawerLink
                   href={addContextHref}
                   request={{ kind: "contextMarker" }}
-                  role="menuitem"
                   className={MENU_ITEM}
                 >
                   Ajouter un repère de contexte
@@ -472,7 +468,6 @@ export function Indicators({
                 <form action={designate.bind(null, null)}>
                   <button
                     type="submit"
-                    role="menuitem"
                     className={MENU_ITEM_DANGER}
                   >
                     Retirer la North Star
@@ -1316,7 +1311,6 @@ function IndicatorCard({
               <DrawerLink
                 href={editHref(indicator.id)}
                 request={{ kind: "indicator", id: indicator.id }}
-                role="menuitem"
                 className={MENU_ITEM}
               >
                 Modifier l&apos;indicateur
@@ -1326,7 +1320,6 @@ function IndicatorCard({
               <DrawerLink
                 href={addReadingHref(indicator.id)}
                 request={{ kind: "reading", id: indicator.id }}
-                role="menuitem"
                 className={MENU_ITEM}
               >
                 Ajouter un relevé
@@ -1336,7 +1329,6 @@ function IndicatorCard({
               <DrawerLink
                 href={readingsHref(indicator.id)}
                 request={{ kind: "readings", id: indicator.id }}
-                role="menuitem"
                 className={MENU_ITEM}
               >
                 Gérer les relevés
@@ -1344,7 +1336,7 @@ function IndicatorCard({
             ) : null}
             {setNorthStar ? (
               <form action={setNorthStar.bind(null, indicator.id)}>
-                <button type="submit" role="menuitem" className={MENU_ITEM}>
+                <button type="submit" className={MENU_ITEM}>
                   Définir comme North Star
                 </button>
               </form>
@@ -1355,7 +1347,6 @@ function IndicatorCard({
               <form action={archiveIndicator.bind(null, indicator.id)}>
                 <button
                   type="submit"
-                  role="menuitem"
                   className={MENU_ITEM_DANGER}
                 >
                   Archiver

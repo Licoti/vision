@@ -148,7 +148,6 @@ export function MeasurementRank({
                 <DrawerLink
                   href={addTrackingHref}
                   request={{ kind: "tracking" }}
-                  role="menuitem"
                   className={MENU_ITEM}
                 >
                   Ajouter un outil
@@ -158,7 +157,6 @@ export function MeasurementRank({
                 <DrawerLink
                   href={planHref}
                   request={{ kind: "taggingPlan" }}
-                  role="menuitem"
                   className={MENU_ITEM}
                 >
                   {/* L'existence du plan décide de ce que le geste annonce,
@@ -204,7 +202,6 @@ export function MeasurementRank({
                     <DrawerLink
                       href={editTrackingHref(tracking.id)}
                       request={{ kind: "tracking", id: tracking.id }}
-                      role="menuitem"
                       className={MENU_ITEM}
                     >
                       Modifier cet outil
@@ -214,7 +211,6 @@ export function MeasurementRank({
                     <form action={archiveTracking.bind(null, tracking.id)}>
                       <button
                         type="submit"
-                        role="menuitem"
                         className={MENU_ITEM_DANGER}
                       >
                         Retirer cet outil
@@ -260,7 +256,6 @@ export function MeasurementRank({
                 <form action={archivePlan}>
                   <button
                     type="submit"
-                    role="menuitem"
                     className={MENU_ITEM_DANGER}
                   >
                     Retirer le plan

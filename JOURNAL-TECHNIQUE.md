@@ -11578,3 +11578,91 @@ déjà découpé** : aucune session n'est prévue avant T7.7. Je n'ai pas suppri
 suivis de ma propre initiative — perdre un point suivi coûte plus qu'un dépassement de seuil. **À
 trancher par l'humain, ou au prochain découpage** : soit T7.7 balaie en ouvrant, soit le seuil se
 révise. Excédent préexistant à T11.6 (le fichier était à 292 avant).
+
+---
+
+## T7.7 — Accessibilité : quatre relevés, dont un que ce poste ne peut pas rendre (10/09/2026)
+
+**Deux mesures manquent, et elles se disent avant les autres.** La fiche exige un parcours clavier
+*au navigateur* et le tient hors de la lecture du HTML servi. **Je n'ai pas pu le faire** : le dépôt
+n'a ni Playwright ni Puppeteer, l'interdit (b) du chantier refuse une dépendance neuve, et rien
+dans cette session ne pilote un navigateur. Ce qui remplace ce parcours est **plus faible que lui**,
+et se nomme : l'ordre de tabulation **dérivé du HTML servi** — ordre du document, filtré par le
+sélecteur même de `FocusTrap`. Cela mesure la **séquence** et les **noms** des arrêts ; cela ne
+mesure ni `Échap`, ni le clic extérieur, ni le retour du focus au déclencheur, ni le défilement aux
+flèches. Ces quatre-là restent **lus dans le code, jamais éprouvés**. Second manque, plus étroit :
+`ActionMenu` ne rend ses enfants qu'ouvert, donc **aucun de ses attributs ne paraît dans le HTML
+servi** — voir le garde-fou plus bas.
+
+**Le HTML servi a demandé un harnais, et la raison est un durcissement de T11.6.** Les écrans du
+groupe `(app)` exigent une session, `/dev/session` exige désormais une session *déjà ouverte*, et
+son formulaire ne se rend donc pas au premier passage : rien dans le produit n'ouvre une session de
+développement. Un script jetable hors dépôt a scellé un principal par `sealPrincipal` sur la base
+locale, puis `curl`. **Le geste est à refaire à chaque ticket qui veut lire un écran authentifié**,
+et il n'est écrit nulle part — candidat à un point ouvert d'outillage si un troisième ticket le
+redemande.
+
+**La sonde s'est trompée avant le produit, et c'est `disabled:opacity-40` qui l'a piégée.** Le
+premier extracteur écartait tout arrêt dont les attributs contenaient le mot `disabled` — or
+`buttonClass()` sert `disabled:cursor-not-allowed disabled:opacity-40` sur **chaque** bouton. Le
+lien d'évitement et deux boutons manquaient au relevé, silencieusement : 33 arrêts au lieu de 36.
+Corrigé en visant l'attribut (`(?:^|\s)disabled(?:=|\s|$)`) et non le mot. **Une sonde se met en
+défaut comme une règle** — celle-ci l'a été par un écart de décompte, jamais par une assertion.
+
+**Trois corrections se lisent dans le HTML servi ; une quatrième ne le peut pas, et c'est un fait de
+structure.** Les deux `h1` (`/auth/acces`, `/invitation/[jeton]`) et la frise atteignable au clavier
+se relèvent au `curl`, avant et après. Le retrait des trente-huit `role="menuitem"`, de `role="menu"`
+et d'`aria-haspopup="menu"`, non : les enfants d'`ActionMenu` ne sont rendus qu'une fois le menu
+ouvert, si bien que **`role="menuitem"` n'a jamais paru dans le HTML servi** — le `curl` ne peut ni
+le trouver avant, ni constater son départ après. Le dépôt n'ayant par ailleurs aucun harnais de
+rendu (`vitest` en environnement `node`, sans jsdom, et `include` qui ignore `components/**`), le
+correctif serait resté **sans aucun filet**. D'où le cliquet de source dans `eslint.config.mjs`,
+trois clauses `no-restricted-syntax` visant trois attributs nommés — mis en défaut : réécrire les
+trois fait tomber exactement trois erreurs, dans les deux portées (socle et hors socle), et rien
+d'autre. **Les clauses sont reprises dans `spacingScaleLock` *et* dans `socleLock`**, le format plat
+d'ESLint écrasant la valeur d'une règle au lieu de la fusionner — le piège que TD.5 avait déjà
+consigné, et qui aurait fait disparaître les trois clauses partout sauf dans le socle, en silence.
+
+**Le motif ARIA du menu : retirer plutôt qu'écrire.** Deux issues s'offraient, et l'une ajoute quand
+l'autre retire. Écrire le motif complet — focus tournant, flèches, `Home`/`Fin` — aurait posé un
+mécanisme d'interaction neuf dans un composant client pour **ne rien changer à ce qu'on peut faire**.
+Retirer les trois attributs rend au HTML ce qu'il est déjà : un déclencheur qui dit `aria-expanded`,
+et une liste de liens et de boutons que la tabulation traverse — ce qu'elle faisait de toute façon.
+C'est l'interdit du ticket pris à la lettre. Le coût du mensonge était double : `menuitem` **efface**
+la nature de lien des `<Link>` qu'il recouvrait — donc la liste des liens de la page —, et le lecteur
+d'écran annonçait un menu dont les flèches ne faisaient rien.
+
+**Trois énoncés de fiche mis en défaut.** (1) *« chaque `<nav>` distinct nommé — il y en a jusqu'à
+trois sur la page projet »* : il y en a **deux** au rendu, `Navigation principale` et `Fil d'Ariane`.
+Le troisième, `components/projects/subnav.tsx`, **n'a aucun appelant** et ne se rend nulle part — son
+propre en-tête le dit depuis son écriture. (2) *« le `<summary>` du journal, qui est un titre sans en
+porter la balise »* : il **porte** un `h2`, mesuré dans le HTML servi — `SectionHeader as="summary"`
+enveloppe un `<h2>` depuis TD.4. Rien à faire, mais l'énoncé promettait un manque qui n'existe pas.
+(3) *« trois positions à 1,04:1, 1,05:1 et 1,24:1 »* pour la carte qui ne se détache d'aucun fond :
+elles sont **cinq**, et l'étendue mesurée va de **1,01:1 à 1,26:1** — `ETAT.md` disait déjà cinq, de
+1,04 à 1,27, et c'est son étendue qui se corrige de deux arrondis.
+
+**Le point de la carte ne se referme pas, et la mesure le confirme au lieu de l'affirmer.** Le plus
+franc jeton de surface neutre employable en filet, `surface-neutral-light`, plafonne à **2,22:1** sur
+`surface-neutral-pale` et **2,11:1** sur le fond de page, sous le seuil de 3:1 d'un composant. Le
+seul jeton qui passerait, `surface-neutral-base` (**4,73:1**), est un jeton de **texte** : le poser en
+filet de carte serait un trait sombre sur chaque bloc du produit, c'est-à-dire un redessin — ce que
+la fiche interdit en toutes lettres. **Aucun neuvième jeton n'a été inventé.** Le point garde sa
+destination.
+
+**Une destination échoue pour la seconde fois du dépôt.** Deux points ouverts attendent *« le
+prochain ticket qui ouvre `eslint.config.mjs` »* — la clause qui refermerait `withoutAnySession()`
+et la dette d'`uiLayerSeal`. **Ce ticket a ouvert ce fichier et ne les a pas faits** : ils ne sont
+d'aucune façon de l'accessibilité, et la règle 3 refuse le geste « pendant que j'y suis ». C'est
+exactement ce qui était arrivé à T8.4, qui avait fini par recevoir un ticket pour ce seul motif. Une
+destination formulée en « le prochain ticket qui ouvre le fichier » **ne tient pas** quand la règle 3
+tient : les deux se contredisent. À trancher.
+
+**`ETAT.md` reste au-dessus de 250 lignes, et le geste de balayage n'a pas été fait ici non plus.**
+T11.6 avait laissé le choix ouvert — *« soit T7.7 balaie en ouvrant, soit le seuil se révise »*. Je
+n'ai pas balayé : sortir des points refermés est un geste de session de découpage, C7 est déjà
+découpé, et supprimer de ma propre initiative des points ouverts suivis coûte plus qu'un dépassement
+de seuil. **285 → 304 lignes** : la ligne de journal du ticket et ses deux points ouverts neufs, tous
+trois resserrés après une première rédaction qui portait le fichier à 315. **Le point reste entier
+pour l'humain**, et les deux règles se contredisent toujours — l'étape 5 demande de balayer au-delà
+de 250, la session de découpage dit qu'elle est le seul moment où l'on balaie.

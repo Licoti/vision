@@ -486,7 +486,6 @@ export default async function AdminPage({
                         <form action={RESTORE[referential].bind(null, row.id)}>
                           <button
                             type="submit"
-                            role="menuitem"
                             className={MENU_ITEM}
                           >
                             {`Rétablir ${noun.demonstrative}`}
@@ -496,7 +495,6 @@ export default async function AdminPage({
                         <DrawerLink
                           href={ROUTES.adminRowEdit(referential, row.id)}
                           request={{ kind: "row", referential, id: row.id }}
-                          role="menuitem"
                           className={MENU_ITEM}
                         >
                           {referential === "entites" || referential === "outils"
@@ -509,7 +507,6 @@ export default async function AdminPage({
                         <DrawerLink
                           href={ROUTES.adminRowArchive(referential, row.id)}
                           request={{ kind: "archive", referential, id: row.id }}
-                          role="menuitem"
                           className={MENU_ITEM}
                         >
                           {`Archiver ${noun.demonstrative}`}
@@ -524,7 +521,6 @@ export default async function AdminPage({
                         <DrawerLink
                           href={ROUTES.adminEntityDelete(row.id)}
                           request={{ kind: "delete", id: row.id }}
-                          role="menuitem"
                           className={MENU_ITEM_DANGER}
                         >
                           Supprimer cette entité

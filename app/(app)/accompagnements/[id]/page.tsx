@@ -419,7 +419,6 @@ export default async function ProjectPage({
                         <DrawerLink
                           href={ROUTES.projectDelete(project.id)}
                           request={{ kind: "delete" }}
-                          role="menuitem"
                           className={MENU_ITEM_DANGER}
                         >
                           Supprimer définitivement
@@ -450,7 +449,6 @@ export default async function ProjectPage({
                         <DrawerLink
                           href={ROUTES.projectArchive(project.id)}
                           request={{ kind: "archive" }}
-                          role="menuitem"
                           className={MENU_ITEM_DANGER}
                         >
                           Archiver cet accompagnement
@@ -467,7 +465,6 @@ export default async function ProjectPage({
                         <DrawerLink
                           href={ROUTES.projectDelete(project.id)}
                           request={{ kind: "delete" }}
-                          role="menuitem"
                           className={MENU_ITEM_DANGER}
                         >
                           Supprimer définitivement
