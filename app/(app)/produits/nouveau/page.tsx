@@ -28,7 +28,7 @@ import { notFound } from "next/navigation";
 
 import { Breadcrumb } from "@/components/shell/breadcrumb";
 import { ProductForm } from "@/components/products/product-form";
-import { ACTION_LINK_SM } from "@/components/ui/action-link";
+import { buttonClass } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Page, PageHeader } from "@/components/ui/page";
 import { requireSession } from "@/lib/auth/provider";
@@ -72,16 +72,37 @@ export default async function NewProductPage() {
           /* Un produit se rattache obligatoirement à une entité : sans
              référentiel, le formulaire serait un écran qu'on ne peut pas
              soumettre. L'état vide dit pourquoi, plutôt que de laisser
-             chercher (règle 5). */
+             chercher (règle 5).
+
+             **Le geste qui le remplit, et non le demi-tour** (T7.8). Il
+             proposait « Revenir aux produits », d'où l'on venait : sur un
+             domaine neuf — que `bootstrapReferentials` sème **sans aucune
+             entité**, son en-tête l'écrit —, le chemin vers le premier produit
+             se refermait donc sur lui-même. `docs/06` §9 veut qu'un état vide
+             propose l'action correspondante ; c'est ici l'ajout d'une entité.
+
+             **Le droit est acquis avant d'être proposé** : cette page rend 404
+             sans `manageDomain`, et `/administration` exige le même droit. Un
+             état vide qui proposerait un geste hors de portée serait un
+             cul-de-sac de plus.
+
+             **`buttonClass()` et non `ACTION_LINK_SM`** : c'est le rang des
+             états vides qui portent un vrai geste — équipe, administration,
+             entreprises, les deux roadmaps. Le lien discret était le rang du
+             demi-tour, et le demi-tour n'est pas perdu pour autant : le fil
+             d'Ariane porte « Produits ».
+
+             **Un `<Link>` nu suffit** : le panneau d'ajout se résout des
+             paramètres d'URL, côté serveur, au rendu de `/administration`. */
           <EmptyState
             title="Aucune entité dans ce domaine"
             description="Un produit se rattache toujours à une entité de l'entreprise. Le référentiel des entités est vide : il doit être alimenté avant qu'un produit puisse être créé."
             action={
               <Link
-                href={ROUTES.products}
-                className={ACTION_LINK_SM}
+                href={ROUTES.adminRowNew("entites")}
+                className={buttonClass()}
               >
-                Revenir aux produits
+                Ajouter une entité
               </Link>
             }
           />

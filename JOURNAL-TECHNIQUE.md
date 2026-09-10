@@ -11666,3 +11666,45 @@ de seuil. **285 → 304 lignes** : la ligne de journal du ticket et ses deux poi
 trois resserrés après une première rédaction qui portait le fichier à 315. **Le point reste entier
 pour l'humain**, et les deux règles se contredisent toujours — l'étape 5 demande de balayer au-delà
 de 250, la session de découpage dit qu'elle est le seul moment où l'on balaie.
+
+---
+
+## T7.8 — Les états vides : deux corrections, quatre inatteignables (10/09/2026)
+
+**L'état vide de `/administration` n'est atteignable par aucun jeu de données, et c'est structurel.**
+Un domaine amorcé reçoit ses neuf référentiels de `bootstrapReferentials` ; et l'écran liste **aussi
+les lignes rangées**, puisqu'on y les rétablit. Ranger les neuf lignes d'un référentiel ne le vide
+donc pas. Il faudrait une table restée vide depuis toujours — ce qu'aucun chemin du produit ne
+produit. Neuf titres et neuf descriptions sont écrits pour cet écran, mesurés par personne. Ce n'est
+pas un défaut : c'est un filet qui ne se lèvera jamais tant que l'amorçage sème. **Rien n'a été
+touché** (règle 3). → **à relire le jour où un référentiel s'ajoute sans être semé.**
+
+**L'état vide de `/equipe` a la même propriété, et la raison est plus jolie : la session est une
+personne du domaine.** « Aucune personne pour l'instant » ne peut se rendre qu'à qui n'est lui-même
+personne d'ici — c'est-à-dire à personne, `/equipe` vivant sous `requireSession()`. La seule façon de
+l'atteindre serait un domaine dont l'unique personne s'est rangée elle-même. → **même destination.**
+
+**Deux variantes de plus n'ont pas été vues rendues**, et pour une raison de configuration cette
+fois : les branches « aucun fournisseur d'identité n'est raccordé » d'`/auth/acces` et de
+`/invitation/[jeton]` demandent un environnement sans fournisseur. Elles sont **nommées, non
+déclarées bonnes** — la fiche l'exigeait, et c'est la seule discipline qui distingue une revue d'une
+relecture.
+
+**Les deux corrections sont mesurées et non gardées.** `/produits/nouveau`, `/accompagnements/nouveau`
+et `/a-propos` n'ont **aucun test**, et le dépôt n'en a aucun de cette forme : les 1 962 tests portent
+sur les actions et les requêtes, jamais sur un composant serveur sans logique. Un troisième
+« Revenir à… » ne serait donc rattrapé par rien. Le geste qui l'empêcherait — un harnais de rendu —
+est exactement celui que T7.7 s'est déjà vu refuser par l'interdit de dépendance neuve de C7.
+→ **avec le manque de harnais de rendu, si un troisième ticket le redemande.**
+
+**La sonde a redemandé le harnais que T7.7 avait nommé.** Lire un écran authentifié au `curl` demande
+un principal scellé ; `/dev/session` exigeant depuis T11.6 une session **déjà ouverte**, il a fallu
+sept scripts jetables — sceller deux principals, semer un produit, ranger les statuts, ranger les
+entités, poser un accompagnement et une entité sans produit, poser une invitation vivante, puis
+ranger le domaine. **Troisième ticket consécutif à refaire ce geste**, et le premier à en payer le
+prix en volume. → **outillage : `scripts/probe.ts` ou son équivalent.**
+
+**Le domaine de sonde est rangé, jamais laissé.** C8 avait relevé un domaine de tests résiduel en base
+de développement ; celui-ci s'archive par `archiveDomain` en fin de ticket — règle 4, on range, on ne
+supprime pas. La base de développement porte donc une entreprise cliente archivée de plus, ce qu'elle
+sait faire.

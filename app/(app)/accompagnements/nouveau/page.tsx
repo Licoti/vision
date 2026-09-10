@@ -23,7 +23,7 @@ import { notFound } from "next/navigation";
 
 import { ProjectForm } from "@/components/projects/project-form";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
-import { ACTION_LINK_SM } from "@/components/ui/action-link";
+import { buttonClass } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Page, PageHeader } from "@/components/ui/page";
 import { requireSession } from "@/lib/auth/provider";
@@ -58,7 +58,17 @@ export default async function NewProjectPage({
   /* Un accompagnement se rattache obligatoirement à un produit (D4) et porte
      un statut non nul. Sans l'un des deux, le formulaire serait un écran qu'on
      ne peut pas soumettre : l'état vide dit pourquoi, plutôt que de laisser
-     chercher (règle 5). */
+     chercher (règle 5).
+
+     **Les deux branches proposent désormais le geste qui remplit** (T7.8). La
+     première le faisait déjà — « Créer un produit » ; la seconde disait
+     « Revenir aux accompagnements », c'est-à-dire l'écran d'où l'on venait, et
+     laissait chercher où un statut se saisit. `docs/06` §9 veut l'action
+     correspondante, et c'est ici l'ajout d'un statut dans l'administration.
+
+     **Le droit est acquis avant d'être proposé** : cette page rend 404 sans
+     `manageDomain`, et `/administration` exige le même droit. Le fil d'Ariane
+     garde le demi-tour, que le lien discret portait. */
   const missing =
     options.products.length === 0
       ? {
@@ -73,8 +83,8 @@ export default async function NewProjectPage({
             title: "Aucun statut d'accompagnement dans ce domaine",
             description:
               "Un accompagnement porte toujours un statut — en cours, terminé, en pause. Le référentiel des statuts est vide : il doit être alimenté avant qu'un accompagnement puisse être créé.",
-            href: ROUTES.projects,
-            label: "Revenir aux accompagnements",
+            href: ROUTES.adminRowNew("statuts"),
+            label: "Ajouter un statut",
           }
         : null;
 
@@ -97,10 +107,7 @@ export default async function NewProjectPage({
             title={missing.title}
             description={missing.description}
             action={
-              <Link
-                href={missing.href}
-                className={ACTION_LINK_SM}
-              >
+              <Link href={missing.href} className={buttonClass()}>
                 {missing.label}
               </Link>
             }

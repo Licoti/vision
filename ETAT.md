@@ -2,25 +2,17 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 10/09/2026. **T7.7 terminé — le premier des deux balayages de C7**, tout
-en attribut, rien en dessin. **Deux écrans publics n'avaient aucun `h1`** (`/auth/acces`,
-`/invitation/[jeton]` — mesuré *0*, corrigé à *1*), **la frise du produit s'atteint au clavier**, et
-le **motif ARIA du menu est retiré plutôt que complété** : `role="menu"`, `aria-haspopup` et
-**trente-huit `role="menuitem"`** promettaient des flèches qu'`ActionMenu` n'a jamais eues.
-**Quatre relevés sur treize rendus** : un `h1` partout, aucun rang sauté, **zéro contrôle sans nom**,
-l'anneau de focus au-dessus de 3:1 sauf sur la barre latérale déjà dérogée. **Deux mesures manquent
-et se disent** (voir points ouverts). **Trois énoncés de fiche en défaut.** **1 962 tests, 69
-fichiers**, inchangés.
+**Dernière mise à jour :** 10/09/2026. **T7.8 terminé — la note « À propos » et les seize états
+vides.** D36 est tenue après T1.6 : quatre sections, **aucune lecture en base**, servie **sans
+cookie** en 200. La revue a trouvé **deux cul-de-sac** — `/produits/nouveau` et
+`/accompagnements/nouveau` proposaient le demi-tour d'où l'on venait, ils proposent désormais le geste
+qui remplit ; **douze états vides vus rendus**, **quatre variantes nommées comme inatteignables**
+plutôt que déclarées bonnes. Le droit **éprouvé par l'action** : 404 sur les quatre points d'entrée
+pour un membre. **1 962 tests**, inchangés.
 
 **09/09/2026 — C7 rouvert pour reprendre les quatre finitions mises en pause** (T7.1 → T7.6 livrés
-les 28-30/08). **Ticket suivant : T7.8 — les états vides et la note « À propos »**, puis T7.9
-(colonnes saisies qu'aucun écran ne lit) et T7.10 (gestes qui n'atteignent pas leur cible) — et
-**T7.10 ferme le POC**. Le premier des deux balayages est passé (T7.7) ; le second est T7.10.
-
-**09/09/2026 — C11 a rouvert pour T11.6, le contrôle, puis s'est refermé.** Le ticket a éprouvé
-**ensemble**, comme une surface d'attaque, ce que C9 et C11 avaient écrit ticket par ticket. Sept
-familles frappées, chacune mise en défaut avant d'être crue. Le socle d'étanchéité
-(`lib/db/scoped.ts`) et le chemin d'authentification (`lib/auth/`) tiennent leurs promesses, mesurés.
+les 28-30/08). **Ticket suivant : T7.9 — les colonnes saisies qu'aucun écran ne lit**, puis T7.10
+(gestes qui n'atteignent pas leur cible) — et **T7.10 ferme le POC**, second des deux balayages.
 
 ---
 
@@ -37,7 +29,7 @@ familles frappées, chacune mise en défaut avant d'être crue. Le socle d'étan
 | TD — Dette technique et couche de présentation | TD.1 → TD.6 | **terminé** |
 | C5bis — Équipe | T5bis.1 → T5bis.7 | **terminé** |
 | C6 — Liens et journal | T6.1 → T6.7 | **terminé** |
-| C7 — Finitions | T7.1 → T7.10 | **en cours** (rouvert le 09/09) — T7.1 → T7.7 livrés, T7.8 → T7.10 ferment le POC |
+| C7 — Finitions | T7.1 → T7.10 | **en cours** (rouvert le 09/09) — T7.1 → T7.8 livrés, T7.9 et T7.10 ferment le POC |
 | C8 — Dette | T8.1 → T8.5 | **terminé** |
 | C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **terminé** |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
@@ -81,10 +73,14 @@ familles frappées, chacune mise en défaut avant d'être crue. Le socle d'étan
   trois trous de couverture comblés, un énoncé de fiche corrigé. Détail : `HISTORIQUE-TICKETS.md` ;
   contrôle : `SECURITE-C9-C11.md`. 1 816 → **1 962 tests, 69 fichiers**.
 - **C7 — T7.7, Accessibilité — 10/09.** Deux écrans publics sans `h1`, la frise atteignable au
-  clavier, **trente-huit `role="menuitem"` retirés** avec `role="menu"` et `aria-haspopup` — l'ARIA
-  promettait un menu que le clavier ne tenait pas. Quatre relevés sur treize rendus, **zéro contrôle
-  sans nom**. Le HTML servi ne pouvant pas tenir le correctif de menu, un **cliquet de lint** le
-  tient. **Trois énoncés de fiche en défaut.** 1 962 tests, inchangés.
+  clavier, **trente-huit `role="menuitem"` retirés** — l'ARIA promettait un menu que le clavier ne
+  tenait pas ; un **cliquet de lint** tient ce que le HTML servi ne peut pas tenir. Quatre relevés
+  sur treize rendus. **Trois énoncés de fiche en défaut.**
+- **C7 — T7.8, États vides et « À propos » — 10/09.** D36 tenue après T1.6 : quatre sections, aucune
+  lecture en base, **200 sans cookie**, aucun terme proscrit. La revue des **seize** états vides a
+  trouvé **deux cul-de-sac** — `/produits/nouveau` et `/accompagnements/nouveau` renvoyaient d'où
+  l'on venait —, **douze vus rendus**, **quatre nommés inatteignables**. Droit éprouvé par l'action.
+  1 962 tests, inchangés.
 
 - **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, détaillés dans
   `HISTORIQUE-TICKETS.md`. **Cinq portent une migration, `0010` à `0014`** ; le reste est de
@@ -174,9 +170,19 @@ l'interdit (b) de C7 refuse une dépendance neuve. Est mesuré l'ordre de tabula
 servi** ; ne sont **pas** mesurés `Échap`, le clic extérieur, le retour du focus au déclencheur et le
 défilement de la frise aux flèches. → **arbitrage humain : une dépendance de développement, ou le
 manque assumé.**
-**Lire un écran authentifié au `curl` demande un harnais qui n'existe pas** (T7.7) : `/dev/session`
-exige une session **déjà ouverte** depuis T11.6, et son formulaire ne se rend donc pas au premier
-passage. Le geste est à refaire à chaque ticket. → **outillage, si un troisième le redemande.**
+**Lire un écran authentifié au `curl` demande un harnais qui n'existe pas** (T7.7, **redemandé par
+T7.8** — sept scripts jetables pour amener un domaine dans sept états) : `/dev/session` exige une
+session **déjà ouverte** depuis T11.6. **Le troisième ticket l'a redemandé, et il a payé le plus
+cher.** → **outillage : `scripts/probe.ts` ou son équivalent.**
+**Quatre états vides ne s'atteignent par aucun jeu de données** (T7.8), et deux le sont
+structurellement : `/administration` — les neuf référentiels sont semés, et l'écran liste aussi les
+lignes rangées — et `/equipe`, dont la session **est** une personne du domaine. Les deux autres sont
+les variantes « aucun fournisseur d'identité » d'`/auth/acces` et de l'invitation. **Rien n'a été
+touché** (règle 3). → **le jour où un référentiel s'ajoute sans être semé.**
+**Les deux corrections d'états vides de T7.8 sont mesurées et non gardées** : ces trois écrans n'ont
+aucun test, le dépôt n'en ayant aucun de cette forme. Un troisième « Revenir à… » ne serait rattrapé
+par rien, et le harnais de rendu qui l'empêcherait bute sur l'interdit de dépendance neuve de C7.
+→ **avec le harnais de rendu ci-dessus.**
 
 **Le journal reste incomplet** (T8.3, laissé intact — règle 3) : **six familles écrivent sans
 trace** — le produit, l'adoption, la compétence portée, les huit référentiels autres que l'entité

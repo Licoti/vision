@@ -8505,3 +8505,91 @@ avait valu un ticket entier à T8.4.
 fichiers**, inchangés — aucun test ne couvrait ces attributs, et le filet du correctif de menu est un
 cliquet de lint, mis en défaut : trois clauses réécrites font tomber exactement trois erreurs, dans
 les deux portées, et rien d'autre.
+
+---
+
+## T7.8 — Les états vides, et la note « À propos » — 10/09/2026
+
+**Deux objets sans rapport dans un seul ticket, et c'est la fiche qui les réunit** : la note que D36
+attendait depuis T1.6, et la revue des seize états vides du dépôt. Le lien entre eux est la règle 5 —
+`/a-propos` était **le seul état vide de Vision qui n'attendait aucune donnée**. Il attendait du
+texte, et le texte est ce ticket.
+
+### La note
+
+**Elle remplace un état vide qui annonçait son propre contenu.** Quatre sections : ce qu'est Vision
+(`docs/01` §1-2), le vocabulaire, ce qu'elle ne fait pas, l'état daté. **Aucune lecture en base**, et
+c'est une exigence, pas une économie : la page n'est pas `async`, ne prend aucun paramètre, ne connaît
+pas le domaine courant — servie au `curl` **nu**, sans cookie, elle rend **200**.
+
+**Le glossaire dit neuf mots sur onze, et le choix est motivé.** Les cinq premiers sont la chaîne
+d'appartenance elle-même — c'est elle qui structure le produit ; les quatre suivants sont ceux dont
+l'ambiguïté coûte : l'entité qu'on prend pour une frontière, l'indicateur qu'on croit porté par
+l'accompagnement, le journal qu'on prend pour une activité, l'approche qu'on confond avec le métier.
+Un `<dl>` et non neuf titres : neuf rangs de plus dans la hiérarchie pour des définitions d'une
+phrase, quand `Field` et le détail d'un marqueur de produit emploient déjà cette balise.
+
+**L'écran dit « Accompagnement » là où `docs/02` §3 dit « Projet »** — le vocabulaire de l'interface
+depuis le renommage du 02/09, jamais celui des documents de conception. Cette page est la première
+qui **définit** les mots au lieu de les employer : y définir un mot que la navigation ne sert nulle
+part aurait posé un troisième vocabulaire. Le code et la base restent en `projects`.
+
+**La date de la section 4 est un littéral.** `new Date()` afficherait toujours « aujourd'hui » sur un
+texte qui, lui, ne bouge pas. Et l'état vide qu'elle remplace annonçait « ce qui existe, ce qui
+viendra » : la seconde moitié tombe, la fiche interdisant toute promesse datée.
+
+### Les deux états vides qui ont changé, et pourquoi
+
+**`/produits/nouveau` — « Revenir aux produits » devient « Ajouter une entité ».** Sans entité, aucun
+produit ne peut naître ; le geste proposé renvoyait à l'écran **d'où l'on venait**. Sur un domaine
+neuf — que `bootstrapReferentials` sème **sans aucune entité**, son en-tête l'écrit — le chemin vers
+le premier produit se refermait donc sur lui-même.
+
+**`/accompagnements/nouveau` — « Revenir aux accompagnements » devient « Ajouter un statut ».** Même
+défaut, même cause : un demi-tour là où `docs/06` §9 veut l'action correspondante. Le demi-tour n'est
+perdu ni dans l'un ni dans l'autre — le fil d'Ariane le porte.
+
+Les deux passent d'`ACTION_LINK_SM` à `buttonClass()` : c'est le rang des états vides qui portent un
+vrai geste — équipe, administration, entreprises, les deux roadmaps —, et le lien discret était celui
+du demi-tour. **Un `<Link>` nu suffit** : le panneau d'ajout se résout des paramètres d'URL, côté
+serveur.
+
+**Le droit est acquis avant d'être proposé, et il s'éprouve par l'action.** Les deux pages rendent
+404 sans `manageDomain`, `/administration` exige le même droit, et les deux adresses proposées y
+mènent : mesuré au `curl` avec un cookie de membre — **404 sur les quatre**, la page comme sa cible.
+
+### Les quatorze autres, et ce qui a été vu rendu
+
+**Douze ont été vus rendus**, sur un domaine de sonde amené dans chacun des états : `/produits` vide
+et filtré, `/accompagnements` vide et filtré, `/equipe` filtré, la roadmap d'un accompagnement sans
+activité, celle d'un produit sans accompagnement, `/macro-parcours`, `/auth/acces`, l'invitation
+vivante et l'invitation refusée, plus les deux corrigés. Sur `/produits` et `/accompagnements`, la
+mesure a été refaite **avec un cookie de membre** : l'état vide reste, le bouton disparaît — la
+condition de droit tient dans le HTML servi, pas seulement dans le code.
+
+**Quatre variantes n'ont été atteintes par aucun jeu de données, et sont nommées comme telles** —
+jamais déclarées bonnes. L'état vide de `/administration` ne s'atteint pas : les neuf référentiels
+sont semés par `bootstrapReferentials`, et l'écran liste **aussi** les lignes rangées. Celui de
+`/equipe` non plus, et la raison est structurelle : la session **est** une personne du domaine.
+Celui de `/domaines` demanderait zéro entreprise cliente. Et les deux variantes « aucun fournisseur
+d'identité raccordé » d'`/auth/acces` et de l'invitation demanderaient un environnement sans
+fournisseur.
+
+### Ce qui n'a pas été fait, et pourquoi
+
+**Aucun test n'a été ajouté.** Ces trois écrans n'en avaient aucun — les tests du dépôt portent sur
+les actions et les requêtes, jamais sur un composant serveur sans logique —, et la fiche demande le
+HTML servi. Les deux corrections sont donc **mesurées, non gardées** : rien ne rattrapera un
+troisième « Revenir à… ».
+
+**Aucun manque n'a été trouvé dans `components/ui/empty-state.tsx`**, que le périmètre ouvrait « si
+un manque s'y trouve ». Le composant dit déjà les deux choses, et `level` couvre les deux rangs.
+
+### Chiffres
+
+`npm run lint` (`--max-warnings=0`) au vert · `tsc --noEmit` au vert · **1 962 tests sur 69
+fichiers**, inchangés. `/a-propos` servi sans cookie : **200**, *1 `h1`*, *4 `h2`*, aucun rang sauté,
+neuf couples `dt`/`dd`, **aucun terme proscrit de `docs/02` §8** — les douze « fiche » du document
+sont tous dans « affiche », et le seul « document » en mot entier est le `document.cookie` du script
+de Next. Le domaine de sonde est **rangé** en fin de ticket : C8 avait relevé un domaine de tests
+résiduel, il n'y en a pas un second.
