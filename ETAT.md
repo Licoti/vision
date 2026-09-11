@@ -34,6 +34,7 @@ les 28-30/08). **Ticket suivant : T7.9 — les colonnes saisies qu'aucun écran 
 | C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **terminé** |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
 | C11 — Le parcours d'entrée | T11.1 → T11.6 | **terminé** (rouvert puis refermé le 09/09) |
+| C12 — Détail et journal d'administration des domaines | à découper | ouvert le 11/09/2026 |
 
 ---
 
@@ -117,6 +118,31 @@ refermé part dans `HISTORIQUE-TICKETS.md`, avec la rédaction longue d'avant le
   « Réseau de liens entre produits » de `docs/02` §10**, même direction sous un autre nom. L'entrée
   de menu et l'écran vide restent tels quels — ni table, ni objet, ni droit ; le concept devra entrer
   dans `docs/02` §2, figé. → **session de découpage de C10.**
+- **L'écran au-dessus des domaines n'a pas de route de détail** — `/domaines` est une liste et six
+  panneaux, et ce qu'il dit d'une entreprise tient en trois booléens d'existence (`AdminDomainRow`).
+  Une fiche rassemblerait ce qui vit en tiroirs — identité de l'entreprise, identités vérifiées,
+  état d'accès — **et rien de plus** : `app/domaines/page.tsx:44` refuse la donnée métier du domaine
+  (*« il administre des entreprises, il ne les traverse pas »*), les comptes restent l'affaire de
+  `/equipe`, et D39 interdit le décompte. `DOMAIN_PANEL_PARAM` attend déjà un identifiant
+  (`lib/navigation.ts:659-664`). **Reste à trancher : les six panneaux déménagent-ils, ou la liste
+  les garde-t-elle ?** → **C12 — session de découpage.**
+- **Les neuf gestes de `app/domaines/actions.ts` n'ont aucune trace, et `events` ne peut pas la
+  porter** — ce n'est pas un oubli d'appel, c'est le schéma, sur trois points : `events.actor_id`
+  référence `persons`, et un super administrateur n'a **aucune ligne `persons`**
+  (`lib/db/schema.ts:1861`, arbitrage (4) de C9) · `record()` vit dans la fermeture de
+  `forDomain(scope)` et pose `actorId` depuis le contexte (`lib/db/scoped.ts:947`) ·
+  `event_target_type` porte seize valeurs et **aucune ne dit « domaine »** (`lib/db/schema.ts:265`).
+  Une table **hors produit** — modèle `domain_identities` et `super_admins` — porterait l'acteur,
+  le domaine, le verbe, la phrase figée et l'horodatage. **Elle n'est pas dans `docs/04`, qui est
+  figé**, et une migration est un signal d'arrêt : ce n'est pas une décision de ticket. **Le même
+  obstacle bloque le sixième nom du point « Le journal reste incomplet » (groupe b)** sans que les
+  deux se confondent — celui-là est une écriture *dans* le domaine, celui-ci une écriture
+  *au-dessus*. → **C12 — session de découpage, après arbitrage humain sur `docs/04`.**
+- **Ce journal d'administration se lit-il aussi depuis le domaine ?** Un responsable voit-il qu'on
+  a touché à son entreprise ? La question ne se pose pas pour la suspension — un domaine suspendu
+  n'ouvre plus de session —, elle se pose pour l'archivage, le rétablissement et les identités
+  vérifiées. **La trancher change la table** : un journal lu des deux côtés voudrait vivre dans
+  `events`, un journal lu d'en haut seul non. → **C12 — à trancher avant d'écrire la migration.**
 
 ### b. Assignés à un ticket
 
