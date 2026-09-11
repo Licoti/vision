@@ -134,6 +134,13 @@
       "when": 1788893462581,
       "tag": "0018_oval_mandroid",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1789125260784,
+      "tag": "0019_wealthy_betty_ross",
+      "breakpoints": true
     }
   ]
 }

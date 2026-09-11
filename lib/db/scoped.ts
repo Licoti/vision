@@ -35,6 +35,7 @@
 
 import {
   and,
+  desc,
   eq,
   isNotNull,
   isNull,
@@ -48,6 +49,7 @@ import { getTableConfig, type PgColumn, type PgTable } from "drizzle-orm/pg-core
 import { db, type Database } from "./client";
 import {
   activities,
+  domainEvents,
   domainIdentities,
   domains,
   domainStatus,
@@ -1297,6 +1299,27 @@ export type AdminDomainRow = {
   hasPendingInvitation: boolean;
 };
 
+/**
+ * Une ligne du journal d'administration, telle que la fiche la lit (T12.1).
+ *
+ * **Quatre colonnes, et chacune a son lecteur.** C'est l'arbitrage (a) de
+ * `tickets-C12.md` : `events.verb` et `events.target_type` n'en ont aucun, et
+ * poser deux colonnes de plus ici aurait ajouté à la charge de T7.9 —
+ * précisément le ticket des colonnes saisies qu'aucun écran ne lit.
+ */
+export type DomainEventRow = {
+  id: string;
+  /** La phrase, figée à l'écriture (D22). */
+  summary: string;
+  occurredAt: Date;
+  /**
+   * Le nom de l'autorité qui a agi — **nul veut dire *« depuis le domaine »***,
+   * et non *« acteur inconnu »* : c'est une écriture faite à l'intérieur de
+   * l'entreprise, que rien, d'en haut, n'a le droit de nommer.
+   */
+  actorName: string | null;
+};
+
 export function asSuperAdmin(grant: SuperAdminGrant) {
   /**
    * La garde, appelée avant chaque écriture et par elles seules.
@@ -1430,6 +1453,45 @@ export function asSuperAdmin(grant: SuperAdminGrant) {
         .from(domainIdentities)
         .where(eq(domainIdentities.domainId, domainId))
         .orderBy(domainIdentities.provider, domainIdentities.value);
+    },
+
+    /**
+     * Le journal de l'administration d'une entreprise — T12.1.
+     *
+     * **Elle vit du côté fermé, et c'est le critère de T9.4** : *avec ou sans
+     * autorité nommable*. Elle ne tourne pas pendant la connexion, et elle dit
+     * ce qu'on a fait d'une entreprise — l'autorité est donc relue avant la
+     * lecture, et un grant forgé ne vaut rien. Elle prend un `domainId` sans
+     * passer par `forDomain`, pour la raison de `listDomainIdentities` juste
+     * au-dessus : l'appelant n'a pas de session.
+     *
+     * **`leftJoin`, jamais `innerJoin`.** Un `super_admin_id` nul n'écarte pas
+     * la ligne : il dit *« depuis le domaine »* (arbitrage (b) de
+     * `tickets-C12.md`), et une lecture qui filtrerait en silence rendrait un
+     * journal **incomplet sans le dire**.
+     *
+     * **Le nom de l'acteur est courant, jamais recopié dans la phrase**
+     * (arbitrage (e) de `tickets-C6.md`) : un super administrateur renommé l'est
+     * partout dans le journal, ce qui est juste — c'est la même personne.
+     *
+     * **Aucune donnée métier n'entre ici** : une phrase figée, une date, et le
+     * nom d'une autorité qui vit *au-dessus* des domaines. C'est la frontière
+     * que `app/domaines/page.tsx:44` écrit.
+     */
+    async listDomainEvents(domainId: string): Promise<DomainEventRow[]> {
+      await assertAuthority();
+
+      return db
+        .select({
+          id: domainEvents.id,
+          summary: domainEvents.summary,
+          occurredAt: domainEvents.occurredAt,
+          actorName: superAdmins.fullName,
+        })
+        .from(domainEvents)
+        .leftJoin(superAdmins, eq(superAdmins.id, domainEvents.superAdminId))
+        .where(eq(domainEvents.domainId, domainId))
+        .orderBy(desc(domainEvents.occurredAt));
     },
 
     async createDomain(values: {

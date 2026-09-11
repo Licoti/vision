@@ -446,6 +446,99 @@ export const domainIdentities = pgTable(
 );
 
 /**
+ * Le journal de l'administration d'une entreprise — ce qu'on a fait **d'un**
+ * domaine, et non ce qu'on a fait **dedans** (T12.1).
+ *
+ * **Pourquoi une table, et pas `events`.** Les neuf gestes de
+ * `app/domaines/actions.ts` écrivent sans trace, et ce n'est pas un oubli
+ * d'appel : `events.actor_id` référence `persons`, dont un super administrateur
+ * n'a **aucune ligne** (arbitrage (4) de `tickets-C9.md`) · `record()` vit dans
+ * la fermeture de `forDomain(scope)` et pose `actorId` depuis un contexte qu'il
+ * n'a pas · `event_target_type` porte seize valeurs et aucune ne dit
+ * « domaine ». L'y faire entrer demandait **trois gestes** — une migration
+ * d'énuméré sur une table du produit pour un objet qui n'en est pas, un acteur
+ * qu'aucune colonne ne sait nommer, et l'acceptation que ces lignes paraissent
+ * dans le flux du domaine. Arbitrage (2) de `tickets-C12.md`.
+ *
+ * **Elle porte `id` et `domain_id`, donc elle est un `ScopedTable`** : les neuf
+ * gestes l'écriront par la porte qu'ils traversent déjà — `forDomain().insert`,
+ * `assertNoForcedDomain` et `parentChecksOf` la couvrent sans une ligne de
+ * couche neuve —, et `asSuperAdmin(grant)` la lit comme il lit les identités
+ * vérifiées. **`events` n'est pas touchée** : ce qui est écrit *au-dessus* d'un
+ * domaine ne descend pas dedans.
+ *
+ * **Sans `archived_at`**, comme `domain_identities`, `person_skills` et
+ * `invitations` : la table entre ainsi dans `LinkTable` (`lib/db/scoped.ts`), où
+ * `archive` est un refus de typage, et elle n'entre pas dans `DeletableTable`.
+ * Le journal est en **écriture seule** (D22) : une ligne ne s'efface pas, ne se
+ * corrige pas et ne s'archive pas — le typage le refuse, la vigilance n'y est
+ * pour rien.
+ *
+ * **Sans `verb` ni cible**, et c'est un écart à la lettre du point ouvert qui
+ * demandait un verbe. La raison est mesurable : `events.verb` et
+ * `events.target_type` **n'ont aucun lecteur** — `ProjectEvent` les écarte en
+ * toutes lettres (`lib/queries/journal.ts`), et le flux de la vue d'ensemble ne
+ * les lit pas davantage. Quatre colonnes utiles, toutes lues par la fiche.
+ * Arbitrage (a) de `tickets-C12.md`.
+ *
+ * **Sans `created_by`**, qui pointerait `persons` : c'est la raison pour
+ * laquelle `domains` et `super_admins` n'en ont pas, et elle vaut ici. `stamps`
+ * n'est donc pas épandu, comme dans `domain_identities`.
+ *
+ * **Écart à `docs/04` §4**, qui décrit `events` comme le journal et n'en
+ * connaît pas d'autre. `docs/` est figé (règle 6) : l'écart est consigné dans
+ * `JOURNAL-TECHNIQUE.md`, il ne se corrige pas dans le document.
+ */
+export const domainEvents = pgTable(
+  "domain_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    domainId: domainRef(),
+    /**
+     * L'auteur du geste — **et sa nullité dit *« depuis le domaine »***.
+     *
+     * Un seul acteur, jamais deux. Écrire aussi un `actor_id → persons`
+     * obligerait, pour le nommer, à **lire une ligne `persons` d'en haut** — ce
+     * que `app/domaines/page.tsx:44` refuse en toutes lettres : *« il
+     * administre des entreprises, il ne les traverse pas »* — ou à laisser une
+     * colonne sans lecteur, ce que l'arbitrage (a) vient de refuser. La fiche
+     * dit donc *« depuis le domaine »* sans nommer personne, et c'est
+     * exactement ce qu'un écran d'en haut a le droit de savoir. Le jour où le
+     * journal se lira depuis le domaine, la colonne s'ajoutera avec son
+     * lecteur. Arbitrage (b) de `tickets-C12.md`.
+     *
+     * `set null` au patron d'`events.actor_id` : ce qu'une autorité a fait
+     * reste, son nom en moins.
+     */
+    superAdminId: uuid("super_admin_id").references(() => superAdmins.id, {
+      onDelete: "set null",
+    }),
+    /** Phrase lisible, **figée à l'écriture** (D22). Jamais un jeton, jamais un secret. */
+    summary: text("summary").notNull(),
+    /** La date du geste, que `defaultNow()` pose et qu'une soumission n'a pas à forger. */
+    occurredAt: timestamp("occurred_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    /* **Un seul index, et c'est la forme exacte de la seule lecture écrite** —
+       `listDomainEvents` filtre sur le domaine et range du plus récent au plus
+       ancien. Un index qui ne sert aucune lecture est un index qu'on garde par
+       habitude. */
+    index("domain_events_domain_id_occurred_at_idx").on(
+      t.domainId,
+      t.occurredAt.desc(),
+    ),
+  ],
+);
+
+/**
  * L'invitation à rejoindre l'espace d'un domaine — le lien qu'on envoie à
  * quelqu'un à qui l'on ouvre un accès.
  *

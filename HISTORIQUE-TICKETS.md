@@ -8593,3 +8593,112 @@ neuf couples `dt`/`dd`, **aucun terme proscrit de `docs/02` §8** — les douze 
 sont tous dans « affiche », et le seul « document » en mot entier est le `document.cookie` du script
 de Next. Le domaine de sonde est **rangé** en fin de ticket : C8 avait relevé un domaine de tests
 résiduel, il n'y en a pas un second.
+
+## Session de découpage de C12 — ce qui a quitté `ETAT.md` le 11/09/2026
+
+**Geste 1 — le repliement.** Cinq lignes de chantier clos (C1 à C3, C4/C4bis, C5, TD, C5bis) sont
+devenues **deux**, et les huit rangs « terminé » du tableau d'avancement **un seul** : leurs tickets
+sont nommés au journal des tickets, leur récit vit plus haut dans ce fichier, et **aucun point
+ouvert ne les vise**. Rien n'a été récrit au passage.
+
+**Geste 2 — trois points sortis, pris par les tickets de C12.** Ils ne sont pas refermés : leur
+contenu **est devenu la fiche** `tickets-C12.md`, qui porte les arbitrages qu'ils demandaient. Ils
+sont conservés ici **verbatim**, dans leur rédaction du 07 au 11/09/2026, parce qu'un point sorti
+documente ce qu'on savait au moment de le trancher.
+
+- **L'écran au-dessus des domaines n'a pas de route de détail** — `/domaines` est une liste et six
+  panneaux, et ce qu'il dit d'une entreprise tient en trois booléens d'existence (`AdminDomainRow`).
+  Une fiche rassemblerait ce qui vit en tiroirs — identité de l'entreprise, identités vérifiées,
+  état d'accès — **et rien de plus** : `app/domaines/page.tsx:44` refuse la donnée métier du domaine
+  (*« il administre des entreprises, il ne les traverse pas »*), les comptes restent l'affaire de
+  `/equipe`, et D39 interdit le décompte. `DOMAIN_PANEL_PARAM` attend déjà un identifiant
+  (`lib/navigation.ts:659-664`). **Reste à trancher : les six panneaux déménagent-ils, ou la liste
+  les garde-t-elle ?** → **C12 — session de découpage.**
+- **Les neuf gestes de `app/domaines/actions.ts` n'ont aucune trace, et `events` ne peut pas la
+  porter** — ce n'est pas un oubli d'appel, c'est le schéma, sur trois points : `events.actor_id`
+  référence `persons`, et un super administrateur n'a **aucune ligne `persons`**
+  (`lib/db/schema.ts:1861`, arbitrage (4) de C9) · `record()` vit dans la fermeture de
+  `forDomain(scope)` et pose `actorId` depuis le contexte (`lib/db/scoped.ts:947`) ·
+  `event_target_type` porte seize valeurs et **aucune ne dit « domaine »** (`lib/db/schema.ts:265`).
+  Une table **hors produit** — modèle `domain_identities` et `super_admins` — porterait l'acteur,
+  le domaine, le verbe, la phrase figée et l'horodatage. **Elle n'est pas dans `docs/04`, qui est
+  figé**, et une migration est un signal d'arrêt : ce n'est pas une décision de ticket. **Le même
+  obstacle bloque le sixième nom du point « Le journal reste incomplet » (groupe b)** sans que les
+  deux se confondent — celui-là est une écriture *dans* le domaine, celui-ci une écriture
+  *au-dessus*. → **C12 — session de découpage, après arbitrage humain sur `docs/04`.**
+- **Ce journal d'administration se lit-il aussi depuis le domaine ?** Un responsable voit-il qu'on
+  a touché à son entreprise ? La question ne se pose pas pour la suspension — un domaine suspendu
+  n'ouvre plus de session —, elle se pose pour l'archivage, le rétablissement et les identités
+  vérifiées. **La trancher change la table** : un journal lu des deux côtés voudrait vivre dans
+  `events`, un journal lu d'en haut seul non. → **C12 — à trancher avant d'écrire la migration.**
+
+**Ce que le découpage en a fait, point par point.** Le premier → **T12.3** (la fiche) et **T12.4**
+(le déménagement des six panneaux, tranché : ils déménagent, et la liste garde l'ajout, les trois
+faits et le lien). Le deuxième → **T12.1** et **T12.2**, sur une **table hors produit**,
+`domain_events`, avec deux écarts nommés au journal technique : `docs/04` §4 ne connaît qu'`events`,
+et la table n'a **ni verbe ni cible** là où le point en nommait un. Le troisième → **arbitrage (3)
+de C12** : *lu d'en haut seul*, et le point se **récrit** dans `ETAT.md` avec sa destination plutôt
+que de se refermer — rien n'est forclos, `domain_events` portant `domain_id`.
+
+**Et un quatrième point a été récrit, non sorti.** *« Le journal reste incomplet »* (T8.3) attendait
+« la prochaine session de découpage » : il **perd son sixième nom**, la correction des informations
+du domaine, que T12.2 journalise. Ses **cinq** autres familles gardent leur destination, désormais
+chiffrée — une migration d'énuméré dans le produit, une quarantaine de points d'appel, soit un
+ticket à soi.
+
+---
+
+## T12.1 — La table du journal d'administration — 11/09/2026
+
+**Ce que le ticket a posé, et ce qu'il n'a pas posé.** `domain_events` existe ; **rien ne l'écrit et
+aucun écran ne la lit**. C'est l'ordre voulu par le découpage : la table et ses garanties d'abord,
+les dix traces en T12.2, la fiche en T12.3. Le ticket déroge au premier point du protocole et le
+dit — **il ne rend aucun écran**, comme T9.1, T9.3 et T11.1 avant lui, et son critère se mesure en
+base.
+
+**Quatre colonnes utiles, et trois absences qui sont des décisions.** `domain_id`, `super_admin_id`,
+`summary`, `occurred_at` — **toutes lues par T12.3**. Pas de `verb`, pas de `target_type`, pas de
+`target_id` : `events` porte les deux premiers **sans aucun lecteur**, et T7.9 est précisément le
+ticket des colonnes saisies qu'aucun écran ne lit. Pas d'`archived_at` : la table entre ainsi dans
+`LinkTable`, où `archive` est un refus de compilation, et elle n'entre pas dans `DeletableTable`, où
+`deleteRow` en est un autre — le journal est en écriture seule (D22), **et c'est le typage qui le
+tient**, pas la vigilance. Pas de `created_by`, qui pointerait `persons` : la raison de `domains` et
+de `super_admins`, et elle vaut ici.
+
+**Un seul acteur, et sa nullité parle.** `super_admin_id` nul dira *« depuis le domaine »* — ce qui
+suffit au dixième point d'appel de T12.2, `updateOwnDomain`. Un second acteur vers `persons` aurait
+obligé, **pour le nommer**, à lire une ligne `persons` d'en haut : ce que
+`app/domaines/page.tsx:44` refuse en toutes lettres.
+
+**La table entre dans la couche sans une ligne de couche neuve.** Portant `id` et `domain_id`, elle
+est un `ScopedTable` : `forDomain().insert` l'écrira par la porte que les neuf gestes traversent
+déjà, `assertNoForcedDomain` et `parentChecksOf` la couvrent — cette dernière ignorant la clé vers
+`super_admins`, qui n'est pas scopée. **C'était l'argument de l'arbitrage (2), et il s'est vérifié :
+`lib/db/scoped.ts` n'a reçu qu'une lecture et un type, aucune adaptation.**
+
+**Une lecture, du côté fermé.** `asSuperAdmin(grant).listDomainEvents(domainId)` — l'autorité relue
+avant la lecture, le filtre de domaine, l'ordre décroissant, et le nom de l'acteur **joint sur
+`super_admins`, jamais recopié** : une autorité renommée l'est partout dans le journal, ce qui est
+juste. `leftJoin` et non `innerJoin` : une lecture qui écarterait la ligne sans acteur rendrait un
+journal **incomplet sans le dire**. Elle ne tourne pas pendant la connexion, donc elle n'est pas
+allée sur `superAdmin` — et le sceau nominatif l'a constaté : **neuf clés, dont quatre lisent**.
+
+**Un index, `(domain_id, occurred_at desc)`** — la forme exacte de la seule lecture écrite.
+
+**Une migration, `0019`, et pas une seconde** : `create table`, deux clés étrangères — `restrict`
+vers `domains`, `set null` vers `super_admins`, au patron d'`events.actor_id` —, un index
+descendant. Appliquée sur la base de développement **et** sur la branche de test.
+
+**Le défaut trouvé en cours de route**, détaillé au journal technique : le cas de lecture tombait
+sur **la trace témoin du cas voisin**, écrite dans le même domaine de fixture à `defaultNow()`, donc
+en tête de liste. Le cas s'est donné deux domaines jetables ; les deux domaines de la fixture
+restent pour ce qui se moque de l'ordre.
+
+**Quatre mises en défaut, une seule mesure tombe à chaque fois** — la garde retirée de la fonction
+neuve, le filtre de domaine retiré, le `leftJoin` changé en `innerJoin`, une septième clé posée sur
+`superAdmin`. Ce qui ne se neutralise pas sans écrire en base — l'index, les contraintes — a pour
+substitut **le nom de la clé, assérté dans la cause**, et le contre-essai a été fait : l'autre clé
+étrangère de la même table fait tomber l'assertion.
+
+**1 962 → 1 966 tests, 69 fichiers**, tous verts ; `tsc --noEmit` et `eslint --max-warnings=0`
+passent — et les deux `@ts-expect-error` ne valent que parce que le premier passe.

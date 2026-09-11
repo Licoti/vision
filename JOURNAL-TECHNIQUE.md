@@ -11708,3 +11708,107 @@ prix en volume. → **outillage : `scripts/probe.ts` ou son équivalent.**
 de développement ; celui-ci s'archive par `archiveDomain` en fin de ticket — règle 4, on range, on ne
 supprime pas. La base de développement porte donc une entreprise cliente archivée de plus, ce qu'elle
 sait faire.
+
+## Session de découpage de C12 — trois écarts, rendus au découpage (11/09/2026)
+
+**Quatrième écart à `docs/05` §6.** Le document écrit *« un chantier à la fois, fermé avant d'ouvrir
+le suivant »* ; C12 s'ouvre le 11/09/2026 alors que **C7 reste ouvert** sur T7.9 et T7.10. Décision
+humaine, comme les trois précédents — les découpages de C8, de C9 et de C11. Le motif est celui de
+C11, retourné dans le même sens : *« les deux balayages viennent après les écrans neufs, faute de
+quoi ils passeraient sur un produit qu'un ticket suivant changerait »* (`tickets-C7.md`). C12 ajoute
+un écran neuf, T7.10 est l'un de ces balayages ; dans l'ordre inverse, la fiche d'une entreprise
+n'aurait jamais été balayée.
+
+**Sa conséquence est payée par les fiches, pas reportée.** T7.6 — les petits écrans — est dépensé
+depuis le 30/08 et T7.7 — l'accessibilité — depuis le 10/09. **Aucun des deux ne repassera.** La
+fiche de T12.3 se fait donc responsive et accessible **à la main**, comme la page publique
+d'invitation en T11.2, et son interdit le dit.
+
+**Écart à `docs/04` §4 — un second journal, hors du produit.** Le document décrit `events` comme
+*le* journal et n'en connaît pas d'autre. C12 pose `domain_events` : le domaine, le super
+administrateur, la phrase figée, l'horodatage. **`docs/` est figé (règle 6)**, l'écart se consigne
+ici.
+
+**Pourquoi pas `events`, et les trois obstacles sont de schéma, pas d'appel.** `events.actor_id`
+référence `persons`, et un super administrateur n'a **aucune ligne `persons`** (arbitrage (4) de C9,
+`lib/db/schema.ts:1861`) · `record()` vit dans la fermeture de `forDomain(scope)` et pose `actorId`
+depuis le contexte (`lib/db/scoped.ts:947`) · `event_target_type` porte seize valeurs et **aucune ne
+dit « domaine »** (`lib/db/schema.ts:265`). Les lever demandait **trois gestes** sur une table du
+produit — une migration d'énuméré pour un objet qui n'en est pas, une colonne d'acteur neuve, et
+l'acceptation que ces lignes paraissent dans le flux de la vue d'ensemble du domaine. La table hors
+produit n'en demande **aucun** : portant `id` et `domain_id`, elle est un `ScopedTable`, donc
+`forDomain().insert`, `assertNoForcedDomain` et `parentChecksOf` la couvrent sans une ligne de
+couche neuve.
+
+**Écart à la lettre d'un point ouvert — ni verbe, ni cible.** Le point écrivait *« l'acteur, le
+domaine, le verbe, la phrase figée et l'horodatage »* ; la table n'a **pas de `verb`**, pas de
+`target_type`, pas de `target_id`. La raison est mesurable et non doctrinale : **`events.verb` et
+`events.target_type` n'ont aucun lecteur** — `ProjectEvent` les écarte en toutes lettres
+(`lib/queries/journal.ts`), et le flux de la vue d'ensemble ne les lit pas davantage. **T7.9 est le
+ticket des colonnes saisies qu'aucun écran ne lit** : en poser deux neuves à sa veille aurait ajouté
+à sa charge ce qu'on venait de décider. Quatre colonnes, toutes lues par T12.3.
+
+**Un acteur, pas deux — et c'est la frontière qui le décide.** `domain_events` porte
+`super_admin_id` seul ; sa nullité dit *« depuis le domaine »*, ce qui suffit au dixième point
+d'appel, `updateOwnDomain`. Écrire aussi un `actor_id → persons` obligerait, **pour le nommer**, à
+lire une ligne `persons` **d'en haut** — ce que `app/domaines/page.tsx:44` refuse en toutes lettres :
+*« il administre des entreprises, il ne les traverse pas »* — ou à laisser une colonne sans lecteur,
+ce que l'écart précédent vient de refuser. **Le jour où le journal se lira depuis le domaine, la
+colonne s'ajoutera avec son lecteur.**
+
+**Un désaccord possible, nommé plutôt que masqué.** Le journal d'administration ne dira donc pas
+*qui*, à l'intérieur d'un domaine, a corrigé le nom de son entreprise — seulement que quelqu'un
+l'a fait. C'est une perte réelle, assumée au profit de la frontière ; elle se referme le jour où
+l'arbitrage (3) se rouvre, et les deux se referment ensemble.
+
+---
+
+## T12.1 — La table du journal d'administration (11/09/2026)
+
+**Le piège du ticket : un test qui tombe pour la raison d'un autre.** Le cas de lecture assérait la
+liste entière de `listDomainEvents(a.domainId)` mot pour mot. Il est tombé — non sur son objet, mais
+sur une quatrième ligne : **la trace témoin du cas précédent**, écrite dans le même domaine de
+fixture et sans `occurred_at`, donc posée par `defaultNow()`, donc **en tête**. L'assertion disait
+« trois phrases dans cet ordre » et en recevait quatre ; elle n'aurait rien dit de la lecture même
+si elle était passée, et elle serait retombée au premier cas inséré avant elle.
+
+La parade est celle de `freshPerson` au bloc de l'invitation, un cran plus haut : **le cas de
+lecture s'est donné deux domaines jetables**, créés et détruits dans son propre `try`/`finally`. Les
+deux domaines de la fixture restent pour ce qui se moque de l'ordre — la frontière, la clé
+étrangère. **Le couplage par l'ordre est un faux positif qui attend son heure** : ici il n'a pas
+attendu, et c'est la seule raison pour laquelle il a été vu.
+
+**Les quatre mises en défaut, et ce que chacune fait tomber — une seule mesure à chaque fois.**
+
+| Neutralisation | Ce qui tombe |
+|---|---|
+| `await assertAuthority()` retiré de `listDomainEvents` | *sans autorité vivante, le journal ne se lit pas* |
+| `.where(eq(domainEvents.domainId, domainId))` retiré | *la lecture rend le seul domaine demandé* |
+| `leftJoin` changé en `innerJoin` | *la lecture rend le seul domaine demandé* (la ligne sans acteur disparaît) |
+| une septième clé posée sur `superAdmin` | *ne donne accès qu'aux domaines et aux identités* |
+
+**La garde neutralisée est celle de l'appel, et non celle de la couche**, et c'est délibéré :
+`assertAuthority` elle-même est déjà éprouvée par T9.3 et T9.4. Ce que T12.1 doit prouver est que
+**la fonction neuve l'appelle**, ce qu'un test sur la garde n'aurait jamais dit.
+
+**Ce qui ne se neutralise pas, et son substitut.** Un index et une contrainte ne se retirent pas
+sans écrire en base (`drop index`, `alter table`). Le substitut est **le nom, assérté** : la mesure
+lit `domain_events_super_admin_id_super_admins_id_fk` dans la *cause* de la levée, et le contre-essai
+a été fait — l'autre clé étrangère de la même table, `domain_events_domain_id_domains_id_fk`,
+**fait tomber l'assertion**. Un nom qui distingue deux clés d'une même table ne peut venir que de la
+contrainte qui a refusé.
+
+**Les deux refus de typage se prouvent d'eux-mêmes.** `// @ts-expect-error` **échoue quand il n'y a
+rien à excuser** : `npx tsc --noEmit` passant, `archive(domainEvents, …)` et
+`deleteRow(domainEvents, …)` sont bien refusés à la compilation. Aucune assertion d'exécution n'est
+nécessaire, et aucune n'aurait valu autant.
+
+**Une propriété de la couche, vérifiée plutôt que supposée.** `insertMany` épand `createdBy: actorId`
+sur **toute** insertion, et `domain_events` n'a pas la colonne. Drizzle ignore la clé inconnue — le
+précédent est `domain_identities`, écrite ainsi depuis T9.1 — donc la table entre dans la couche
+sans une ligne d'adaptation. Le fait est noté ici parce qu'il **n'est pas garanti par un test à lui**
+: il tient par les écritures de `domain_identities` et de `domain_events`, et il tomberait bruyamment
+si le pilote changeait d'avis.
+
+**Aucune dette ouverte par ce ticket.** La table existe, rien ne l'écrit encore ; l'écart à
+`docs/04` §4 est consigné au découpage ci-dessus, et il n'a pas bougé.

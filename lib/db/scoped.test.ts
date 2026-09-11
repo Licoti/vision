@@ -35,6 +35,7 @@ import {
   activityTypes,
   approaches,
   budgets,
+  domainEvents,
   domainIdentities,
   domains,
   entities,
@@ -71,6 +72,7 @@ const outsideAnySession = asSuperAdmin(withoutAnySession("fixture"));
 /** Enfants d'abord, parents ensuite : `domains` refuse la suppression sinon. */
 const teardownOrder: ScopedTable[] = [
   events,
+  domainEvents,
   projectLinks,
   budgets,
   projectIndicators,
@@ -1163,6 +1165,19 @@ describe("les garde-fous de typage", () => {
       await scope.unlink(invitations, "…");
       // @ts-expect-error `invitations` n'a pas `archived_at` : rien à archiver.
       await scope.archive(invitations, "…");
+      /* **Le journal est en écriture seule, et c'est le typage qui le tient**
+         (D22, T12.1). `domain_events` n'a pas d'`archived_at` : elle entre dans
+         `LinkTable`, donc `archive` est un refus de compilation ; elle n'est pas
+         dans `DeletableTable`, donc `deleteRow` en est un aussi. Une trace ne
+         s'efface pas, ne se corrige pas et ne s'archive pas — deux lignes, pas
+         un commentaire. `unlink` reste disponible à la compilation, comme pour
+         les trois autres tables de liaison : **aucun appelant ne l'emploie**, et
+         ce qui interdirait la troisième porte est une union nominative, qui est
+         un arbitrage humain (voir `DeletableTable`). */
+      // @ts-expect-error `domain_events` n'a pas `archived_at` : un journal ne s'archive pas.
+      await scope.archive(domainEvents, "…");
+      // @ts-expect-error `domain_events` n'est pas dans `DeletableTable` : une trace ne s'efface pas.
+      await scope.deleteRow(domainEvents, "…");
       /* **La garde de T9.3 se relit ici, à la compilation.** `createDomain` a
          quitté `superAdmin` : on ne l'obtient qu'en ayant nommé son autorité.
          C'est ce qui a rattrapé les trente-six sites d'appel du jour du ticket,
@@ -1249,15 +1264,22 @@ describe("superAdmin", () => {
       "listDomains",
     ]);
 
-    /* **Huit clés depuis T9.4, dont trois lisent** — et c'est le déplacement de
-       frontière ci-dessus, rendu constatable. Les trois écritures neuves ne
-       touchent que `domains` : suspendre, ranger, rétablir. **Aucun
-       `updateDomain`**, et ce n'est pas un oubli — la fiche de T9.4 ne liste pas
-       le renommage, et trois fonctions nommées le rendent impossible par
-       construction plutôt que par vigilance. */
+    /* **Neuf clés, dont quatre lisent** — et c'est le déplacement de frontière
+       ci-dessus, rendu constatable. Les trois écritures de T9.4 ne touchent que
+       `domains` : suspendre, ranger, rétablir. **Aucun `updateDomain`**, et ce
+       n'est pas un oubli — la fiche de T9.4 ne liste pas le renommage, et trois
+       fonctions nommées le rendent impossible par construction plutôt que par
+       vigilance.
+
+       **La neuvième est `listDomainEvents`** (T12.1), et le critère du bloc l'a
+       rangée sans hésitation : elle ne tourne pas pendant la connexion, et elle
+       dit ce qu'on a fait d'une entreprise. La poser sur `superAdmin` aurait
+       ouvert le côté ouvert à une lecture qui n'a rien à y faire — et c'est
+       exactement ce que ces deux listes servent à empêcher. */
     expect(Object.keys(outsideAnySession).sort()).toEqual([
       "archiveDomain",
       "createDomain",
+      "listDomainEvents",
       "listDomainIdentities",
       "listDomainsForAdmin",
       "listSuperAdmins",
@@ -2272,5 +2294,181 @@ describe("l'adresse d'une personne", () => {
       email,
     });
     expect(elsewhere.domainId).toBe(b.domainId);
+  });
+});
+
+/* ==========================================================================
+   Le journal d'administration — T12.1
+
+   **La table existe, et rien ne l'écrit encore** : les dix gestes viendront au
+   ticket suivant. Ce qui se mesure ici est donc la table elle-même — ses deux
+   garanties d'écriture — et sa seule lecture, avant qu'aucun appelant ne
+   dépende d'elle.
+   ========================================================================== */
+
+describe("le journal d'administration", () => {
+  /** Un super administrateur en exercice, son identifiant et son autorité. */
+  async function authority(
+    label: string,
+  ): Promise<{ id: string; name: string; grant: SuperAdminGrant }> {
+    const name = `Autorité ${label} ${suffix}`;
+    const { row } = await outsideAnySession.upsertSuperAdmin({
+      email: `journal-${label}.${suffix}@exemple.test`,
+      fullName: name,
+    });
+    return {
+      id: row.id,
+      name,
+      grant: { kind: "super_admin", superAdminId: row.id },
+    };
+  }
+
+  const countEvents = async (domainId: string): Promise<number> =>
+    (await db.select().from(domainEvents).where(eq(domainEvents.domainId, domainId)))
+      .length;
+
+  /**
+   * Un domaine jetable, et sa portée — **jamais ceux de la fixture**.
+   *
+   * La lecture s'assère mot pour mot sur la liste entière : une ligne laissée
+   * par un cas voisin — la trace témoin juste au-dessus, écrite à `defaultNow()`
+   * donc en tête — la ferait tomber pour la raison d'un autre. C'est la leçon de
+   * `freshPerson` au bloc de l'invitation : le couplage par l'ordre est un faux
+   * positif qui attend son heure.
+   */
+  async function throwaway(label: string): Promise<{ id: string; scope: ScopedDb }> {
+    const domain = await outsideAnySession.createDomain({
+      name: `__test__journal-${label}__${suffix}`,
+      competenceCenterName: `Centre journal ${label}`,
+    });
+    return { id: domain.id, scope: forDomain({ domainId: domain.id }) };
+  }
+
+  async function dropDomains(...ids: string[]): Promise<void> {
+    for (const id of ids) {
+      await db.delete(domainEvents).where(eq(domainEvents.domainId, id));
+      await db.delete(domains).where(eq(domains.id, id));
+    }
+  }
+
+  test("`domainId` ne se force pas sur une trace", async () => {
+    const before = await countEvents(b.domainId);
+
+    await expect(
+      /* Le typage l'interdit déjà ; le cast éprouve le garde-fou d'exécution.
+         **Hérité de `ScopedTable`, et mesuré ici** : une garantie supposée
+         héritée est une garantie que personne n'a vue tenir. */
+      a.scope.insert(domainEvents, {
+        summary: "Trace intruse",
+        domainId: b.domainId,
+      } as never),
+    ).rejects.toThrow(DomainScopeError);
+
+    expect(await countEvents(b.domainId)).toBe(before);
+  });
+
+  test("un acteur qui ne désigne aucune autorité est refusé par la base", async () => {
+    /* **La contrainte se nomme dans l'assertion.** Un `toThrow()` nu passerait
+       pour n'importe quelle levée — une colonne manquante, un réseau coupé — et
+       cesserait alors de dire ce qu'il prétend (leçon de T11.1). Le nom vit dans
+       la **cause**, `drizzle` enveloppant la levée du pilote. */
+    expect(
+      await refusedBy(
+        a.scope.insert(domainEvents, {
+          summary: "Trace sans autorité",
+          superAdminId: crypto.randomUUID(),
+        }),
+      ),
+    ).toBe("domain_events_super_admin_id_super_admins_id_fk");
+
+    /* **L'étape témoin, et elle n'est pas optionnelle** : une clé qui refuse
+       tout se testerait aussi bien sans le produit. */
+    const { id } = await authority("temoin");
+    const written = await a.scope.insert(domainEvents, {
+      summary: `Trace témoin ${suffix}`,
+      superAdminId: id,
+    });
+    expect(written.superAdminId).toBe(id);
+    expect(written.domainId).toBe(a.domainId);
+  });
+
+  test("la lecture rend le seul domaine demandé, du plus récent au plus ancien", async () => {
+    const { grant, id, name } = await authority("lecture");
+    const { id: other, name: otherName } = await authority("lecture-bis");
+    const here = await throwaway("ici");
+    const there = await throwaway("ailleurs");
+
+    /* **Les dates sont posées à la main**, et distinctes : trois lignes écrites
+       dans la même seconde par `defaultNow()` rendraient l'ordre indécidable, et
+       un test qui passe par hasard ne dit rien de la lecture. */
+    const at = (minutes: number) => new Date(Date.now() - minutes * 60_000);
+
+    try {
+      await here.scope.insert(domainEvents, {
+        summary: `Ancienne ${suffix}`,
+        superAdminId: id,
+        occurredAt: at(30),
+      });
+      /* **La ligne sans acteur**, celle qu'un `innerJoin` aurait fait
+         disparaître en silence : elle dira « depuis le domaine ». */
+      await here.scope.insert(domainEvents, {
+        summary: `Médiane ${suffix}`,
+        occurredAt: at(20),
+      });
+      await here.scope.insert(domainEvents, {
+        summary: `Récente ${suffix}`,
+        superAdminId: other,
+        occurredAt: at(10),
+      });
+      await there.scope.insert(domainEvents, {
+        summary: `Ailleurs ${suffix}`,
+        superAdminId: id,
+        occurredAt: at(15),
+      });
+
+      const reader = asSuperAdmin(grant);
+      const read = await reader.listDomainEvents(here.id);
+      const elsewhere = await reader.listDomainEvents(there.id);
+
+      /* **Le décompte est lu sur les deux domaines**, et non sur le seul
+         demandé : une lecture qui rendrait tout passerait la première
+         assertion. */
+      expect(read.map((row) => row.summary)).toEqual([
+        `Récente ${suffix}`,
+        `Médiane ${suffix}`,
+        `Ancienne ${suffix}`,
+      ]);
+      expect(elsewhere.map((row) => row.summary)).toEqual([`Ailleurs ${suffix}`]);
+
+      /* **Le nom est joint, jamais recopié** : renommer l'autorité renomme la
+         trace, ce qui est juste — c'est la même personne. Et le nul reste nul. */
+      expect(read.map((row) => row.actorName)).toEqual([otherName, null, name]);
+    } finally {
+      await dropDomains(here.id, there.id);
+    }
+  });
+
+  test("sans autorité vivante, le journal ne se lit pas", async () => {
+    const forged: SuperAdminGrant = {
+      kind: "super_admin",
+      superAdminId: crypto.randomUUID(),
+    };
+    await expect(
+      asSuperAdmin(forged).listDomainEvents(a.domainId),
+    ).rejects.toThrow(SuperAdminRequiredError);
+
+    /* **Archiver *est* le geste qui retire le droit** : la ligne existe encore,
+       et c'est exactement ce que la relecture doit refuser. */
+    const { id, grant } = await authority("archivee");
+    expect(await asSuperAdmin(grant).listDomainEvents(a.domainId)).toBeDefined();
+
+    await db
+      .update(superAdmins)
+      .set({ archivedAt: new Date() })
+      .where(eq(superAdmins.id, id));
+
+    await expect(
+      asSuperAdmin(grant).listDomainEvents(a.domainId),
+    ).rejects.toThrow(SuperAdminRequiredError);
   });
 });
