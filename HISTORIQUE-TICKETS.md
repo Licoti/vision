@@ -8702,3 +8702,142 @@ substitut **le nom de la clé, assérté dans la cause**, et le contre-essai a �
 
 **1 962 → 1 966 tests, 69 fichiers**, tous verts ; `tsc --noEmit` et `eslint --max-warnings=0`
 passent — et les deux `@ts-expect-error` ne valent que parce que le premier passe.
+
+---
+
+## T12.2 — Les dix gestes laissent leur trace — 11/09/2026
+
+**Ce que le ticket a refermé.** `domain_events` existait et personne ne l'écrivait ; les neuf gestes
+de `app/domaines/actions.ts` et `updateOwnDomain` écrivent désormais **une ligne chacun**. Le point
+*« Le journal reste incomplet »* **perd son sixième nom** ; ses cinq autres familles restent dehors
+avec leur destination. **Seconde dérogation du chantier au premier point du protocole**, dite dans
+la fiche plutôt que découverte : le journal s'écrit, **aucun écran ne le lit** — c'est T12.3.
+
+**Une septième forme de phrase, pure comme les six autres.** `domainPhrase` porte un **vocabulaire
+clos de dix gestes** dans une seule table — entreprise créée · accès suspendu · accès rétabli ·
+entreprise archivée · entreprise rétablie · identité vérifiée ajoutée · identité vérifiée retirée ·
+premier responsable désigné · invitation d'amorçage révoquée · informations corrigées. C'est la
+discipline de `DEEDS` et de `STATES` : **le seul moyen que deux gestes voisins divergent serait de
+changer cette table**. Les mots sont ceux de l'écran, comme `STATES` prend ceux de la roadmap.
+
+**Elles ne passent pas par `objectPhrase`**, et c'est la raison qui a fait naître `accessPhrase` en
+T9.6 : ses quatre participes disent *ce qui est arrivé à un objet*, quand « Accès suspendu » et
+« Premier responsable désigné » disent **un geste**. Deux d'entre elles nomment d'ailleurs un objet
+que la ligne ne vise pas — l'accès, l'invitation.
+
+**Le complément est facultatif, et quatre gestes seulement en portent un** : la création nomme
+l'entreprise, les deux identités leur valeur, la désignation le nom du responsable, la correction le
+nom **d'après** le geste (D22). Les six autres n'ont rien à nommer — l'entreprise est celle que porte
+`domain_id`, et la répéter ferait un journal qui dit six fois son propre titre.
+
+**L'acteur ne coûte pas une requête.** `openInviter()` appelait déjà `getSuperAdmin()`, que `cache()`
+mémorise pour la durée du rendu : il rend désormais `superAdminId` en plus du nom, et `openDomain()`
+le passe. Les neuf traces écrivent donc par `forDomain({ domainId }).insert(domainEvents, …)` — **et
+jamais par `record()`**, qui poserait un acteur depuis un contexte que le super administrateur n'a
+pas.
+
+**Le dixième écrit avec un acteur nul**, ce qui dit *« depuis le domaine »* : `updateOwnDomain` est
+une écriture *dans* le domaine sur la ligne qui le nomme. C'est l'arbitrage (b), et sa perte est
+nommée au journal technique — le journal ne dira jamais *qui*, à l'intérieur, a corrigé le nom de
+son entreprise.
+
+**La trace de désignation ne descend pas dans le geste partagé.** `inviteFirstManager` sert la
+création **et** la redésignation ; y poser la ligne aurait fait écrire deux lignes à la création.
+Elle vit dans les deux actions, où chacune sait si la désignation *est* le geste ou n'en est qu'une
+étape — **neuf gestes, neuf lignes**, et c'est le décompte final qui le tient.
+
+**Sept mises en défaut, et la deuxième a trouvé un trou.** *La trace d'archivage déplacée avant
+l'écriture qu'elle raconte* **n'a rien fait tomber** : le retour anticipé d'`archiveDomain` sortait
+avant la condition que le cas prétendait éprouver. **Trois refus d'une autre espèce n'étaient donc
+mesurés nulle part** — ceux dont seule la couche sait qu'ils n'ont rien touché : rétablir l'accès
+d'une entreprise rangée, rétablir une entreprise qui ne l'est pas, retirer une identité d'une autre
+entreprise. Trois cas neufs ont été écrits, et les trois déplacements correspondants **font tomber
+chacun sa seule mesure**.
+
+**La frontière entre les deux journaux est gardée de cinq côtés** : une trace qui descendrait *aussi*
+dans `events` fait tomber cinq cas, dont celui que T11.4 avait écrit pour tout autre chose. Ce qui
+est écrit **au-dessus** d'un domaine ne paraît pas dans son flux d'accueil.
+
+**Le test que T11.5 avait écrit pour tomber est tombé.** *« La correction n'écrit aucune ligne de
+journal »* est récrit en son contraire, et il mesure désormais **les deux tables ensemble**.
+
+**Le piège attrapé en cours de route** : la constante `NBSP` du fichier de tests neuf, écrite en
+caractère au lieu de l'échappement — la suite passait au vert, et c'est exactement le danger.
+
+**Les mesures** — chacun des dix gestes écrit exactement une ligne, la phrase lue mot pour mot ·
+sept refus laissent le journal vide, **chacun avec son étape témoin** · les neuf points d'entrée
+frappés sous trois identités sans autorité n'écrivent rien, le témoin écrit · `events` n'a pas bougé,
+les deux lignes `person` de T11.4 comprises.
+
+**1 966 → 1 987 tests, 69 fichiers**, tous verts ; `tsc --noEmit` et `eslint --max-warnings=0`
+passent. Aucun écran, aucune migration, aucun geste neuf, aucun refus neuf.
+
+---
+
+## T12.3 — La fiche d'une entreprise — 11/09/2026
+
+**L'écran qui donne un objet à ce que C9 avait laissé en liste.** `/domaines/[id]` répond à *« où en
+est cette entreprise, et qu'a-t-on fait sur elle ? »* — la justification que `docs/06` §2 exige de
+tout écran au-delà des six. La liste répondait *« laquelle peut ouvrir une session ? »*, et trois
+booléens ne disent pas une entreprise. **Le journal de T12.1 et T12.2 y trouve son seul lecteur.**
+
+**Une lecture, et rien qu'une lecture** : aucun geste, aucun panneau, aucune action, aucun
+`ActionMenu`. Les six panneaux déménagent en T12.4.
+
+**Hors du groupe `(app)`**, comme sa liste : ni coquille, ni navigation, ni carte de personne
+courante — un super administrateur n'a ni domaine ni ligne `persons`. Même en-tête à deux liens.
+
+**Trois refus, dans cet ordre.** `requireSuperAdmin()` **avant toute lecture**, et elle redirige ·
+la **forme** de l'identifiant vérifiée **avant la base** — une colonne `uuid` interrogée avec
+n'importe quoi rend 500, pas 404 · la ligne cherchée, sinon `notFound()`.
+
+**Aucune lecture neuve pour l'identité.** `AdminDomainRow` gagne `description` et `created_at` —
+**deux colonnes dans un `select` déjà écrit**. C'est la porte qu'`openDomain` emprunte déjà pour les
+cinq panneaux ciblés ; une septième fonction dans `asSuperAdmin` aurait été la duplication que T9.4
+a évitée. **Les trois faits d'accessibilité ne bougent pas.**
+
+**Quatre blocs, et rien de plus** : l'identité — un `<dl>`, centre de compétence, description, état,
+date de création · les identités vérifiées, dans la forme du panneau de T9.4 · l'accès, les trois
+faits **dans les mots de la liste**, plus le quatrième qui prime — une entreprise suspendue ou
+archivée n'ouvre aucune session · le journal. Un `h1`, et **un fil d'Ariane** : *aucun écran n'est un
+cul-de-sac*.
+
+**Le bloc « Journal de l'administration » est ouvert, non replié.** Le journal d'un accompagnement
+est *« une information de contrôle, pas de compréhension »* et se replie pour cela ; celui-ci **est
+la réponse à la question de l'écran**. C'est la ligne du flux de la vue d'ensemble, **l'origine en
+moins** — ici toutes les lignes ont la même. **Aucun décompte**, et un état vide qui, lui,
+**s'atteint par un jeu de données**, à la différence des quatre que T7.8 avait dû déclarer
+inatteignables.
+
+**Un plafond, `DOMAIN_EVENTS_LIMIT = 30`**, au patron de `RECENT_EVENTS_LIMIT` — trente et non
+quinze, la question n'étant pas *« que se passe-t-il en ce moment »* mais *« qu'a-t-on fait sur
+elle »*. **Rien ne l'affiche.** Et un départage par `id`, la raison de `listRecentEvents` : sous un
+plafond, l'ordre décide **qui entre**.
+
+**Cinq mesures, toutes par sonde** — aucun harnais de rendu n'existe, quatrième ticket de suite à
+payer le geste de T7.8. **(1)** Le HTML servi porte le nom, le centre, la description, les deux
+identités, les trois faits et **les sept phrases du journal**, acteur nommé et *« depuis le
+domaine »* compris. **(2)** Sans cookie : **307** vers `/auth/acces`, et pas une trace du nom dans
+le corps ; avec l'autorité : **200** ; UUID inconnu : **404** ; identifiant qui n'est pas un UUID :
+**404**, et non 500 — la signature de la forme vérifiée avant la base. **(3)** Sur une entreprise
+portant produit, accompagnement, personne, entité et indicateur, **aucun de ces cinq libellés n'est
+dans le HTML servi**. **(4)** L'état vide du journal **vu rendu**. **(5)** Sept couples de couleurs
+mesurés, six au-dessus de 4,5:1 ; le septième, à 2,11:1, est le chevron décoratif du fil d'Ariane,
+**qui précède ce ticket**.
+
+**Ce qui n'a pas été vu est nommé** : la relecture à 375 px s'est faite sur le HTML servi et les
+classes, l'extension de navigateur ayant été refusée. Deux formes portaient un vrai risque — une
+valeur d'identité et une phrase de journal, chaînes sans espace où couper — et ont reçu
+`break-words`.
+
+**Deux mises en défaut sur trois portent, et la troisième est dite.** Le plafond retiré fait tomber
+deux cas · le filtre de domaine retiré fait **paraître sur la fiche de l'entreprise nue les sept
+phrases de l'autre**, son nom compris — mesures 1, 3 et 4 tombent ensemble · **le départage retiré ne
+fait rien tomber**, et c'est un filet, nommé au journal plutôt que présenté comme mesuré.
+
+**Et l'insécable a faussé une mesure pour la seconde fois du chantier** : le premier constat de la
+fuite a conclu « absent » parce que le motif cherché portait un deux-points ordinaire. Cette
+fois-ci, le faux était un **faux négatif** — une fuite déclarée absente.
+
+**1 987 → 1 989 tests, 69 fichiers**, tous verts ; `tsc --noEmit` et `eslint --max-warnings=0`
+passent. Aucune migration, aucune dépendance neuve, aucun geste, aucun graphique.

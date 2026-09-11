@@ -108,6 +108,7 @@ import type { Session } from "@/lib/auth/session";
 import {
   activityTypes,
   approaches,
+  domainEvents,
   entities,
   jobs,
   products,
@@ -170,7 +171,7 @@ import {
   readToolForm,
   type ToolFormState,
 } from "@/lib/forms/tool";
-import { objectPhrase } from "@/lib/journal";
+import { domainPhrase, objectPhrase } from "@/lib/journal";
 import { ROUTES, type Referential } from "@/lib/navigation";
 import { listEntityLabels } from "@/lib/queries/entities";
 import {
@@ -1746,13 +1747,19 @@ export async function restoreStarter(starterId: string): Promise<void> {
    action ajoute est le droit et la lecture champ par champ — la frontière, elle,
    est tenue un étage plus bas, où l'on ne peut pas l'oublier.
 
-   **Ce geste ne laisse aucune trace, et c'est un arbitrage, pas un oubli.**
-   Aucun `event_target_type` ne dit « domaine » ; l'élargir demanderait une
-   migration d'énuméré pour un seul objet — ce que l'arbitrage (d) de
-   `tickets-C7.md` refuse déjà pour le budget —, et le poser sur `person`
-   mentirait sur l'objet, ce qui est pire qu'un silence. Le geste rejoint donc la
-   famille des écritures sans trace ouverte par T8.3, avec un **cinquième** nom,
-   et le point est écrit comme tel dans `ETAT.md`.
+   **Ce geste laisse sa trace depuis T12.2, et pas dans `events`.** L'obstacle
+   n'a pas été levé — aucun `event_target_type` ne dit « domaine », et l'élargir
+   pour un seul objet reste ce que l'arbitrage (d) de `tickets-C7.md` refuse —,
+   il a été **contourné par la table** : `domain_events` (T12.1) est la table de
+   ce qu'on fait *d'un* domaine, et cette ligne-ci en nomme le domaine. **Le
+   point « Le journal reste incomplet » perd donc son sixième nom** ; les cinq
+   autres familles restent dehors avec leur destination.
+
+   **Et c'est la seule écriture de `domain_events` qui vienne de l'intérieur** :
+   son `super_admin_id` est **nul**, ce qui dit *« depuis le domaine »*. Nommer
+   qui a corrigé obligerait à lire une ligne `persons` **d'en haut**, ce que
+   `app/domaines/page.tsx:44` refuse — arbitrage (b) de `tickets-C12.md`, dont la
+   perte est nommée au journal technique plutôt que masquée.
    ========================================================================== */
 
 /** Le refus du droit, quand il porte sur la ligne qui nomme le domaine. */
@@ -1810,9 +1817,16 @@ export async function updateOwnDomain(
     );
   }
 
-  /* **Aucune ligne de journal** : voir le bandeau de section ci-dessus.
+  /* **La trace vient après l'écriture qu'elle raconte**, et seulement si celle-ci
+     a eu lieu : le refus ci-dessus est sorti sans rien journaliser. Le nom écrit
+     est celui **d'après** le geste (D22) — écrire celui d'avant serait une
+     « valeur avant », que le journal ne garde pas. L'acteur est nul : voir le
+     bandeau de section ci-dessus. */
+  await session.db.insert(domainEvents, {
+    summary: domainPhrase("updated", input.name),
+  });
 
-     Un seul écran est invalidé, et la barre latérale n'en fait pas partie : elle
+  /* Un seul écran est invalidé, et la barre latérale n'en fait pas partie : elle
      porte le nom du domaine, mais elle est rendue sous session — donc
      dynamiquement — à chaque requête, et suit sans qu'on l'y invite. */
   revalidatePath(ROUTES.admin);

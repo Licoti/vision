@@ -1,20 +1,27 @@
 /**
- * Le vocabulaire du journal — les phrases d'`events`, et rien d'autre.
+ * Le vocabulaire du journal — les phrases des **deux** journaux, et rien d'autre.
  *
  * **Pur : ce module ne touche pas la base.** L'écriture est dans
- * `lib/db/scoped.ts` (`record`), le déclenchement est dans l'action — arbitrage
- * (a) de `tickets-C6.md`. Ici ne vit que ce que le geste **dit**.
+ * `lib/db/scoped.ts` (`record`, `insert`), le déclenchement est dans l'action —
+ * arbitrage (a) de `tickets-C6.md`. Ici ne vit que ce que le geste **dit**.
+ *
+ * **Deux journaux depuis T12.1, et ce module ne les distingue pas.** Six formes
+ * composent les phrases d'`events`, le journal *du* domaine ; la septième
+ * compose celles de `domain_events`, le journal de ce qu'on fait *d'un* domaine.
+ * La différence est dans la table, jamais ici — le module reste pur, il
+ * n'importe pas le schéma, et c'est ce qui lui permet de se tester sans base.
  *
  * **Une fonction par forme de phrase, jamais une par point d'appel.** C'est ce
  * qui empêche deux gestes voisins de dire la même chose de deux manières :
  * `createProject` et `archiveProject` traversent la même fonction, et le seul
- * moyen qu'ils divergent serait de changer la table des participes. **Six
- * formes depuis T9.6** : les gestes qui disent « ceci a été créé, corrigé,
+ * moyen qu'ils divergent serait de changer la table des participes. **Sept
+ * formes depuis T12.2** : les gestes qui disent « ceci a été créé, corrigé,
  * archivé ou rétabli » passent tous par `objectPhrase`, ceux qui font *atteindre
  * un état* par `statePhrase`, ceux qui touchent la composition d'une équipe par
  * `teamPhrase`, ceux qui relient deux accompagnements par `linkPhrase`, la
- * désignation de la North Star par `northStarPhrase`, et l'accès d'une personne
- * au domaine par `accessPhrase`.
+ * désignation de la North Star par `northStarPhrase`, l'accès d'une personne
+ * au domaine par `accessPhrase`, et les dix gestes d'administration d'une
+ * entreprise cliente par `domainPhrase`.
  *
  * **La sixième non plus n'est pas venue d'un objet, mais d'un geste** : `person`
  * était déjà l'un des seize noms, et `objectPhrase` savait dire « Personne
@@ -496,4 +503,95 @@ export function linkPhrase(
 ): string {
   const clause = `Lien ${LINK_DEEDS[deed]}${NBSP}: ${projectName}`;
   return reason ? `${clause}${NBSP}— ${reason}` : clause;
+}
+
+/**
+ * Ce qu'un geste a fait d'une **entreprise cliente** — T12.2.
+ *
+ * **Dix, et c'est le vocabulaire entier de l'administration des domaines** :
+ * les neuf gestes de `app/domaines/actions.ts` et la correction des
+ * informations du domaine par son responsable (`updateOwnDomain`). Aucun
+ * onzième sans appelant — ce serait le nom que le ticket suivant emploierait de
+ * travers.
+ *
+ * **Ces phrases-ci ne vont pas dans `events`, mais dans `domain_events`**
+ * (T12.1) : ce qui est écrit *au-dessus* d'un domaine ne descend pas dedans.
+ * Le module, lui, ne le sait pas — il est **pur**, il n'importe pas le schéma,
+ * et c'est ce qui lui permet de se tester sans base.
+ */
+export type JournalDomainDeed =
+  | "created"
+  | "suspended"
+  | "resumed"
+  | "archived"
+  | "restored"
+  | "identity_added"
+  | "identity_removed"
+  | "manager_designated"
+  | "invitation_revoked"
+  | "updated";
+
+/**
+ * Les dix phrases, **écrites accordées**.
+ *
+ * **Elles ne passent pas par `DEEDS`**, et c'est la raison qui a fait naître
+ * `accessPhrase` en T9.6 : les quatre participes disent *ce qui est arrivé à un
+ * objet*, quand « Accès suspendu » et « Premier responsable désigné » disent
+ * **un geste**. Deux d'entre elles nomment d'ailleurs un objet que la ligne ne
+ * vise pas — l'accès, l'invitation —, ce qu'aucune mécanique d'accord ne saurait
+ * former depuis un nom et un participe.
+ *
+ * **Les mots sont ceux de l'écran**, comme `STATES` prend ceux de la roadmap :
+ * `app/domaines/page.tsx` dit « Suspendre cette entreprise » et « Rétablir
+ * l'accès », `lib/drawers/domains.tsx` « Désigner le premier responsable » et
+ * « Révoquer l'invitation ». Un journal qui nommerait les gestes autrement que
+ * l'écran obligerait à traduire.
+ *
+ * **C'est la discipline de `DEEDS` et de `STATES`** : le seul moyen que deux
+ * gestes voisins divergent serait de changer cette table.
+ */
+const DOMAIN_DEEDS: Record<JournalDomainDeed, string> = {
+  created: "Entreprise créée",
+  suspended: "Accès suspendu",
+  resumed: "Accès rétabli",
+  archived: "Entreprise archivée",
+  restored: "Entreprise rétablie",
+  identity_added: "Identité vérifiée ajoutée",
+  identity_removed: "Identité vérifiée retirée",
+  manager_designated: "Premier responsable désigné",
+  invitation_revoked: "Invitation d'amorçage révoquée",
+  updated: "Informations corrigées",
+};
+
+/**
+ * La septième forme : ce qu'on vient de faire d'une entreprise cliente.
+ *
+ * « Entreprise créée : Acme » · « Accès suspendu » · « Identité vérifiée
+ * retirée : acme.example » · « Informations corrigées : Acme ».
+ *
+ * **Le complément est facultatif, et quatre gestes seulement en portent un.**
+ * C'est la dissymétrie de `statePhrase`, dont le motif ne vient qu'avec
+ * l'annulation : la création nomme l'entreprise, les deux identités leur valeur,
+ * la désignation le nom du responsable, la correction le nom **d'après** le
+ * geste (D22 — écrire celui d'avant serait une « valeur avant »). Les six
+ * autres n'ont rien à nommer : l'entreprise est celle que porte `domain_id`, et
+ * la répéter à chaque ligne ferait un journal qui dit six fois son propre titre.
+ *
+ * **Le complément d'identité est la valeur seule, sans son fournisseur.** C'est
+ * la désignation de ce qui a été touché, et au retrait la ligne n'existe plus
+ * pour la redonner. Une même valeur rattachée sous deux fournisseurs rendrait
+ * deux phrases identiques — cas noté au journal technique, et non payé d'un
+ * second champ que neuf phrases sur dix n'emploieraient pas.
+ *
+ * **Aucun secret n'entre ici** : l'invitation révoquée dit son existence, jamais
+ * son lien — *le clair ne descend jamais en base* (T11.1). C'est aussi pourquoi
+ * la révocation ne nomme personne : elle referme **toutes** les vivantes, et
+ * n'en nommer qu'une choisirait.
+ */
+export function domainPhrase(
+  deed: JournalDomainDeed,
+  label?: string,
+): string {
+  const clause = DOMAIN_DEEDS[deed];
+  return label ? `${clause}${NBSP}: ${label}` : clause;
 }

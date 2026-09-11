@@ -1281,6 +1281,19 @@ export type AdminDomainRow = {
   id: string;
   name: string;
   competenceCenterName: string;
+  /**
+   * Ce que fait cette entreprise, en une phrase — **facultative** (T11.4).
+   *
+   * **Deux colonnes de plus dans un `select` déjà écrit** (T12.3), et aucune
+   * lecture neuve : `openDomain` (`lib/drawers/domains.tsx`) filtre déjà cette
+   * liste par identifiant et sert de porte aux cinq panneaux ciblés ; la fiche
+   * d'une entreprise prend la même. Une septième fonction dans `asSuperAdmin`
+   * pour lire une ligne qu'une lecture rend déjà serait la duplication que T9.4
+   * a évitée.
+   */
+  description: string | null;
+  /** La date de création — **un fait saisi, jamais une fraîcheur** (D39). */
+  createdAt: Date;
   status: (typeof domainStatus.enumValues)[number];
   archivedAt: Date | null;
   /** Au moins une ligne `domain_identities` : sans elle, aucun jeton ne la désigne. */
@@ -1307,6 +1320,24 @@ export type AdminDomainRow = {
  * poser deux colonnes de plus ici aurait ajouté à la charge de T7.9 —
  * précisément le ticket des colonnes saisies qu'aucun écran ne lit.
  */
+/**
+ * Le plafond du journal d'administration — **un nombre écrit, jamais une
+ * pagination** (T12.3), au patron de `RECENT_EVENTS_LIMIT`
+ * (`lib/queries/overview.ts`).
+ *
+ * **Trente et non quinze**, et la différence est celle des deux questions : le
+ * flux de la vue d'ensemble répond à *« que se passe-t-il en ce moment »*, où
+ * quinze lignes suffisent et où le bloc partage l'écran avec trois autres.
+ * Celui-ci répond à *« qu'a-t-on fait sur cette entreprise »* — une **histoire**
+ * —, et les gestes d'administration sont rares : dix formes, et une entreprise
+ * qui vit bien n'en reçoit que quelques-uns par an.
+ *
+ * **Ce n'est pas un décompte, et rien ne l'affiche** : ni « 30 derniers
+ * gestes », ni « voir plus ». Il borne la hauteur d'un bloc qui croîtrait sans
+ * fin ; il ne se lit pas.
+ */
+export const DOMAIN_EVENTS_LIMIT = 30;
+
 export type DomainEventRow = {
   id: string;
   /** La phrase, figée à l'écriture (D22). */
@@ -1389,6 +1420,8 @@ export function asSuperAdmin(grant: SuperAdminGrant) {
           id: domains.id,
           name: domains.name,
           competenceCenterName: domains.competenceCenterName,
+          description: domains.description,
+          createdAt: domains.createdAt,
           status: domains.status,
           archivedAt: domains.archivedAt,
           /* **Les deux sous-requêtes portent un alias, et ce n'est pas un
@@ -1477,8 +1510,17 @@ export function asSuperAdmin(grant: SuperAdminGrant) {
      * **Aucune donnée métier n'entre ici** : une phrase figée, une date, et le
      * nom d'une autorité qui vit *au-dessus* des domaines. C'est la frontière
      * que `app/domaines/page.tsx:44` écrit.
+     *
+     * **`id` départage les instants égaux** (T12.3), et c'est la raison exacte
+     * de `listRecentEvents` : `occurred_at` porte un `defaultNow()` que deux
+     * écritures voisines peuvent partager — l'amorçage d'un domaine en écrit
+     * plusieurs d'affilée —, et un ordre qui varierait d'un affichage à l'autre
+     * serait un défaut. **Ici il décide en plus qui entre sous le plafond.**
      */
-    async listDomainEvents(domainId: string): Promise<DomainEventRow[]> {
+    async listDomainEvents(
+      domainId: string,
+      limit: number = DOMAIN_EVENTS_LIMIT,
+    ): Promise<DomainEventRow[]> {
       await assertAuthority();
 
       return db
@@ -1491,7 +1533,8 @@ export function asSuperAdmin(grant: SuperAdminGrant) {
         .from(domainEvents)
         .leftJoin(superAdmins, eq(superAdmins.id, domainEvents.superAdminId))
         .where(eq(domainEvents.domainId, domainId))
-        .orderBy(desc(domainEvents.occurredAt));
+        .orderBy(desc(domainEvents.occurredAt), desc(domainEvents.id))
+        .limit(limit);
     },
 
     async createDomain(values: {

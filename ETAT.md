@@ -2,10 +2,9 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 11/09/2026. **T12.1 terminé** — `domain_events` existe et **rien ne
-l'écrit encore** ; migration `0019`, **et pas une seconde**. 1 962 → **1 966 tests**. **Ticket
-suivant : T12.2 — les dix gestes laissent leur trace.** **C7 reste ouvert** sur T7.9 et T7.10 : C12
-passe devant, **quatrième écart à `docs/05` §6**, consigné — T7.10, qui ferme le POC, verra la fiche.
+**Dernière mise à jour :** 11/09/2026. **T12.3 terminé** — la fiche d'une entreprise lit enfin le
+journal, cinq mesures par sonde. 1 987 → **1 989 tests**. **Ticket suivant : T12.4 — les gestes
+déménagent.** **C7 reste ouvert** sur T7.9 et T7.10 ; C12 passe devant, écart consigné à `docs/05` §6.
 
 ---
 
@@ -19,7 +18,7 @@ passe devant, **quatrième écart à `docs/05` §6**, consigné — T7.10, qui f
 | C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **terminé** |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
 | C11 — Le parcours d'entrée | T11.1 → T11.6 | **terminé** (rouvert puis refermé le 09/09) |
-| C12 — Détail et journal d'administration des domaines | T12.1 → T12.4 | **en cours** — T12.1 livré |
+| C12 — Détail et journal d'administration des domaines | T12.1 → T12.4 | **en cours** — T12.1 → T12.3 livrés |
 
 ---
 
@@ -57,9 +56,11 @@ passe devant, **quatrième écart à `docs/05` §6**, consigné — T7.10, qui f
   des **seize** états vides : **deux cul-de-sac** corrigés, **douze vus rendus**, **quatre nommés
   inatteignables**. 1 962 tests, inchangés.
 - **C12 — T12.1, 11/09.** `domain_events` posée **avant tout écrivain et tout lecteur** : un
-  `ScopedTable` hors produit, donc couvert **sans une ligne de couche neuve** ; quatre colonnes,
-  toutes lues par T12.3 ; `archive` et `deleteRow` en refus de typage. **Quatre mises en défaut, une
-  seule mesure tombe à chaque fois.** 1 962 → **1 966 tests**.
+  `ScopedTable` hors produit couvert **sans une ligne de couche neuve**. 1 962 → **1 966 tests**.
+- **C12 — T12.2, 11/09.** Les dix gestes laissent leur trace, `events` inchangée. **Sept mises en
+  défaut, dont une a trouvé un trou** : trois refus non mesurés. 1 966 → **1 987 tests**.
+- **C12 — T12.3, 11/09.** La fiche : quatre blocs, un plafond, un fil d'Ariane. **Cinq mesures par
+  sonde** ; **une mise en défaut n'épingle rien**, dite au journal. 1 987 → **1 989 tests**.
 - **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, détaillés dans
   `HISTORIQUE-TICKETS.md`. **Cinq portent une migration, `0010` à `0014`** ; le reste est de
   l'ergonomie, plus le **renommage de « Projets » en « Accompagnements »**, qui **rouvre D35**.
@@ -111,9 +112,9 @@ refermé part dans `HISTORIQUE-TICKETS.md`.)*
   récrit exprès, étant pur. → **T7.9**, avec les quatre libellés hors de `lib/format.ts`.
 - **`persons.identity_provider` n'a aucun écrivain**, et l'inscrire buterait sur
   `persons_external_id_requires_directory`. → **le jour où l'import d'annuaire arrive.**
-- **L'amorçage d'un domaine n'est pas atomique et écrit quatre tables** (T11.4) — **C12 lui en ajoute
-  une, la ligne de journal, posée en dernier pour cette raison** ; rien ne répare un amorçage
-  partiel, et le rapprochement de T8.4 le rendrait rejouable. → **avec la dette de T3.6.**
+- **L'amorçage d'un domaine n'est pas atomique et écrit cinq tables** (T11.4 ; T12.2 lui ajoute la
+  ligne de journal, **posée en dernier** pour cette raison) ; rien ne répare un amorçage partiel, et
+  le rapprochement de T8.4 le rendrait rejouable. → **avec la dette de T3.6.**
 - **`withoutAnySession()` reste importable depuis `app/`** : la refermer demande une clause ESLint,
   ce qui réveille la dette d'`uiLayerSeal` — deux sujets pour un geste, et **T7.7 a ouvert le fichier
   sans les faire** (règle 3). **Seconde fois qu'une destination « le prochain ticket qui ouvre le
@@ -130,25 +131,24 @@ refermé part dans `HISTORIQUE-TICKETS.md`.)*
   (`designateDomainManager`) · **`redeemInvitation` ne juge pas l'état du domaine**, et c'est ce qui
   rend l'arbitrage (4) de C11 mesurable : **un seul témoin isole l'ordre des six règles**. → **à
   relire avant de toucher l'un des deux, jamais après.**
-- **Le parcours clavier n'a jamais été fait au navigateur** (T7.7) : l'ordre de tabulation est mesuré
-  **d'après le HTML servi** ; `Échap`, le clic extérieur, le retour du focus et le défilement de la
-  frise aux flèches ne le sont pas. → **arbitrage humain : une dépendance de développement, ou le
-  manque assumé.**
-- **Lire un écran authentifié au `curl` demande un harnais qui n'existe pas** — `/dev/session` exige
-  une session **déjà ouverte** depuis T11.6, et **trois tickets de suite l'ont redemandé**, T7.8
-  payant sept scripts jetables. S'y rattachent **les deux corrections d'états vides de T7.8**,
-  mesurées et non gardées. → **outillage : `scripts/probe.ts` ou son équivalent.**
+- **Rien n'a jamais été vu dans un navigateur** — ni le parcours clavier (T7.7), ni la relecture à
+  375 px de la fiche (T12.3, extension refusée) : les deux sont mesurés **d'après le HTML servi et
+  les classes**. `Échap`, le retour du focus, le défilement aux flèches et tout débordement réel
+  restent hors mesure. → **arbitrage humain : une dépendance de développement, ou le manque assumé.**
+- **Lire un écran authentifié au `curl` demande un harnais qui n'existe pas** — **quatre tickets de
+  suite l'ont redemandé**, T12.3 rejouant le geste de T7.8 : sceller un principal, semer, sonder,
+  purger. S'y rattachent les deux corrections d'états vides de T7.8, mesurées et non gardées.
+  → **outillage : `scripts/probe.ts` ou son équivalent.**
 - **Quatre états vides ne s'atteignent par aucun jeu de données** (T7.8), deux structurellement —
   `/administration`, dont les référentiels sont semés, et `/equipe`, dont la session **est** une
   personne du domaine. **Rien n'a été touché** (règle 3). → **le jour où un référentiel s'ajoute sans
   être semé.**
-- **Le journal reste incomplet, et il perd son sixième nom** (T8.3, récrit le 11/09) : **cinq
-  familles écrivent sans trace** — le produit, l'adoption, la compétence portée, les huit
-  référentiels autres que l'entité (trente-deux gestes), les trois gestes de l'invitation (arbitrage
-  assumé : l'acceptation n'a ni session ni acteur). La **sixième** — la correction des informations
-  du domaine — **est prise par C12**. Chacune des cinq est **fixée par un test qui tombera**, et leur
-  contenu est connu : une migration d'énuméré, une quarantaine de points d'appel. → **un ticket à
-  soi, hors C12.**
+- **Le journal reste incomplet — cinq familles, la sixième refermée** (T8.3, récrit le 11/09) : le
+  produit, l'adoption, la compétence portée, les huit référentiels autres que l'entité (trente-deux
+  gestes), les trois gestes de l'invitation (arbitrage assumé : l'acceptation n'a ni session ni
+  acteur). **T12.2 a pris la sixième**, la correction des informations du domaine. Chacune est
+  **fixée par un test qui tombera** : une migration d'énuméré, une quarantaine de points d'appel.
+  → **un ticket à soi, hors C12.**
 - **Huit petites dettes partagent la même destination**, détaillées au journal technique :
   `uiLayerSeal` garde une liste de six dossiers et non une propriété · **`listProductsWithCounts` ne
   rejoue pas la jointure de statut — quatrième décompte de la famille, et le seul qui rende un

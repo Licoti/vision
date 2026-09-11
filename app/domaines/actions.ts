@@ -30,12 +30,31 @@
  * fait est consigné au journal plutôt que contourné, et il se referme avec la
  * dette de T3.6 — *le jour où le pilote exposera la transaction interactive*.
  *
- * **Aucun journal sur les gestes de domaine**, et c'est une contrainte, pas un
- * oubli : `domains` n'est pas un `event_target_type`, et en ajouter un serait
- * une migration — signal d'arrêt des interdits communs de C9. La désignation du
- * premier responsable, elle, écrit sa ligne : `person` est déjà un
- * `event_target_type`, et l'acteur y est nul — ce que l'écran rend alors est
- * « l'amorçage », qui est exactement ce dont il s'agit.
+ * **Les neuf gestes laissent chacun leur trace, et jamais dans `events`**
+ * (T12.2). Ce qui se fait *d'une* entreprise s'écrit dans `domain_events`, la
+ * table hors produit de T12.1 : `events` n'a aucun `target_type` qui dise
+ * « domaine », et son `actor_id` référence `persons`, dont un super
+ * administrateur n'a aucune ligne. Ce qui est écrit **au-dessus** d'un domaine
+ * ne descend pas dedans — sans quoi l'administration des entreprises paraîtrait
+ * dans le flux d'accueil de chacune.
+ *
+ * **L'écriture passe par `forDomain({ domainId }).insert(domainEvents, …)`** —
+ * la porte que ces gestes traversent déjà pour `domain_identities`, `persons` et
+ * `invitations` — **et jamais par `record()`**, qui pose un acteur depuis un
+ * contexte que le super administrateur n'a pas. L'acteur, ici, est nommé :
+ * `super_admin_id`, récolté sur la lecture que `requireSuperAdmin()` a déjà
+ * faite, donc sans une requête de plus.
+ *
+ * **Chaque trace vient après l'écriture qu'elle raconte, et seulement si celle-ci
+ * a eu lieu** — *rien n'est journalisé qui n'a pas eu lieu*, la règle de
+ * `restoreEntity`. Les gestes dont la couche rend `undefined` conditionnent donc
+ * leur ligne sur ce retour, et non sur le fait d'être arrivés jusque-là.
+ *
+ * **La désignation du premier responsable garde en plus sa ligne `person`**
+ * dans `events`, à l'intérieur du domaine (T11.4) : deux niveaux, deux tables,
+ * et elles ne se remplacent pas. La première dit *« un compte est né ici »* à
+ * qui lit ce domaine ; la seconde dit *« on a désigné son premier responsable »*
+ * à qui administre les entreprises.
  */
 
 import { revalidatePath } from "next/cache";
@@ -58,7 +77,12 @@ import {
   superAdmin,
   type SuperAdminGrant,
 } from "@/lib/db/scoped";
-import { domainIdentities, invitations, persons } from "@/lib/db/schema";
+import {
+  domainEvents,
+  domainIdentities,
+  invitations,
+  persons,
+} from "@/lib/db/schema";
 import type { ConfirmState } from "@/components/ui/confirm-panel";
 import {
   addressDomainsOf,
@@ -73,7 +97,7 @@ import {
   readDomainManagerForm,
   type DomainManagerFormState,
 } from "@/lib/forms/domain-manager";
-import { objectPhrase } from "@/lib/journal";
+import { domainPhrase, objectPhrase, type JournalDomainDeed } from "@/lib/journal";
 import { sendInvitationMail } from "@/lib/mail/send";
 import { ROUTES } from "@/lib/navigation";
 import { isUuid } from "@/lib/uuid";
@@ -131,13 +155,38 @@ function revalidate(): void {
 async function openInviter(): Promise<{
   grant: SuperAdminGrant;
   inviterName: string;
+  superAdminId: string;
 }> {
   const grant = await requireSuperAdmin();
 
   const admin = await getSuperAdmin();
   if (!admin) redirect(AUTH_ROUTES.entry);
 
-  return { grant, inviterName: admin.fullName };
+  return { grant, inviterName: admin.fullName, superAdminId: admin.id };
+}
+
+/**
+ * La trace d'un geste d'administration — **une ligne, et jamais dans `events`**.
+ *
+ * Elle passe par la porte scopée, qui pose `domain_id` ; l'acteur, lui, est
+ * nommé — c'est ce que `record()` ne saurait pas faire ici, posant son `actorId`
+ * depuis un contexte qu'un super administrateur n'a pas.
+ *
+ * **Elle ne décide de rien.** L'appelant l'invoque après l'écriture qu'elle
+ * raconte, et seulement si celle-ci a eu lieu : *rien n'est journalisé qui n'a
+ * pas eu lieu*. Une fonction qui relirait l'état pour décider serait une seconde
+ * autorité, qui divergerait un jour de la première.
+ */
+async function trace(
+  domainId: string,
+  superAdminId: string,
+  deed: JournalDomainDeed,
+  label?: string,
+): Promise<void> {
+  await forDomain({ domainId }).insert(domainEvents, {
+    superAdminId,
+    summary: domainPhrase(deed, label),
+  });
 }
 
 /**
@@ -150,12 +199,13 @@ async function openDomain(domainId: string): Promise<
   | {
       grant: SuperAdminGrant;
       inviterName: string;
+      superAdminId: string;
       name: string;
       archivedAt: Date | null;
     }
   | null
 > {
-  const { grant, inviterName } = await openInviter();
+  const { grant, inviterName, superAdminId } = await openInviter();
   if (!isUuid(domainId)) return null;
 
   const domain = await superAdmin.findDomain(domainId);
@@ -164,6 +214,7 @@ async function openDomain(domainId: string): Promise<
   return {
     grant,
     inviterName,
+    superAdminId,
     name: domain.name,
     archivedAt: domain.archivedAt,
   };
@@ -316,7 +367,7 @@ export async function createDomain(
   _previous: DomainFormState,
   formData: FormData,
 ): Promise<DomainFormState> {
-  const { grant, inviterName } = await openInviter();
+  const { grant, inviterName, superAdminId } = await openInviter();
 
   const { values, errors, input } = parseDomainForm(formData);
   if (!input) return { values, errors };
@@ -366,6 +417,13 @@ export async function createDomain(
     prepared,
   );
 
+  /* **La trace en dernier**, et c'est l'ordre de T11.4 qui le veut : ce qui
+     compte d'abord, la datation ensuite. Le geste est *créer une entreprise* —
+     **une** ligne, et non une par table écrite ; la désignation du premier
+     responsable n'a la sienne que sur le chemin de rattrapage, où elle *est* le
+     geste. */
+  await trace(domain.id, superAdminId, "created", input.name);
+
   revalidate();
   return { values, errors: {}, link: prepared.link, sent };
 }
@@ -384,6 +442,8 @@ export async function suspendDomain(
   );
   if (!updated) return { message: GONE };
 
+  await trace(domainId, opened.superAdminId, "suspended");
+
   revalidate();
   return { ok: true };
 }
@@ -393,7 +453,15 @@ export async function resumeDomain(domainId: string): Promise<void> {
   const opened = await openDomain(domainId);
   if (!opened) return;
 
-  await asSuperAdmin(opened.grant).setDomainStatus(domainId, "active");
+  /* **Le retour est capté, et il décide de la trace** : `setDomainStatus` rend
+     `undefined` sur une ligne archivée, et une bascule qui n'a pas porté n'a
+     rien à raconter. */
+  const updated = await asSuperAdmin(opened.grant).setDomainStatus(
+    domainId,
+    "active",
+  );
+  if (updated) await trace(domainId, opened.superAdminId, "resumed");
+
   revalidate();
 }
 
@@ -408,7 +476,11 @@ export async function archiveDomain(
   /* Déjà rangée : rien, et rien à dire — le patron d'`archiveEntity`. */
   if (opened.archivedAt) return {};
 
-  await asSuperAdmin(opened.grant).archiveDomain(domainId);
+  /* Le filtre `is not null` de la couche rend `undefined` sur une ligne déjà
+     rangée — la course que le test ci-dessus ne couvre pas. La trace suit le
+     retour, jamais le fait d'être arrivé ici. */
+  const archived = await asSuperAdmin(opened.grant).archiveDomain(domainId);
+  if (archived) await trace(domainId, opened.superAdminId, "archived");
 
   revalidate();
   return { ok: true };
@@ -418,7 +490,9 @@ export async function restoreDomain(domainId: string): Promise<void> {
   const opened = await openDomain(domainId);
   if (!opened) return;
 
-  await asSuperAdmin(opened.grant).restoreDomain(domainId);
+  const restored = await asSuperAdmin(opened.grant).restoreDomain(domainId);
+  if (restored) await trace(domainId, opened.superAdminId, "restored");
+
   revalidate();
 }
 
@@ -447,6 +521,8 @@ export async function addDomainIdentity(
     value: input.value,
   });
 
+  await trace(domainId, opened.superAdminId, "identity_added", input.value);
+
   revalidate();
   return { values, errors: {}, ok: true };
 }
@@ -474,7 +550,17 @@ export async function removeDomainIdentity(
   const remaining = await scope.count(domainIdentities);
   if (remaining <= 1) return;
 
-  await scope.unlink(domainIdentities, identityId);
+  /* **La valeur se lit avant le retrait**, seul moment où elle existe encore :
+     la phrase est figée (D22), et la ligne ne sera plus là pour la redonner. La
+     lecture confronte au passage l'identifiant au domaine, ce que `unlink`
+     ferait de toute façon. */
+  const identity = await scope.find(domainIdentities, identityId);
+
+  const removed = await scope.unlink(domainIdentities, identityId);
+  if (removed > 0 && identity) {
+    await trace(domainId, opened.superAdminId, "identity_removed", identity.value);
+  }
+
   revalidate();
 }
 
@@ -554,6 +640,17 @@ export async function designateDomainManager(
     prepared,
   );
 
+  /* **Ici la désignation *est* le geste**, quand elle n'est qu'une étape de la
+     création. La trace vit donc dans les deux actions et non dans
+     `inviteFirstManager`, qu'elles partagent : l'y poser ferait écrire deux
+     lignes à la création, et le décompte est ce qui tranche. */
+  await trace(
+    domainId,
+    opened.superAdminId,
+    "manager_designated",
+    input.fullName,
+  );
+
   revalidate();
   return { values, errors: {}, link: prepared.link, sent };
 }
@@ -601,6 +698,12 @@ export async function revokeDomainInvitation(domainId: string): Promise<void> {
   for (const invitation of pending) {
     await scope.update(invitations, invitation.id, { revokedAt });
   }
+
+  /* **Une ligne par geste, jamais une par invitation révoquée.** L'état n'en
+     porte qu'une, mais la boucle les referme toutes ; ce que le journal raconte
+     est le geste, et il a eu lieu une fois. La phrase ne nomme personne pour la
+     même raison — n'en nommer qu'une choisirait. */
+  await trace(domainId, opened.superAdminId, "invitation_revoked");
 
   revalidate();
 }

@@ -37,6 +37,7 @@ import {
 import {
   activityTypes,
   approaches,
+  domainEvents,
   domainIdentities,
   domains,
   entities,
@@ -285,6 +286,9 @@ afterAll(async () => {
   for (const id of created) {
     for (const table of [
       events,
+      /* **Le journal d'administration part avec le reste** (T12.2) :
+         `domain_events.domain_id` est `restrict` comme les autres. */
+      domainEvents,
       /* **Les invitations avant les personnes** : `invitations.person_id` est
          `restrict`, et une personne invitée ne se supprime pas sans le dire. */
       invitations,
@@ -1139,5 +1143,606 @@ describe("un domaine créé par l'écran naît utilisable", () => {
 
     /* Le domaine qui tenait déjà le couple n'a pas gagné de ligne. */
     expect(await countReferentials(taken)).toEqual(REFERENTIALS);
+  });
+});
+
+/* ==========================================================================
+   Le journal de l'administration — T12.2
+
+   **Deux niveaux, deux tables, et elles se lisent ensemble.** `domain_events`
+   dit ce qu'on a fait *d'une* entreprise ; `events` dit ce qui s'est passé
+   *dedans*. Un geste qui écrirait dans les deux ferait paraître l'administration
+   des domaines dans le flux d'accueil d'une entreprise — c'est pourquoi les
+   deux décomptes sont pris à chaque fois.
+   ========================================================================== */
+
+/**
+ * **L'insécable s'écrit en échappement, jamais en caractère** — la leçon de
+ * `lib/format.test.ts`, resservie : dans un source comme dans un navigateur,
+ * l'insécable et l'espace ordinaire sont indiscernables à l'œil, et une règle
+ * qu'on ne peut pas voir saute au premier copier-coller. Le fichier voisin
+ * `app/(app)/administration/actions.test.ts` le pose de la même façon.
+ */
+const NBSP = "\u00A0";
+
+type AdminTrace = { summary: string; superAdminId: string | null };
+
+/** Le journal d'administration d'un domaine, lu **par le client brut**. */
+async function adminJournal(domainId: string) {
+  return db
+    .select({
+      id: domainEvents.id,
+      summary: domainEvents.summary,
+      superAdminId: domainEvents.superAdminId,
+    })
+    .from(domainEvents)
+    .where(eq(domainEvents.domainId, domainId));
+}
+
+/** Les lignes d'`events` d'un domaine — celles qui ne doivent pas bouger. */
+const countEvents = async (domainId: string): Promise<number> =>
+  (await db.select().from(events).where(eq(events.domainId, domainId))).length;
+
+/**
+ * Ce qu'un geste vient d'écrire, **dans les deux journaux**.
+ *
+ * **Le delta se prend par identifiant, jamais par décompte.** Deux lignes
+ * écrites dans la même milliseconde rendraient `occurred_at` incapable de les
+ * ordonner, et un `slice` sur la longueur retiendrait alors la mauvaise —
+ * défaut qui passe au vert le jour où il se trompe.
+ */
+async function traced(
+  domainId: string,
+  gesture: () => Promise<unknown>,
+): Promise<{ admin: AdminTrace[]; events: number }> {
+  const before = new Set((await adminJournal(domainId)).map((row) => row.id));
+  const eventsBefore = await countEvents(domainId);
+
+  await gesture();
+
+  const after = await adminJournal(domainId);
+  return {
+    admin: after
+      .filter((row) => !before.has(row.id))
+      .map(({ summary, superAdminId }) => ({ summary, superAdminId })),
+    events: (await countEvents(domainId)) - eventsBefore,
+  };
+}
+
+/** Le domaine que l'écran vient de créer, retrouvé par son nom. */
+async function createdDomain(name: string): Promise<string> {
+  const row = (await db.select().from(domains).where(eq(domains.name, name)))[0];
+  created.push(row!.id);
+  return row!.id;
+}
+
+describe("les neuf gestes laissent chacun leur trace", () => {
+  /**
+   * **Un seul cas, et il parcourt les neuf.**
+   *
+   * Les découper en neuf cas aurait demandé neuf domaines jetables et neuf
+   * amorçages de référentiels ; surtout, il aurait fallu **fabriquer** l'état
+   * que chaque geste exige au lieu de l'atteindre par le geste précédent. Ici
+   * l'ordre est celui d'une vie d'entreprise, et chaque étape laisse l'écran
+   * dans l'état qui rend la suivante légitime.
+   */
+  test("une ligne par geste, la phrase mot pour mot, l'acteur nommé", async () => {
+    asSuperAdministrator();
+
+    const name = `__0__test__domaines__journal__${suffix}`;
+    const identity = `journal-${suffix}.example`;
+    const second = `journal-bis-${suffix}.example`;
+
+    /* 1. La création. **La trace est posée en dernier**, après l'amorçage des
+       référentiels et l'invitation : l'ordre de T11.4 n'a pas bougé. */
+    const creation = await createDomain(
+      EMPTY_DOMAIN,
+      domainForm(name, identity),
+    );
+    expect(creation.link).toContain("/invitation/");
+
+    const domainId = await createdDomain(name);
+    expect(await adminJournal(domainId)).toMatchObject([
+      { summary: `Entreprise créée${NBSP}: ${name}`, superAdminId: f.superAdminId },
+    ]);
+
+    /* **La ligne `person` de T11.4 est là, et elle est seule** : le geste écrit
+       dans les deux tables, chacune la sienne, et jamais la même chose. */
+    expect(await countEvents(domainId)).toBe(1);
+
+    const step = async (gesture: () => Promise<unknown>) =>
+      traced(domainId, gesture);
+
+    /* 2. L'ajout d'une identité vérifiée. */
+    expect(
+      await step(() =>
+        addDomainIdentity(domainId, EMPTY_IDENTITY, identityForm(second)),
+      ),
+    ).toEqual({
+      admin: [
+        {
+          summary: `Identité vérifiée ajoutée${NBSP}: ${second}`,
+          superAdminId: f.superAdminId,
+        },
+      ],
+      events: 0,
+    });
+
+    /* 3. Le retrait — **la valeur est dans la phrase**, seule trace qui en
+       reste : la ligne, elle, n'existe plus. */
+    const removed = (
+      await db
+        .select()
+        .from(domainIdentities)
+        .where(
+          and(
+            eq(domainIdentities.domainId, domainId),
+            eq(domainIdentities.value, second),
+          ),
+        )
+    )[0];
+    expect(
+      await step(() => removeDomainIdentity(domainId, removed!.id)),
+    ).toEqual({
+      admin: [
+        {
+          summary: `Identité vérifiée retirée${NBSP}: ${second}`,
+          superAdminId: f.superAdminId,
+        },
+      ],
+      events: 0,
+    });
+
+    /* 4 et 5. La suspension, puis le rétablissement de l'accès. */
+    expect(await step(() => suspendDomain(domainId, ...confirm()))).toEqual({
+      admin: [{ summary: "Accès suspendu", superAdminId: f.superAdminId }],
+      events: 0,
+    });
+    expect(await step(() => resumeDomain(domainId))).toEqual({
+      admin: [{ summary: "Accès rétabli", superAdminId: f.superAdminId }],
+      events: 0,
+    });
+
+    /* 6. La révocation — **une ligne par geste**, quand la création en avait
+       laissé une invitation vivante. */
+    expect(await step(() => revokeDomainInvitation(domainId))).toEqual({
+      admin: [
+        { summary: "Invitation d'amorçage révoquée", superAdminId: f.superAdminId },
+      ],
+      events: 0,
+    });
+
+    /* 7. La redésignation — **le seul chemin où elle est le geste**, et non une
+       étape de la création. Elle garde sa ligne `person` dans `events`. */
+    const manager = `Nouvelle ${suffix}`;
+    expect(
+      await step(() =>
+        designateDomainManager(
+          domainId,
+          EMPTY_MANAGER,
+          managerForm(manager, `nouvelle.${suffix}@${identity}`),
+        ),
+      ),
+    ).toEqual({
+      admin: [
+        {
+          summary: `Premier responsable désigné${NBSP}: ${manager}`,
+          superAdminId: f.superAdminId,
+        },
+      ],
+      events: 1,
+    });
+
+    /* 8 et 9. Le rangement, puis le rétablissement. */
+    expect(await step(() => archiveDomain(domainId, ...confirm()))).toEqual({
+      admin: [{ summary: "Entreprise archivée", superAdminId: f.superAdminId }],
+      events: 0,
+    });
+    expect(await step(() => restoreDomain(domainId))).toEqual({
+      admin: [{ summary: "Entreprise rétablie", superAdminId: f.superAdminId }],
+      events: 0,
+    });
+
+    /* **Le décompte final tranche** : neuf gestes, neuf lignes, et deux lignes
+       `events` — celles des deux désignations, que T11.4 écrivait déjà. */
+    expect(await adminJournal(domainId)).toHaveLength(9);
+    expect(await countEvents(domainId)).toBe(2);
+  }, 60_000);
+});
+
+describe("un refus ne laisse aucune trace", () => {
+  /**
+   * **L'étape témoin n'est pas optionnelle.**
+   *
+   * Sans elle, un journal vide ne distingue pas un refus d'un geste qui
+   * n'écrirait de toute façon rien : chaque cas rejoue donc **le même geste**
+   * sous les conditions qui le font réussir, et vérifie qu'il écrit alors.
+   */
+  const silent = async (domainId: string, gesture: () => Promise<unknown>) =>
+    (await traced(domainId, gesture)).admin;
+
+  test("un identifiant qui ne désigne aucune entreprise n'écrit rien", async () => {
+    asSuperAdministrator();
+    const absent = crypto.randomUUID();
+
+    /* `GONE` : la porte `openDomain` rend `null`, et rien derrière elle ne
+       tourne. Le journal du **domaine de fixture** est lu, puisque aucun autre
+       ne pourrait recevoir la ligne. */
+    expect(
+      await silent(f.domainId, () => suspendDomain(absent, ...confirm())),
+    ).toEqual([]);
+    expect(await silent(f.domainId, () => resumeDomain(absent))).toEqual([]);
+    expect(
+      await silent(f.domainId, () => archiveDomain(absent, ...confirm())),
+    ).toEqual([]);
+    expect(await silent(f.domainId, () => restoreDomain(absent))).toEqual([]);
+
+    /* Le témoin : le même geste sur une entreprise qui existe écrit. */
+    const domainId = await seedDomain("refus-gone-temoin");
+    expect(
+      await silent(domainId, () => suspendDomain(domainId, ...confirm())),
+    ).toEqual([{ summary: "Accès suspendu", superAdminId: f.superAdminId }]);
+  });
+
+  test("une identité déjà prise n'écrit rien, une identité libre écrit", async () => {
+    asSuperAdministrator();
+    const domainId = await seedDomain("refus-identite");
+    const other = await seedDomain("refus-identite-voisine");
+    const taken = `refus-identite-${suffix}.example`;
+
+    await addDomainIdentity(other, EMPTY_IDENTITY, identityForm(taken));
+
+    /* `TAKEN` : la confrontation précède l'écriture, et le journal la suit. */
+    const refused = await traced(domainId, () =>
+      addDomainIdentity(domainId, EMPTY_IDENTITY, identityForm(taken)),
+    );
+    expect(refused.admin).toEqual([]);
+    expect(refused.events).toBe(0);
+
+    const free = `refus-identite-libre-${suffix}.example`;
+    expect(
+      await silent(domainId, () =>
+        addDomainIdentity(domainId, EMPTY_IDENTITY, identityForm(free)),
+      ),
+    ).toEqual([
+      {
+        summary: `Identité vérifiée ajoutée${NBSP}: ${free}`,
+        superAdminId: f.superAdminId,
+      },
+    ]);
+  });
+
+  /**
+   * **Le refus « jamais la dernière » est celui qui compte le plus ici.**
+   *
+   * Il ne rend rien — l'action est muette —, si bien que **seul le journal
+   * pourrait mentir** : une trace écrite avant le décompte dirait qu'une
+   * identité a été retirée quand la base en porte toujours autant.
+   */
+  test("le retrait de la dernière identité n'écrit rien, celui d'une autre écrit", async () => {
+    asSuperAdministrator();
+    const domainId = await seedDomain("refus-derniere");
+    const first = `refus-derniere-${suffix}.example`;
+    await addDomainIdentity(domainId, EMPTY_IDENTITY, identityForm(first));
+
+    const only = (
+      await db
+        .select()
+        .from(domainIdentities)
+        .where(eq(domainIdentities.domainId, domainId))
+    )[0];
+
+    expect(
+      await silent(domainId, () => removeDomainIdentity(domainId, only!.id)),
+    ).toEqual([]);
+    expect(await countIdentities(domainId)).toBe(1);
+
+    /* Le témoin : une seconde identité posée, le même geste porte. */
+    const second = `refus-derniere-bis-${suffix}.example`;
+    await addDomainIdentity(domainId, EMPTY_IDENTITY, identityForm(second));
+    expect(
+      await silent(domainId, () => removeDomainIdentity(domainId, only!.id)),
+    ).toEqual([
+      {
+        summary: `Identité vérifiée retirée${NBSP}: ${first}`,
+        superAdminId: f.superAdminId,
+      },
+    ]);
+  });
+
+  /**
+   * **Une entreprise déjà rangée n'écrit rien**, et c'est la mesure de *« rien
+   * n'est journalisé qui n'a pas eu lieu »* : l'action rend `{}` puis `{ok:true}`
+   * selon le chemin, mais la couche, elle, rend `undefined` — et c'est ce retour
+   * que la trace suit.
+   */
+  test("un second rangement n'écrit rien, le premier écrit", async () => {
+    asSuperAdministrator();
+    const domainId = await seedDomain("refus-deja-range");
+
+    expect(
+      await silent(domainId, () => archiveDomain(domainId, ...confirm())),
+    ).toEqual([
+      { summary: "Entreprise archivée", superAdminId: f.superAdminId },
+    ]);
+    expect(
+      await silent(domainId, () => archiveDomain(domainId, ...confirm())),
+    ).toEqual([]);
+
+    /* Et la bascule de statut, que le rangement fige, n'écrit pas davantage. */
+    expect(
+      await silent(domainId, () => suspendDomain(domainId, ...confirm())),
+    ).toEqual([]);
+  });
+
+  test("une révocation sans objet n'écrit rien, une révocation qui porte écrit", async () => {
+    asSuperAdministrator();
+    const domainId = await seedDomain("refus-revocation");
+
+    /* Aucune invitation vivante : le geste sort sans rien toucher. */
+    expect(
+      await silent(domainId, () => revokeDomainInvitation(domainId)),
+    ).toEqual([]);
+
+    const value = `refus-revocation-${suffix}.example`;
+    await addDomainIdentity(domainId, EMPTY_IDENTITY, identityForm(value));
+    await designateDomainManager(
+      domainId,
+      EMPTY_MANAGER,
+      managerForm(`Attendue ${suffix}`, `attendue.${suffix}@${value}`),
+    );
+
+    expect(
+      await silent(domainId, () => revokeDomainInvitation(domainId)),
+    ).toEqual([
+      { summary: "Invitation d'amorçage révoquée", superAdminId: f.superAdminId },
+    ]);
+  });
+
+  test("une désignation refusée n'écrit rien, la première écrit", async () => {
+    asSuperAdministrator();
+    const domainId = await seedDomain("refus-designation");
+    const value = `refus-designation-${suffix}.example`;
+    await addDomainIdentity(domainId, EMPTY_IDENTITY, identityForm(value));
+
+    const designate = (label: string) =>
+      designateDomainManager(
+        domainId,
+        EMPTY_MANAGER,
+        managerForm(`${label} ${suffix}`, `${label}.${suffix}@${value}`),
+      );
+
+    /* La première porte, et elle écrit. */
+    expect(await silent(domainId, () => designate("premiere"))).toEqual([
+      {
+        summary: `Premier responsable désigné${NBSP}: premiere ${suffix}`,
+        superAdminId: f.superAdminId,
+      },
+    ]);
+
+    /* `ALREADY_INVITED` : une invitation attend, rien n'est écrit. */
+    expect(await silent(domainId, () => designate("seconde"))).toEqual([]);
+
+    /* `ALREADY_STAFFED` : le compte ouvert ferme le chemin pour de bon. */
+    await db
+      .update(persons)
+      .set({ hasAccess: true, domainRole: "domain_manager" })
+      .where(eq(persons.domainId, domainId));
+    expect(await silent(domainId, () => designate("troisieme"))).toEqual([]);
+  });
+
+  /**
+   * **`NO_HOST` — le refus qui précède la première écriture.**
+   *
+   * Sans `AUTH_URL`, le lien n'aurait mené nulle part : *rien n'est
+   * enregistré du tout*, et le journal doit dire la même chose que la base.
+   */
+  test("sans hôte, ni entreprise ni trace", async () => {
+    asSuperAdministrator();
+    const name = `__0__test__domaines__sans-hote__${suffix}`;
+    const value = `sans-hote-${suffix}.example`;
+
+    const host = process.env.AUTH_URL;
+    delete process.env.AUTH_URL;
+    try {
+      const refused = await createDomain(EMPTY_DOMAIN, domainForm(name, value));
+      expect(refused.message).toContain("adresse publique");
+      expect(await countDomains(name)).toBe(0);
+    } finally {
+      process.env.AUTH_URL = host;
+    }
+
+    /* Le témoin : la **même** charge, l'hôte rendu, écrit l'entreprise et sa
+       ligne. */
+    const witness = await createDomain(EMPTY_DOMAIN, domainForm(name, value));
+    expect(witness.link).toContain("/invitation/");
+    const domainId = await createdDomain(name);
+    expect(await adminJournal(domainId)).toMatchObject([
+      { summary: `Entreprise créée${NBSP}: ${name}`, superAdminId: f.superAdminId },
+    ]);
+  }, 60_000);
+});
+
+describe("le droit s'éprouve par l'action, le journal compris", () => {
+  /**
+   * **Les neuf points d'entrée, frappés sans autorité.**
+   *
+   * *Un panneau absent du rendu n'a jamais protégé le point d'entrée HTTP qui
+   * l'accompagne* : ce que T9.4 mesurait sur les tables, ce cas le mesure sur le
+   * journal. Une trace écrite avant le contrôle du droit serait une fuite d'un
+   * genre particulier — elle dirait qu'un geste a eu lieu, et donnerait le nom
+   * d'une entreprise à qui n'a pas le droit de la connaître.
+   */
+  const cases = [
+    ["aucun cookie", asNobody],
+    ["un responsable de domaine", asDomainManager],
+    ["un super administrateur archivé", asArchivedSuperAdmin],
+  ] as const;
+
+  for (const [label, become] of cases) {
+    test(`${label} n'écrit aucune ligne de journal`, async () => {
+      asSuperAdministrator();
+      const slug = label.replace(/\s/g, "-");
+      const domainId = await seedDomain(`droit-${slug}`);
+      const value = `droit-${slug}-${suffix}.example`;
+      await addDomainIdentity(domainId, EMPTY_IDENTITY, identityForm(value));
+
+      const identity = (
+        await db
+          .select()
+          .from(domainIdentities)
+          .where(eq(domainIdentities.domainId, domainId))
+      )[0];
+
+      const before = await adminJournal(domainId);
+
+      become();
+      /* Les neuf, sans exception. Chacune redirige — et **la redirection ne
+         prouve rien** : c'est le décompte d'après qui tranche. */
+      const forbidden = [
+        () =>
+          createDomain(
+            EMPTY_DOMAIN,
+            domainForm(`__0__test__domaines__vol-${slug}__${suffix}`, value),
+          ),
+        () => suspendDomain(domainId, ...confirm()),
+        () => resumeDomain(domainId),
+        () => archiveDomain(domainId, ...confirm()),
+        () => restoreDomain(domainId),
+        () =>
+          addDomainIdentity(
+            domainId,
+            EMPTY_IDENTITY,
+            identityForm(`vol-${slug}-${suffix}.example`),
+          ),
+        () => removeDomainIdentity(domainId, identity!.id),
+        () =>
+          designateDomainManager(
+            domainId,
+            EMPTY_MANAGER,
+            managerForm(`Volé ${suffix}`, `vole.${suffix}@${value}`),
+          ),
+        () => revokeDomainInvitation(domainId),
+      ];
+
+      for (const gesture of forbidden) {
+        await expect(gesture()).rejects.toThrow(`${REDIRECT}/auth/acces`);
+      }
+
+      expect(await adminJournal(domainId)).toHaveLength(before.length);
+      expect(await countEvents(domainId)).toBe(0);
+
+      /* **L'étape témoin**, sur l'un des neuf : la même charge sous l'autorité
+         écrit, et l'acteur nommé est celui qui a agi. */
+      asSuperAdministrator();
+      expect(
+        (await traced(domainId, () => suspendDomain(domainId, ...confirm())))
+          .admin,
+      ).toEqual([{ summary: "Accès suspendu", superAdminId: f.superAdminId }]);
+    }, 60_000);
+  }
+});
+
+describe("rien n'est journalisé qui n'a pas eu lieu", () => {
+  /**
+   * **Les trois gestes dont la couche seule sait qu'ils n'ont rien touché.**
+   *
+   * Les refus du bloc précédent sortent par une condition écrite dans l'action :
+   * un identifiant inconnu, une identité déjà prise, un compte déjà ouvert.
+   * Ceux-ci sont d'une autre espèce — l'action va **jusqu'au bout**, appelle la
+   * couche, et c'est le retour de la couche qui dit que rien n'a bougé. Sans ces
+   * cas, la condition portée par chaque trace ne serait éprouvée nulle part, et
+   * une trace inconditionnelle passerait au vert.
+   *
+   * *Mesuré le 11/09/2026 en déplaçant une trace avant l'écriture qu'elle
+   * raconte : le bloc précédent ne l'a pas vue.*
+   */
+  const silent = async (domainId: string, gesture: () => Promise<unknown>) =>
+    (await traced(domainId, gesture)).admin;
+
+  test("rétablir l'accès d'une entreprise rangée n'écrit rien", async () => {
+    asSuperAdministrator();
+    const domainId = await seedDomain("sans-objet-acces");
+
+    await suspendDomain(domainId, ...confirm());
+    await archiveDomain(domainId, ...confirm());
+
+    /* `setDomainStatus` porte un filtre `is null` sur `archived_at` et rend
+       `undefined` : l'action, elle, n'a aucune condition qui l'arrête avant. */
+    expect(await silent(domainId, () => resumeDomain(domainId))).toEqual([]);
+    expect((await domainRow(domainId))?.status).toBe("suspended");
+
+    /* Le témoin : l'entreprise rétablie, le même geste porte. */
+    await restoreDomain(domainId);
+    expect(await silent(domainId, () => resumeDomain(domainId))).toEqual([
+      { summary: "Accès rétabli", superAdminId: f.superAdminId },
+    ]);
+  });
+
+  test("rétablir une entreprise qui n'est pas rangée n'écrit rien", async () => {
+    asSuperAdministrator();
+    const domainId = await seedDomain("sans-objet-retablissement");
+
+    /* `restore` porte un filtre `is not null` et rend `undefined` — c'est la
+       leçon de `restoreEntity`, mot pour mot. */
+    expect(await silent(domainId, () => restoreDomain(domainId))).toEqual([]);
+
+    await archiveDomain(domainId, ...confirm());
+    expect(await silent(domainId, () => restoreDomain(domainId))).toEqual([
+      { summary: "Entreprise rétablie", superAdminId: f.superAdminId },
+    ]);
+  });
+
+  test("retirer une identité d'une autre entreprise n'écrit rien", async () => {
+    asSuperAdministrator();
+    const domainId = await seedDomain("sans-objet-identite");
+    const other = await seedDomain("sans-objet-identite-voisine");
+
+    /* Deux identités : le décompte « jamais la dernière » ne peut pas arrêter le
+       geste, et ce qui reste à éprouver est le retour d'`unlink`. */
+    for (const rank of [1, 2]) {
+      await addDomainIdentity(
+        domainId,
+        EMPTY_IDENTITY,
+        identityForm(`sans-objet-${rank}-${suffix}.example`),
+      );
+    }
+    await addDomainIdentity(
+      other,
+      EMPTY_IDENTITY,
+      identityForm(`sans-objet-voisine-${suffix}.example`),
+    );
+
+    const foreign = (
+      await db
+        .select()
+        .from(domainIdentities)
+        .where(eq(domainIdentities.domainId, other))
+    )[0];
+
+    /* `unlink` est borné au domaine : il rend **zéro**, et la ligne de l'autre
+       entreprise ne bouge pas. Une trace inconditionnelle dirait ici qu'on a
+       retiré une identité qu'on n'a pas touchée. */
+    expect(
+      await silent(domainId, () => removeDomainIdentity(domainId, foreign!.id)),
+    ).toEqual([]);
+    expect(await countIdentities(domainId)).toBe(2);
+    expect(await countIdentities(other)).toBe(1);
+
+    /* Le témoin : une identité du domaine, et le geste porte. */
+    const own = (
+      await db
+        .select()
+        .from(domainIdentities)
+        .where(eq(domainIdentities.domainId, domainId))
+    )[0];
+    expect(
+      await silent(domainId, () => removeDomainIdentity(domainId, own!.id)),
+    ).toEqual([
+      {
+        summary: `Identité vérifiée retirée${NBSP}: ${own!.value}`,
+        superAdminId: f.superAdminId,
+      },
+    ]);
   });
 });

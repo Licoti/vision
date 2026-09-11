@@ -20,6 +20,7 @@ import { db } from "./client";
 import {
   DomainScopeError,
   IntegrityError,
+  DOMAIN_EVENTS_LIMIT,
   SuperAdminRequiredError,
   asSuperAdmin,
   forDomain,
@@ -2445,6 +2446,89 @@ describe("le journal d'administration", () => {
       expect(read.map((row) => row.actorName)).toEqual([otherName, null, name]);
     } finally {
       await dropDomains(here.id, there.id);
+    }
+  });
+
+  /**
+   * **Le plafond, et ce qu'il écarte** — T12.3.
+   *
+   * Un plafond se mesure par ce qu'il **laisse dehors**, jamais par la longueur
+   * de ce qu'il rend : une lecture sans `limit` passerait la première assertion
+   * si le jeu de données tenait sous le nombre. Le cas écrit donc **une ligne de
+   * plus que le plafond** et vérifie que c'est **la plus ancienne** qui manque.
+   */
+  test("le plafond rend les plus récentes, et écarte les plus anciennes", async () => {
+    const { grant } = await authority("plafond");
+    const here = await throwaway("plafond");
+
+    try {
+      /* Le plafond est passé en argument : écrire `DOMAIN_EVENTS_LIMIT + 1`
+         lignes au vrai plafond coûterait trente et un allers-retours pour
+         mesurer la même propriété. **Le défaut est la constante**, et la mesure
+         suivante le dit. */
+      for (const rank of [1, 2, 3, 4]) {
+        await here.scope.insert(domainEvents, {
+          summary: `Rang ${rank} ${suffix}`,
+          occurredAt: new Date(Date.now() - (10 - rank) * 60_000),
+        });
+      }
+
+      expect(
+        (await asSuperAdmin(grant).listDomainEvents(here.id, 3)).map(
+          (row) => row.summary,
+        ),
+      ).toEqual([
+        `Rang 4 ${suffix}`,
+        `Rang 3 ${suffix}`,
+        `Rang 2 ${suffix}`,
+      ]);
+
+      /* **Le plafond par défaut est celui de la constante**, et non un nombre
+         écrit une seconde fois dans la signature : quatre lignes passent
+         entières sous trente. */
+      expect(await asSuperAdmin(grant).listDomainEvents(here.id)).toHaveLength(4);
+      expect(DOMAIN_EVENTS_LIMIT).toBeGreaterThan(4);
+    } finally {
+      await dropDomains(here.id);
+    }
+  });
+
+  /**
+   * **Deux lignes au même instant sortent dans un ordre stable.**
+   *
+   * `occurred_at` porte un `defaultNow()` que deux écritures voisines partagent
+   * — l'amorçage d'un domaine en écrira plusieurs d'affilée. Sans départage,
+   * l'ordre viendrait du plan d'exécution, et **le plafond couperait au hasard**
+   * : deux lectures de la même page rendraient deux listes.
+   */
+  test("deux traces au même instant gardent un ordre stable", async () => {
+    const { grant } = await authority("ordre-stable");
+    const here = await throwaway("ordre-stable");
+
+    try {
+      const occurredAt = new Date();
+      for (const rank of [1, 2, 3]) {
+        await here.scope.insert(domainEvents, {
+          summary: `Simultanée ${rank} ${suffix}`,
+          occurredAt,
+        });
+      }
+
+      const reader = asSuperAdmin(grant);
+      const first = (await reader.listDomainEvents(here.id)).map((r) => r.summary);
+      const second = (await reader.listDomainEvents(here.id)).map((r) => r.summary);
+
+      expect(first).toHaveLength(3);
+      expect(second).toEqual(first);
+
+      /* Et le plafond coupe **toujours la même** : sans départage, celle qui
+         reste dehors changerait d'une lecture à l'autre. */
+      const capped = (await reader.listDomainEvents(here.id, 2)).map(
+        (r) => r.summary,
+      );
+      expect(capped).toEqual(first.slice(0, 2));
+    } finally {
+      await dropDomains(here.id);
     }
   });
 

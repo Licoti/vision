@@ -204,9 +204,22 @@ export default async function DomainsPage({
                 return (
                   <ListRow key={domain.id}>
                     <span className={COLUMN.name}>
-                      <span className="font-semibold text-content-neutral-darkest">
+                      {/* **Le nom mène à la fiche** (T12.3) — et c'est la
+                          descente que `docs/06` §7 exige : *aucun écran n'est un
+                          cul-de-sac*, et une liste dont les lignes ne mènent
+                          nulle part oblige à tout dire d'elles.
+
+                          **Aucun couple de couleurs neuf par la position** : le
+                          lien garde `content-neutral-darkest` en gras, la
+                          couleur qu'il avait en simple texte, et porte sa nature
+                          par le soulignement au survol — la règle du nom de
+                          produit sur `/produits`. */}
+                      <Link
+                        href={ROUTES.domain(domain.id)}
+                        className="font-semibold text-content-neutral-darkest hover:underline"
+                      >
                         {domain.name}
-                      </span>
+                      </Link>
                       {/* **Une absence se dit, elle ne se compte pas.** Sans
                           compte, l'entreprise est close : c'est la règle
                           d'entrée 6, et c'est ce qui commande le geste du

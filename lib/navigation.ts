@@ -1378,6 +1378,20 @@ export const ROUTES = {
    * `/auth/acces`, qui l'y renvoie dès que la connexion aboutit.
    */
   domains: "/domaines",
+  /**
+   * La fiche d'une entreprise cliente — T12.3.
+   *
+   * **Le premier écran de cette famille qui ait un objet**, et c'est ce qui lui
+   * vaut une route à segment plutôt qu'un paramètre : les six panneaux de la
+   * liste s'ouvrent *sur* une ligne sans quitter l'écran, la fiche **est** un
+   * écran, avec son `h1`, son fil d'Ariane et sa question — *« où en est cette
+   * entreprise, et qu'a-t-on fait sur elle ? »*, à laquelle la liste ne répond
+   * pas (`docs/06` §2).
+   *
+   * **Hors du groupe `(app)`**, comme sa liste et pour la même raison : la
+   * coquille suppose une session de domaine, qu'un super administrateur n'a pas.
+   */
+  domain: (domainId: string) => `/domaines/${domainId}`,
   /** L'écran, panneau de création ouvert. Un paramètre, pas un écran de plus. */
   domainNew: `/domaines?${DOMAIN_PANEL_PARAM}=${DOMAIN_PANEL_NEW}`,
   /** L'écran, panneau des identités ouvert sur une entreprise. */

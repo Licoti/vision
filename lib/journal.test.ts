@@ -30,6 +30,7 @@ import { describe, expect, test } from "vitest";
 import {
   linkPhrase,
   accessPhrase,
+  domainPhrase,
   northStarPhrase,
   objectPhrase,
   statePhrase,
@@ -604,6 +605,111 @@ describe("accessPhrase — le compte d'une personne", () => {
   test("aucun accord sur la personne", () => {
     expect(accessPhrase("granted", "Sofia Marchand", "member")).toBe(
       `Accès accordé${NBSP}: Sofia Marchand${NBSP}— membre`,
+    );
+  });
+});
+
+/* ==========================================================================
+   La septième forme — les dix gestes d'administration d'une entreprise
+   ========================================================================== */
+
+describe("`domainPhrase`", () => {
+  /**
+   * **Le vocabulaire entier, éprouvé d'un coup.**
+   *
+   * Une table de dix est exactement le genre d'objet dont un seul membre se
+   * relit et dont les neuf autres se supposent. Les dix sont donc écrits ici,
+   * mot pour mot : c'est le seul endroit du dépôt où le vocabulaire de
+   * l'administration des domaines se lit en entier, et un onzième geste qui
+   * arriverait sans sa phrase ne compilerait pas.
+   */
+  test("les dix gestes, mot pour mot", () => {
+    expect(domainPhrase("created", "Acme")).toBe(`Entreprise créée${NBSP}: Acme`);
+    expect(domainPhrase("suspended")).toBe("Accès suspendu");
+    expect(domainPhrase("resumed")).toBe("Accès rétabli");
+    expect(domainPhrase("archived")).toBe("Entreprise archivée");
+    expect(domainPhrase("restored")).toBe("Entreprise rétablie");
+    expect(domainPhrase("identity_added", "acme.example")).toBe(
+      `Identité vérifiée ajoutée${NBSP}: acme.example`,
+    );
+    expect(domainPhrase("identity_removed", "acme.example")).toBe(
+      `Identité vérifiée retirée${NBSP}: acme.example`,
+    );
+    expect(domainPhrase("manager_designated", "Camille Roux")).toBe(
+      `Premier responsable désigné${NBSP}: Camille Roux`,
+    );
+    expect(domainPhrase("invitation_revoked")).toBe(
+      "Invitation d'amorçage révoquée",
+    );
+    expect(domainPhrase("updated", "Acme corrigé")).toBe(
+      `Informations corrigées${NBSP}: Acme corrigé`,
+    );
+  });
+
+  /**
+   * **Le complément absent ne compose pas de clause vide**, et c'est la règle du
+   * motif de `statePhrase` : ce module ne redécide rien — il n'écrit pas un
+   * deux-points suivi de rien quand rien ne lui est passé.
+   */
+  test("sans complément, aucun deux-points", () => {
+    for (const phrase of [
+      domainPhrase("suspended"),
+      domainPhrase("resumed"),
+      domainPhrase("archived"),
+      domainPhrase("restored"),
+      domainPhrase("invitation_revoked"),
+    ]) {
+      expect(phrase).not.toContain(":");
+      expect(phrase).not.toContain(NBSP);
+    }
+  });
+
+  /**
+   * **L'insécable est devant le deux-points, et il est le vrai.**
+   *
+   * La leçon de `lib/format.test.ts` : dans un source comme dans un navigateur,
+   * l'insécable et l'espace ordinaire sont indiscernables à l'œil. Le test
+   * l'assère par son code, jamais par sa forme.
+   */
+  test("l'insécable précède le deux-points", () => {
+    const phrase = domainPhrase("created", "Acme");
+    const index = phrase.indexOf(":");
+    expect(phrase.charCodeAt(index - 1)).toBe(0x00a0);
+  });
+
+  /**
+   * **Les dix phrases sont distinctes, et aucune ne double une forme voisine.**
+   *
+   * « Entreprise archivée » n'est pas `objectPhrase(…, "archived", …)` : ces
+   * phrases-ci disent un **geste** d'administration, celles-là ce qui est arrivé
+   * à un objet du domaine. Deux gestes qui rendraient la même phrase seraient
+   * indiscernables dans la fiche, et c'est la table qui les sépare.
+   */
+  test("dix gestes, dix phrases", () => {
+    const deeds = [
+      "created",
+      "suspended",
+      "resumed",
+      "archived",
+      "restored",
+      "identity_added",
+      "identity_removed",
+      "manager_designated",
+      "invitation_revoked",
+      "updated",
+    ] as const;
+
+    expect(new Set(deeds.map((deed) => domainPhrase(deed, "Acme"))).size).toBe(10);
+  });
+
+  /**
+   * **Aucun accord sur l'entreprise**, et c'est la règle de `teamPhrase` et
+   * d'`accessPhrase` : « créée » s'accorde avec « Entreprise », le mot, jamais
+   * avec celle qu'on nomme. Un nom d'entreprise ne porte aucun genre.
+   */
+  test("aucun accord sur le nom rendu", () => {
+    expect(domainPhrase("created", "Le Grand Bazar")).toBe(
+      `Entreprise créée${NBSP}: Le Grand Bazar`,
     );
   });
 });

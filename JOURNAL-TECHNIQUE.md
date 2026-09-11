@@ -11812,3 +11812,143 @@ si le pilote changeait d'avis.
 
 **Aucune dette ouverte par ce ticket.** La table existe, rien ne l'écrit encore ; l'écart à
 `docs/04` §4 est consigné au découpage ci-dessus, et il n'a pas bougé.
+
+---
+
+## T12.2 — Les dix gestes laissent leur trace (11/09/2026)
+
+**La mise en défaut a trouvé un trou, et c'est le fait du ticket.** Sept neutralisations ont été
+jouées ; la deuxième — *la trace d'archivage déplacée **avant** l'écriture qu'elle raconte* — **n'a
+rien fait tomber**. La cause n'était pas dans le code mais dans la mesure : `archiveDomain` porte un
+retour anticipé, `if (opened.archivedAt) return {}`, si bien que le cas *« un second rangement
+n'écrit rien »* sortait **avant** d'atteindre la condition qu'il prétendait éprouver. La condition
+`if (archived)` n'était mesurée nulle part, et une trace inconditionnelle serait passée au vert.
+
+**Trois refus d'une autre espèce, et ils n'étaient mesurés nulle part.** Les refus du ticket sortent
+par une condition écrite dans l'action — un identifiant inconnu, une identité déjà prise, un compte
+déjà ouvert. Trois autres vont **jusqu'au bout**, appellent la couche, et c'est **son retour** qui
+dit que rien n'a bougé : rétablir l'accès d'une entreprise rangée (`setDomainStatus` porte un filtre
+`is null`), rétablir une entreprise qui ne l'est pas (`restore` porte un `is not null`), retirer une
+identité d'une autre entreprise (`unlink` est borné au domaine et rend **zéro**). Trois cas neufs ont
+été écrits pour eux, et **les trois déplacements correspondants font tomber chacun sa seule mesure**.
+
+**Ce que la mise en défaut a aussi montré, et qui reste tel quel.** Sur `removeDomainIdentity`, le
+déplacement seul ne fait rien tomber : la garde réellement éprouvée est le `scope.find`, **scopé au
+domaine**, qui rend `undefined` pour une identité étrangère — le `removed > 0` est un filet contre la
+course entre la lecture et le retrait. Neutraliser **les deux** fait bien tomber la mesure, et c'est
+ce qui a été joué. De même, le `if (archived)` d'`archiveDomain` reste **un filet qu'aucun test ne
+peut exercer** : le retour anticipé le couvre, et seule une course l'atteindrait. Deux filets
+conservés, nommés plutôt que retirés — et le second rejoint la famille du décompte de jumelles de
+`grantPersonAccess`.
+
+**Le piège de l'insécable, pris sur le fait.** La constante `NBSP` du fichier de tests neuf a
+d'abord été écrite **en caractère** — l'insécable tapé tel quel entre les guillemets — et la suite
+est passée au vert, ce qui est exactement le danger : dans un source comme dans un navigateur,
+l'insécable et l'espace ordinaire sont indiscernables à l'œil. Récrite en échappement — `\u00A0`
+sous un nom lisible —, comme `lib/journal.ts` et `app/(app)/administration/actions.test.ts` la
+posent déjà. *Une règle qu'on ne peut pas voir est une règle qui saute au premier copier-coller.*
+
+**L'ordre de lecture d'un journal ne se prend pas par décompte.** Les deux aides de mesure
+(`traced`, `tracedAdmin`) prennent le delta **par identifiant** et non par `slice(before.length)` :
+deux lignes écrites dans la même milliseconde rendent `occurred_at` incapable de les ordonner, et un
+`slice` retiendrait alors la mauvaise — un défaut qui passe au vert le jour où il se trompe. La
+forme par décompte existait déjà dans `app/(app)/administration/actions.test.ts` (`traced`, T8.3) :
+elle n'a **pas** été récrite, la règle 3 l'interdisant, et le fait est noté ici.
+
+**La trace de désignation ne descend pas dans le geste partagé.** `inviteFirstManager` sert
+`createDomain` **et** `designateDomainManager` ; y poser la ligne aurait fait écrire **deux** lignes
+à la création. Elle vit donc dans les deux actions, où chacune sait si la désignation *est* le geste
+ou n'en est qu'une étape. Le décompte final du cas de cycle de vie — **neuf gestes, neuf lignes** —
+est ce qui le tient.
+
+**La frontière entre les deux journaux est gardée de cinq côtés.** Une trace qui descendrait *aussi*
+dans `events` fait tomber **cinq** cas, dont celui que T11.4 avait écrit pour tout autre chose. C'est
+la propriété qui compte : ce qui est écrit *au-dessus* d'un domaine ne paraît pas dans le flux
+d'accueil de ce domaine (arbitrage (3) de C12).
+
+**Une perte assumée, déjà nommée au découpage et maintenant réelle.** `updateOwnDomain` écrit avec
+`super_admin_id` **nul** : le journal ne dira jamais *qui*, à l'intérieur d'un domaine, a corrigé le
+nom de son entreprise — seulement que quelqu'un l'a fait. Elle se referme le jour où l'arbitrage (3)
+se rouvre, et les deux se referment ensemble.
+
+**Une ambiguïté de phrase, bornée et notée.** `identity_removed` nomme **la valeur seule**, sans son
+fournisseur : `domain_identities_provider_value_unique` porte sur le **couple**, si bien qu'une même
+valeur rattachée sous Google et sous Microsoft rendrait deux phrases identiques. Le cas est
+improbable — un `hd` et un `tid` ne se ressemblent pas — et le payer d'un second champ que neuf
+phrases sur dix n'emploieraient pas aurait coûté plus que le défaut. → **le jour où le cas se
+présente.**
+
+**Le test que T11.5 avait écrit pour tomber est tombé.** *« La correction n'écrit aucune ligne de
+journal »* assérait un arbitrage qui n'existe plus : il est récrit en son contraire, et il mesure
+désormais **les deux tables ensemble** — `events` reste vide, `domain_events` reçoit une ligne. Un
+énoncé de fiche mis en défaut par le ticket qui l'avait annoncé, et c'est le mécanisme qui marche.
+
+---
+
+## T12.3 — La fiche d'une entreprise (11/09/2026)
+
+**Une mise en défaut sur deux n'épingle rien, et il faut le dire.** Le départage de
+`listDomainEvents` — `desc(id)` après `desc(occurred_at)` — a été retiré : **aucun test n'est
+tombé**. Ce n'est pas que le départage soit inutile, c'est qu'un `ORDER BY` sur une clé non unique
+**a le droit** de varier sans être **tenu** de le faire : PostgreSQL rend un ordre stable sur une
+table de trois lignes, et rien dans un test ne peut le forcer à ne pas l'être. Le cas *« deux traces
+au même instant gardent un ordre stable »* mesure donc la stabilité **en fait**, jamais **par
+construction**. Le départage reste — c'est la raison écrite de `listRecentEvents`, et sous un plafond
+il décide **qui entre** —, mais c'est un filet, nommé comme tel. → **à relire avant de l'ôter, jamais
+après.**
+
+**Le plafond, lui, est mesuré par ce qu'il laisse dehors.** Un cas qui vérifierait la longueur de ce
+qui est rendu passerait sans plafond dès que le jeu de données tient sous le nombre : celui-ci écrit
+**une ligne de plus** que le plafond passé en argument et vérifie que c'est **la plus ancienne** qui
+manque. Retiré, il fait tomber deux cas — le sien et celui de l'ordre stable, qui s'appuie sur
+`limit 2`.
+
+**La mise en défaut du filtre de domaine a fui, et mon premier grep ne l'a pas vue.** Le filtre
+retiré, la fiche de l'entreprise **nue** rend les sept phrases de l'entreprise **pleine**, son nom
+compris — mesure 1 et mesure 3 tombent ensemble, et l'état vide de la mesure 4 disparaît. Le premier
+constat a pourtant conclu « absent » : le motif cherché portait un **deux-points ordinaire**, quand
+le HTML porte l'insécable de `lib/journal.ts`. *Deuxième fois du chantier que l'insécable fausse une
+mesure*, après la constante de T12.2 — et cette fois il donnait un **faux négatif**, c'est-à-dire une
+fuite déclarée absente. → **un motif de sonde qui traverse une phrase de journal se cherche sans son
+deux-points.**
+
+**Aucun harnais de rendu, quatrième ticket de suite.** Les cinq mesures d'écran ont demandé le geste
+complet de T7.8 : sceller un principal de super administrateur, semer deux entreprises — une pleine
+de données métier, une nue —, lancer le serveur, `curl`, puis purger. Les scripts ont vécu dans
+`node_modules/.probe-t123/` et non dans le scratchpad, parce que **`tsx` ne résout ni `@/` ni
+`node_modules` depuis un fichier hors du projet** — trois tentatives avant de le comprendre. Ils ont
+été retirés, et le jeu de données purgé.
+
+**Le fil d'Ariane ne pose aucun couple de couleurs neuf**, et c'est mesuré plutôt que supposé : les
+pages de `(app)` et celles de `/domaines` n'ont **ni l'une ni l'autre de fond propre** sur leur
+`<main>` — les deux héritent de `--surface-neutral-lightest` posé sur `html`. Le composant est donc
+servi sur exactement le fond où il l'était déjà.
+
+**Sept couples mesurés, six au-dessus de 4,5:1.** `content-neutral-darkest` 17,87:1 et
+`content-neutral-base` 4,98:1 sur `surface-neutral-pale` ; `content-neutral-dark` 8,12:1 ;
+`content-neutral-darkest` 16,98:1, `content-neutral-dark` 7,72:1 et `content-neutral-base` 4,73:1 sur
+`surface-neutral-lightest`. **Le septième est à 2,11:1** — `content-neutral-light`, le chevron `›`
+du fil d'Ariane. Il est `aria-hidden`, purement décoratif, **et il précède T12.3** : le composant
+n'a pas été touché, et la règle 3 interdit de le corriger ici. → **design system, avec les neuf
+manques déjà relevés.**
+
+**Le débordement à 375 px n'a pas été vu, il a été raisonné.** L'extension de navigateur a été
+refusée, et le dépôt n'a pas de harnais de rendu : l'audit s'est fait sur le **HTML servi et les
+classes**. Deux formes portaient un vrai risque — une valeur d'identité et une phrase de journal sont
+des chaînes **sans espace où couper** —, et les deux ont reçu `break-words`. Le reste replie déjà :
+le `<dl>` n'est une grille qu'à partir de `sm`, les en-têtes portent `flex-wrap`. **Ce qui n'a pas
+été vu est nommé**, pas déclaré bon.
+
+**La ligne d'identité a repris la forme du panneau de T9.4 plutôt que d'en inventer une seconde.**
+Écrite d'abord « fournisseur · valeur », elle est devenue « valeur · *vérifiée par* fournisseur »,
+qui est celle de `domain-identities-panel.tsx`. Deux vocabulaires pour une même ligne auraient obligé
+à traduire d'un écran à l'autre — le piège que `NOUNS` évite dans le journal.
+
+**Un commentaire affirmait le contraire du code, et il a été corrigé sur place.** Il disait de
+`sm:grid-cols-[12rem_1fr]` *« et non une largeur en dur »* alors que c'est exactement une piste
+arbitraire. La forme reste — c'est celle de `lg:grid-cols-[20rem_1fr]`
+(`components/products/indicators.tsx`) et d'`xl:grid-cols-[1fr_320px]` (vue d'ensemble) —, mais elle
+est désormais présentée pour ce qu'elle est : un **rail de mise en page**, quand la règle 2 tient les
+couleurs, les espacements et les rayons.
+
+**Aucune dette ouverte par ce ticket**, hors le filet du départage ci-dessus.

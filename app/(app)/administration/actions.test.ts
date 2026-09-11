@@ -54,6 +54,7 @@ import {
   activities,
   activityTypes,
   approaches,
+  domainEvents,
   domains,
   entities,
   events,
@@ -518,6 +519,9 @@ afterAll(async () => {
      ici. */
   for (const table of [
     events,
+    /* **Le journal d'administration part avec le reste** (T12.2) : la correction
+       des informations du domaine y écrit sa ligne. */
+    domainEvents,
     personSkills,
     activities,
     projectApproaches,
@@ -2005,6 +2009,44 @@ const EMPTY_OWN_DOMAIN = {
   errors: {},
 };
 
+/**
+ * Le journal d'administration du domaine — T12.2.
+ *
+ * **Lu par le client brut**, comme `journal()` au-dessus, et pour la même
+ * raison : un test qui observerait la base à travers la couche qu'il éprouve ne
+ * prouverait rien. L'ordre est celui de l'écriture, la fixture étant seule à
+ * écrire ici.
+ */
+async function adminJournal() {
+  return db
+    .select({
+      id: domainEvents.id,
+      summary: domainEvents.summary,
+      superAdminId: domainEvents.superAdminId,
+    })
+    .from(domainEvents)
+    .where(eq(domainEvents.domainId, f.domainId))
+    .orderBy(domainEvents.occurredAt, domainEvents.createdAt);
+}
+
+/**
+ * Ce qu'un geste vient d'ajouter au journal d'administration.
+ *
+ * **Le delta se prend par identifiant, jamais par décompte.** Deux lignes
+ * écrites dans la même milliseconde rendraient `occurred_at` incapable de les
+ * ordonner, et un `slice` sur la longueur retiendrait alors la mauvaise —
+ * défaut qui passe au vert le jour où il se trompe.
+ */
+async function tracedAdmin(
+  gesture: () => Promise<unknown>,
+): Promise<{ summary: string; superAdminId: string | null }[]> {
+  const before = new Set((await adminJournal()).map((row) => row.id));
+  await gesture();
+  return (await adminJournal())
+    .filter((row) => !before.has(row.id))
+    .map(({ summary, superAdminId }) => ({ summary, superAdminId }));
+}
+
 /** La ligne du domaine, lue **par le client brut** : le décompte tranche. */
 async function domainRow() {
   const rows = await db.select().from(domains).where(eq(domains.id, f.domainId));
@@ -2148,28 +2190,130 @@ describe("les informations du domaine", () => {
   });
 
   /**
-   * **Le geste n'écrit aucune ligne de journal, et c'est un arbitrage.**
+   * **Le test que T11.5 avait écrit pour tomber ici**, et il est tombé.
    *
-   * Aucun `event_target_type` ne dit « domaine » ; l'élargir demanderait une
-   * migration d'énuméré pour un seul objet (arbitrage (d) de `tickets-C7.md`),
-   * et le poser sur `person` mentirait sur l'objet. **Ce test tombera** le jour
-   * où le journal recevra ce cinquième nom — c'est ce qu'on lui demande.
+   * Il assérait *« la correction n'écrit aucune ligne de journal »*, faute
+   * d'`event_target_type` qui dise « domaine ». T12.1 a posé la table qui
+   * manquait, et T12.2 le dixième appel : le geste écrit désormais — **dans
+   * `domain_events`, jamais dans `events`**. Les deux décomptes sont pris
+   * ensemble, parce que c'est leur **partage** qui est la propriété : une ligne
+   * dans `events` ferait paraître l'administration du domaine dans le flux
+   * d'accueil, ce que l'arbitrage (3) de C12 refuse.
    */
-  test("la correction n'écrit aucune ligne de journal", async () => {
+  test("la correction écrit dans le journal d'administration, et dans lui seul", async () => {
     currentPerson = f.managerId;
     const before = await domainRow();
+    const name = `${before?.name ?? ""}`;
 
-    const written = await traced(() =>
+    let written: unknown[] = [];
+    const admin = await tracedAdmin(async () => {
+      written = await traced(() =>
+        updateOwnDomain(
+          EMPTY_OWN_DOMAIN,
+          ownDomainForm({
+            name,
+            competenceCenterName: before?.competenceCenterName ?? "",
+            description: "Tracée, et elle l'est.",
+          }),
+        ),
+      );
+    });
+
+    /* **`events` n'a pas bougé** : c'est la moitié de la mesure, et la plus
+       facile à perdre le jour où quelqu'un « uniformiserait » les journaux. */
+    expect(written).toHaveLength(0);
+
+    /* **La phrase se lit mot pour mot, et l'acteur est nul** : la trace dit
+       *« depuis le domaine »* et ne nomme personne — arbitrage (b) de C12. */
+    expect(admin).toEqual([
+      { summary: `Informations corrigées${NBSP}: ${name}`, superAdminId: null },
+    ]);
+  });
+
+  /**
+   * **Le nom écrit est celui d'après le geste** (D22).
+   *
+   * Écrire celui d'avant serait une « valeur avant », que le journal ne garde
+   * pas : *« on ne stocke ni valeur avant, ni valeur après »*, et ce qui reste
+   * est la désignation de ce qui a été touché **au moment où on l'a touché**.
+   */
+  test("la phrase porte le nom d'après la correction", async () => {
+    currentPerson = f.managerId;
+    const before = await domainRow();
+    const renamed = `__0__test__admin__${suffix} renommé`;
+
+    const admin = await tracedAdmin(() =>
       updateOwnDomain(
         EMPTY_OWN_DOMAIN,
         ownDomainForm({
-          name: before?.name ?? "",
+          name: renamed,
           competenceCenterName: before?.competenceCenterName ?? "",
-          description: "Tracée, si elle l'était.",
+          description: before?.description ?? "",
         }),
       ),
     );
 
-    expect(written).toHaveLength(0);
+    expect(admin[0]?.summary).toBe(
+      `Informations corrigées${NBSP}: ${renamed}`,
+    );
+
+    /* Le nom est rendu à la fixture : les fichiers de tests d'action dépendent
+       de l'ordre alphabétique des domaines depuis T8.1. */
+    await updateOwnDomain(
+      EMPTY_OWN_DOMAIN,
+      ownDomainForm({
+        name: before?.name ?? "",
+        competenceCenterName: before?.competenceCenterName ?? "",
+        description: before?.description ?? "",
+      }),
+    );
+  });
+
+  /**
+   * **La mesure de T11.5, rejouée avec le journal en plus.**
+   *
+   * Un `member` qui frappe l'action n'écrit pas la ligne du domaine — c'était
+   * déjà mesuré —, et il n'écrit **pas davantage la trace** : une trace posée
+   * avant le contrôle du droit dirait qu'une correction a eu lieu quand la base
+   * dit le contraire.
+   */
+  test("un membre qui frappe l'action n'écrit aucune trace", async () => {
+    const charge = ownDomainForm({
+      name: `Volé sans trace ${suffix}`,
+      competenceCenterName: `Volé centre ${suffix}`,
+      description: "Écrit par qui n'a pas le droit.",
+    });
+
+    currentPerson = f.outsiderId;
+    const before = await domainRow();
+
+    const refused = await tracedAdmin(async () => {
+      expect(
+        (await updateOwnDomain(EMPTY_OWN_DOMAIN, charge)).ok,
+      ).toBeUndefined();
+    });
+    expect(await domainRow()).toEqual(before);
+    expect(refused).toEqual([]);
+
+    /* **L'étape témoin** : la même charge, sous le responsable, écrit les deux. */
+    currentPerson = f.managerId;
+    const witness = await tracedAdmin(async () => {
+      expect((await updateOwnDomain(EMPTY_OWN_DOMAIN, charge)).ok).toBe(true);
+    });
+    expect(witness).toEqual([
+      {
+        summary: `Informations corrigées${NBSP}: Volé sans trace ${suffix}`,
+        superAdminId: null,
+      },
+    ]);
+
+    await updateOwnDomain(
+      EMPTY_OWN_DOMAIN,
+      ownDomainForm({
+        name: before?.name ?? "",
+        competenceCenterName: before?.competenceCenterName ?? "",
+        description: before?.description ?? "",
+      }),
+    );
   });
 });
