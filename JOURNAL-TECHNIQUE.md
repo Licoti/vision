@@ -11952,3 +11952,293 @@ est désormais présentée pour ce qu'elle est : un **rail de mise en page**, qu
 couleurs, les espacements et les rayons.
 
 **Aucune dette ouverte par ce ticket**, hors le filet du départage ci-dessus.
+
+---
+
+## T12.4 — Les gestes déménagent (11/09/2026)
+
+**Le relevé témoin a corrigé un énoncé de la fiche, et il valait d'être fait avant de toucher au
+code.** Le ticket dit que le relevé sur `/domaines` *« n'en portait aucun »* des huit gestes. C'est
+vrai des huit **libellés de menu** — zéro sur zéro, mesuré —, mais la colonne « Identités vérifiées »
+servait bien une ancre `Gérer les identités`, sous un libellé plus court, **cinq fois dans le HTML
+servi**. Un des huit gestes était donc atteignable sans JavaScript avant le ticket, par un autre
+chemin que le menu. L'exception à D30 portait sur **sept** gestes sur huit, pas sur huit.
+
+**Une mesure a bougé pour une raison qui n'était pas la sienne, et il a fallu la refaire.** La mise
+en défaut « un geste retiré fait tomber sa seule ligne » a d'abord montré **trois** lignes
+déplacées : `Archiver` tombé, mais aussi `Suspendre` apparu et `Rétablir l'accès` disparu sur
+l'entreprise C. La cause n'était pas la mutation : la mesure 4 venait de **rétablir l'accès de C**
+par un vrai POST, quelques minutes plus tôt. L'état de la fixture avait changé entre les deux
+relevés. Remis à l'état, la mise en défaut est propre — une ligne, et une seule.
+*Leçon : une sonde qui écrit invalide les relevés d'après, et une mise en défaut se joue à état
+égal.*
+
+**Le cookie n'a jamais été imprimé.** Le classificateur d'auto-mode a refusé un script qui rendait
+un principal scellé sur la sortie standard — refus juste. La sonde écrit donc un **bocal Netscape**
+lu par `curl -b`, et la valeur ne traverse ni le terminal ni un argument de ligne de commande. À
+retenir pour le harnais du point ouvert : *le sceau va dans un fichier, jamais dans un `echo`.*
+
+**Aucun harnais de rendu, cinquième ticket de suite.** Même geste qu'en T12.3 — sceller, semer,
+sonder, purger —, avec cette fois **quatre entreprises de fixture** : les huit gestes sont
+mutuellement exclusifs par l'état, et aucune entreprise n'en porte plus de cinq. Les scripts ont vécu
+à la racine du projet (`probe-*.mts`), `tsx` ne résolvant ni `@/` ni `node_modules` depuis le
+scratchpad — le constat de T12.3, repris tel quel. Retirés, données purgées.
+
+**La mesure 4 se mesure deux fois, et les deux moitiés ne disent pas la même chose.** La boucle
+réelle — POST du formulaire nu depuis la fiche, journal relu sur cette même fiche — a été **vue**
+(journal vide avant, `Accès rétabli` après, et le bloc « Accès » qui suit). Mais elle ne met pas en
+défaut le `revalidatePath` de la fiche : chaque `curl` est une requête neuve, et la fiche est
+`force-dynamic`. Ce qui met la revalidation en défaut est le **test**, dont le mock de `next/cache`
+enregistre désormais les adresses au lieu de les jeter. **Une sonde ne peut pas mesurer un cache
+qu'elle contourne**, et c'est dit plutôt que confondu.
+
+**Le contrôle d'appartenance ne protège rien, et il est écrit comme tel.** `domainPageRequest` refuse
+sur la fiche de A une clé qui désigne B ; **il ne vaut que pour le rendu serveur**, le clic passant
+par `loadDomainDrawer`, qui ne sait pas de quelle page il vient. Aucun droit ne s'y joue — les cinq
+panneaux ne montrent que ce qu'un super administrateur voit déjà, et `resolveDomainDrawer` relit
+l'autorité puis la ligne. Ce qu'il tient est une **cohérence d'écran**. → **sans échéance.**
+
+**Une décision de forme, nommée parce qu'elle surprend** : `?domaine=nouveau` ouvre le panneau de
+création **sur la fiche aussi**. C'est la lettre de la mesure 2 du ticket — *« les six panneaux
+s'ouvrent par l'adresse collée sur la fiche »* — et le prix de « `resolveDomainDrawer` ne bouge
+pas ». C'est une adresse, pas un point d'entrée : aucun lien de la fiche n'y mène.
+
+**Un geste a perdu un chemin, et c'est assumé.** Avant T12.4, la colonne d'identités servait
+`Gérer les identités` **même sur une entreprise archivée**, quand l'`ActionMenu` ne l'offrait pas. Les
+deux règles se contredisaient. La fiche garde celle du menu — une entreprise archivée ne porte que
+son rétablissement —, et c'est la règle sensée : une entreprise archivée n'ouvre aucune session, donc
+ses identités n'ont plus d'effet. **Aucun pouvoir n'est ajouté ; un chemin est retiré.**
+
+**Deux textes disaient « la liste » et ne le pouvaient plus.** `ALREADY_INVITED` envoyait révoquer
+*« depuis la liste »* alors que le geste est **derrière le panneau qui affiche le refus**, dans le
+bloc « Accès » de la même fiche — corrigé. **Hors périmètre et donc non corrigé** : l'en-tête de
+`DOMAIN_DEEDS` (`lib/journal.ts`) cite `app/domaines/page.tsx` comme source des mots « Suspendre
+cette entreprise » et « Rétablir l'accès », qui vivent désormais sur la fiche. Règle 3.
+→ **le prochain ticket qui ouvre `lib/journal.ts`.**
+
+**Contraste : aucun couple neuf par la position.** `ACTION_LINK_SM` —
+`content-primary-dark` sur `surface-neutral-pale` — mesuré **15,72:1**, le couple d'`ACTION_LINK`
+depuis T4.1. Le fait ajouté sur la liste hérite de `content-neutral-dark` de `ListRow`, **8,12:1**,
+celui que la cellule voisine sert déjà. **Rien de neuf n'a été introduit, et c'est mesuré, pas
+supposé.**
+
+**Le débordement à 375 px n'a pas été vu, il a été raisonné** — même limite qu'en T12.3, même aveu.
+Les trois rangées de gestes sont `flex-wrap`, dans des en-têtes eux-mêmes `flex-wrap` dont le bloc
+titre porte `min-w-0 flex-1` : les gestes descendent sous le titre plutôt que de le comprimer. Le
+plus long libellé, *« Désigner le premier responsable »*, demande ≈ 217 px pour 335 px utiles.
+**Ce qui n'a pas été vu est nommé.**
+
+**Aucune dette ouverte par ce ticket**, hors l'appartenance côté client ci-dessus.
+
+**Hors ticket, 11/09/2026 — l'identité vérifiée du domaine de démonstration.** Constat de l'humain
+après T12.4 : *« il manque l'affichage du nom de domaine »* sur la fiche. **Mesuré avant de
+répondre** — la fiche rend bien `identity.value` quand la ligne existe (`sonde-t78.example` vu dans
+le HTML servi) ; **c'est `scripts/seed.ts` qui ne créait aucune ligne `domain_identities`**, et
+« Groupe Meridian » affichait donc son état vide, à raison. *Une absence à l'écran n'est pas
+toujours un défaut d'écran : ici les deux écrans disaient exactement la vérité de la base.*
+
+La ligne est semée **juste après le domaine et avant les référentiels**, l'ordre de l'écran au-dessus
+des domaines. `meridian.example.com` / `google` — provisoire et **prouvablement** provisoire, le
+raisonnement de `TOOL_BASE_URLS` repris tel quel (RFC 2606), et le seul fournisseur branché.
+**La confrontation précède l'écriture**, `domain_identities_provider_value_unique` étant **globale**
+et non bornée au domaine ; une valeur rattachée ailleurs n'est ni déplacée ni effacée (règle 4), elle
+est **dite** en avertissement. **Rejouable, vérifié** : seconde exécution → *« Rien à faire »*,
+`domain_identities 0 créé, 1 inchangé`.
+
+**La seconde moitié du point ouvert tient** : les huit personnes du brief n'ont toujours **aucune
+adresse**, si bien que le domaine est désormais *désigné* sans être encore *connectable*. Le point a
+été récrit dans `ETAT.md` plutôt que refermé. 1 991 tests, inchangés.
+
+## Hors ticket — Supprimer une entreprise vide (12/09/2026)
+
+**La demande touchait une règle non négociable, et elle a été posée avant d'écrire.** La règle 4
+nomme le domaine ; `DeletableTable` ajoute que toucher à cette liste est *« un arbitrage humain,
+jamais une décision de ticket »*. Les trois lectures possibles de *« supprimer »* — l'archivage qui
+existe déjà, la purge d'une entreprise vide, la suppression totale des 36 tables — ont été chiffrées
+puis rendues à l'humain, qui a tranché la seconde. **Le geste n'écarte donc pas la règle 4** : il
+n'efface que ce qu'aucune main n'a saisi, et `domains` reste hors de `DeletableTable`.
+
+**Trois faits de terrain ont commandé la forme.** (1) Les **36** tables scopées pointent
+`domains.id` en `on delete restrict` : aucune suppression n'est possible tant qu'une ligne subsiste,
+et c'est une barrière qu'on garde. (2) Le journal d'administration **ne peut pas survivre** au
+geste — `domain_events.domain_id` est `not null` et `restrict`. (3) `deleteProject` avait déjà
+tranché les deux questions de forme : le panneau comme garde-fou, et la redirection parce qu'il n'y
+a plus de page derrière le panneau.
+
+### La polarité d'une liste nommée, et pourquoi elle s'inverse ici
+
+`DeletableTable` est une **union nommée** parce qu'un prédicat *« toute table qui a la bonne forme »*
+aurait rendu supprimable la prochaine table à naître. Ici la même prudence demande l'inverse : la
+liste nomme les **treize** tables que la purge efface (`PURGED_TABLES`), et ce qui **retient** est le
+complément, dérivé du schéma par `domainContentTables()`. Une table métier ajoutée demain tombe donc
+du côté qui refuse. **Dans les deux cas, un oubli n'efface rien** — c'est le seul critère qui a
+décidé de la polarité, et il est écrit sur les deux listes.
+
+Le complément est figé par un **cliquet** : `expect(domainContentTables()).toHaveLength(23)`. Une
+table neuve fait tomber ce test, et demande qu'on dise de quel côté elle tombe. La dérivation la met
+du bon côté par défaut ; le cliquet fait qu'on le **sait**.
+
+### `db.batch` est une transaction, et la dette de T3.6 porte sur l'interactif
+
+**Nuance mesurée, et elle ne rouvre aucune décision.** `neon-http` n'expose pas de transaction
+interactive — c'est ce que T3.6 a consigné, et la création d'un projet comme l'amorçage d'un domaine
+en dépendent toujours. Mais `db.batch` envoie ses instructions **en une requête, dans une
+transaction**, et une purge dont les quatorze instructions sont connues d'avance n'a besoin de rien
+d'autre. Mesure : un lot `[delete jobs, delete domains]` sur une entreprise retenue par une entité
+**lève, et laisse `jobs` intacte** — la première instruction est défaite avec la seconde.
+
+**Ce que cela ne donne pas** : l'atomicité d'un enchaînement qui doit *lire entre deux écritures*.
+La création d'un domaine écrit quatre tables **et lit entre elles** (l'unicité d'identité, l'hôte du
+lien) ; elle reste donc non atomique, et la dette de T3.6 est intacte. **Deux dettes voisines, une
+seule cause — et la purge n'en est plus une.**
+
+### Le sceau des clés a arrêté les deux méthodes neuves
+
+`lib/db/scoped.test.ts` fige la liste des clés de `asSuperAdmin`, et il a fait tomber le test au
+premier ajout : neuf clés, puis onze. **C'est exactement ce que ce sceau sert à obtenir** — une clé
+de plus est une décision qui s'écrit, jamais un ajout qui passe. La décision est consignée dans le
+commentaire du test : `domainEmptiness` lit sans rendre aucune donnée métier, `deleteEmptyDomain`
+est la seule écriture du produit qui **ôte** une ligne `domains`, et les deux sont du côté fermé
+parce que l'autorité y est relue.
+
+### Trois contraintes de sonde, dont deux neuves
+
+Le harnais manque toujours (`scripts/probe.ts`, point ouvert, **sixième ticket** à le redemander).
+Aux trois contraintes acquises s'en ajoute une : **un fichier `.ts` du bac à sable est traité en
+CJS** — pas d'`await` de tête, et `drizzle-orm` ne se résout pas par son nom depuis ce dossier ; les
+imports absolus vers le dépôt, eux, fonctionnent, `@/` restant réservé à la racine.
+
+**Une discipline a été enfreinte, et elle est notée comme telle** : *le sceau va dans un bocal de
+cookies, jamais dans un `echo`* — le cookie de sonde a d'abord été **imprimé** avant d'être mis en
+bocal. Sans conséquence ici — HMAC d'un super administrateur jetable sur la base de développement,
+dont la ligne a été retirée à la fin, ce qui tue le sceau —, mais la règle existe précisément pour
+ce réflexe-là.
+
+### Dettes et constats
+
+- **Le geste est le seul des dix à ne laisser aucune trace**, et c'est structurel. Une trace
+  survivante demanderait un `domain_id` nullable sur `domain_events`, ou une table au-dessus des
+  domaines — donc une migration, hors du périmètre accordé. → **arbitrage humain, si l'usage le
+  réclame.**
+- **`starters` manque au `teardownOrder` de `lib/db/scoped.test.ts`** — découvert par le balayage de
+  ce bloc, qui pose une piste là où aucune fixture du fichier n'en posait : la ligne restait, et
+  `domains` refusait alors la suppression. Contourné par un ordre local (`purgeOrder`), qui place
+  `starters` en tête ; le `teardownOrder` du fichier, lui, reste incomplet. → **au prochain ticket
+  qui ouvre ce fichier.**
+- **Le lien de suppression n'a pas été vu dans un navigateur** — comme tout le reste depuis T7.7 :
+  la rangée de gestes est `flex-wrap`, le troisième lien passe donc à la ligne plutôt que de
+  comprimer le titre, mais **c'est une propriété lue dans les classes**, pas un relevé à 375 px.
+- **La base de développement porte quatre entreprises de sonde** laissées par T5bis.4, T7.8 et
+  T9.4 — `Sonde T5bis.4 …`, `Sonde T7.8`, `Sonde T9.4`. Le geste neuf sait désormais les effacer ;
+  rien n'a été fait sans demande, et la base de développement reste jetable.
+
+## Hors ticket — Préparer la mise en ligne (12/09/2026)
+
+Demande humaine : *« les instructions pour envoyer tout ça sur Netlify »*. Aucun fichier applicatif
+touché, aucun écran, aucune migration. Deux écritures dans le dépôt — l'exclusion du scanner de
+secrets dans `netlify.toml`, et `ACTIONS-HUMAINES-DEPLOIEMENT.md` —, le reste étant des gestes de
+console que personne d'autre que l'humain ne peut faire.
+
+### L'exclusion du scanner était écrite depuis le 06/09, elle est posée
+
+Le journal la portait déjà, *« écrite maintenant pour être trouvée au premier build rouge »*, avec
+sa condition de pose : « le jour du déploiement ». C'est ce jour. `SECRETS_SCAN_OMIT_PATHS` vaut
+`.next/cache,.netlify/.next/cache`, **et pas `SECRETS_SCAN_ENABLED = "false"`** — la formulation de
+l'époque tient mot pour mot : désactiver le scanner reviendrait à retirer le garde-fou pour éteindre
+son alarme.
+
+**Elle reste non éprouvée, et c'est le point à retenir.** Aucun build Netlify n'a jamais tourné : ni
+la panne qu'elle prévient, ni la parade elle-même n'ont été observées. Ce qui est posé est une
+hypothèse documentée — la même forme que Microsoft depuis C9 et que le `fetch` Resend depuis C11 —,
+pas un fait mesuré. Le premier build tranchera, dans un sens ou dans l'autre.
+
+> **Amendé le 13/09/2026 : la panne est mesurée, la parade ne l'est toujours pas.** Le premier
+> `npm run build` du dépôt a montré quatre valeurs en clair dans `.next/cache` — détail à l'entrée
+> du 13/09, ci-dessous. Ce qui reste hypothétique est le comportement du scanner de Netlify face à
+> l'exclusion, pas l'existence de ce qu'elle couvre.
+
+### Deux énoncés du journal ont été confrontés à Netlify, et ils ont vieilli à l'envers
+
+Le passage du 06/09 s'inquiétait de Next 16.3 sur Netlify. Vérifié le 12/09 : l'adaptateur v5
+annonce Next 16 sans réglage, et **`NODE_VERSION = "24"` n'est plus une demande mais le défaut** de
+Netlify depuis le 07/07/2026. Les deux lignes de `netlify.toml` qui les portaient restent — un défaut
+qui se déclare ne dépend pas de la date où il a été pris.
+
+### Ce que le build local aurait dû dire, et pourquoi il ne l'a pas dit
+
+`npm run build` **n'a jamais tourné dans ce dépôt** — cinq chantiers de `next dev` et 2 003 tests,
+zéro build de production. Il est le premier geste de la note, avant même de brancher Netlify, et il
+n'a pas été lancé ici : le plan le donne à l'humain avec les sept autres, l'arbre de travail portant
+treize fichiers non commités qu'un build figerait sans les valider.
+
+**Une chose se lit dans le code sans build** : `lib/db/client.ts` lève à l'import si `DATABASE_URL`
+est absente. La variable est donc requise **à la construction**, pas seulement à l'exécution — d'où
+la portée *All scopes* dans la note, qui n'est pas une précaution mais une condition.
+
+### Dettes et constats
+
+- **`ETAT.md` revient exactement à 250 lignes**, le seuil. La récriture du point de production a dû
+  être resserrée deux fois pour y tenir : le geste est bon, la marge est nulle. → **le prochain
+  découpage balaie.**
+- **Trois fichiers d'actions humaines coexistent** — C9, C11, et celui-ci —, chacun devant se
+  supprimer à la clôture de son sujet, et les trois pointant vers le même groupe (a) d'`ETAT.md`.
+  Le troisième reprend des morceaux des deux autres par renvoi, jamais par copie ; c'est tenu
+  aujourd'hui, ce n'est pas garanti demain. → **fusion ou suppression, le jour où le site est en
+  ligne et mesuré.**
+- **Les *deploy previews* ne passeront jamais le SSO** : URL unique par branche, aucun fournisseur
+  n'accepte de joker dans une URI de redirection. Constat, pas dette — déjà écrit le 06/09, répété
+  ici parce que c'est en ouvrant une prévisualisation qu'on le redécouvrirait.
+
+## Hors ticket — Le premier build, et les secrets retrouvés dans son cache (13/09/2026)
+
+Demande humaine : *« si je te donne mes accès Netlify, tu saurais le faire toi-même ? »* — d'où un
+partage des gestes, et deux mesures produites avant tout accès.
+
+### `npm run build` passe, du premier coup, après cinq chantiers sans lui
+
+Zéro build de production dans ce dépôt jusqu'à aujourd'hui : cinq chantiers de `next dev` et
+2 003 tests, jamais un `next build`. Il est **vert** — compilation 2,8 s, TypeScript 7,0 s,
+**23 routes, dont une seule statique** (`/_not-found`), les vingt-deux autres rendues à la demande.
+
+Ce résultat était moins acquis qu'il n'en a l'air : `lib/db/client.ts` **lève à l'import** si
+`DATABASE_URL` est absente, et la collecte des données de page charge les modules. Le build passe ici
+parce que Next lit `.env.local` ; **chez Netlify, la variable devra donc exister à la construction et
+pas seulement à l'exécution** — la portée *All scopes*, dans la note de déploiement, n'est pas une
+précaution mais une condition.
+
+### Les quatre valeurs sont dans `.next/cache`, en clair, et c'était une supposition jusqu'à ce matin
+
+Le passage du 06/09 annonçait le piège sans l'avoir vu. Mesuré, `.env.local` sourcé et les valeurs
+cherchées littéralement dans la sortie de build — **jamais imprimées**, seuls les chemins le sont :
+
+| Où | Ce qu'on y retrouve |
+|---|---|
+| `.next/cache/turbopack/v16.3.0-…/00000277.sst` | `AUTH_SECRET`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, le mot de passe Neon |
+| `.next/cache/turbopack/v16.3.0-…/00000267.sst` | le mot de passe Neon |
+| `.next/server`, `.next/static` | **aucune occurrence** |
+
+**Les deux lignes comptent autant l'une que l'autre.** La première dit que le scanner de Netlify
+aurait refusé le déploiement : l'exclusion n'est pas une précaution théorique. La seconde dit que
+l'exclusion **ne masque aucune fuite réelle** — ce qui est servi au navigateur est propre, et une
+exclusion qui couvrirait un vrai secret servi serait exactement le garde-fou retiré pour éteindre son
+alarme que le 06/09 refusait.
+
+**Un détail qui n'en est pas un** : `DATABASE_URL` **entière** ne se retrouve nulle part, son **mot
+de passe seul** se retrouve sept fois. Turbopack conserve l'URL découpée, pas la chaîne. Chercher la
+valeur entière aurait donc rendu « rien à signaler », et conclu de travers.
+
+### Une troisième cache existe, et elle ne concerne pas Netlify
+
+`.next/dev/cache/turbopack/` porte les mêmes quatre valeurs, sur cinq fichiers. C'est le cache du
+**serveur de développement**, absent d'un build Netlify — qui clone le dépôt, où `.next` est ignoré,
+et n'exécute jamais `next dev`. **Rien n'est ajouté à `SECRETS_SCAN_OMIT_PATHS` pour lui** : une
+exclusion pour un chemin qui ne peut pas exister élargirait la portée sans rien acheter.
+
+### Dettes et constats
+
+- **`.next` pèse 1,3 Go en local**, dont 171 Mo pour `.next/cache` : le reste est le cache du serveur
+  de développement, accumulé sur cinq chantiers. Sans conséquence en ligne, mais la recherche des
+  quatre valeurs y a pris plus de deux minutes. → **`rm -rf .next` quand la machine tire la langue.**
+- **La parade reste non éprouvée** : le comportement du scanner de Netlify face à
+  `SECRETS_SCAN_OMIT_PATHS` ne se mesurera qu'au premier build en ligne. Ce qui est acquis
+  aujourd'hui, c'est ce que l'exclusion couvre, pas qu'elle fonctionne.

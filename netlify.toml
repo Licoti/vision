@@ -5,5 +5,19 @@
 [build.environment]
   NODE_VERSION = "24"
 
+  # Le scanner de secrets de Netlify contre le cache de Turbopack.
+  #
+  # Depuis Next 16.3, le cache persistant de Turbopack conserve entre deux
+  # exécutions l'état du build — **y compris les valeurs des variables
+  # d'environnement lues** — et l'écrit dans `.next/cache`. Le scanner de
+  # secrets, actif par défaut, y retrouve la valeur d'une variable et refuse le
+  # déploiement.
+  #
+  # L'exclusion est **restreinte à ces deux chemins**, et jamais
+  # `SECRETS_SCAN_ENABLED = "false"` : désactiver le scanner reviendrait à
+  # retirer le garde-fou pour éteindre son alarme. Ce qui est servi — le HTML,
+  # les paquets client, les fonctions — reste scanné.
+  SECRETS_SCAN_OMIT_PATHS = ".next/cache,.netlify/.next/cache"
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"

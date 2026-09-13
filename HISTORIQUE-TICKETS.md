@@ -8841,3 +8841,153 @@ fois-ci, le faux était un **faux négatif** — une fuite déclarée absente.
 
 **1 987 → 1 989 tests, 69 fichiers**, tous verts ; `tsc --noEmit` et `eslint --max-warnings=0`
 passent. Aucune migration, aucune dépendance neuve, aucun geste, aucun graphique.
+
+---
+
+## T12.4 — Les gestes déménagent, et redeviennent atteignables — 11/09/2026
+
+**Le ticket qui rend la liste à son métier.** T9.4 avait rangé les huit gestes visant une entreprise
+dans un `ActionMenu` de ligne, faute d'écran où cette entreprise soit nommée. Ils vivent désormais
+sur sa **fiche** — cinq panneaux ciblés, trois formulaires nus —, et l'`ActionMenu` a disparu de
+`/domaines`. *Un geste qui vise une entreprise se fait là où cette entreprise est nommée.*
+
+**Chaque geste est dans le bloc qui porte le fait qu'il change** : suspension, rétablissement de
+l'accès, archivage et rétablissement dans « Identité », qui affiche l'état ; ajout et gestion des
+identités vérifiées dans le bloc qui les liste ; désignation du premier responsable et révocation de
+l'invitation dans « Accès ». **Les conditions d'affichage sont celles de l'`ActionMenu` au mot près**
+— aucun geste neuf, aucun pouvoir neuf.
+
+**Les cinq adresses de panneau visent la fiche, et la clé garde son identifiant.** `resolveDomainDrawer`
+n'a pas bougé d'une ligne : c'est l'**hôte** qui change, et les deux chemins d'ouverture traversent
+la même résolution (TD.2). En contrepartie de la clé redondante, **la fiche refuse une clé qui ne
+désigne pas son objet** — sur la fiche de A, `?identites=<B>` n'ouvre rien. Le décompte
+d'exclusivité, recopié dans la page depuis T9.4, est descendu dans `lib/drawers/domains.tsx` avec les
+panneaux : deux hôtes, une règle.
+
+**La liste garde trois choses** : *« Ajouter une entreprise »* — le seul geste qui ne vise aucune
+ligne —, ses trois faits d'accessibilité et le lien vers chaque fiche. La colonne « Identités
+vérifiées » a troqué son ancre `Gérer les identités` contre le **fait** que la fiche énonce déjà.
+
+**`revalidate()` vise les deux adresses.** La liste et la fiche portent les mêmes faits ; depuis que
+les gestes se font sur la fiche, c'est elle qui doit montrer ce qui vient d'être fait.
+
+**Quatre mesures, et la première referme un point ouvert.** **(1)** Relevé témoin d'abord, sur
+`/domaines` **avant toute modification** : **zéro** des huit libellés de geste dans le HTML servi,
+pour **neuf** déclencheurs de menu. Puis, sur quatre entreprises de fixture couvrant les quatre états
+— active sans compte, invitation en attente, suspendue, archivée —, **8 gestes sur 8** atteignables
+depuis la fiche, en ancre ou en bouton de `<form method="POST">`, **zéro `ActionMenu`**.
+**(2)** Les **six** panneaux ouverts par l'adresse collée sur la fiche ; deux clés ensemble
+n'ouvrent rien ; `?identites=<autre entreprise>` n'ouvre rien, et le témoin — la même clé sur la
+bonne fiche — ouvre. **(3)** Sans cookie, la fiche et ses adresses de panneau rendent **307** vers
+`/auth/acces` sans une trace du nom ; avec l'autorité **200** ; UUID inconnu **404** ; identifiant
+qui n'est pas un UUID **404**, et non 500. Les mesures de T9.4 et T12.2 rejouées après déménagement
+restent vertes. **(4)** **La boucle entière, vue** : le formulaire nu « Rétablir l'accès » rejoué en
+`curl` comme un navigateur sans JavaScript l'enverrait, et la ligne `Accès rétabli` **lue sur cette
+même fiche**, journal vide avant.
+
+**Trois mises en défaut, toutes portantes, et une à refaire.** Le `revalidatePath` de la fiche retiré
+fait tomber **les deux cas neufs, et rien d'autre** — 36 verts sur 38 · le contrôle d'appartenance
+retiré fait servir sur la fiche de A le panneau de B, **son nom compris**, sans toucher à
+l'exclusivité ni aux six panneaux · un geste retiré de la fiche fait tomber **sa seule** ligne —
+mais la première tentative en a montré trois, **la sonde de la mesure 4 ayant changé l'état d'une
+entreprise entre les deux relevés**. Refaite à état égal : une ligne, et une seule.
+
+**Le relevé témoin a corrigé un énoncé de la fiche du ticket** : la colonne d'identités servait bien
+une ancre `Gérer les identités` dans le HTML servi, **cinq fois**. L'exception à D30 portait donc sur
+**sept gestes sur huit**, pas sur huit. Elle se referme entière sur cet écran.
+
+**1 989 → 1 991 tests, 69 fichiers**, tous verts ; `tsc --noEmit` et `eslint --max-warnings=0`
+passent. Aucune migration, aucune dépendance neuve, aucun geste neuf, aucun `ActionMenu`, aucun
+graphique. Six fichiers touchés — `app/domaines/drawers.tsx`, pourtant au périmètre, n'a pas eu à
+changer.
+
+## Hors ticket — Supprimer une entreprise vide — 12/09/2026
+
+**Demande humaine** : *« pouvoir supprimer une entreprise, en tant que super admin »*. La règle 4
+nomme le domaine — *« cela vaut aussi pour un domaine, qui se suspend ou s'archive »* — et
+`DeletableTable` ajoute que toucher à cette liste est *« un arbitrage humain, jamais une décision de
+ticket »*. Trois lectures ont donc été posées avant d'écrire une ligne, et l'humain a tranché la
+troisième : **purger les entreprises vides**, hors ticket.
+
+### Ce qu'est « vide », et c'est toute la sûreté du geste
+
+Deux conditions, et la seconde est **dérivée du schéma** :
+
+1. **aucune personne n'a `has_access`**, archivée comprise — plus strict que le `hasAccount` de
+   `listDomainsForAdmin`, qui écarte les archivées parce qu'il répond à *« quelqu'un peut-il entrer
+   aujourd'hui »*. Ici la question est *« quelqu'un est-il entré »*, et l'archivage ne défait pas ce
+   fait. L'écart entre les deux lectures est **voulu**, et c'est la seule raison pour laquelle il
+   n'est pas une divergence ;
+2. **aucune ligne dans les 23 tables de contenu** — `entities`, `products`, `projects` et ses neuf
+   dépendances, les activités, les résultats, les indicateurs, les budgets, les liens.
+
+**La liste nommée est celle des tables qu'on efface, jamais celle des tables qui bloquent.**
+`PURGED_TABLES` énumère les treize tables que l'amorçage écrit ; **ce qui retient est le
+complément**, que `domainContentTables()` dérive du schéma. Une table métier ajoutée demain tombe
+donc **du côté qui refuse**, sans que personne ait à y penser. C'est la polarité inverse de
+`DeletableTable`, où un prédicat aurait rendu supprimable la prochaine table de bonne forme — et
+l'inversion est délibérée : là-bas un oubli n'autorise rien, ici un oubli aurait effacé.
+
+**`domains` n'entre pas dans `DeletableTable`**, et l'arbitrage n'a donc pas été élargi d'un
+caractère : ce qui est accordé est **un geste nommé**, `deleteEmptyDomain`, pas une table dont une
+ligne quelconque s'efface.
+
+### La purge est atomique, et ce n'est pas une affirmation
+
+`neon-http` n'a pas de transaction **interactive** (dette de T3.6) — mais `db.batch` en est une
+*non* interactive, et les quatorze instructions de la purge sont **connues d'avance**. Mesuré
+plutôt que supposé : un lot `[delete jobs, delete domains]` sur une entreprise retenue par une
+entité **lève, et laisse la ligne `jobs` en place**. Le décompte parle, la base tranche, et si une
+ligne apparaissait entre les deux, l'une des **36 clés `restrict`** qui pointent `domains.id`
+défairait tout.
+
+### Le geste n'a pas de trace, et il ne peut pas en avoir
+
+`domain_events.domain_id` est `not null` et `restrict` : le journal d'administration part **avec**
+l'entreprise qu'il raconte. C'est la disparition admise de `deleteProject`, pour la même raison —
+*il n'y a pas une ligne à écrire, il y a une disparition à admettre*. `DOMAIN_DEEDS` ne reçoit donc
+aucun onzième verbe, et la fiche du geste est son commentaire. **Neuf gestes sur dix laissent leur
+trace** ; le dixième est celui-ci.
+
+### Les mesures
+
+**Douze tests neufs, 1 991 → 2 003.** Sept sur la couche, cinq sur l'action — tous par **décompte en
+base**, jamais sur un code de retour : la purge des treize tables et de la ligne du domaine, l'état
+témoin lu avant ; le refus d'une entreprise saisie **qui n'efface rien** ; le refus d'une entreprise
+habitée, **archivage compris** ; le second passage qui rend `gone` ; l'autorité forgée qui ne lit ni
+n'efface, et le témoin qui efface ; le cliquet des 23 tables dérivées ; l'atomicité du lot.
+
+**Deux mises en défaut, toutes deux portantes.** La barrière du décompte neutralisée fait tomber
+**deux cas et rien d'autre** — et l'un des deux refus **tient quand même**, la base refusant ce que
+le décompte avait cessé de refuser : les deux barrières ne se remplacent pas, et on l'a vu. La
+moitié « compte » neutralisée fait tomber **exactement les deux cas du compte**.
+
+**Le sceau du `superAdmin` a fait ce qu'on lui demande** : la liste close des clés de `asSuperAdmin`
+a arrêté les deux méthodes neuves, qui sont entrées par une décision écrite — neuf clés, puis onze.
+
+**Quatre relevés dans le HTML servi**, `<script>` retirés, sous un cookie scellé par le vrai sceau,
+**relevé témoin d'abord** : sur « Groupe Meridian » (peuplée) le libellé « Supprimer définitivement »
+est **absent**, quand « Archiver cette entreprise » est là — l'écran rendait bien ses gestes ; sur
+une entreprise amorcée à l'instant il est **présent**, son ancre portant `?supprimer=<id>` ;
+l'adresse collée **ouvre** le panneau au rendu serveur ; la même adresse sur l'entreprise peuplée
+**n'ouvre rien**, et `?supprimer=<autre entreprise>` non plus. Puis, **en dernier**, la sonde qui
+écrit : `deleted`, puis `gone` au second passage.
+
+### Ce qui n'a pas été fait, et pourquoi
+
+**Aucune suppression d'entreprise peuplée**, sous aucune option — c'est le refus, pas une limite
+d'implémentation. **Aucune migration** : les 36 clés `restrict` sont la seconde barrière, les
+changer aurait retiré la seule chose qui rattrape une course. **Aucun décompte affiché** : le
+panneau nomme ce qu'il efface, il ne le chiffre pas — contrairement à celui de l'accompagnement, où
+le chiffre est la seule information qui aide à décider ; ici il n'y a rien à compter.
+
+**Le 404 de la fiche purgée n'a pas été isolé** : la sonde avait déjà retiré son autorité, et
+l'adresse rend donc **307** — l'autorité relue à chaque requête, ce qui est une autre mesure, juste,
+mais pas celle-là. Le cas est couvert par l'action (`Cette entreprise n'existe plus.`) et par le
+404 d'un identifiant inconnu, mesuré en T12.3.
+
+### Chiffres
+
+**1 991 → 2 003 tests, 69 fichiers**, tous verts ; `tsc --noEmit` et `eslint --max-warnings=0`
+passent. Aucune migration, aucune dépendance neuve, aucun graphique, aucun couple de couleurs neuf —
+le lien porte `ACTION_LINK_SM`, celui de ses trois voisins. **Neuf fichiers touchés.**

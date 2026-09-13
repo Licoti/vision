@@ -2,9 +2,10 @@
 
 Fichier de contexte de session. Mis à jour par Claude en fin de chaque ticket.
 
-**Dernière mise à jour :** 11/09/2026. **T12.3 terminé** — la fiche d'une entreprise lit enfin le
-journal, cinq mesures par sonde. 1 987 → **1 989 tests**. **Ticket suivant : T12.4 — les gestes
-déménagent.** **C7 reste ouvert** sur T7.9 et T7.10 ; C12 passe devant, écart consigné à `docs/05` §6.
+**Dernière mise à jour :** 12/09/2026. **Hors ticket** : une entreprise **vide** s'efface — neuvième
+geste de la fiche, **présent dans le HTML servi** de la seule entreprise vide, absent au témoin ;
+la règle 4 tient, les 23 tables de contenu **retiennent**. 1 991 → **2 003 tests**. **Ticket
+suivant : T7.9.** **C7 reste ouvert** sur T7.9 et T7.10 ; C12 est clos, écart à `docs/05` §6.
 
 ---
 
@@ -18,14 +19,14 @@ déménagent.** **C7 reste ouvert** sur T7.9 et T7.10 ; C12 passe devant, écart
 | C9 — SSO et administration multi-domaine | T9.1 → T9.6 | **terminé** |
 | C10 — les macro-parcours | à découper | reporté hors C8, 04/09/2026 |
 | C11 — Le parcours d'entrée | T11.1 → T11.6 | **terminé** (rouvert puis refermé le 09/09) |
-| C12 — Détail et journal d'administration des domaines | T12.1 → T12.4 | **en cours** — T12.1 → T12.3 livrés |
+| C12 — Détail et journal d'administration des domaines | T12.1 → T12.4 | **terminé**, 11/09 |
 
 ---
 
 ## Journal des tickets
 
-*(une ligne par **chantier clos**, une par ticket du chantier en cours. Récit :
-`HISTORIQUE-TICKETS.md` ; pièges et dettes : `JOURNAL-TECHNIQUE.md`.)*
+*(une ligne par **chantier clos**, une par ticket du chantier en cours — **C12 replié le 11/09, à
+sa clôture**. Récit : `HISTORIQUE-TICKETS.md` ; pièges : `JOURNAL-TECHNIQUE.md`.)*
 
 - **C1 à C4bis — T1.1 → T4bis.6, 11-15/08.** Le socle, quatre écrans de lecture, deux formulaires,
   les activités, les ressources et les résultats : le POC minimal démontrable, et la boucle de
@@ -50,20 +51,19 @@ déménagent.** **C7 reste ouvert** sur T7.9 et T7.10 ; C12 passe devant, écart
   l'invitation, l'amorçage en un geste (quatre tables), la correction des informations de son
   domaine —, puis **le contrôle de sécurité T11.6** : sept familles éprouvées ensemble, **aucune
   faille** (`SECURITE-C9-C11.md`). 1 816 → **1 962 tests, 69 fichiers**.
-- **C7 — T7.7, 10/09.** Accessibilité : deux `h1` absents, la frise atteignable au clavier,
-  **trente-huit `role="menuitem"` retirés**, un cliquet de lint. **Trois énoncés de fiche en défaut.**
+- **C7 — T7.7, 10/09.** Accessibilité : deux `h1` absents, la frise au clavier, **trente-huit
+  `role="menuitem"` retirés**, un cliquet de lint. **Trois énoncés de fiche en défaut.**
 - **C7 — T7.8, 10/09.** D36 tenue : « À propos », **aucune lecture en base**, 200 sans cookie. Revue
-  des **seize** états vides : **deux cul-de-sac** corrigés, **douze vus rendus**, **quatre nommés
+  des **seize** états vides : **deux cul-de-sac** corrigés, **douze vus rendus**, **quatre
   inatteignables**. 1 962 tests, inchangés.
-- **C12 — T12.1, 11/09.** `domain_events` posée **avant tout écrivain et tout lecteur** : un
-  `ScopedTable` hors produit couvert **sans une ligne de couche neuve**. 1 962 → **1 966 tests**.
-- **C12 — T12.2, 11/09.** Les dix gestes laissent leur trace, `events` inchangée. **Sept mises en
-  défaut, dont une a trouvé un trou** : trois refus non mesurés. 1 966 → **1 987 tests**.
-- **C12 — T12.3, 11/09.** La fiche : quatre blocs, un plafond, un fil d'Ariane. **Cinq mesures par
-  sonde** ; **une mise en défaut n'épingle rien**, dite au journal. 1 987 → **1 989 tests**.
-- **Hors ticket, 17/08 → 02/09 — vingt-neuf gestes**, tous à la demande humaine, détaillés dans
-  `HISTORIQUE-TICKETS.md`. **Cinq portent une migration, `0010` à `0014`** ; le reste est de
-  l'ergonomie, plus le **renommage de « Projets » en « Accompagnements »**, qui **rouvre D35**.
+- **C12 — T12.1 → T12.4, 11/09.** Le second chantier tiré des seuls points ouverts après C8 :
+  `domain_events` posée **avant tout écrivain et tout lecteur**, les dix traces — **une mise en
+  défaut a trouvé un trou**, trois refus non mesurés —, la fiche qui les lit, puis le déménagement
+  des huit gestes, **0 au témoin et 8 sur 8 après**, qui referme la **troisième exception à D30**.
+  1 962 → **1 991 tests**.
+- **Hors ticket, 17/08 → 12/09 — trente gestes**, tous à la demande humaine, détaillés dans
+  `HISTORIQUE-TICKETS.md`. **Cinq portent une migration, `0010` à `0014`**, le trentième aucune —
+  *effacer une entreprise vide*. Le reste : l'ergonomie, et le **renommage qui rouvre D35**.
 
 ---
 
@@ -72,14 +72,14 @@ déménagent.** **C7 reste ouvert** sur T7.9 et T7.10 ; C12 passe devant, écart
 *(un point, une destination — sans destination, c'est un point qu'on n'a pas tranché. Un point
 refermé part dans `HISTORIQUE-TICKETS.md`.)*
 
-### a. À trancher · gestes détaillés : `ACTIONS-HUMAINES-C9.md` et `ACTIONS-HUMAINES-C11.md`
+### a. À trancher · gestes détaillés : `ACTIONS-HUMAINES-C9.md`, `-C11.md`, `-DEPLOIEMENT.md`
 
 - **Les secrets Neon n'ont jamais été tournés.** Deux chaînes ont transité en clair le 12/08, hors
   dépôt mais valides ; **reportés cinq fois**, et la raison qui les reportait n'existe plus.
   → **action humaine, la plus vieille de la liste.**
-- **Rien n'est prêt côté production** — `AUTH_URL` vaut `localhost:3000`, l'URI de rappel n'est
-  enregistrée nulle part, les trois secrets ne sont pas dans Netlify : **le SSO ne peut pas
-  fonctionner en ligne avant ces quatre gestes** (`ACTIONS-HUMAINES-C9.md` §4). → **action humaine.**
+- **La mise en ligne est préparée, elle n'est pas faite** — exclusion du scanner dans
+  `netlify.toml`, marche à suivre dans `ACTIONS-HUMAINES-DEPLOIEMENT.md` (12/09). **Aucun site
+  n'existe**, aucun build n'a tourné : l'exclusion même reste non éprouvée. → **console.**
 - **Microsoft est écrit et n'est pas branché** — Entra ID Free demande une carte bancaire, et
   `ENTRA_CLIENT_ID`/`_SECRET` manquent. **Mesuré** : la découverte aboutit, l'adresse d'autorisation
   est juste ; **pas mesuré** : l'échange du code et le gabarit `{tenantid}`. → **action humaine.**
@@ -103,11 +103,12 @@ refermé part dans `HISTORIQUE-TICKETS.md`.)*
 *(le fait et sa destination. Le récit vit dans `HISTORIQUE-TICKETS.md`, la mesure dans
 `JOURNAL-TECHNIQUE.md`.)*
 
-- **Le jeu de démonstration n'a ni adresse ni identité vérifiée** : connectable, pas **cohérent**.
+- **Le jeu de démonstration n'a aucune adresse** — `persons.email` est nul pour les huit personnes,
+  le brief n'en donnant pas : le domaine est **désigné** sans être **connectable**. *Son identité
+  vérifiée, elle, est semée depuis le 11/09* (`meridian.example.com`, Google).
   → **le prochain ticket qui ouvre `scripts/seed.ts`.**
 - **Le décompte de jumelles de `grantPersonAccess` est inatteignable** depuis T11.1, qui a posé
-  l'index sur `lower(email)` : filet conservé, **aucun test ne peut plus l'exercer**. → **le jour où
-  l'on ôte un filet.**
+  l'index sur `lower(email)` : filet conservé, inexerçable. → **le jour où l'on ôte un filet.**
 - **Le libellé des deux rôles est écrit à trois endroits**, plus deux mots que `lib/journal.ts`
   récrit exprès, étant pur. → **T7.9**, avec les quatre libellés hors de `lib/format.ts`.
 - **`persons.identity_provider` n'a aucun écrivain**, et l'inscrire buterait sur
@@ -122,39 +123,38 @@ refermé part dans `HISTORIQUE-TICKETS.md`.)*
 - **Sans JavaScript, le lien d'invitation est perdu** — `resolveTeamDrawer` ferme le panneau dès
   qu'une invitation vivante existe ; l'invitation, elle, est écrite. **Seconde exception à D30**, non
   arbitrée. → **arbitrage humain, puis le ticket qui rouvre `lib/drawers/team.tsx`.**
-- **Sans JavaScript, aucun geste de la ligne d'entreprise n'est atteignable** — `ActionMenu` n'est
-  pas dans le HTML servi depuis T9.4. **Troisième exception à D30.** → **C12, T12.4 : le déménagement
-  des gestes sur la fiche le referme sur cet écran, et sa mesure 1 le prouve.**
+- **L'appartenance d'une clé de panneau ne vaut que pour le rendu serveur** (T12.4) : sur la fiche
+  de A, `?identites=<B>` n'ouvre rien, mais le clic passe par `loadDomainDrawer`, qui ignore d'où il
+  vient. **Aucun droit ne s'y joue**, c'est une cohérence d'écran. → **sans échéance.**
 - **Deux garde-fous à relire avant de « simplifier », jamais après.** **Rien en base ne double le
   refus « une invitation attend déjà »** — l'index partiel porte sur `(domain_id, person_id)`, et une
   seconde désignation vise une autre personne, donc le contrôle applicatif est seul gardien
   (`designateDomainManager`) · **`redeemInvitation` ne juge pas l'état du domaine**, et c'est ce qui
   rend l'arbitrage (4) de C11 mesurable : **un seul témoin isole l'ordre des six règles**. → **à
   relire avant de toucher l'un des deux, jamais après.**
-- **Rien n'a jamais été vu dans un navigateur** — ni le parcours clavier (T7.7), ni la relecture à
-  375 px de la fiche (T12.3, extension refusée) : les deux sont mesurés **d'après le HTML servi et
-  les classes**. `Échap`, le retour du focus, le défilement aux flèches et tout débordement réel
-  restent hors mesure. → **arbitrage humain : une dépendance de développement, ou le manque assumé.**
-- **Lire un écran authentifié au `curl` demande un harnais qui n'existe pas** — **quatre tickets de
-  suite l'ont redemandé**, T12.3 rejouant le geste de T7.8 : sceller un principal, semer, sonder,
-  purger. S'y rattachent les deux corrections d'états vides de T7.8, mesurées et non gardées.
-  → **outillage : `scripts/probe.ts` ou son équivalent.**
+- **Rien n'a jamais été vu dans un navigateur** — ni le parcours clavier (T7.7), ni les 375 px de la
+  fiche (T12.3, T12.4) : tout est mesuré **d'après le HTML servi et les classes**. `Échap`, le retour
+  du focus, les flèches et tout débordement réel restent hors mesure. → **arbitrage humain.**
+- **Lire un écran authentifié au `curl` demande un harnais qui n'existe pas** — **cinq tickets de
+  suite l'ont redemandé** : sceller, semer, sonder, purger. Trois contraintes acquises — `tsx` ne
+  résout `@/` que depuis la racine · **le sceau va dans un bocal de cookies, jamais dans un `echo`**
+  · **une sonde qui écrit invalide les relevés d'après** (T12.4). → **outillage : `scripts/probe.ts`.**
 - **Quatre états vides ne s'atteignent par aucun jeu de données** (T7.8), deux structurellement —
   `/administration`, dont les référentiels sont semés, et `/equipe`, dont la session **est** une
-  personne du domaine. **Rien n'a été touché** (règle 3). → **le jour où un référentiel s'ajoute sans
-  être semé.**
+  personne du domaine. → **le jour où un référentiel s'ajoute sans être semé.**
 - **Le journal reste incomplet — cinq familles, la sixième refermée** (T8.3, récrit le 11/09) : le
   produit, l'adoption, la compétence portée, les huit référentiels autres que l'entité (trente-deux
   gestes), les trois gestes de l'invitation (arbitrage assumé : l'acceptation n'a ni session ni
   acteur). **T12.2 a pris la sixième**, la correction des informations du domaine. Chacune est
   **fixée par un test qui tombera** : une migration d'énuméré, une quarantaine de points d'appel.
   → **un ticket à soi, hors C12.**
-- **Huit petites dettes partagent la même destination**, détaillées au journal technique :
-  `uiLayerSeal` garde une liste de six dossiers et non une propriété · **`listProductsWithCounts` ne
-  rejoue pas la jointure de statut — quatrième décompte de la famille, et le seul qui rende un
-  chiffre faux** · `listResultToolOptions` · les deux comparateurs de libellé, et `entities.position`
-  · la carte radio écrite deux fois · l'état vide absent de `picker.tsx` · un pied de formulaire sur
-  quatre · les props d'icône de `Button`. → **au prochain ticket qui ouvre le fichier.**
+- **Dix petites dettes partagent la même destination**, au journal technique : **`DOMAIN_DEEDS`
+  cite `app/domaines/page.tsx` pour des mots passés sur la fiche** · `uiLayerSeal` garde une liste
+  de six dossiers · **`listProductsWithCounts` ne rejoue pas la jointure de statut — le seul
+  décompte faux** · `listResultToolOptions` · les deux comparateurs de libellé, et
+  `entities.position` · la carte radio écrite deux fois · l'état vide de `picker.tsx` · un pied de
+  formulaire sur quatre · les props d'icône de `Button` · **`starters` manque au `teardownOrder` de
+  `scoped.test.ts`** (12/09). → **au prochain ticket qui ouvre le fichier.**
 
 ### c. Dettes assumées — le fait et sa destination ; le détail vit dans `JOURNAL-TECHNIQUE.md`
 
@@ -223,9 +223,9 @@ refermé part dans `HISTORIQUE-TICKETS.md`.)*
   **les exclusions sont réécrites par chacune des trois lectures** — et l'arbitrage (d) de C5bis n'a
   plus de gardien en base, `persons_availability_requires_center` étant tombé avec la colonne.
 - **Trois tables se suppriment, et elles n'ont pas la même barrière.** `entities` et `persons` sont
-  retenues par des clés `restrict` ; **`projects` n'est retenue par rien** — ses dix clés étrangères
-  sont `cascade`, son panneau de confirmation est le seul garde-fou. Ajouter une quatrième table à
-  `DeletableTable` est un arbitrage humain, jamais une décision de ticket.
+  retenues par des clés `restrict` ; **`projects` n'est retenue par rien** — ses dix clés sont
+  `cascade`, son panneau est le seul garde-fou. Ajouter une quatrième à `DeletableTable` est un
+  arbitrage humain. **Une entreprise *vide* s'efface aussi (12/09)** — un geste nommé, pas une table.
 - **La période d'un accompagnement se déduit de ses activités** — **cinq lectures joignant la même
   règle**, en sous-requête groupée et non corrélée (31/08).
 - **Le domaine vient du jeton, et de lui seul.** `resolveDomainId` prend une identité vérifiée — le
