@@ -30,8 +30,9 @@
  * fait est consigné au journal plutôt que contourné, et il se referme avec la
  * dette de T3.6 — *le jour où le pilote exposera la transaction interactive*.
  *
- * **Les neuf gestes laissent chacun leur trace, et jamais dans `events`**
- * (T12.2). Ce qui se fait *d'une* entreprise s'écrit dans `domain_events`, la
+ * **Neuf gestes sur dix laissent leur trace, et jamais dans `events`**
+ * (T12.2 ; le dixième est `deleteDomain`, qui emporte le journal avec
+ * l'entreprise — sa raison est écrite sur lui). Ce qui se fait *d'une* entreprise s'écrit dans `domain_events`, la
  * table hors produit de T12.1 : `events` n'a aucun `target_type` qui dise
  * « domaine », et son `actor_id` référence `persons`, dont un super
  * administrateur n'a aucune ligne. Ce qui est écrit **au-dessus** d'un domaine
@@ -74,6 +75,7 @@ import { createReconciler } from "@/lib/db/reconcile";
 import {
   asSuperAdmin,
   forDomain,
+  IntegrityError,
   superAdmin,
   type SuperAdminGrant,
 } from "@/lib/db/scoped";
@@ -121,22 +123,50 @@ const ALREADY_STAFFED =
  * désignation : deux liens ouvriraient le même premier compte, et n'en révoquer
  * qu'un laisserait l'autre valide. Le refus **dit le geste qui le débloque** —
  * révoquer, puis redésigner —, comme le sixième refus d'`invitePerson`.
+ *
+ * **Le refus dit désormais « cette fiche » et non « la liste »** : le geste de
+ * révocation a déménagé en T12.4, et il est **derrière ce panneau**, dans le
+ * bloc « Accès » de l'écran qui le rend. Un message qui enverrait ailleurs
+ * ferait chercher ce qui est là.
  */
 const ALREADY_INVITED =
-  "Une invitation est déjà en attente pour cette entreprise : son premier compte s'ouvrira quand la personne l'aura acceptée. Révoquez-la depuis la liste avant d'en désigner un autre.";
+  "Une invitation est déjà en attente pour cette entreprise : son premier compte s'ouvrira quand la personne l'aura acceptée. Révoquez-la depuis cette fiche avant d'en désigner un autre.";
+
+/**
+ * **Le refus d'une entreprise où quelqu'un est entré**, et il dit le geste qui
+ * reste.
+ *
+ * La condition est plus stricte que le `hasAccount` de la liste : elle compte
+ * les personnes archivées, parce que *« quelqu'un est entré »* est un fait que
+ * l'archivage ne défait pas (`domainEmptiness`).
+ */
+const HAS_ACCOUNT =
+  "Quelqu'un est entré dans cette entreprise : elle ne s'efface plus. Archivez-la — elle quitte la liste des clientes, et rien n'est perdu.";
+
+/** Le refus d'une entreprise peuplée — la règle 4, dans les mots de l'écran. */
+const NOT_EMPTY =
+  "Cette entreprise porte des données saisies : elle ne s'efface pas. Archivez-la — elle quitte la liste des clientes, et ses produits, ses accompagnements et son journal restent en base.";
 
 const NO_HOST =
   "L'adresse publique de Vision n'est pas configurée sur cet environnement : le lien d'invitation n'aurait mené nulle part, et rien n'a été enregistré.";
 
 /**
- * L'écran ne revalide qu'une adresse — la sienne.
+ * Les deux adresses de l'écran — **la liste et la fiche** (T12.4).
+ *
+ * **Les deux portent les mêmes faits**, et l'une ne doit pas rester périmée
+ * quand l'autre se rafraîchit : la liste dit d'une entreprise ses trois faits
+ * d'accessibilité et son état, la fiche les redit, plus son journal. Depuis que
+ * les neuf gestes se font **sur la fiche**, c'est elle qui doit d'abord montrer
+ * ce qui vient d'être fait — la boucle entière, et la seule mesure qui dise que
+ * C12 a servi.
  *
  * **Il n'en touche aucune autre, et c'est l'interdit du ticket** : cet écran
- * administre des domaines, il ne les traverse pas. Revalider une page de produit
- * supposerait qu'il en connaisse une.
+ * administre des entreprises, il ne les traverse pas. Revalider une page de
+ * produit supposerait qu'il en connaisse une.
  */
-function revalidate(): void {
+function revalidate(domainId: string): void {
   revalidatePath(ROUTES.domains);
+  revalidatePath(ROUTES.domain(domainId));
 }
 
 /**
@@ -424,7 +454,7 @@ export async function createDomain(
      geste. */
   await trace(domain.id, superAdminId, "created", input.name);
 
-  revalidate();
+  revalidate(domain.id);
   return { values, errors: {}, link: prepared.link, sent };
 }
 
@@ -444,7 +474,7 @@ export async function suspendDomain(
 
   await trace(domainId, opened.superAdminId, "suspended");
 
-  revalidate();
+  revalidate(domainId);
   return { ok: true };
 }
 
@@ -462,7 +492,7 @@ export async function resumeDomain(domainId: string): Promise<void> {
   );
   if (updated) await trace(domainId, opened.superAdminId, "resumed");
 
-  revalidate();
+  revalidate(domainId);
 }
 
 export async function archiveDomain(
@@ -482,7 +512,7 @@ export async function archiveDomain(
   const archived = await asSuperAdmin(opened.grant).archiveDomain(domainId);
   if (archived) await trace(domainId, opened.superAdminId, "archived");
 
-  revalidate();
+  revalidate(domainId);
   return { ok: true };
 }
 
@@ -493,7 +523,67 @@ export async function restoreDomain(domainId: string): Promise<void> {
   const restored = await asSuperAdmin(opened.grant).restoreDomain(domainId);
   if (restored) await trace(domainId, opened.superAdminId, "restored");
 
-  revalidate();
+  revalidate(domainId);
+}
+
+/**
+ * Effacer une entreprise **vide** — 12/09/2026, geste hors ticket, à la demande
+ * humaine.
+ *
+ * **Ce qu'il efface n'a jamais été saisi.** Les huit référentiels que
+ * l'amorçage sème, les identités vérifiées, l'invitation d'amorçage et la
+ * personne qu'elle vise, le journal d'administration : ce qu'une entreprise
+ * porte **avant que quiconque y entre**. Dès qu'une main a écrit quoi que ce
+ * soit — une entité, un produit, un accompagnement —, ou dès que quelqu'un a
+ * eu un accès, le geste refuse et nomme l'archivage. **La règle 4 n'est donc
+ * pas écartée** : elle protège la donnée métier, et il n'y en a aucune.
+ *
+ * **Le décompte parle, la base tranche.** La couche refait la lecture avant
+ * d'écrire, et sa purge tient dans un `db.batch` — une transaction : si une
+ * ligne apparaissait entre les deux, l'une des trente-six clés `restrict` qui
+ * pointent `domains.id` défairait tout. Les deux barrières ne se remplacent
+ * pas, et c'est pourquoi le refus de la base rend **le même message** que le
+ * refus du décompte.
+ *
+ * **Aucune ligne de journal, et il n'y a pas de ligne à écrire** :
+ * `domain_events.domain_id` est `not null` et `restrict`, le journal part avec
+ * l'entreprise qu'il raconte. C'est la disparition admise de `deleteProject`,
+ * pour la même raison exactement — **ce commentaire est la trace, puisqu'il ne
+ * peut pas y en avoir en base.** `DOMAIN_DEEDS` ne reçoit donc aucun onzième
+ * verbe : un geste qu'aucun lecteur ne pourra jamais lire n'a pas de phrase.
+ *
+ * **Une seule adresse revalidée**, et ce n'est pas l'oubli de la seconde : la
+ * fiche n'existe plus, et la revalider ne ferait que la re-rendre en 404
+ * derrière le panneau (geste de `deleteProject`).
+ */
+export async function deleteDomain(
+  domainId: string,
+  _previous: ConfirmState,
+  _formData: FormData,
+): Promise<ConfirmState> {
+  const opened = await openDomain(domainId);
+  if (!opened) return { message: GONE };
+
+  let outcome: "deleted" | "gone" | "account" | "content";
+  try {
+    outcome = await asSuperAdmin(opened.grant).deleteEmptyDomain(domainId);
+  } catch (error) {
+    /* La course que le décompte ne couvre pas : la base a refusé, la
+       transaction est défaite, et rien n'a été effacé. */
+    if (error instanceof IntegrityError) return { message: NOT_EMPTY };
+    throw error;
+  }
+
+  if (outcome === "account") return { message: HAS_ACCOUNT };
+  if (outcome === "content") return { message: NOT_EMPTY };
+  if (outcome === "gone") return { message: GONE };
+
+  revalidatePath(ROUTES.domains);
+
+  /* **La fermeture *est* la navigation** : `ConfirmPanel` se referme sur
+     `ok: true` en laissant la page derrière lui (TD.2), or il n'y a plus de
+     page derrière lui. `redirect` lève : elle est appelée hors de tout `try`. */
+  redirect(ROUTES.domains);
 }
 
 /* ==========================================================================
@@ -523,7 +613,7 @@ export async function addDomainIdentity(
 
   await trace(domainId, opened.superAdminId, "identity_added", input.value);
 
-  revalidate();
+  revalidate(domainId);
   return { values, errors: {}, ok: true };
 }
 
@@ -561,7 +651,7 @@ export async function removeDomainIdentity(
     await trace(domainId, opened.superAdminId, "identity_removed", identity.value);
   }
 
-  revalidate();
+  revalidate(domainId);
 }
 
 /* ==========================================================================
@@ -651,7 +741,7 @@ export async function designateDomainManager(
     input.fullName,
   );
 
-  revalidate();
+  revalidate(domainId);
   return { values, errors: {}, link: prepared.link, sent };
 }
 
@@ -705,5 +795,5 @@ export async function revokeDomainInvitation(domainId: string): Promise<void> {
      même raison — n'en nommer qu'une choisirait. */
   await trace(domainId, opened.superAdminId, "invitation_revoked");
 
-  revalidate();
+  revalidate(domainId);
 }

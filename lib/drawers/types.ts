@@ -211,9 +211,10 @@ export type AdminDrawerRequest =
   | { kind: "ownDomain" };
 
 /**
- * Les cinq panneaux de l'écran **au-dessus des domaines** — T9.4.
+ * Les panneaux de l'écran **au-dessus des domaines** — T9.4, plus la
+ * suppression d'une entreprise vide (12/09/2026).
  *
- * **Une écriture, une lecture-écriture, et deux confirmations**, et aucun
+ * **Une écriture, une lecture-écriture, et trois confirmations**, et aucun
  * panneau de détail : cet écran ne s'ouvre qu'au super administrateur, il n'a
  * donc pas la paire « une clé pour lire, une clé pour écrire » des pages produit
  * et Équipe.
@@ -240,7 +241,20 @@ export type DomainDrawerRequest =
   | { kind: "identity"; id: string }
   | { kind: "manager"; id: string }
   | { kind: "suspend"; id: string }
-  | { kind: "archive"; id: string };
+  | { kind: "archive"; id: string }
+  /**
+   * **`delete` porte la même condition tacite que `manager`**, et l'autre
+   * moitié de sa raison : il n'ouvre que sur une entreprise **vide** — aucune
+   * personne n'y ayant eu d'accès, aucune des vingt-trois tables de contenu n'y
+   * portant de ligne. Une condition qui dépend de la base ne se prouve pas dans
+   * un type ; `resolveDomainDrawer` la vérifie, `deleteDomain` la refait sur ce
+   * qu'elle reçoit.
+   *
+   * **`delete` n'est pas une variante d'`archive`** — c'est le mot
+   * d'`AdminDrawerRequest`, et il vaut ici sans changer d'un caractère : l'un
+   * range et se défait, l'autre efface et ne se défait pas.
+   */
+  | { kind: "delete"; id: string };
 
 export type DrawerRequest =
   | ProductDrawerRequest
@@ -346,6 +360,7 @@ const DOMAIN_KINDS = [
   "manager",
   "suspend",
   "archive",
+  "delete",
 ] as const;
 
 export function asProductRequest(

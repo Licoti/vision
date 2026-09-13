@@ -9,9 +9,26 @@
  * identités vérifiées, l'état d'accès — se rassemble ici, et le journal
  * d'administration de C12 y trouve son seul lecteur.
  *
- * **Une lecture, et rien qu'une lecture.** Aucun geste, aucun panneau, aucune
- * action : les six panneaux de la liste déménagent en T12.4, et un ticket de
- * lecture qui s'autoriserait une écriture ne serait plus mesurable.
+ * **Et depuis T12.4, elle porte les gestes.** T12.3 n'en avait aucun — un ticket
+ * de lecture qui se serait autorisé une écriture n'aurait plus été mesurable.
+ * Les **six panneaux ciblés** et les **trois formulaires nus** vivent ici
+ * désormais, sur la fiche de l'entreprise qu'ils visent, et l'`ActionMenu` de la
+ * liste a disparu (arbitrage (1) de `tickets-C12.md`). La raison n'est pas un
+ * rangement : *un geste qui vise une entreprise se fait là où cette entreprise
+ * est nommée*.
+ *
+ * **Chaque geste est dans le bloc qui porte le fait qu'il change** : l'état dans
+ * « Identité », les deux gestes d'identité vérifiée dans le bloc qui les liste,
+ * le compte dans « Accès ». Leurs conditions d'affichage sont **celles de
+ * l'`ActionMenu` qu'ils quittent, au mot près** — aucun geste neuf, aucun
+ * pouvoir neuf (arbitrage (10) de C11), et le super administrateur ne renomme
+ * toujours pas une entreprise.
+ *
+ * **Aucun menu, et c'est un interdit du ticket.** Un `ActionMenu` ici rouvrirait
+ * ce qu'on vient de refermer : ses enfants ne sont rendus qu'une fois ouvert, si
+ * bien qu'**aucun de ces gestes n'était dans le HTML servi** — troisième
+ * exception à D30 depuis T9.4. Huit ancres et boutons de formulaire la
+ * referment, **et cela se mesure**.
  *
  * **Hors du groupe `(app)`**, comme sa liste, `app/auth/` et `app/invitation/` :
  * ni coquille, ni navigation, ni carte de personne courante. Un super
@@ -34,7 +51,7 @@
  * **Aucune lecture neuve pour l'identité de l'entreprise.** `listDomainsForAdmin()`
  * rend déjà la ligne, et T12.3 lui a ajouté deux colonnes dans un `select` déjà
  * écrit. C'est la porte qu'`openDomain` (`lib/drawers/domains.tsx`) emprunte
- * pour les cinq panneaux ciblés ; une septième fonction dans `asSuperAdmin` pour
+ * pour les six panneaux ciblés ; une septième fonction dans `asSuperAdmin` pour
  * lire une ligne qu'une lecture rend déjà serait la duplication que T9.4 a
  * évitée.
  *
@@ -50,12 +67,16 @@
  * la date de création est une valeur **saisie**, et le journal ne se compte pas.
  */
 
+import type { ReactNode } from "react";
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { DomainJournal } from "@/components/admin/domain-journal";
 import { Breadcrumb } from "@/components/shell/breadcrumb";
+import { ACTION_LINK_SM } from "@/components/ui/action-link";
 import { buttonClass } from "@/components/ui/button";
+import { DrawerHost, DrawerLink } from "@/components/ui/drawer";
 import { BlockNote } from "@/components/ui/empty-state";
 import { Page, PageHeader } from "@/components/ui/page";
 import { Section, SectionHeader } from "@/components/ui/section";
@@ -63,12 +84,67 @@ import { AUTH_ROUTES } from "@/lib/auth/provider";
 import { requireSuperAdmin } from "@/lib/auth/super-admin";
 import { asSuperAdmin } from "@/lib/db/scoped";
 import {
+  domainPageRequest,
+  DOMAIN_PANEL_PARAMS,
+  resolveDomainDrawer,
+} from "@/lib/drawers/domains";
+import {
   formatDomainStatus,
   formatEventDay,
   formatIdentityProvider,
 } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
 import { isUuid } from "@/lib/uuid";
+
+import {
+  restoreDomain,
+  resumeDomain,
+  revokeDomainInvitation,
+} from "../actions";
+import { loadDomainDrawer } from "../drawers";
+
+/**
+ * Un geste qui **défait** : un formulaire nu, sans confirmation.
+ *
+ * `docs/06` §9 proscrit la confirmation là où elle ne protège rien, et les trois
+ * gestes qui la portent ici — rétablir l'entreprise, rétablir l'accès, révoquer
+ * l'invitation — se refont d'un clic. **Aucun d'eux n'a de panneau**, et c'est
+ * pourquoi ils traversent la page sous cette forme depuis T9.4 : seule la place
+ * change.
+ *
+ * **Un `<form>` et non un `<span>`** dans l'en-tête d'une `Section` : c'est du
+ * contenu de flux, et l'en-tête est un `div`. Le mettre dans un élément de
+ * phrasé ferait réécrire le balisage par le navigateur.
+ */
+function BareAction({
+  action,
+  children,
+}: {
+  action: () => Promise<void>;
+  children: string;
+}) {
+  return (
+    <form action={action}>
+      <button type="submit" className={ACTION_LINK_SM}>
+        {children}
+      </button>
+    </form>
+  );
+}
+
+/**
+ * La rangée de gestes d'un bloc — **jamais un menu** (T7.7, et l'interdit du
+ * ticket : rouvrir un `ActionMenu` ici rouvrirait l'exception à D30 qu'on vient
+ * de refermer).
+ *
+ * Une simple boîte souple : les gestes se lisent côte à côte, et passent à la
+ * ligne plutôt que de comprimer le titre du bloc à 375 px.
+ */
+function Actions({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-4">{children}</div>
+  );
+}
 
 /* L'autorité se relit à chaque requête : rien à mettre en cache. */
 export const dynamic = "force-dynamic";
@@ -79,8 +155,10 @@ export const metadata = {
 
 export default async function DomainPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   /* L'autorité avant toute lecture — et avant même de regarder l'identifiant.
      Elle redirige : rien de ce qui suit ne s'exécute pour qui ne la porte pas,
@@ -101,14 +179,42 @@ export default async function DomainPage({
   );
   if (!domain) notFound();
 
-  const [identities, events] = await Promise.all([
+  /* **Une troisième lecture depuis le 12/09/2026**, et elle ne sert qu'à
+     décider d'un lien : une entreprise vide s'efface, les autres s'archivent.
+     Elle ne rend **aucune donnée** du domaine — un booléen et un motif, tirés
+     de vingt-quatre sondes d'existence (`domainEmptiness`) : la frontière que
+     cet écran ne franchit pas tient, il ne lit toujours pas ce qu'il y a
+     dedans. */
+  const [identities, events, emptiness] = await Promise.all([
     reader.listDomainIdentities(domain.id),
     reader.listDomainEvents(domain.id),
+    reader.domainEmptiness(domain.id),
   ]);
 
   const archived = domain.archivedAt !== null;
 
+  /* **L'URL reste une adresse, elle n'est plus le mécanisme** (TD.2) : coller
+     `?identites=<identifiant>` ouvre le panneau ici, au rendu serveur ; le clic
+     passe par `DrawerHost`. Les deux chemins traversent ensuite la **même**
+     résolution, et c'est ce qui fait qu'aucune règle ne vit à deux endroits.
+
+     **L'appartenance, l'exclusivité et la forme de la valeur vivent dans
+     `domainPageRequest`** : une clé qui désigne une autre entreprise n'ouvre
+     rien, deux clés ensemble non plus. */
+  const request = domainPageRequest(domain.id, await searchParams);
+
+  const drawer = request ? await resolveDomainDrawer(grant, request) : null;
+
   return (
+    <DrawerHost
+      initial={drawer}
+      load={loadDomainDrawer}
+      panelParams={DOMAIN_PANEL_PARAMS}
+      /* **La fiche, jamais la liste.** Un panneau se referme là où il s'est
+         ouvert — sans quoi fermer une confirmation ferait perdre l'entreprise
+         qu'on regardait. */
+      closeHref={ROUTES.domain(domain.id)}
+    >
     <main className="mx-auto flex min-h-screen max-w-320 flex-col gap-8 px-6 py-12 md:px-10">
       {/* La coquille tient en deux liens, exactement celle de la liste :
           l'identité de l'écran, et la sortie. Aucune navigation de produit — un
@@ -156,6 +262,74 @@ export default async function DomainPage({
           <SectionHeader
             title="Identité"
             note="Ce que l'entreprise a déclaré d'elle-même, et son état."
+            /* **Les gestes d'état, dans le bloc qui porte l'état** (T12.4) : ce
+               sont eux qui font changer la ligne « État » deux rangs plus bas.
+               Les conditions sont **exactement celles de l'`ActionMenu`** qu'ils
+               quittent — aucun geste neuf, aucun pouvoir neuf (arbitrage (10) de
+               C11) : le super administrateur ne renomme toujours pas une
+               entreprise, et rien ici ne le propose.
+
+               **Une entreprise archivée n'en porte qu'un**, son rétablissement :
+               suspendre ou archiver ce qui est déjà rangé n'a pas d'objet, et la
+               résolution des deux panneaux le refuse de toute façon sur ce
+               qu'elle reçoit. */
+            action={
+              <Actions>
+                {archived ? (
+                  <BareAction action={restoreDomain.bind(null, domain.id)}>
+                    Rétablir cette entreprise
+                  </BareAction>
+                ) : (
+                  <>
+                    {domain.status === "active" ? (
+                      <DrawerLink
+                        href={ROUTES.domainSuspend(domain.id)}
+                        request={{ kind: "suspend", id: domain.id }}
+                        className={ACTION_LINK_SM}
+                      >
+                        Suspendre cette entreprise
+                      </DrawerLink>
+                    ) : (
+                      <BareAction action={resumeDomain.bind(null, domain.id)}>
+                        Rétablir l&apos;accès
+                      </BareAction>
+                    )}
+
+                    <DrawerLink
+                      href={ROUTES.domainArchive(domain.id)}
+                      request={{ kind: "archive", id: domain.id }}
+                      className={ACTION_LINK_SM}
+                    >
+                      Archiver cette entreprise
+                    </DrawerLink>
+                  </>
+                )}
+
+                {/* **Le neuvième geste — 12/09/2026, hors ticket.** Il est
+                    rendu **sur les deux états**, archivé compris : *ranger puis
+                    effacer est le chemin naturel* (`deleteProject`). Sa seule
+                    condition est le vide, et elle se **lit**, quand celle des
+                    quatre autres se lit dans une colonne.
+
+                    **Aucun couple de couleurs neuf par la position** : le lien
+                    porte `ACTION_LINK_SM`, celui de ses trois voisins. Ce que
+                    le geste a d'irréversible est dit **par le panneau**, en
+                    toutes lettres — une couleur d'alerte l'aurait dit moins
+                    bien, et à personne sans la voir.
+
+                    Ce n'est pas ce rendu qui protège : `deleteDomain` refait la
+                    lecture sur l'identifiant qu'elle **reçoit**. */}
+                {emptiness.empty ? (
+                  <DrawerLink
+                    href={ROUTES.domainDelete(domain.id)}
+                    request={{ kind: "delete", id: domain.id }}
+                    className={ACTION_LINK_SM}
+                  >
+                    Supprimer définitivement
+                  </DrawerLink>
+                ) : null}
+              </Actions>
+            }
           />
 
           {/* Une **liste de définitions** : chaque ligne est un couple
@@ -223,6 +397,38 @@ export default async function DomainPage({
           <SectionHeader
             title="Identités vérifiées"
             note="Les entreprises que le fournisseur d'identité rattache à ce domaine. Sans elles, aucun jeton ne le désigne."
+            /* **Les deux gestes de l'identité, dans le bloc qui les liste**
+               (T12.4). Ils reprennent les mots de l'`ActionMenu` qu'ils
+               quittent, et le panneau de gestion — qui **retire** — ne paraît
+               que s'il y a quelque chose à gérer : c'est la condition
+               `hasIdentity` de la liste, et elle évite un cul-de-sac.
+
+               **Le retrait n'a pas d'entrée ici** : il vit dans le panneau de
+               gestion, en formulaire muet, depuis T9.4. Le sortir serait un
+               geste neuf, et la fiche n'en ajoute aucun. */
+            action={
+              !archived ? (
+                <Actions>
+                  <DrawerLink
+                    href={ROUTES.domainIdentityNew(domain.id)}
+                    request={{ kind: "identity", id: domain.id }}
+                    className={ACTION_LINK_SM}
+                  >
+                    Ajouter une identité vérifiée
+                  </DrawerLink>
+
+                  {domain.hasIdentity ? (
+                    <DrawerLink
+                      href={ROUTES.domainIdentities(domain.id)}
+                      request={{ kind: "identities", id: domain.id }}
+                      className={ACTION_LINK_SM}
+                    >
+                      Gérer les identités vérifiées
+                    </DrawerLink>
+                  ) : null}
+                </Actions>
+              ) : null
+            }
           />
 
           {identities.length > 0 ? (
@@ -259,8 +465,10 @@ export default async function DomainPage({
           ) : (
             /* **Un état vide qui dit la conséquence, pas l'absence** : ce qui
                importe n'est qu'il n'y ait aucune ligne, c'est que personne ne
-               puisse entrer. Aucun geste proposé — il vit sur la liste jusqu'à
-               T12.4. */
+               puisse entrer. **Le geste qui le remplit est en tête de bloc**
+               depuis T12.4 — `docs/06` §9 veut qu'un état vide propose l'action
+               correspondante, et il ne l'avait pas, le geste vivant encore sur
+               la liste. */
             <BlockNote>
               Aucune identité vérifiée : aucun jeton ne désigne cette entreprise,
               et personne ne peut ouvrir de session, même avec un compte.
@@ -275,6 +483,45 @@ export default async function DomainPage({
           <SectionHeader
             title="Accès"
             note="Ce qui s'oppose, ou non, à l'ouverture d'une session."
+            /* **Les deux gestes du compte, dans le bloc qui porte le fait qu'ils
+               changent** (T12.4), et leurs conditions sont celles de
+               l'`ActionMenu` qu'ils quittent, au mot près.
+
+               **La désignation n'ouvre qu'une fois** : une fois un compte posé,
+               la suite se passe à l'intérieur du domaine, par son responsable.
+               Et pas davantage tant qu'une invitation attend — deux liens
+               ouvriraient le même premier compte (T11.4).
+
+               **La révocation est le seul chemin de rattrapage** : sans elle,
+               une entreprise dont l'administrateur ne vient jamais resterait
+               close, le geste du produit demandant une session que personne ne
+               peut ouvrir ici.
+
+               **Ce n'est pas cet écran qui protège** : `designateDomainManager`
+               et `revokeDomainInvitation` refont ces décomptes **en base**, sur
+               ce qu'elles reçoivent. Un lien absent du rendu n'a jamais protégé
+               le point d'entrée qui l'accompagne. */
+            action={
+              !archived && !domain.hasAccount ? (
+                <Actions>
+                  {domain.hasPendingInvitation ? (
+                    <BareAction
+                      action={revokeDomainInvitation.bind(null, domain.id)}
+                    >
+                      Révoquer l&apos;invitation
+                    </BareAction>
+                  ) : (
+                    <DrawerLink
+                      href={ROUTES.domainManager(domain.id)}
+                      request={{ kind: "manager", id: domain.id }}
+                      className={ACTION_LINK_SM}
+                    >
+                      Désigner le premier responsable
+                    </DrawerLink>
+                  )}
+                </Actions>
+              ) : null
+            }
           />
 
           {/* **Les trois faits de la liste, dans les mots de la liste.** Ce sont
@@ -319,5 +566,6 @@ export default async function DomainPage({
         <DomainJournal events={events} />
       </Page>
     </main>
+    </DrawerHost>
   );
 }

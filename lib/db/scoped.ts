@@ -37,6 +37,7 @@ import {
   and,
   desc,
   eq,
+  is,
   isNotNull,
   isNull,
   sql,
@@ -44,11 +45,13 @@ import {
   type InferSelectModel,
   type SQL,
 } from "drizzle-orm";
-import { getTableConfig, type PgColumn, type PgTable } from "drizzle-orm/pg-core";
+import { getTableConfig, PgTable, type PgColumn } from "drizzle-orm/pg-core";
 
 import { db, type Database } from "./client";
 import {
   activities,
+  activityTypes,
+  approaches,
   domainEvents,
   domainIdentities,
   domains,
@@ -57,11 +60,26 @@ import {
   events,
   identityProvider,
   invitations,
+  jobs,
   persons,
   projects,
+  projectStatuses,
   results,
+  skillLevels,
+  skills,
+  starters,
   superAdmins,
+  tools,
 } from "./schema";
+/**
+ * **Le schéma entier, et un seul lecteur** : `domainContentTables()`, qui
+ * dérive de lui la liste des tables qu'une entreprise doit avoir vides pour
+ * qu'on puisse l'effacer. C'est le seul endroit du produit qui a besoin de
+ * parcourir les tables plutôt que de les nommer — et la raison est écrite avec
+ * la liste, plus bas : **une table ajoutée demain doit tomber du côté qui
+ * refuse**, jamais du côté qui efface.
+ */
+import * as schema from "./schema";
 
 /* ==========================================================================
    Erreurs
@@ -1351,6 +1369,124 @@ export type DomainEventRow = {
   actorName: string | null;
 };
 
+/* ==========================================================================
+   La purge d'une entreprise vide — 12/09/2026, hors ticket
+   ========================================================================== */
+
+/**
+ * Les treize tables que la purge efface, **dans l'ordre où les clés étrangères
+ * l'imposent** — `invitations` avant `persons`, qu'elle retient en `restrict`.
+ *
+ * **Ce sont exactement les tables que l'amorçage écrit** : les huit
+ * référentiels de `lib/db/bootstrap.ts`, les deux tables hors produit de C9 et
+ * de C12, l'invitation d'amorçage et la personne qu'elle vise, et la ligne
+ * `events` que la désignation laisse derrière elle. Aucune d'elles n'a jamais
+ * été saisie par une main : un domaine qui n'a que cela est un domaine où
+ * personne n'est entré.
+ *
+ * **Une union nommée, comme `DeletableTable` — et l'inverse de sa polarité.**
+ * Là-bas la liste dit ce qu'on *autorise* à effacer, et un prédicat aurait rendu
+ * supprimable la prochaine table qui aurait la bonne forme. Ici elle dit ce
+ * qu'on *efface d'office*, et **ce qui retient est le complément, dérivé du
+ * schéma** : une table métier ajoutée demain n'est pas dans cette liste, donc
+ * elle bloque. La décision se relit toujours à un seul endroit ; c'est le
+ * risque d'un oubli qui a changé de côté — d'un effacement silencieux à un
+ * refus visible.
+ */
+const PURGED_TABLES = [
+  events,
+  invitations,
+  persons,
+  starters,
+  activityTypes,
+  projectStatuses,
+  approaches,
+  skillLevels,
+  skills,
+  jobs,
+  tools,
+  domainEvents,
+  domainIdentities,
+] as const satisfies readonly ScopedTable[];
+
+/** Calculé une fois : le schéma ne change pas pendant l'exécution. */
+let contentTables: readonly ScopedTable[] | null = null;
+
+/**
+ * Les tables qu'une entreprise doit avoir **vides** pour pouvoir être effacée :
+ * toute table scopée du schéma qui n'est pas dans `PURGED_TABLES`.
+ *
+ * `domains` et `super_admins` n'en sont pas — elles ne portent pas de
+ * `domain_id`, et `isScoped` les écarte pour cette raison même : ce qui vit
+ * au-dessus des domaines ne se scope pas.
+ *
+ * **Exportée pour un cliquet, et pour lui seul** : son décompte est figé par un
+ * test, si bien qu'une table ajoutée au schéma fait tomber ce test et demande
+ * qu'on dise de quel côté elle tombe. La dérivation la met du bon côté par
+ * défaut — celui qui refuse —, le cliquet fait qu'on le sait.
+ */
+export function domainContentTables(): readonly ScopedTable[] {
+  if (contentTables) return contentTables;
+
+  /* `Object.values` rend l'union de tout ce que le module exporte — énumérés
+     compris. Le prédicat part donc d'`unknown` : `is(value, PgTable)` écarte
+     les énumérés, `isScoped` les tables hors domaine (`domains`,
+     `super_admins`), la liste le reste. */
+  const purged: readonly unknown[] = PURGED_TABLES;
+  const derived = (Object.values(schema) as unknown[]).filter(
+    (value): value is ScopedTable =>
+      is(value, PgTable) && isScoped(value) && !purged.includes(value),
+  );
+
+  contentTables = derived;
+  return derived;
+}
+
+/**
+ * Ce qui retient une entreprise, ou rien.
+ *
+ * **Deux motifs, et ils ne disent pas la même chose.** `account` dit que
+ * quelqu'un est entré ; `content` dit qu'une main a saisi. L'écran en fait deux
+ * refus distincts, chacun nommant le geste qui reste.
+ */
+export type DomainEmptiness =
+  | { readonly empty: true }
+  | { readonly empty: false; readonly reason: "account" | "content" };
+
+/**
+ * La sonde elle-même — **hors de l'objet**, parce que ses deux appelants sont
+ * dans l'objet : une méthode qui en appellerait une autre par `this` ferait
+ * dépendre le typage de l'objet entier de son propre initialiseur.
+ */
+async function domainEmptinessOf(domainId: string): Promise<DomainEmptiness> {
+  const tables = domainContentTables();
+
+  const probes = [
+    db
+      .select({ id: persons.id })
+      .from(persons)
+      .where(and(eq(persons.domainId, domainId), eq(persons.hasAccess, true)))
+      .limit(1),
+    ...tables.map((table) =>
+      db
+        .select({ id: table.id })
+        .from(anyTable(table))
+        .where(eq(table.domainId, domainId))
+        .limit(1),
+    ),
+  ];
+
+  const [account, ...contents] = (await db.batch(
+    probes as unknown as Batch,
+  )) as unknown as { id: string }[][];
+
+  if (account && account.length > 0) return { empty: false, reason: "account" };
+  if (contents.some((rows) => rows.length > 0)) {
+    return { empty: false, reason: "content" };
+  }
+  return { empty: true };
+}
+
 export function asSuperAdmin(grant: SuperAdminGrant) {
   /**
    * La garde, appelée avant chaque écriture et par elles seules.
@@ -1638,6 +1774,102 @@ export function asSuperAdmin(grant: SuperAdminGrant) {
         .where(and(eq(domains.id, id), isNotNull(domains.archivedAt)))
         .returning();
       return rows[0];
+    },
+
+    /**
+     * Ce qui retient une entreprise — **la lecture qui décide d'offrir le
+     * geste**, et celle que l'effacement refait juste avant d'écrire.
+     *
+     * **Deux conditions, et la première est plus stricte que celle de la
+     * liste.** `listDomainsForAdmin` écarte les personnes archivées de son
+     * `hasAccount`, parce qu'elle répond à *« quelqu'un peut-il entrer
+     * aujourd'hui »*. Ici la question est *« quelqu'un est-il entré »*, et
+     * l'archivage ne défait pas ce fait : une entreprise dont le compte a été
+     * archivé s'archive, elle ne s'efface pas. L'écart entre les deux lectures
+     * est voulu, et c'est la seule raison pour laquelle il n'est pas une
+     * divergence.
+     *
+     * **Un aller-retour, et rien que des requêtes typées.** Le gabarit `sql`
+     * aurait fait tenir les vingt-quatre sondes en une chaîne — et rouvert le
+     * piège d'alias mesuré le 06/09/2026 (`listDomainsForAdmin`), où une
+     * colonne rendue sans son qualificatif comparait une table à elle-même et
+     * rendait `false` sans lever. `db.batch` donne le même aller-retour sans le
+     * piège.
+     */
+    async domainEmptiness(domainId: string): Promise<DomainEmptiness> {
+      await assertAuthority();
+
+      return domainEmptinessOf(domainId);
+    },
+
+    /**
+     * Effacer une entreprise vide — **le seul geste de ce fichier qui ôte une
+     * ligne `domains`**, et il ne l'ôte que si rien n'y a jamais été saisi.
+     *
+     * **Ce n'est pas un écart à la règle 4, et la nuance porte tout le geste.**
+     * La règle protège la donnée métier ; ici il n'y en a aucune, par
+     * construction : `domainEmptiness` refuse dès qu'une des vingt-trois tables
+     * de contenu porte une ligne, ou qu'une personne y a eu un accès. Ce qui
+     * s'efface est ce que l'amorçage a écrit — huit référentiels semés, une
+     * identité vérifiée, une invitation, le journal d'administration —, jamais
+     * ce qu'une main a saisi. Une entreprise peuplée s'archive, et le refus le
+     * dit.
+     *
+     * **`domains` n'entre donc pas dans `DeletableTable`** : celle-ci nomme les
+     * tables dont *une ligne quelconque* s'efface, et rien de tel n'est accordé
+     * ici. Le geste est nommé, pas la table — l'arbitrage humain du 11/09/2026
+     * porte sur *effacer une entreprise vide*, et il ne s'étend pas d'un
+     * caractère.
+     *
+     * **La purge est atomique**, et c'est ce qui la rend sûre sans transaction
+     * interactive : les quatorze instructions sont connues d'avance, donc elles
+     * tiennent dans un `db.batch`, que Neon exécute en une transaction (dette
+     * de T3.6 — elle porte sur l'interactif, pas sur le lot). Si une ligne
+     * apparaissait entre le décompte et la purge, le `delete` final buterait
+     * sur l'une des **trente-six clés `restrict`** qui pointent `domains.id`, et
+     * **rien ne serait effacé**. Le décompte parle, la base tranche : les deux
+     * barrières ne se remplacent pas.
+     *
+     * **Aucune trace n'est écrite, et il n'y a pas de trace à écrire** :
+     * `domain_events.domain_id` est `not null` et `restrict`, le journal part
+     * donc avec l'entreprise qu'il raconte. C'est la disparition de
+     * `deleteProject`, admise pour la même raison — *ce commentaire est la
+     * trace, puisqu'il ne peut pas y en avoir en base*.
+     */
+    async deleteEmptyDomain(
+      domainId: string,
+    ): Promise<"deleted" | "gone" | "account" | "content"> {
+      await assertAuthority();
+
+      /* **Le motif remonte, et il n'est pas un décompte** : l'écran en fait
+         deux refus distincts, et un refus qui ne dirait pas lequel obligerait
+         l'appelant à refaire la lecture pour l'écrire. */
+      const emptiness = await domainEmptinessOf(domainId);
+      if (!emptiness.empty) return emptiness.reason;
+
+      try {
+        const outcomes = (await db.batch([
+          ...PURGED_TABLES.map((table) =>
+            db.delete(anyTable(table)).where(eq(table.domainId, domainId)),
+          ),
+          db
+            .delete(domains)
+            .where(eq(domains.id, domainId))
+            .returning({ id: domains.id }),
+        ] as unknown as Batch)) as unknown as unknown[];
+
+        const removed = outcomes.at(-1) as { id: string }[] | undefined;
+        return removed && removed.length > 0 ? "deleted" : "gone";
+      } catch (error) {
+        /* Une ligne est apparue entre le décompte et la purge : la transaction
+           est défaite, et l'appelant en fait le même message que le refus. */
+        if (isReferenceViolation(error)) {
+          throw new IntegrityError(
+            "Cette entreprise porte des données saisies : elle ne peut pas être supprimée.",
+          );
+        }
+        throw error;
+      }
     },
 
     /**

@@ -73,7 +73,26 @@ vi.mock("next/headers", () => ({
   }),
 }));
 
-vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
+/**
+ * `revalidatePath` **enregistre au lieu de ne rien faire** — T12.4.
+ *
+ * Le mock était muet depuis T9.4, ce qui se défendait tant que l'écran n'avait
+ * qu'une adresse : rien à mesurer sur un appel unique et invariable. Depuis que
+ * les gestes se font **sur la fiche**, il y en a deux, et la seule chose qui
+ * dise que la fiche ne restera pas périmée après un geste est **le relevé des
+ * adresses revalidées**.
+ *
+ * **`vi.hoisted` parce que `vi.mock` est hissé** : la fabrique s'évalue avant
+ * les déclarations du module, et un `const` ordinaire y serait lu avant son
+ * initialisation.
+ */
+const { revalidated } = vi.hoisted(() => ({ revalidated: [] as string[] }));
+
+vi.mock("next/cache", () => ({
+  revalidatePath: (path: string) => {
+    revalidated.push(path);
+  },
+}));
 
 /**
  * `redirect` lève, comme dans Next — et le message porte la destination.
@@ -93,6 +112,7 @@ const {
   addDomainIdentity,
   archiveDomain,
   createDomain,
+  deleteDomain,
   designateDomainManager,
   removeDomainIdentity,
   restoreDomain,
@@ -1745,4 +1765,344 @@ describe("rien n'est journalisé qui n'a pas eu lieu", () => {
       },
     ]);
   });
+});
+
+describe("les deux adresses se rafraîchissent ensemble", () => {
+  /**
+   * **La fiche ne reste pas périmée quand la liste se rafraîchit** — T12.4.
+   *
+   * Depuis que les huit gestes se font **sur la fiche**, c'est elle qui doit
+   * montrer ce qui vient d'être fait : sa ligne de journal, son état, ses trois
+   * faits. Une action qui ne revaliderait que la liste renverrait sur une fiche
+   * d'avant le geste — et le journal d'administration, qui est la réponse à la
+   * question de cet écran, serait le dernier à la voir.
+   *
+   * **Un seul cas, et il parcourt les neuf**, au patron du bloc des traces :
+   * l'ordre est celui d'une vie d'entreprise, et chaque étape laisse l'écran
+   * dans l'état qui rend la suivante légitime. Les découper aurait demandé neuf
+   * domaines jetables et neuf amorçages de référentiels.
+   *
+   * **Ce que le cas mesure, et ce qu'il ne mesure pas.** Il lit les adresses que
+   * l'action **déclare** périmées, pas ce que Next en fait : c'est un contrat
+   * d'appel, et c'est tout ce qu'un test hors serveur peut tenir. La boucle
+   * réelle — un geste fait sur la fiche, sa ligne relue sur cette même fiche —
+   * se mesure par sonde, dans le HTML servi.
+   */
+  test("chacun des neuf gestes revalide la liste et la fiche, et rien d'autre", async () => {
+    asSuperAdministrator();
+
+    const name = `__0__test__domaines__revalidation__${suffix}`;
+    const identity = `revalidation-${suffix}.example`;
+    const second = `revalidation-bis-${suffix}.example`;
+
+    /* Ce qu'un geste déclare périmé, relevé autour de lui seul. Le tri range
+       deux adresses dont l'ordre d'appel n'est pas une propriété. */
+    const paths = async (gesture: () => Promise<unknown>) => {
+      revalidated.length = 0;
+      await gesture();
+      return [...revalidated].sort();
+    };
+
+    /* 1. La création — **la fiche n'existait pas encore quand le geste a
+       commencé**, et l'adresse qu'elle revalide est celle de l'entreprise
+       qu'elle vient d'écrire. */
+    const creation = await paths(() =>
+      createDomain(EMPTY_DOMAIN, domainForm(name, identity)),
+    );
+    const domainId = await createdDomain(name);
+    expect(creation).toEqual(["/domaines", `/domaines/${domainId}`]);
+
+    const both = ["/domaines", `/domaines/${domainId}`];
+
+    /* 2 et 3. L'identité vérifiée, ajoutée puis retirée. */
+    expect(
+      await paths(() =>
+        addDomainIdentity(domainId, EMPTY_IDENTITY, identityForm(second)),
+      ),
+    ).toEqual(both);
+
+    const removed = (
+      await db
+        .select()
+        .from(domainIdentities)
+        .where(
+          and(
+            eq(domainIdentities.domainId, domainId),
+            eq(domainIdentities.value, second),
+          ),
+        )
+    )[0];
+    expect(
+      await paths(() => removeDomainIdentity(domainId, removed!.id)),
+    ).toEqual(both);
+
+    /* 4 et 5. La suspension, puis le rétablissement de l'accès. */
+    expect(await paths(() => suspendDomain(domainId, ...confirm()))).toEqual(
+      both,
+    );
+    expect(await paths(() => resumeDomain(domainId))).toEqual(both);
+
+    /* 6 et 7. La révocation de l'invitation d'amorçage, puis la redésignation. */
+    expect(await paths(() => revokeDomainInvitation(domainId))).toEqual(both);
+    expect(
+      await paths(() =>
+        designateDomainManager(
+          domainId,
+          EMPTY_MANAGER,
+          managerForm(`Nouvelle ${suffix}`, `revalide.${suffix}@${identity}`),
+        ),
+      ),
+    ).toEqual(both);
+
+    /* 8 et 9. Le rangement, puis le rétablissement. */
+    expect(await paths(() => archiveDomain(domainId, ...confirm()))).toEqual(
+      both,
+    );
+    expect(await paths(() => restoreDomain(domainId))).toEqual(both);
+  }, 60_000);
+
+  /**
+   * **Un refus ne revalide rien**, et c'est la contre-épreuve du cas ci-dessus :
+   * sans elle, une revalidation inconditionnelle — posée avant le geste plutôt
+   * qu'après — passerait au vert sur les neuf lignes.
+   *
+   * Les trois refus choisis sortent par trois portes différentes : l'autorité,
+   * l'entreprise inconnue, et la forme de l'identifiant.
+   */
+  test("un geste refusé ne déclare aucune adresse périmée", async () => {
+    const domainId = await seedDomain("revalidation-refus");
+
+    /* Sans autorité : `requireSuperAdmin` redirige, et rien n'est appelé. */
+    asDomainManager();
+    revalidated.length = 0;
+    await expect(restoreDomain(domainId)).rejects.toThrow(REDIRECT);
+    expect(revalidated).toEqual([]);
+
+    asSuperAdministrator();
+
+    /* Une entreprise qui n'existe pas, et un identifiant qui n'est pas un
+       UUID : `openDomain` rend `null` dans les deux cas, et l'action sort avant
+       toute écriture comme avant toute revalidation. */
+    revalidated.length = 0;
+    await restoreDomain("00000000-0000-4000-8000-000000000000");
+    await restoreDomain("pas-un-uuid");
+    expect(revalidated).toEqual([]);
+
+    /* **L'étape témoin** : la même charge, sur l'entreprise qui existe et sous
+       l'autorité, déclare bien ses deux adresses. */
+    revalidated.length = 0;
+    await archiveDomain(domainId, ...confirm());
+    await restoreDomain(domainId);
+    expect([...new Set(revalidated)].sort()).toEqual([
+      "/domaines",
+      `/domaines/${domainId}`,
+    ]);
+  }, 60_000);
+});
+
+/* ==========================================================================
+   La suppression d'une entreprise vide — 12/09/2026
+   ========================================================================== */
+
+describe("une entreprise vide s'efface, et elle seule", () => {
+  /**
+   * Les treize tables de l'amorçage, **plus la ligne du domaine**.
+   *
+   * L'ordre est celui d'`afterAll`, et il n'est pas décoratif : les décomptes
+   * se lisent par le client brut, mais une liste qui oublierait une table
+   * laisserait passer une purge incomplète.
+   */
+  const leftovers = async (domainId: string): Promise<string[]> => {
+    const found: string[] = [];
+    for (const [name, table] of [
+      ["events", events],
+      ["domain_events", domainEvents],
+      ["invitations", invitations],
+      ["persons", persons],
+      ["starters", starters],
+      ["activity_types", activityTypes],
+      ["tools", tools],
+      ["project_statuses", projectStatuses],
+      ["approaches", approaches],
+      ["skill_levels", skillLevels],
+      ["skills", skills],
+      ["jobs", jobs],
+      ["entities", entities],
+      ["domain_identities", domainIdentities],
+    ] as const) {
+      const rows = await db
+        .select()
+        .from(table)
+        .where(eq(table.domainId, domainId));
+      if (rows.length > 0) found.push(name);
+    }
+    if ((await db.select().from(domains).where(eq(domains.id, domainId))).length)
+      found.push("domains");
+    return found;
+  };
+
+  /** Une entreprise créée par l'écran : quatre tables, huit référentiels. */
+  const openedDomain = async (label: string): Promise<string> => {
+    asSuperAdministrator();
+    const name = `__0__test__domaines__${label}__${suffix}`;
+    await createDomain(
+      EMPTY_DOMAIN,
+      domainForm(name, `${label}-${suffix}.example`),
+    );
+    return createdDomain(name);
+  };
+
+  /**
+   * **Les trois identités, et l'étape témoin.** Sans le second temps, un
+   * décompte inchangé ne distinguerait pas un refus d'une charge qui n'aurait de
+   * toute façon rien écrit.
+   *
+   * **Le décompte en base tranche, jamais le code de retour** : les deux
+   * premières identités sortent par une redirection (`requireSuperAdmin`), et
+   * une redirection ne prouve pas qu'aucune ligne n'a été effacée.
+   */
+  test("seul un super administrateur en exercice efface une entreprise", async () => {
+    const domainId = await openedDomain("suppression-droit");
+
+    const before = await leftovers(domainId);
+    expect(before).toContain("domains");
+
+    for (const become of [asNobody, asDomainManager, asArchivedSuperAdmin]) {
+      become();
+      await expect(deleteDomain(domainId, ...confirm())).rejects.toThrow(
+        REDIRECT,
+      );
+      expect(await leftovers(domainId)).toEqual(before);
+    }
+
+    /* L'étape témoin : la **même** charge, sous l'autorité. */
+    asSuperAdministrator();
+    await expect(deleteDomain(domainId, ...confirm())).rejects.toThrow(
+      `${REDIRECT}/domaines`,
+    );
+    expect(await leftovers(domainId)).toEqual([]);
+  }, 60_000);
+
+  /**
+   * **Le tour complet**, et c'est le seul cas qui dise que le geste sert : une
+   * entreprise créée par l'écran — quatre tables, huit référentiels, une
+   * invitation, un journal — ne laisse **rien** derrière elle.
+   */
+  test("une entreprise amorcée s'efface entièrement, journal compris", async () => {
+    const domainId = await openedDomain("suppression-tour");
+
+    expect((await leftovers(domainId)).sort()).toEqual(
+      [
+        "activity_types",
+        "approaches",
+        "domain_events",
+        "domain_identities",
+        "domains",
+        "events",
+        "invitations",
+        "jobs",
+        "persons",
+        "project_statuses",
+        "skill_levels",
+        "skills",
+        "starters",
+        "tools",
+      ].sort(),
+    );
+
+    await expect(deleteDomain(domainId, ...confirm())).rejects.toThrow(
+      `${REDIRECT}/domaines`,
+    );
+
+    expect(await leftovers(domainId)).toEqual([]);
+
+    /* **Le journal part avec l'entreprise**, et rien ne le remplace : c'est la
+       disparition admise de `deleteProject`. Le geste est donc le seul des dix
+       à ne laisser aucune trace, et c'est structurel — `domain_events.domain_id`
+       est `not null`. */
+    expect(
+      (
+        await db
+          .select()
+          .from(domainEvents)
+          .where(eq(domainEvents.domainId, domainId))
+      ).length,
+    ).toBe(0);
+  }, 60_000);
+
+  /**
+   * **Les deux refus, et ils ne disent pas la même chose.** L'un parle d'une
+   * main qui a saisi, l'autre de quelqu'un qui est entré — et chacun nomme le
+   * geste qui reste : *archivez-la*.
+   */
+  test("une entreprise saisie ou habitée refuse, et rien n'est effacé", async () => {
+    /* (1) Une entité — la table qu'aucun amorçage n'écrit. */
+    const saisie = await openedDomain("suppression-saisie");
+    const before = await leftovers(saisie);
+
+    await db
+      .insert(entities)
+      .values({ domainId: saisie, label: `Division ${suffix}` });
+
+    const refusedContent = await deleteDomain(saisie, ...confirm());
+    expect(refusedContent.ok).toBeUndefined();
+    expect(refusedContent.message).toContain("données saisies");
+    expect(refusedContent.message).toContain("Archivez-la");
+    expect((await leftovers(saisie)).sort()).toEqual(
+      [...before, "entities"].sort(),
+    );
+
+    /* (2) Un compte vivant : l'invitation d'amorçage acceptée. */
+    const habitee = await openedDomain("suppression-habitee");
+    const invited = (
+      await db.select().from(persons).where(eq(persons.domainId, habitee))
+    )[0];
+    await db
+      .update(persons)
+      .set({ hasAccess: true, domainRole: "domain_manager" })
+      .where(eq(persons.id, invited!.id));
+
+    const refusedAccount = await deleteDomain(habitee, ...confirm());
+    expect(refusedAccount.ok).toBeUndefined();
+    expect(refusedAccount.message).toContain("Quelqu'un est entré");
+    expect(await leftovers(habitee)).toContain("domains");
+  }, 60_000);
+
+  /**
+   * **Une entreprise inconnue, et une forme qui n'est pas un UUID** : les deux
+   * sortent par `openDomain`, avant toute lecture de vacuité — *une colonne
+   * `uuid` interrogée avec n'importe quoi rend un 500, pas un 404*.
+   */
+  test("un identifiant qui ne désigne rien n'efface rien et ne lève pas", async () => {
+    asSuperAdministrator();
+
+    for (const id of ["00000000-0000-4000-8000-000000000000", "pas-un-uuid"]) {
+      const state = await deleteDomain(id, ...confirm());
+      expect(state.message).toBe("Cette entreprise n'existe plus.");
+    }
+  });
+
+  /**
+   * **La suppression ne revalide que la liste**, et c'est le seul geste des dix
+   * dans ce cas : revalider la fiche ne ferait que la re-rendre en 404 derrière
+   * le panneau (geste de `deleteProject`).
+   *
+   * **Et un refus ne revalide rien** : sans cette moitié, une revalidation
+   * posée avant le geste plutôt qu'après passerait au vert.
+   */
+  test("la suppression déclare la liste périmée, et elle seule", async () => {
+    const refused = await openedDomain("suppression-adresse-refus");
+    await db
+      .insert(entities)
+      .values({ domainId: refused, label: `Division ${suffix}` });
+
+    revalidated.length = 0;
+    await deleteDomain(refused, ...confirm());
+    expect(revalidated).toEqual([]);
+
+    const domainId = await openedDomain("suppression-adresse");
+    revalidated.length = 0;
+    await expect(deleteDomain(domainId, ...confirm())).rejects.toThrow(REDIRECT);
+    expect(revalidated).toEqual(["/domaines"]);
+  }, 60_000);
 });

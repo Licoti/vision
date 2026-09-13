@@ -59,6 +59,7 @@ import {
   activities,
   activityParticipants,
   activityState,
+  domainIdentities,
   domainRole,
   entities,
   indicatorReadings,
@@ -93,6 +94,38 @@ const DOMAIN = {
   name: "Groupe Meridian",
   competenceCenterName: "Centre de compétence Design & Produit",
 };
+
+/**
+ * **L'identité vérifiée du domaine de démonstration** — 11/09/2026.
+ *
+ * **Sans elle, le jeu de démonstration était incohérent** : un domaine sans
+ * aucune ligne `domain_identities` est un domaine qu'**aucun jeton ne
+ * désigne**, donc où personne ne peut ouvrir de session — quand ce même jeu
+ * sème huit personnes dont deux avec un accès. Toute entreprise créée par
+ * l'écran en reçoit une **dans le même geste** (T9.4) ; seule celle-ci, née
+ * avant le SSO, n'en avait pas. Les deux écrans le disaient en toutes lettres,
+ * chacun à sa place — *« Aucune identité — aucun jeton ne la désigne »* sur la
+ * liste, l'état vide du bloc sur la fiche.
+ *
+ * **Provisoire et prouvablement provisoire**, exactement comme `TOOL_BASE_URLS`
+ * ci-dessous et pour la même raison : `example.com` est le domaine réservé à la
+ * documentation (RFC 2606), et un sous-domaine en est la seule forme qui soit
+ * plausible dans sa structure **et** incapable d'atteindre un tiers réel par
+ * accident. Une identité vérifiée est un nom de domaine nu, jamais une URL.
+ *
+ * **`google` parce que c'est le seul fournisseur branché** : Entra ID est écrit
+ * et n'a ni `ENTRA_CLIENT_ID` ni secret (`ETAT.md`). Semer un fournisseur qu'on
+ * ne peut pas éprouver serait semer une promesse.
+ *
+ * **Ce qui reste ouvert, et qui n'est pas de ce geste** : les huit personnes du
+ * brief n'ont **aucune adresse** — `email` est nul, le brief n'en donne pas —,
+ * si bien que le domaine est *désigné* sans être encore *connectable*. La
+ * seconde moitié du point ouvert tient toujours.
+ */
+const DOMAIN_IDENTITY = {
+  provider: "google",
+  value: "meridian.example.com",
+} as const;
 
 /** Brief §7. */
 const ENTITIES = [
@@ -729,6 +762,39 @@ async function seed(): Promise<void> {
   record("domains", existingDomain ? "unchanged" : "created");
 
   const scope = forDomain({ domainId: domain.id, actorId: null });
+
+  /* --- L'identité vérifiée ----------------------------------------------- */
+
+  /* **Elle vient juste après le domaine**, et avant tout le reste : c'est
+     l'ordre de l'écran au-dessus des domaines, où la création pose le domaine
+     puis son identité avant d'amorcer quoi que ce soit.
+
+     **La confrontation précède l'écriture**, comme dans `createDomain` :
+     `domain_identities_provider_value_unique` est **globale**, pas bornée au
+     domaine. Sans elle, une seconde exécution après qu'un autre domaine a pris
+     la même valeur ferait lever la couche au lieu de dire ce qui se passe.
+
+     **Rejouable** : `findDomainIdentity` compare en minuscules, donc la
+     deuxième exécution reconnaît la ligne et ne réécrit rien. Une identité
+     rattachée **ailleurs** n'est ni déplacée ni effacée — la règle 4 vaut aussi
+     pour un rattachement —, elle est dite. */
+  const takenIdentity = await superAdmin.findDomainIdentity(
+    DOMAIN_IDENTITY.provider,
+    DOMAIN_IDENTITY.value,
+  );
+
+  if (!takenIdentity) {
+    await scope.insert(domainIdentities, { ...DOMAIN_IDENTITY });
+    record("domain_identities", "created");
+  } else if (takenIdentity.domainId === domain.id) {
+    record("domain_identities", "unchanged");
+  } else {
+    record("domain_identities", "unchanged");
+    console.warn(
+      `  ⚠ « ${DOMAIN_IDENTITY.value} » est rattachée à une autre entreprise : ` +
+        "rien n'a été touché, et le domaine de démonstration reste sans identité vérifiée.",
+    );
+  }
 
   /* --- Les référentiels -------------------------------------------------- */
 

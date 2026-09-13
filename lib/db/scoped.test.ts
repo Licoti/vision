@@ -13,7 +13,7 @@
  * test passent par la couche.
  */
 
-import { and, eq, inArray, like, sql } from "drizzle-orm";
+import { and, eq, getTableName, inArray, like, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { db } from "./client";
@@ -23,6 +23,7 @@ import {
   DOMAIN_EVENTS_LIMIT,
   SuperAdminRequiredError,
   asSuperAdmin,
+  domainContentTables,
   forDomain,
   superAdmin,
   withoutAnySession,
@@ -59,6 +60,7 @@ import {
   results,
   skillLevels,
   skills,
+  starters,
   superAdmins,
   tools,
 } from "./schema";
@@ -1265,7 +1267,7 @@ describe("superAdmin", () => {
       "listDomains",
     ]);
 
-    /* **Neuf clés, dont quatre lisent** — et c'est le déplacement de frontière
+    /* **Onze clés, dont cinq lisent** — et c'est le déplacement de frontière
        ci-dessus, rendu constatable. Les trois écritures de T9.4 ne touchent que
        `domains` : suspendre, ranger, rétablir. **Aucun `updateDomain`**, et ce
        n'est pas un oubli — la fiche de T9.4 ne liste pas le renommage, et trois
@@ -1276,10 +1278,20 @@ describe("superAdmin", () => {
        rangée sans hésitation : elle ne tourne pas pendant la connexion, et elle
        dit ce qu'on a fait d'une entreprise. La poser sur `superAdmin` aurait
        ouvert le côté ouvert à une lecture qui n'a rien à y faire — et c'est
-       exactement ce que ces deux listes servent à empêcher. */
+       exactement ce que ces deux listes servent à empêcher.
+
+       **Les deux dernières sont la purge d'une entreprise vide** (12/09/2026),
+       et **le sceau a fait ce qu'on lui demande** : il les a arrêtées, elles
+       sont entrées par une décision. `domainEmptiness` lit — vingt-quatre
+       sondes d'existence, aucune donnée —, `deleteEmptyDomain` écrit, et c'est
+       la seule écriture du produit qui **ôte** une ligne `domains`. Elle est du
+       côté fermé pour la raison des trois autres : l'autorité y est relue, et
+       un grant forgé ne vaut rien. */
     expect(Object.keys(outsideAnySession).sort()).toEqual([
       "archiveDomain",
       "createDomain",
+      "deleteEmptyDomain",
+      "domainEmptiness",
       "listDomainEvents",
       "listDomainIdentities",
       "listDomainsForAdmin",
@@ -2554,5 +2566,329 @@ describe("le journal d'administration", () => {
     await expect(
       asSuperAdmin(grant).listDomainEvents(a.domainId),
     ).rejects.toThrow(SuperAdminRequiredError);
+  });
+});
+
+/* ==========================================================================
+   La purge d'une entreprise vide — 12/09/2026
+   ========================================================================== */
+
+describe("une entreprise vide s'efface, et elle seule", () => {
+  /** Une autorité vivante, jetable. */
+  async function purger(label: string): Promise<SuperAdminGrant> {
+    const { row } = await outsideAnySession.upsertSuperAdmin({
+      email: `purge-${label}.${suffix}@exemple.test`,
+      fullName: `Purge ${label} ${suffix}`,
+    });
+    return { kind: "super_admin", superAdminId: row.id };
+  }
+
+  /**
+   * Une entreprise **amorcée** : ce qu'une création par l'écran laisse derrière
+   * elle, et rien de plus.
+   *
+   * Les tables choisies sont celles dont l'ordre de purge est contraint —
+   * l'invitation retient la personne en `restrict`, la piste et le type
+   * d'activité pointent l'outil. Un ordre faux ne rendrait pas un test vert.
+   */
+  async function bootstrapped(label: string): Promise<{ id: string }> {
+    const domain = await outsideAnySession.createDomain({
+      name: `__test__purge-${label}__${suffix}`,
+      competenceCenterName: `Centre ${label}`,
+    });
+    const scope = forDomain({ domainId: domain.id });
+
+    await scope.insert(domainIdentities, {
+      provider: "google",
+      value: `purge-${label}-${suffix}.example`,
+    });
+    await scope.insert(domainEvents, { summary: `Entreprise créée : ${label}` });
+
+    const tool = await scope.insert(tools, { name: "Ergonome", kind: "audit" });
+    await scope.insert(starters, {
+      label: "Piste",
+      summary: "Ce que la piste permet.",
+      kind: "tool",
+      toolId: tool.id,
+    });
+    await scope.insert(activityTypes, {
+      label: "Atelier",
+      family: "design",
+      defaultToolId: tool.id,
+    });
+    await scope.insert(jobs, { label: "Product Design" });
+    await scope.insert(skills, { label: "UX Research" });
+    await scope.insert(skillLevels, { label: "Débutant", rank: 1 });
+    await scope.insert(approaches, { label: "Research" });
+    await scope.insert(projectStatuses, { label: "En cours", nature: "active" });
+
+    /* **La personne de l'amorçage n'a pas d'accès** (arbitrage (9) de C11) :
+       c'est l'acceptation du lien qui pose le couple. */
+    const invited = await scope.insert(persons, {
+      fullName: `Invité ${label}`,
+      email: `invite-${label}.${suffix}@exemple.test`,
+      source: "manual",
+      kind: "center",
+    });
+    await scope.insert(invitations, {
+      personId: invited.id,
+      email: `invite-${label}.${suffix}@exemple.test`,
+      role: "domain_manager",
+      tokenHash: `empreinte-${label}-${suffix}`,
+      expiresAt: new Date(Date.now() + 900_000),
+    });
+    await scope.record({
+      verb: "created",
+      targetType: "person",
+      targetId: invited.id,
+      summary: `Personne créée : Invité ${label}`,
+    });
+
+    return { id: domain.id };
+  }
+
+  /**
+   * L'ordre de balayage de ce bloc — **`teardownOrder` n'a pas `starters`**,
+   * qu'aucune fixture de ce fichier n'écrit ; la purge, elle, en pose une.
+   * Elle passe en tête : rien ne la référence, et elle pointe `tools`.
+   */
+  const purgeOrder: ScopedTable[] = [starters, ...teardownOrder];
+
+  /** Les lignes que ce domaine porte encore, table par table. */
+  async function remaining(id: string): Promise<Record<string, number>> {
+    const counts: Record<string, number> = {};
+    for (const table of purgeOrder) {
+      const rows = await db.select().from(table).where(eq(table.domainId, id));
+      if (rows.length > 0) counts[getTableName(table)] = rows.length;
+    }
+    const self = await db.select().from(domains).where(eq(domains.id, id));
+    if (self.length > 0) counts["domains"] = self.length;
+    return counts;
+  }
+
+  async function drop(id: string): Promise<void> {
+    for (const table of purgeOrder) {
+      await db.delete(table).where(eq(table.domainId, id));
+    }
+    await db.delete(domains).where(eq(domains.id, id));
+  }
+
+  afterAll(async () => {
+    await db.delete(superAdmins).where(like(superAdmins.email, `purge-%${suffix}%`));
+  });
+
+  /**
+   * **Le cliquet.** La liste des tables qui retiennent une entreprise est
+   * dérivée du schéma : une table ajoutée demain y entre d'elle-même, du côté
+   * qui **refuse** la suppression. Ce décompte figé est ce qui fait qu'on le
+   * **sait** — s'il tombe, une table est née, et il faut dire si elle retient
+   * (rien à faire, elle y est déjà) ou si l'amorçage l'écrit (elle rejoint
+   * `PURGED_TABLES`).
+   */
+  test("les tables qui retiennent une entreprise sont dérivées du schéma", () => {
+    const names = domainContentTables().map((table) => getTableName(table));
+
+    expect(names).toHaveLength(23);
+
+    /* Ce qu'une main saisit retient. */
+    expect(names).toContain("products");
+    expect(names).toContain("projects");
+    expect(names).toContain("entities");
+    expect(names).toContain("activities");
+
+    /* Ce que l'amorçage écrit ne retient pas — c'est ce que la purge efface. */
+    expect(names).not.toContain("jobs");
+    expect(names).not.toContain("tools");
+    expect(names).not.toContain("invitations");
+    expect(names).not.toContain("persons");
+    expect(names).not.toContain("domain_events");
+    expect(names).not.toContain("domain_identities");
+
+    /* Et ce qui vit au-dessus des domaines n'est pas scopé du tout. */
+    expect(names).not.toContain("domains");
+    expect(names).not.toContain("super_admins");
+  });
+
+  test("une entreprise amorcée est vide, une entreprise saisie ne l'est plus", async () => {
+    const grant = await purger("lecture");
+    const { id } = await bootstrapped("lecture");
+    const reader = asSuperAdmin(grant);
+
+    try {
+      expect(await reader.domainEmptiness(id)).toEqual({ empty: true });
+
+      /* Une entité, et le verdict change : c'est la table qu'aucun amorçage
+         n'écrit — *semer l'organigramme d'un client serait l'inventer*. */
+      const entity = await forDomain({ domainId: id }).insert(entities, {
+        label: `Division ${suffix}`,
+      });
+      expect(await reader.domainEmptiness(id)).toEqual({
+        empty: false,
+        reason: "content",
+      });
+
+      /* **Même archivée, elle retient** : la règle 4 protège la donnée métier,
+         et l'archivage ne la fait pas disparaître. */
+      await forDomain({ domainId: id }).archive(entities, entity.id);
+      expect(await reader.domainEmptiness(id)).toEqual({
+        empty: false,
+        reason: "content",
+      });
+    } finally {
+      await drop(id);
+    }
+  });
+
+  /**
+   * **Le compte prime sur le contenu**, et l'ordre n'est pas indifférent : les
+   * deux refus ne disent pas la même chose à l'écran — *quelqu'un est entré*
+   * n'est pas *une main a saisi*.
+   */
+  test("une entreprise où quelqu'un est entré n'est jamais vide", async () => {
+    const grant = await purger("compte");
+    const { id } = await bootstrapped("compte");
+    const reader = asSuperAdmin(grant);
+
+    try {
+      const person = await forDomain({ domainId: id }).insert(persons, {
+        fullName: `Entrée ${suffix}`,
+        source: "manual",
+        kind: "center",
+        hasAccess: true,
+        domainRole: "domain_manager",
+      });
+      expect(await reader.domainEmptiness(id)).toEqual({
+        empty: false,
+        reason: "account",
+      });
+
+      /* **L'archivage ne défait pas le fait** — et c'est l'écart voulu avec le
+         `hasAccount` de la liste, qui écarte les archivées parce qu'il répond à
+         *« quelqu'un peut-il entrer aujourd'hui »*. */
+      await forDomain({ domainId: id }).archive(persons, person.id);
+      expect(await reader.domainEmptiness(id)).toEqual({
+        empty: false,
+        reason: "account",
+      });
+    } finally {
+      await drop(id);
+    }
+  });
+
+  test("la purge efface les treize tables de l'amorçage, et la ligne du domaine", async () => {
+    const grant = await purger("effacement");
+    const { id } = await bootstrapped("effacement");
+
+    /* **L'étape témoin** : sans elle, « plus rien » ne distinguerait une purge
+       d'un domaine qui n'avait jamais rien porté. */
+    const before = await remaining(id);
+    expect(before).toEqual({
+      domains: 1,
+      domain_identities: 1,
+      domain_events: 1,
+      events: 1,
+      invitations: 1,
+      persons: 1,
+      starters: 1,
+      activity_types: 1,
+      tools: 1,
+      project_statuses: 1,
+      approaches: 1,
+      skill_levels: 1,
+      skills: 1,
+      jobs: 1,
+    });
+
+    expect(await asSuperAdmin(grant).deleteEmptyDomain(id)).toBe("deleted");
+    expect(await remaining(id)).toEqual({});
+
+    /* Le second passage ne trouve plus rien à effacer, et le dit. */
+    expect(await asSuperAdmin(grant).deleteEmptyDomain(id)).toBe("gone");
+  });
+
+  /**
+   * **Le refus n'efface rien, et c'est la mesure qui compte** : un geste qui
+   * purgerait les référentiels avant de buter sur le domaine laisserait une
+   * entreprise vivante et amputée — pire que de ne rien faire.
+   */
+  test("une entreprise saisie refuse la purge, et rien n'est effacé", async () => {
+    const grant = await purger("refus");
+    const { id } = await bootstrapped("refus");
+
+    try {
+      await forDomain({ domainId: id }).insert(entities, {
+        label: `Division ${suffix}`,
+      });
+      const before = await remaining(id);
+
+      expect(await asSuperAdmin(grant).deleteEmptyDomain(id)).toBe("content");
+      expect(await remaining(id)).toEqual(before);
+    } finally {
+      await drop(id);
+    }
+  });
+
+  /**
+   * **Ce qui rend la purge sûre sans transaction interactive.**
+   *
+   * Le décompte parle, la base tranche : si une ligne apparaissait entre les
+   * deux, le `delete` final buterait sur l'une des trente-six clés `restrict`
+   * qui pointent `domains.id`. Ce cas mesure la propriété **sur le pilote**,
+   * puisque c'est elle qu'on invoque : un lot est une transaction, et une
+   * instruction qui échoue défait celles d'avant.
+   *
+   * `neon-http` n'offre pas de transaction **interactive** (dette de T3.6) —
+   * c'est l'interactif qui manque, pas le lot.
+   */
+  test("un lot dont la dernière instruction échoue n'efface rien", async () => {
+    const { id } = await bootstrapped("atomicite");
+
+    try {
+      await forDomain({ domainId: id }).insert(entities, {
+        label: `Retient ${suffix}`,
+      });
+
+      await expect(
+        db.batch([
+          db.delete(jobs).where(eq(jobs.domainId, id)),
+          db.delete(domains).where(eq(domains.id, id)),
+        ]),
+      ).rejects.toThrow();
+
+      /* La première instruction du lot est défaite avec la seconde. */
+      expect(
+        (await db.select().from(jobs).where(eq(jobs.domainId, id))).length,
+      ).toBe(1);
+      expect(
+        (await db.select().from(domains).where(eq(domains.id, id))).length,
+      ).toBe(1);
+    } finally {
+      await drop(id);
+    }
+  });
+
+  test("sans autorité vivante, une entreprise ne se lit ni ne s'efface", async () => {
+    const { id } = await bootstrapped("autorite");
+    const forged: SuperAdminGrant = {
+      kind: "super_admin",
+      superAdminId: crypto.randomUUID(),
+    };
+
+    try {
+      await expect(asSuperAdmin(forged).domainEmptiness(id)).rejects.toThrow(
+        SuperAdminRequiredError,
+      );
+      await expect(asSuperAdmin(forged).deleteEmptyDomain(id)).rejects.toThrow(
+        SuperAdminRequiredError,
+      );
+      expect((await remaining(id)).domains).toBe(1);
+
+      /* **L'étape témoin** : la même charge sous une autorité vivante efface. */
+      const grant = await purger("autorite");
+      expect(await asSuperAdmin(grant).deleteEmptyDomain(id)).toBe("deleted");
+      expect(await remaining(id)).toEqual({});
+    } finally {
+      await drop(id);
+    }
   });
 });

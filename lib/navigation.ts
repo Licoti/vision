@@ -646,6 +646,13 @@ export const DELETE_PANEL_CONFIRM = "confirmation";
    page : ce qui interdirait le réemploi serait deux sens sur un **même** écran,
    jamais deux écrans qui rangent chacun leur objet.
 
+   **Cinq des six clés ont changé d'écran en T12.4**, sans changer de nom ni de
+   forme : elles s'ouvrent désormais sur la **fiche** d'une entreprise, et la
+   liste ne garde que `domaine=nouveau`, le seul geste qui ne vise aucune ligne.
+   Ce sont les constructeurs de `ROUTES` qui portent le déménagement ; les
+   constantes ci-dessous n'ont pas bougé d'un caractère — une clé d'ouverture ne
+   dit pas quel écran la sert.
+
    **Aucune clé de correction sur cet écran-ci**, et la phrase a changé de
    portée avec T11.5. Elle disait *« la couche n'expose aucun `updateDomain` »* :
    elle en expose un depuis, mais il vit sur `ScopedDb` et n'écrit que **trois
@@ -687,9 +694,12 @@ export const DOMAIN_PANEL_EDIT = "modifier";
 /**
  * Le panneau des **identités vérifiées** d'une entreprise.
  *
- * La valeur porte l'identifiant du domaine : `/domaines` n'a pas d'objet de
- * page, comme `/administration` et `/equipe`. Le panneau lit, ajoute et retire
- * — un seul droit gouverne l'écran, il n'y a donc rien à séparer en deux clés.
+ * La valeur porte l'identifiant du domaine — elle le portait parce que
+ * `/domaines` n'a pas d'objet de page, et elle le garde depuis T12.4 pour une
+ * autre raison, dite au bloc des routes : la résolution confronte ce qu'elle
+ * reçoit, et la fiche refuse une clé qui ne désigne pas son objet. Le panneau
+ * lit, ajoute et retire — un seul droit gouverne l'écran, il n'y a donc rien à
+ * séparer en deux clés.
  */
 export const DOMAIN_IDENTITIES_PANEL_PARAM = "identites";
 
@@ -1392,29 +1402,69 @@ export const ROUTES = {
    * coquille suppose une session de domaine, qu'un super administrateur n'a pas.
    */
   domain: (domainId: string) => `/domaines/${domainId}`,
-  /** L'écran, panneau de création ouvert. Un paramètre, pas un écran de plus. */
-  domainNew: `/domaines?${DOMAIN_PANEL_PARAM}=${DOMAIN_PANEL_NEW}`,
-  /** L'écran, panneau des identités ouvert sur une entreprise. */
-  domainIdentities: (domainId: string) =>
-    `/domaines?${DOMAIN_IDENTITIES_PANEL_PARAM}=${domainId}`,
-  /** L'écran, panneau d'ajout d'une identité ouvert sur une entreprise. */
-  domainIdentityNew: (domainId: string) =>
-    `/domaines?${DOMAIN_IDENTITY_PANEL_PARAM}=${domainId}`,
-  /** L'écran, panneau du premier responsable ouvert sur une entreprise. */
-  domainManager: (domainId: string) =>
-    `/domaines?${DOMAIN_MANAGER_PANEL_PARAM}=${domainId}`,
-  /** L'écran, confirmation de suspension ouverte sur une entreprise. */
-  domainSuspend: (domainId: string) =>
-    `/domaines?${DOMAIN_STATUS_PANEL_PARAM}=${domainId}`,
   /**
-   * L'écran, confirmation d'archivage ouverte sur une entreprise — **cinquième
-   * page à reprendre le couple `ConfirmPanel` + `ARCHIVE_PANEL_PARAM`**.
+   * **La liste**, panneau de création ouvert. Un paramètre, pas un écran de plus.
+   *
+   * **La seule des six adresses de panneau qui reste sur la liste**, et c'est
+   * l'arbitrage (1) de `tickets-C12.md` : ajouter une entreprise est le seul
+   * geste qui **ne vise aucune ligne**. Les cinq autres visent une entreprise,
+   * et un geste qui vise une entreprise se fait là où elle est nommée.
+   */
+  domainNew: `/domaines?${DOMAIN_PANEL_PARAM}=${DOMAIN_PANEL_NEW}`,
+  /* ------------------------------------------------------------------------
+     Les six panneaux ciblés — **cinq sur la fiche depuis T12.4**, le sixième
+     né sur elle le 12/09/2026, et la clé garde son identifiant.
+
+     **Le déménagement est un changement d'hôte, pas de résolution**
+     (`lib/drawers/domains.tsx`) : la même demande, la même vérification de
+     forme, la même relecture de ligne. Ce qui change est l'écran qui sert
+     l'adresse — et avec lui le `closeHref` d'un panneau, qui est désormais la
+     fiche.
+
+     **La clé répète l'identifiant que le chemin porte déjà**, et c'est un
+     choix : la résolution **confronte ce qu'elle reçoit**, et le retirer
+     demanderait une seconde forme de `DomainDrawerRequest` — donc une règle à
+     deux endroits. En contrepartie, la fiche **refuse une clé qui ne désigne
+     pas son objet** : sur la fiche de A, `?identites=<B>` n'ouvre rien.
+     ------------------------------------------------------------------------ */
+  /** La fiche, panneau des identités ouvert. */
+  domainIdentities: (domainId: string) =>
+    `/domaines/${domainId}?${DOMAIN_IDENTITIES_PANEL_PARAM}=${domainId}`,
+  /** La fiche, panneau d'ajout d'une identité ouvert. */
+  domainIdentityNew: (domainId: string) =>
+    `/domaines/${domainId}?${DOMAIN_IDENTITY_PANEL_PARAM}=${domainId}`,
+  /** La fiche, panneau du premier responsable ouvert. */
+  domainManager: (domainId: string) =>
+    `/domaines/${domainId}?${DOMAIN_MANAGER_PANEL_PARAM}=${domainId}`,
+  /** La fiche, confirmation de suspension ouverte. */
+  domainSuspend: (domainId: string) =>
+    `/domaines/${domainId}?${DOMAIN_STATUS_PANEL_PARAM}=${domainId}`,
+  /**
+   * La fiche, confirmation d'archivage ouverte — **cinquième page à reprendre le
+   * couple `ConfirmPanel` + `ARCHIVE_PANEL_PARAM`**.
    *
    * La valeur porte l'identifiant, comme `teamPersonArchive` et à la différence
-   * de `productArchive` : cet écran n'a pas d'objet de page.
+   * de `productArchive` : la fiche a pourtant un objet de page, et la clé
+   * pourrait s'en passer — voir le commentaire ci-dessus, qui dit pourquoi elle
+   * ne s'en passe pas.
    */
   domainArchive: (domainId: string) =>
-    `/domaines?${ARCHIVE_PANEL_PARAM}=${domainId}`,
+    `/domaines/${domainId}?${ARCHIVE_PANEL_PARAM}=${domainId}`,
+  /**
+   * La fiche, confirmation de **suppression** ouverte — 12/09/2026, hors ticket.
+   *
+   * **`supprimer` sert ici sa quatrième page**, après l'entité, la personne et
+   * l'accompagnement, et la valeur porte l'identifiant comme sur les trois
+   * autres clés ciblées de cette fiche. Ce qu'interdirait le réemploi serait
+   * deux sens sur un même écran ; il n'y en a qu'un — *effacer, et cela ne se
+   * défait pas*.
+   *
+   * **Elle n'ouvre que sur une entreprise vide**, et ce n'est pas cette route
+   * qui le tient : `resolveDomainDrawer` relit l'autorité puis l'état de
+   * l'entreprise, et `deleteDomain` refait la lecture sur ce qu'elle reçoit.
+   */
+  domainDelete: (domainId: string) =>
+    `/domaines/${domainId}?${DELETE_PANEL_PARAM}=${domainId}`,
   /**
    * La page publique d'une invitation — T11.2, **seule adresse de Vision qui
    * s'ouvre sans session**, avec l'écran d'entrée.
